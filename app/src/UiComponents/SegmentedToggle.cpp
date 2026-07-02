@@ -107,8 +107,19 @@ void SegmentedToggle::mousePressEvent(QMouseEvent* event)
 {
 	if (event->button() == Qt::LeftButton)
 	{
-		// Clicking anywhere toggles the switch - intentional.
-		m_current = m_current == 0 ? 1 : 0;
+		if (m_segments.size() == 2)
+		{
+			// Clicking anywhere toggles the switch - intentional
+			m_current = m_current == 0 ? 1 : 0;
+		}
+		else
+		{
+			const int clickedSegment = segmentAt(event->pos());
+			if (clickedSegment == -1 || clickedSegment == m_current)
+				return;
+
+			m_current = clickedSegment;
+		}
 
 		update();
 		emit currentChanged(m_current);
