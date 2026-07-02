@@ -142,15 +142,17 @@ still has a usable (if `!isValid()`) id, so even that case stays clean.
 
 ### Batched writes (`Catalog::BatchScope`)
 
-Each `addMediaItem`/`applyRename`/`addLabel` writes through to `MetadataStore` immediately by default — fine for
-a single interactive action, but a loop over many items (the legacy seed, a drag-drop batch, re-export-all,
-the Best/extra-label flush after a Quick Import session) would otherwise re-serialize the *entire* store on
-every single call, making an n-item loop write O(n²) bytes overall. `Catalog::BatchScope` is an RAII guard
-— construct one at the top of such a loop — that defers the physical write until the **outermost** scope is
-destroyed (nests freely), collapsing the whole loop into one write. It forwards to
-`MetadataStore::beginBatch()`/`endBatch()` (not meant to be called directly — see
-[data-model.md](data-model.md)). Used by the multi-item loops: the legacy seed, Quick Import's batch import,
-re-export-all, and the post-Import Best/extra-label flush.
+Every Catalog mutation writes the store through its own `MetadataStore::Writer` (see
+[data-model.md](data-model.md)) — so a multi-field mutation (`addMediaItem`, `addPhoto`, `applyRename`,
+`relinkPlaceholder`, the relocate path) hits disk as **one atomic write of the finished record state**, never
+a partially-updated one, and each single mutation is one write. But a loop over many items (the legacy seed,
+a drag-drop batch, re-export-all, the Best/extra-label flush after a Quick Import session) would still
+re-serialize the *entire* store once per call, making an n-item loop write O(n²) bytes overall.
+`Catalog::BatchScope` is an RAII guard — construct one at the top of such a loop — that defers the physical
+write until the **outermost** scope is destroyed (nests freely), collapsing the whole loop into one write.
+It simply owns a Writer it never writes through; the mutations' own nested Writers coalesce into it. Used by
+the multi-item loops: the legacy seed, Quick Import's batch import, re-export-all, and the post-Import
+Best/extra-label flush.
 
 ## Registry mutations (the label objects themselves)
 

@@ -200,7 +200,7 @@ void Catalog::writeStoredLabelIds(const MediaId& id, const QStringList& labelIds
 	QJsonArray arr;
 	for (const QString& labelId : labelIds)
 		arr.append(labelId);
-	MetadataStore::instance().set(id, kLabelsField, arr);
+	MetadataStore::instance().beginBatch().set(id, kLabelsField, arr);  // single write; the temporary Writer flushes right here (or joins an enclosing batch)
 }
 
 // --- Folder helpers ------------------------------------------------------------------------------------
@@ -414,16 +414,6 @@ void Catalog::removeLabel(const MediaId& id, const QString& labelId)
 	}
 }
 
-Catalog::BatchScope::BatchScope()
-{
-	MetadataStore::instance().beginBatch();
-}
-
-Catalog::BatchScope::~BatchScope()
-{
-	MetadataStore::instance().endBatch();
-}
-
 // --- Media item lifecycle ------------------------------------------------------------------------------
 
 bool Catalog::addMediaItem(const MediaId& id, const QString& sourcePath, const QString& folderAbs, bool splitIntoFrames)
@@ -446,10 +436,10 @@ bool Catalog::addMediaItem(const MediaId& id, const QString& sourcePath, const Q
 		return false;
 	}
 
-	MetadataStore& store = MetadataStore::instance();
-	store.set(id, kSourcePathField, sourcePath);
-	store.set(id, kFolderField, relativeFolder(folderAbs));
-	store.set(id, kSplitIntoFramesField, splitIntoFrames);
+	MetadataStore::Writer writer = MetadataStore::instance().beginBatch();  // one atomic disk write for the whole record update
+	writer.set(id, kSourcePathField, sourcePath);
+	writer.set(id, kFolderField, relativeFolder(folderAbs));
+	writer.set(id, kSplitIntoFramesField, splitIntoFrames);
 
 	if (ensureFolderLabelExists(collectionNameOf(folderAbs)))
 		saveRegistry();
@@ -482,11 +472,11 @@ bool Catalog::addPhoto(const MediaId& id, const QString& sourcePath, const QStri
 		return false;
 	}
 
-	MetadataStore& store = MetadataStore::instance();
-	store.set(id, kSourcePathField, sourcePath);
-	store.set(id, kFolderField, relativeFolder(labelDirAbs));
-	store.set(id, kTypeField, kPhotoTypeValue.toString());
-	store.set(id, kReferencedField, referenced);  // always written, so a re-import under the other mode can't leave a stale flag
+	MetadataStore::Writer writer = MetadataStore::instance().beginBatch();  // one atomic disk write for the whole record update
+	writer.set(id, kSourcePathField, sourcePath);
+	writer.set(id, kFolderField, relativeFolder(labelDirAbs));
+	writer.set(id, kTypeField, kPhotoTypeValue.toString());
+	writer.set(id, kReferencedField, referenced);  // always written, so a re-import under the other mode can't leave a stale flag
 
 	if (!labelDirAbs.isEmpty() && ensureFolderLabelExists(QFileInfo(labelDirAbs).fileName()))
 		saveRegistry();
@@ -503,7 +493,7 @@ bool Catalog::addPhoto(const MediaId& id, const QString& sourcePath, const QStri
 
 void Catalog::removeMediaItem(const MediaId& id)
 {
-	MetadataStore::instance().remove(id);
+	MetadataStore::instance().beginBatch().remove(id);
 	_mediaItems.remove(id);
 }
 
@@ -518,10 +508,10 @@ bool Catalog::applyRename(const MediaId& oldId, const MediaId& newId, const QStr
 		return false;
 	}
 
-	MetadataStore& store = MetadataStore::instance();
-	store.rekey(oldId, newId);  // no-op when ids are equal; carries loop intervals + labels to the new identity
-	store.set(newId, kSourcePathField, newSourcePath);
-	store.set(newId, kFolderField, relativeFolder(newFolderAbs));
+	MetadataStore::Writer writer = MetadataStore::instance().beginBatch();  // one atomic disk write for the re-key + field updates
+	writer.rekey(oldId, newId);  // no-op when ids are equal; carries loop intervals + labels to the new identity
+	writer.set(newId, kSourcePathField, newSourcePath);
+	writer.set(newId, kFolderField, relativeFolder(newFolderAbs));
 
 	Entry e = _mediaItems.value(oldId);  // carries splitIntoFrames/type/referenced across the re-key
 	_mediaItems.remove(oldId);
@@ -641,11 +631,12 @@ bool Catalog::relinkPlaceholder(const MediaId& placeholderId, const QString& con
 
 	const bool splitIntoFrames = placeholderEntry->splitIntoFrames;
 
-	MetadataStore& store = MetadataStore::instance();
-	store.remove(placeholderId);
-	store.set(realId, kSourcePathField, confirmedSourcePath);
-	store.set(realId, kFolderField, relativeFolder(folderAbs));
-	store.set(realId, kSplitIntoFramesField, splitIntoFrames);
+	// One atomic disk write for the remove + record rebuild (writeStoredLabelIds' own Writer nests into this one).
+	MetadataStore::Writer writer = MetadataStore::instance().beginBatch();
+	writer.remove(placeholderId);
+	writer.set(realId, kSourcePathField, confirmedSourcePath);
+	writer.set(realId, kFolderField, relativeFolder(folderAbs));
+	writer.set(realId, kSplitIntoFramesField, splitIntoFrames);
 	writeStoredLabelIds(realId, labels);
 
 	_mediaItems.remove(placeholderId);
@@ -696,6 +687,11 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, const QString& removedLa
 		return;
 	}
 
+	// One atomic disk write for everything below (the stored-id strip's own Writer nests into this one);
+	// opened before the branch so the photo path can write through it too. An early return on a failed
+	// move just closes it with nothing written.
+	MetadataStore::Writer writer = MetadataStore::instance().beginBatch();
+
 	// The disk move: a video relocates its whole frame folder into the destination's collection folder; an
 	// owned photo relocates its file into the destination's label dir under <root>/Photos, and its folder
 	// field is that dir. (Referenced photos never reach here - they have no storage label to remove.)
@@ -716,7 +712,7 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, const QString& removedLa
 			return;
 		}
 		// Unlike a video's, an owned photo's source path moves along with its storage - persist it too.
-		MetadataStore::instance().set(id, kSourcePathField, newFilePath);
+		writer.set(id, kSourcePathField, newFilePath);
 		entryIt->sourcePath = newFilePath;
 		newFolderAbs = destDir;
 	}
@@ -747,7 +743,7 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, const QString& removedLa
 		writeStoredLabelIds(id, ids);
 
 	// Persist the new folder and update the model entry in place.
-	MetadataStore::instance().set(id, kFolderField, relativeFolder(newFolderAbs));
+	writer.set(id, kFolderField, relativeFolder(newFolderAbs));
 	entryIt->folder   = newFolderAbs;
 	entryIt->labelIds = computeLabelIds(id, *entryIt);
 }
@@ -816,8 +812,7 @@ bool Catalog::renameLabel(const QString& labelId, const QString& newDisplayName)
 	// before re-deriving the model (otherwise rebuildIndex would re-seed a stale oldName folder label).
 	// Case-insensitive, like labelIdForFolderName: a stored folder whose case drifted from the label's display
 	// name still just moved on disk, and skipping it here would leave its stored path pointing at the old name.
-	MetadataStore& store = MetadataStore::instance();
-	BatchScope batch;  // one store write for the whole rewrite loop instead of one per item
+	MetadataStore::Writer writer = MetadataStore::instance().beginBatch();  // one store write for the whole rewrite loop instead of one per item
 	for (auto it = _mediaItems.cbegin(); it != _mediaItems.cend(); ++it)
 	{
 		if (storageLabelNameOf(*it).compare(oldName, Qt::CaseInsensitive) != 0)
@@ -825,12 +820,12 @@ bool Catalog::renameLabel(const QString& labelId, const QString& newDisplayName)
 		if (it->type == MediaType::Photo)
 		{
 			// An owned photo's folder is the renamed dir itself, and its source file sits inside it.
-			store.set(it.key(), kFolderField, relativeFolder(newPhotoDir));
-			store.set(it.key(), kSourcePathField, newPhotoDir + "/" + QFileInfo(it->sourcePath).fileName());
+			writer.set(it.key(), kFolderField, relativeFolder(newPhotoDir));
+			writer.set(it.key(), kSourcePathField, newPhotoDir + "/" + QFileInfo(it->sourcePath).fileName());
 		}
 		else
 		{
-			store.set(it.key(), kFolderField, relativeFolder(newFolder + "/" + QFileInfo(it->folder).fileName()));
+			writer.set(it.key(), kFolderField, relativeFolder(newFolder + "/" + QFileInfo(it->folder).fileName()));
 		}
 	}
 
@@ -959,9 +954,9 @@ void Catalog::seedCatalogFromSourceInfo()
 	MetadataStore& store = MetadataStore::instance();
 	int seeded = 0, placeholders = 0, clashes = 0;
 
-	// Up to 2 store.set() calls per folder below; without batching, each rewrites the whole store, making
-	// this an O(n^2)-bytes-written pass for a large pre-existing library.
-	BatchScope batch;
+	// Up to 2 writes per folder below; one Writer for the whole walk, or each would rewrite the whole
+	// store, making this an O(n^2)-bytes-written pass for a large pre-existing library.
+	MetadataStore::Writer writer = store.beginBatch();
 
 	forEachFolder(rootFolder(), [&](const QString&, const QString& folderPath) {
 		const QString sourcePath = readLegacySourceInfo(folderPath);
@@ -986,8 +981,8 @@ void Catalog::seedCatalogFromSourceInfo()
 			return;
 		}
 
-		store.set(id, kSourcePathField, sourcePath);
-		store.set(id, kFolderField, folderRel);
+		writer.set(id, kSourcePathField, sourcePath);
+		writer.set(id, kFolderField, folderRel);
 		if (id.isValid())
 			++seeded;
 		else

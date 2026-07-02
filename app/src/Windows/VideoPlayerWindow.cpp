@@ -144,7 +144,7 @@ VideoPlayerWindow::VideoPlayerWindow(const QString& videoPath, const MediaId& me
 			object.insert("name", loopCombo->itemText(i));
 			array.append(object);
 		}
-		MetadataStore::instance().set(_mediaId, u"intervals", array);
+		MetadataStore::instance().beginBatch().set(_mediaId, u"intervals", array);  // single write; the temporary Writer flushes right here
 	};
 
 	// Load this video's saved loops into the combo without firing the activation handler wired below.

@@ -79,24 +79,44 @@ void MetadataStore::remove(const MediaId& id)
 
 void MetadataStore::scheduleSave()
 {
-	if (_batchDepth > 0)
-		_dirty = true;
-	else
-		save();
+	// A Writer is necessarily alive here (mutations only run through one), so the actual save always
+	// happens at the outermost Writer's destruction.
+	_dirty = true;
 }
 
-void MetadataStore::beginBatch()
+MetadataStore::Writer MetadataStore::beginBatch()
 {
-	++_batchDepth;
+	return Writer(*this);
 }
 
-void MetadataStore::endBatch()
+MetadataStore::Writer::Writer(MetadataStore& store)
+	: _store(store)
 {
-	if (--_batchDepth == 0 && _dirty)
+	++_store._batchDepth;
+}
+
+MetadataStore::Writer::~Writer()
+{
+	if (--_store._batchDepth == 0 && _store._dirty)
 	{
-		_dirty = false;
-		save();
+		_store._dirty = false;
+		_store.save();
 	}
+}
+
+void MetadataStore::Writer::set(const MediaId& id, QStringView field, const QJsonValue& value)
+{
+	_store.set(id, field, value);
+}
+
+void MetadataStore::Writer::remove(const MediaId& id)
+{
+	_store.remove(id);
+}
+
+void MetadataStore::Writer::rekey(const MediaId& oldId, const MediaId& newId)
+{
+	_store.rekey(oldId, newId);
 }
 
 QList<MediaId> MetadataStore::allMediaIds() const

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/MediaId.h"
+#include "Core/MetadataStore.h"  // BatchScope holds a MetadataStore::Writer by value
 
 #include <QHash>
 #include <QList>
@@ -101,15 +102,19 @@ public:
 
 	// RAII: collapses any number of item registrations/mutations made within this scope into a single store
 	// write at the end, instead of one per call. Nests freely - only the outermost scope flushes. Wrap any
-	// loop that touches many videos (seeding, batch import, re-export); without this, each mutation rewrites
-	// the *entire* store, making an n-item loop write O(n^2) bytes overall instead of O(n).
+	// loop that touches many items (seeding, batch import, re-export); without this, each mutation rewrites
+	// the *entire* store, making an n-item loop write O(n^2) bytes overall instead of O(n). Just owns a
+	// store Writer it never writes through: Catalog's mutations open their own nested Writers (per-mutation
+	// atomicity), which an enclosing scope coalesces into one flush.
 	class BatchScope
 	{
 	public:
-		BatchScope();
-		~BatchScope();
+		BatchScope() : _writer(MetadataStore::instance().beginBatch()) {}
 		BatchScope(const BatchScope&) = delete;
 		BatchScope& operator=(const BatchScope&) = delete;
+
+	private:
+		MetadataStore::Writer _writer;
 	};
 
 	// Media item lifecycle.

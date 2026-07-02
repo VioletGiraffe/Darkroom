@@ -93,12 +93,18 @@ Single shared store for per-item metadata. Dumb persistence only — it has no n
   calls it when an in-app rename changes the source filename (and thus the `MediaId`), so metadata (loop
   intervals, labels) follows the rename instead of being orphaned under the old id — the "re-key explicitly"
   hook the `MediaId` design anticipated by deliberately not surviving renames.
-- **Persistence is immediate by default, batchable on request**: `set`/`remove`/`rekey` each write the whole
-  file unconditionally — fine for one-off mutations, but O(n²) total bytes written if called n times in a
-  loop (each write re-serializes the *entire* store). `beginBatch()`/`endBatch()` defer the physical write
-  while a batch is open, flushing once when the outermost batch closes (nesting-safe via a depth counter).
-  Not meant to be called directly — construct a `Catalog::BatchScope` instead (see
-  [catalog-and-labels.md](catalog-and-labels.md)), which pairs them correctly via RAII.
+- **All writes go through `MetadataStore::Writer`** — `beginBatch()` is the only way to obtain one; the raw
+  `set`/`remove`/`rekey` are private behind it, so an unbatched write is impossible by construction rather
+  than by convention. A write applies to the in-memory records *immediately* (read-after-write inside a
+  batch sees fresh data — `rebuildIndex` relies on this mid-`renameLabel`), but the disk write is deferred
+  until the **outermost** live Writer is destroyed (they nest via a depth counter) and happens only if
+  something changed — so a multi-field record update made through one Writer reaches disk as a single
+  atomic `QSaveFile` write, never as a partially-updated record. A one-off single write is a temporary:
+  `instance().beginBatch().set(...)` flushes at the end of the expression (the player's loop intervals do
+  this). What the Writer can't enforce is loop batching: n mutations without an enclosing batch still write
+  n times (O(n²) bytes total) — wrap such loops in a `Catalog::BatchScope` (see
+  [catalog-and-labels.md](catalog-and-labels.md)), which simply owns a Writer for its scope. Don't store a
+  Writer long-term: it holds the batch open, deferring all persistence.
 - **Record field semantics**: each `set()` also stamps a `"name"` field (the human filename, for debugging
   and catalog display). **`"name"` is reserved** — features must use other field names (loop intervals use
   `"intervals"`, labels use `"labels"`).
