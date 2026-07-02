@@ -8,13 +8,13 @@ Separate top-level `QWidget` (`Qt::Window`), persistent — reused, not destroye
 - `showForFolder(path)` — sets folder, refreshes thumbnails, only `show()/raise()/activateWindow()` when
   path is non-empty (guards against popping an empty window).
 - `currentFolder()` — used by `MainWindow` to update it on rename (see [main-window.md](main-window.md)).
-- Ctrl+scroll resizes thumbnails (persisted, see [video-widgets.md](video-widgets.md#card-preview-sizing--zoom-ctrlwheel));
+- Ctrl+scroll resizes thumbnails (persisted, see [media-widgets.md](media-widgets.md#card-preview-sizing--zoom-ctrlwheel));
   Esc closes (`QShortcut`).
 - Context menu (open in explorer, copy path) is local; thumbnail drag is intrinsic to `ThumbnailWidget` (see
-  [video-widgets.md](video-widgets.md)).
+  [media-widgets.md](media-widgets.md)).
 - Uses `CFlowLayout` (`qtutils`) for its thumbnail grid — the one remaining consumer of that layout, since
   it needs a plain non-selectable flow grid (unlike `MainWindow`'s grid, which needs the native multi-select
-  that `CFlowLayout` doesn't provide — see [main-window.md](main-window.md#video-grid--multi-select)).
+  that `CFlowLayout` doesn't provide — see [main-window.md](main-window.md#media-grid--multi-select)).
 
 ---
 
@@ -43,7 +43,7 @@ feedback); keyboard `[` / `]` mirror set-A/set-B.
 
 Multiple per video, one active at a time (combo + **Save**/**Delete**), persisted via `MetadataStore` (see
 [data-model.md](data-model.md)) under the `"intervals"` field — a list of `{start, end, name}` objects keyed by
-the played video's `VideoId`. Programmatic combo resets (Clear, Delete) block the selection signal so Delete
+the played video's `MediaId`. Programmatic combo resets (Clear, Delete) block the selection signal so Delete
 removes only the saved entry and leaves the live loop intact. Interval (de)serialization is owned here, per
 `MetadataStore`'s field-owns-its-format convention.
 

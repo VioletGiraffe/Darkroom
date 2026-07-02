@@ -11,7 +11,7 @@ class QListWidget;
 class QListWidgetItem;
 class SegmentedToggle;
 
-// Left-hand label filter for the main window. Lists every label (color swatch + name + video count) plus an
+// Left-hand label filter for the main window. Lists every label (color swatch + name + item count) plus an
 // "All" row, lets the user toggle any number of them as an active filter, and offers an AND/OR combine mode.
 // It owns only the filter UI and its state: the owner reads activeLabelIds()/isAndMode() (on filterChanged)
 // to drive the grid, and calls refresh() after the catalog changes.

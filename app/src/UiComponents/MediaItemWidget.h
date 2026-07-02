@@ -38,7 +38,7 @@ public:
 	// Updates the card's caption (the "N:  name" label) without re-rendering its thumbnail.
 	void setLabel(const QString& label);
 
-	// Sets the colored dots overlaid on the thumbnail (one per label the video carries, including Best);
+	// Sets the colored dots overlaid on the thumbnail (one per label the item carries, including Best);
 	// tooltip lists their names. An empty list hides the overlay. Colors are computed by the caller
 	// (MainWindow) from the Catalog.
 	void setLabelDots(const QList<QColor>& colors, const QString& tooltip);
@@ -70,7 +70,7 @@ private:
 private:
 	ThumbnailWidget*             m_thumb = nullptr;
 	QWidget*                     m_footer = nullptr;     // bottom row: star + dots + name (sibling of m_thumb)
-	QLabel*                      m_name = nullptr;       // elided, right-aligned video name in the footer
+	QLabel*                      m_name = nullptr;       // elided, right-aligned item name in the footer
 	QWidget*                     m_labelDots = nullptr;  // colored-dot strip (LabelDotStrip), child of m_footer
 	QWidget*                     m_splitPendingBadge = nullptr;  // top-right "not fully split" badge, child of m_thumb
 	MediaId                      m_mediaId;

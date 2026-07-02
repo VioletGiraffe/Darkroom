@@ -75,7 +75,7 @@ QString uniqueTempPreviewDir()
 enum class RelocateMode { LeaveInPlace, Copy, Move };
 
 // Performs the actual copy/move; on failure, warns and falls back to leaving
-// the video at srcPath so the caller can still import it from there.
+// the file at srcPath so the caller can still import it from there.
 [[nodiscard]] QString copyOrMove(QWidget* dialogParent, const QString& srcPath, const QString& destPath, bool isMove)
 {
 	const bool ok = isMove ? QFile::rename(srcPath, destPath) : QFile::copy(srcPath, destPath);
@@ -187,7 +187,7 @@ private:
 	Result m_result = Result::Cancel;
 };
 
-// Outcome of relocating one video. importPath empty => don't import it; of those, keepStaged true => the
+// Outcome of relocating one file. importPath empty => don't import it; of those, keepStaged true => the
 // user deferred (Cancel), so leave it staged for a later retry, while keepStaged false => the collision was
 // resolved as "don't import" (Skip / Skip and Delete), so the entry should be cleared from staging.
 struct RelocationOutcome
@@ -196,11 +196,11 @@ struct RelocationOutcome
 	bool keepStaged = false;
 };
 
-// Resolves relocation (including any naming collision) for a single video.
+// Resolves relocation (including any naming collision) for a single file.
 // On a collision "Skip"/"Skip and Delete" the destination is treated as the
-// already-catalogued copy and this video is not imported; "Cancel" additionally
+// already-catalogued copy and this item is not imported; "Cancel" additionally
 // keeps it staged. File-operation *failures* fall back to importing from the
-// original path, so an I/O error never silently drops a video the user wanted.
+// original path, so an I/O error never silently drops a file the user wanted.
 [[nodiscard]] RelocationOutcome performRelocation(QWidget* dialogParent, const QString& path, RelocateMode mode, const QString& destFolder)
 {
 	const QString destPath = destFolder + "/" + QFileInfo(path).fileName();
@@ -263,7 +263,7 @@ struct BatchRelocation
 
 // Batch entry point - no-op when relocation is disabled. Validates the
 // destination folder once per batch (rather than once per file) to avoid
-// repeating the same warning for every dropped video.
+// repeating the same warning for every dropped file.
 [[nodiscard]] BatchRelocation relocateIfNeeded(QWidget* dialogParent, const QStringList& paths, RelocateMode mode, const QString& destFolder)
 {
 	if (mode == RelocateMode::LeaveInPlace)
@@ -310,7 +310,7 @@ QuickImportDialog::QuickImportDialog(Callbacks callbacks, const QString& suggest
 
 	QVBoxLayout* outerLayout = new QVBoxLayout(this);
 
-	// --- Source video relocation row ---
+	// --- Source file relocation row ---
 	QSettings relocateSettings;
 	m_relocateModeCombo = new QComboBox(this);
 	m_relocateModeCombo->addItem(tr("Leave source file in place"), int(RelocateMode::LeaveInPlace));
@@ -536,7 +536,7 @@ void QuickImportDialog::stageMediaItems(const QStringList& paths)
 	// leaking its temp dir). The id match (name+size) is the cheap gate; a byte comparison then classifies
 	// it, mirroring performRelocation's gate-then-verify shape: identical content is a plain duplicate,
 	// skipped silently, while different content is a genuine collision the user must know about - the
-	// catalog tracks at most one video per id, so the file can't be staged alongside its twin.
+	// catalog tracks at most one item per id, so the file can't be staged alongside its twin.
 	QHash<MediaId, QString> stagedPathById;
 	for (auto it = m_staged.constBegin(); it != m_staged.constEnd(); ++it)
 		stagedPathById.insert(it.key(), it->path);
@@ -805,7 +805,7 @@ void QuickImportDialog::runImport()
 				m_staged[id].path = newPath;
 
 			if (!m_callbacks.isMediaItemTrackedInCollection(id, option->displayName))
-				continue;  // import declined/failed, or the id collided with a video tracked elsewhere - stays staged with its labels intact
+				continue;  // import declined/failed, or the id collided with an item tracked elsewhere - stays staged with its labels intact
 
 			succeededIds << id;
 

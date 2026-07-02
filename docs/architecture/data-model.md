@@ -4,25 +4,25 @@
 
 ## `Catalog` is the authoritative in-memory model
 
-`Catalog` (see [catalog-and-labels.md](catalog-and-labels.md)) holds the video set in memory, keyed by
-`VideoId`: for every video, its frame folder, its source video path, and its full label-id set. It is kept
-current by its own mutation API (`addVideo`/`removeVideo`/`applyRename`/`addLabel`/`removeLabel`/...), not by
+`Catalog` (see [catalog-and-labels.md](catalog-and-labels.md)) holds the media-item set in memory, keyed by
+`MediaId`: for every item, its frame folder, its source path, and its full label-id set. It is kept
+current by its own mutation API (`addMediaItem`/`removeMediaItem`/`applyRename`/`addLabel`/`removeLabel`/...), not by
 re-deriving from disk on every refresh — the filesystem is walked in full only once, at the one-time legacy
 seed described below. `MetadataStore` (below) is how the model is *persisted*, not a second source of truth;
 nothing treats `MetadataStore`'s records as the catalog — callers ask `Catalog`.
 
 - `rootFolder()` (configured, default `H:/VideoFrames`) contains one **subfolder per collection**.
-- Each collection folder contains **frame folders** — one per ingested video — holding the extracted frame
-  images. A frame folder is what the UI shows as a "video" card.
-- The link from a frame folder back to its source video is recorded in the catalog (`Catalog::addVideo`
+- Each collection folder contains **frame folders** — one per imported video — holding the extracted frame
+  images. A frame folder is what the UI shows as a card.
+- The link from a frame folder back to its source video is recorded in the catalog (`Catalog::addMediaItem`
   persists it via `MetadataStore`), not read from disk per-card. `source_info.txt` files from before this
   model existed are left on disk untouched but are never read again post-seed (see "Legacy seed" below).
 - `★ Best` is a **virtual label**, not a folder: membership lives in `MetadataStore` under the `"labels"`
-  field (keyed by `VideoId`) and is indexed by `Catalog`. Toggling Best adds/removes that label; no folder is
+  field (keyed by `MediaId`) and is indexed by `Catalog`. Toggling Best adds/removes that label; no folder is
   moved. Migrated on first run from the legacy path-keyed `best.txt`, renamed to
   `best.txt.pre-labels-backup` (entries whose source video is missing can't be re-keyed and are skipped).
 - Source video files themselves live wherever the user keeps them (often a single dir located via
-  `Catalog::anySourceVideoDir`), not necessarily under `rootFolder()`.
+  `Catalog::anySourceDir`), not necessarily under `rootFolder()`.
 
 ### Legacy seed: `source_info.txt` → catalog (one-time)
 
@@ -31,7 +31,7 @@ source video, read fresh off disk on every refresh. `Catalog::seedCatalogFromSou
 disk state into the catalog exactly once, guarded by a `"seededFromSourceInfo"` flag persisted in
 `labels.json` (so it travels with the catalog onto another drive, e.g. an external disk):
 
-- Present source file → a real (name+size) `VideoId`. Missing/unmounted source → a `VideoId::fromNameAndSize(name, -1)`
+- Present source file → a real (name+size) `MediaId`. Missing/unmounted source → a `MediaId::fromNameAndSize(name, -1)`
   placeholder (`isValid() == false`) so the frames still surface under their folder label, exactly as
   before — the source can be reconciled later if the integrity tool described in
   [catalog-and-labels.md](catalog-and-labels.md) is built.
@@ -49,11 +49,11 @@ disk state into the catalog exactly once, guarded by a `"seededFromSourceInfo"` 
 
 ---
 
-## `VideoId` (`src/Core/VideoId.h/.cpp`)
+## `MediaId` (`src/Core/MediaId.h/.cpp`)
 
-Stable identity for a **source video** = its file name (matched case-insensitively) + byte size.
+Stable identity for a media item's **source file** = its file name (matched case-insensitively) + byte size.
 
-- `VideoId::fromFile(path)` — `QFileInfo` stat only (no content read): `name()` = original filename (kept
+- `MediaId::fromFile(path)` — `QFileInfo` stat only (no content read): `name()` = original filename (kept
   for display), `size()` = byte size. Invalid (`isValid()==false`, `size==-1`) for a missing file.
 - `key()` — canonical map/JSON key, `"<size>:<lowercased-name>"`. `operator==`/`qHash` compare size +
   case-insensitive name, consistent with `key()`.
@@ -61,30 +61,30 @@ Stable identity for a **source video** = its file name (matched case-insensitive
   in sync (the de-sync trap a synthetic/stored id would have). This is why it can exist before a catalog.
 - **Survives moves for free** (path isn't part of identity) — moving a frame folder (e.g. a `Catalog`
   relabel-relocate) needs no re-keying hook. **Does not survive rename** (name change → different
-  `VideoId`) — this is *intentional*, not an oversight: an in-app rename goes through `Catalog::applyRename`
+  `MediaId`) — this is *intentional*, not an oversight: an in-app rename goes through `Catalog::applyRename`
   (see [catalog-and-labels.md](catalog-and-labels.md)), which explicitly re-keys the metadata record.
 - A `key()` collision (same name + same size) is, in practice, a genuine duplicate. Two independent layers
-  catch it: `Catalog::addVideo` refuses to register a video whose id already names a *different* folder (see
+  catch it: `Catalog::addMediaItem` refuses to register an item whose id already names a *different* folder (see
   [catalog-and-labels.md](catalog-and-labels.md)), and `QuickImportDialog`'s file-relocation step separately
-  detects a byte-identical duplicate at the destination path (see [ingestion.md](ingestion.md)).
+  detects a byte-identical duplicate at the destination path (see [import.md](import.md)).
 
 ## `MetadataStore` (`src/Core/MetadataStore.h/.cpp`)
 
-Single shared store for per-video metadata. Dumb persistence only — it has no notion of what a "label" or a
+Single shared store for per-item metadata. Dumb persistence only — it has no notion of what a "label" or a
 "folder" means; `Catalog` is the only caller that interprets its records.
 
 - **Meyers singleton** (`MetadataStore::instance()`), GUI-thread only, no internal locking.
 - Backing file: one **`catalog.json`** in `rootFolder()` (so it travels with the collection, e.g. on an
-  external drive), keyed by `VideoId::key()`, **one record (JSON object of named fields) per video**.
+  external drive), keyed by `MediaId::key()`, **one record (JSON object of named fields) per item**.
   Written atomically via `QSaveFile`, indented for readability. Loaded once at first use.
 - **Field-granular API** (`get`/`set` a single named field, `remove` a whole record) so independent features
   share a record without clobbering each other; the store does read-modify-write internally.
-- `allVideoIds()` reconstructs every recorded video from its key + stored name; `Catalog` enumerates videos
+- `allMediaIds()` reconstructs every recorded item from its key + stored name; `Catalog` enumerates items
   through here, not by walking the filesystem.
 - `rekey(oldId, newId)` moves a whole record to a new identity, preserving every field. `Catalog::applyRename`
-  calls it when an in-app rename changes the source filename (and thus the `VideoId`), so metadata (loop
+  calls it when an in-app rename changes the source filename (and thus the `MediaId`), so metadata (loop
   intervals, labels) follows the rename instead of being orphaned under the old id — the "re-key explicitly"
-  hook the `VideoId` design anticipated by deliberately not surviving renames.
+  hook the `MediaId` design anticipated by deliberately not surviving renames.
 - **Persistence is immediate by default, batchable on request**: `set`/`remove`/`rekey` each write the whole
   file unconditionally — fine for one-off mutations, but O(n²) total bytes written if called n times in a
   loop (each write re-serializes the *entire* store). `beginBatch()`/`endBatch()` defer the physical write

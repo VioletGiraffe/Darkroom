@@ -9,21 +9,21 @@
 #include <QStringList>
 
 // The logical label model for the library. A label is a first-class object with a stable id (so renaming
-// its display name never disturbs associations), a display name, a color, and a "virtual" flag. A video
+// its display name never disturbs associations), a display name, a color, and a "virtual" flag. An item
 // carries a flat set of labels: its positional folder label (derived from which collection folder its
 // frames sit in) plus any extra labels assigned app-side. Extra labels are stored in MetadataStore under
 // the "labels" field - a list of label *ids* - keyed by MediaId. `Best` is the one virtual label (no
 // backing folder; pure membership).
 //
-// Catalog is THE catalog: the authoritative in-memory model of the video set, keyed by MediaId. For each
-// video it holds its frame folder, source-video path, and full label-id set. Every video-set / label query
+// Catalog is THE catalog: the authoritative in-memory model of the media-item set, keyed by MediaId. For each
+// item it holds its frame folder, source path, and full label-id set. Every item-set / label query
 // is answered from this in-memory model. MetadataStore is how the model is *persisted* - a dumb,
 // field-granular, MediaId-keyed store shared with other features (e.g. the player's loop intervals); the
 // catalog loads itself from it once at construction and writes through on each mutation. Nothing treats
 // MetadataStore's records as the catalog - callers ask Catalog.
 //
 // Identity is minted from a file (a stat for name+size) at exactly two points: import (addMediaItem, source
-// path in hand) and the one-time legacy seed (from each folder's source_info.txt). Everywhere else a video
+// path in hand) and the one-time legacy seed (from each folder's source_info.txt). Everywhere else an item
 // is addressed by the MediaId it already carries; the disk is never walked except by that seed.
 //
 // Single shared instance, GUI-thread only.
@@ -33,17 +33,17 @@ public:
 	static Catalog& instance();
 
 	// Reserved id of the one virtual (folderless) label. Equals the string Phase 1 already stored, so no
-	// per-video data migration is needed.
+	// per-item data migration is needed.
 	static const QString BestLabelId;
 
 	struct Label
 	{
 		QString id;           // stable; never the display name (except the reserved "Best")
-		QString displayName;  // shown in the UI; a video stored in a folder of this name incidentally carries this label
+		QString displayName;  // shown in the UI; an item stored in a folder of this name incidentally carries this label
 		QString color;        // hex string e.g. "#378ADD"; empty = unset
 
 		// Virtual = a filter-only label that never names a storage folder. Derived (not stored): Best is the
-		// sole virtual label. A label owns nothing on disk - the folder coincidence is a per-video detail.
+		// sole virtual label. A label owns nothing on disk - the folder coincidence is a per-item detail.
 		[[nodiscard]] bool isVirtual() const { return id == BestLabelId; }
 	};
 
@@ -56,39 +56,39 @@ public:
 	// store may have changed underneath - call it after a structural change if in doubt; it is idempotent.
 	void rebuildIndex();
 
-	// Queries - MediaId-anchored (a card carries its video's id directly).
-	[[nodiscard]] QStringList labelsForMediaItem(const MediaId& id) const;          // full label-id set of the video
+	// Queries - MediaId-anchored (a card carries its item's id directly).
+	[[nodiscard]] QStringList labelsForMediaItem(const MediaId& id) const;          // full label-id set of the item
 	[[nodiscard]] QSet<MediaId> mediaItemsForLabel(const QString& labelId) const;
 	[[nodiscard]] bool mediaItemHasLabel(const MediaId& id, const QString& labelId) const;
 
 	// Enumeration / counts.
 	[[nodiscard]] QList<MediaId> allMediaItems() const { return _mediaItems.keys(); }
 	[[nodiscard]] int mediaItemCount() const { return static_cast<int>(_mediaItems.size()); }
-	// labelId -> number of videos carrying it, computed in one pass (for the sidebar's per-label counts).
+	// labelId -> number of items carrying it, computed in one pass (for the sidebar's per-label counts).
 	[[nodiscard]] QHash<QString, int> labelMediaItemCounts() const;
 
-	// Per-video disk facts the catalog tracks. folderForMediaItem is absolute; both are empty for an unknown id.
+	// Per-item disk facts the catalog tracks. folderForMediaItem is absolute; both are empty for an unknown id.
 	[[nodiscard]] QString folderForMediaItem(const MediaId& id) const;
 	[[nodiscard]] QString sourcePathForMediaItem(const MediaId& id) const;
 	// False once a video was registered with only preview frames (an on-demand split is still owed); true once
 	// the full frame set has been extracted. Unknown id -> true (nothing pending). See addMediaItem.
 	[[nodiscard]] bool isSplitIntoFrames(const MediaId& id) const;
-	// Directory of the first video whose source file is currently present, in iteration order (a sensible
+	// Directory of the first item whose source file is currently present, in iteration order (a sensible
 	// default destination for relocating newly added source files). Empty if none is found.
 	[[nodiscard]] QString anySourceDir() const;
 
 	// Per-video membership. A missing source video has an invalid (placeholder) id and can't be labeled, so
 	// these no-op on one. addLabel only ever writes the stored id list. removeLabel is metadata-only too,
-	// EXCEPT when labelId is the label that happens to name the video's storage folder: then it relocates
-	// that folder on disk to the video's alphabetically-first remaining ordinary label (a video must always
+	// EXCEPT when labelId is the label that happens to name the item's storage folder: then it relocates
+	// that folder on disk to the item's alphabetically-first remaining ordinary label (an item must always
 	// keep at least one ordinary label, so removing its last one is refused).
 	void addLabel(const MediaId& id, const QString& labelId);
 	void removeLabel(const MediaId& id, const QString& labelId);
 
-	// RAII: collapses any number of video registrations/mutations made within this scope into a single store
+	// RAII: collapses any number of item registrations/mutations made within this scope into a single store
 	// write at the end, instead of one per call. Nests freely - only the outermost scope flushes. Wrap any
 	// loop that touches many videos (seeding, batch import, re-export); without this, each mutation rewrites
-	// the *entire* store, making an n-video loop write O(n^2) bytes overall instead of O(n).
+	// the *entire* store, making an n-item loop write O(n^2) bytes overall instead of O(n).
 	class BatchScope
 	{
 	public:
@@ -99,26 +99,26 @@ public:
 	};
 
 	// Media item lifecycle.
-	// addMediaItem registers a freshly imported video (source path + frame folder both known); ensures the
+	// addMediaItem registers a freshly imported item (source path + frame folder both known); ensures the
 	// collection's folder label exists. splitIntoFrames records whether the folder already holds the full
 	// real frame set (true) or only preview frames pending an on-demand split (false) - see isSplitIntoFrames.
-	// Returns false (no-op) if this id already names a video tracked under a different folder - a name+size
+	// Returns false (no-op) if this id already names an item tracked under a different folder - a name+size
 	// collision with an existing video, which the caller must not paper over by leaving newly extracted frames
 	// on disk untracked. Re-registering the same id at its current folder (re-export, or a later on-demand
 	// split flipping splitIntoFrames to true) is not a collision and returns true, updating the entry's fields.
-	// removeMediaItem drops a video from the catalog entirely (delete-all), so it doesn't linger as a ghost now
+	// removeMediaItem drops an item from the catalog entirely (delete-all), so it doesn't linger as a ghost now
 	// that the catalog - not the disk walk - is the authoritative set.
 	bool addMediaItem(const MediaId& id, const QString& sourcePath, const QString& folderAbs, bool splitIntoFrames);
 	void removeMediaItem(const MediaId& id);
 	// Applies an in-app rename: carries the whole metadata record from oldId to newId (re-key; loop intervals
 	// and labels follow the new identity), updates the stored source path + frame folder, and re-keys the
 	// model entry. oldId == newId is allowed (the source file kept its name but the frame folder moved).
-	// Returns false (no-op) if newId already names a different tracked video - a name+size collision, the same
+	// Returns false (no-op) if newId already names a different tracked item - a name+size collision, the same
 	// guard as addMediaItem - so the caller can undo its on-disk renames instead of clobbering that entry.
 	bool applyRename(const MediaId& oldId, const MediaId& newId, const QString& newSourcePath, const QString& newFolderAbs);
 
 	// Registry mutations (the label objects themselves). renameLabel validates newDisplayName is unique, renames
-	// the matching on-disk collection folder if one exists, rewrites the frame folder of every video under it,
+	// the matching on-disk collection folder if one exists, rewrites the frame folder of every item under it,
 	// and updates the registry display name - the id and every association are preserved. Returns false (no-op)
 	// for Best, an empty/duplicate name, or a failed or colliding folder rename. setColor stores a hex color
 	// ("" = unset). Both persist labels.json.
@@ -126,31 +126,31 @@ public:
 	void setColor(const QString& labelId, const QString& color);
 
 	// Creates a folder-backed label with this display name if none exists yet - for the user adding an empty
-	// collection up front, before any video lives in it (such a label can't be derived from the model, since no
-	// video references its collection). Persists labels.json; no-op if the name is already taken. The caller
+	// collection up front, before any item lives in it (such a label can't be derived from the model, since no
+	// item references its collection). Persists labels.json; no-op if the name is already taken. The caller
 	// creates the backing collection folder on disk.
 	void createLabel(const QString& displayName);
 
 	// What deleting a label would do, for a confirmation dialog / pre-flight check (computed, no mutation).
 	struct DeleteImpact
 	{
-		int  relocateCount = 0;      // videos stored under the label (their frame folder will be moved)
-		int  untagCount    = 0;      // videos carrying it only as an extra tag (just untagged)
-		bool wouldOrphan   = false;  // a stored-under video has no other ordinary label to fall back on -> delete refused
+		int  relocateCount = 0;      // items stored under the label (their frame folder will be moved)
+		int  untagCount    = 0;      // items carrying it only as an extra tag (just untagged)
+		bool wouldOrphan   = false;  // a stored-under item has no other ordinary label to fall back on -> delete refused
 	};
 	[[nodiscard]] DeleteImpact deleteLabelImpact(const QString& labelId) const;
 
-	// Removes the label everywhere: relocates each video stored under it to its alphabetically-first remaining
-	// ordinary label, untags any video that merely carried it, removes the (now-empty) backing collection folder
+	// Removes the label everywhere: relocates each item stored under it to its alphabetically-first remaining
+	// ordinary label, untags any item that merely carried it, removes the (now-empty) backing collection folder
 	// and the registry entry. Returns false (no-op on the registry) for Best, an unknown id, if any stored-under
-	// video would be orphaned (no other ordinary label - check deleteLabelImpact().wouldOrphan first for a
+	// item would be orphaned (no other ordinary label - check deleteLabelImpact().wouldOrphan first for a
 	// message), or if a relocation was blocked (e.g. a name collision) so a folder still names the label.
 	bool deleteLabel(const QString& labelId);
 
 	// --- Integrity check (manual, user-triggered; the only other place besides the legacy seed that walks disk) ---
 
 	// A placeholder (source was missing when seeded/imported) whose recorded source path now resolves to an
-	// existing file - the source has reappeared and the video can be relinked to its real identity.
+	// existing file - the source has reappeared and the item can be relinked to its real identity.
 	struct RelinkCandidate
 	{
 		MediaId placeholderId;
@@ -193,7 +193,7 @@ public:
 	// Resolves a placeholder to its real identity now that confirmedSourcePath exists. Unions the placeholder's
 	// stored labels with any pre-existing (orphaned) record already under the real id - see data-model.md's
 	// "Legacy seed" note on how such an orphaned record can exist. Refuses (false, qWarning) if the real id
-	// already names a video tracked under a *different* folder - a separate, unrelated collision.
+	// already names an item tracked under a *different* folder - a separate, unrelated collision.
 	bool relinkPlaceholder(const MediaId& placeholderId, const QString& confirmedSourcePath);
 
 	Catalog(const Catalog&) = delete;
@@ -214,7 +214,7 @@ private:
 	// Registry (labels.json): load/save (incl. the seed flag), and ensuring the labels the current model implies exist.
 	void loadRegistry();
 	void saveRegistry() const;
-	void ensureBestAndFolderLabels();                          // add any missing: Best + one folder-backed label per collection a video lives in
+	void ensureBestAndFolderLabels();                          // add any missing: Best + one folder-backed label per collection an item lives in
 	bool ensureBestLabelExists();                              // returns true if it added the entry
 	bool ensureFolderLabelExists(const QString& displayName);  // returns true if it added the entry
 	[[nodiscard]] QString generateLabelId() const;
@@ -236,7 +236,7 @@ private:
 	void refreshMediaItemLabels(const MediaId& id);  // recompute one entry's labelIds after a mutation
 
 	[[nodiscard]] Label* mutableLabelById(const QString& id);                // non-const finder for registry mutations
-	// Moves a video's frame folder off the label that currently names it, onto its alphabetically-first remaining
+	// Moves an item's frame folder off the label that currently names it, onto its alphabetically-first remaining
 	// ordinary label, and updates the model entry. Warns and does nothing if no other ordinary label remains.
 	void relocateFolderOffLabel(const MediaId& id, const QString& removedLabelId);
 

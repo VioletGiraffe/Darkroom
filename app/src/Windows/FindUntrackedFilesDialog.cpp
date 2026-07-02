@@ -38,7 +38,7 @@ QString normalizePath(const QString& path)
 
 QStringList FindUntrackedFilesDialog::scanAndShowUi(const QString& rootFolder, QWidget* parent)
 {
-	// A video is "tracked" iff the catalog records it as some video's source path. Also remember one tracked
+	// A video is "tracked" iff the catalog records it as some item's source path. Also remember one tracked
 	// video's path - its folder is a more useful default starting point for the picker below than rootFolder
 	// itself, which holds the organized collections rather than wherever the raw source footage actually lives.
 	QSet<QString> tracked;

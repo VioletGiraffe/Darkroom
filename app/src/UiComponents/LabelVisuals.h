@@ -5,7 +5,7 @@
 class QColor;
 class QWidget;
 
-// Shared visuals for the label checklists in the video context menus (main grid and Quick Import). Both menus
+// Shared visuals for the label checklists in the item context menus (main grid and Quick Import). Both menus
 // render an identical per-label row, so the indicator lives here rather than being duplicated per call site.
 namespace LabelVisuals {
 

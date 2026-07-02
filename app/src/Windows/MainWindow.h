@@ -38,7 +38,7 @@ private:
 	void playVideo(const MediaId& id, bool systemPlayer);
 	void refreshMediaGrid();
 	// Refreshes the grid AND the label sidebar (labels/counts). Use after structural changes (add/delete/
-	// rename a video, create a label); plain refreshMediaGrid is for filter/sort/zoom changes.
+	// rename an item, create a label); plain refreshMediaGrid is for filter/sort/zoom changes.
 	void refreshLibraryView();
 	// Reorders the existing grid cards to the current sort settings without rebuilding them (no
 	// thumbnail re-decode). Use for sort/order changes; structural changes still call refreshMediaGrid.
@@ -50,7 +50,7 @@ private:
 	// Ctrl+wheel handler from the cards: steps the preview image height and rebuilds the grid (debounced).
 	void zoomCards(int steps);
 	void showMediaItemContextMenu(const MediaId& id, const QPoint& globalPos);
-	// If id is part of the current multi-selection, returns all selected videos' ids; otherwise just id alone.
+	// If id is part of the current multi-selection, returns all selected items' ids; otherwise just id alone.
 	[[nodiscard]] QList<MediaId> effectiveSelection(const MediaId& id) const;
 	void splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder);
 	// Wipes and fully re-extracts an already-tracked video's frames. preserveExistingPreview controls what

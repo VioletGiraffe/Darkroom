@@ -86,7 +86,7 @@ two separate steps. Two consequences:
 
 The shared `clearStuckHoverIfCursorLeft()` in [`app/src/Utils.h`](../../app/src/Utils.h) does exactly that after a
 context menu's `exec()` - guarded so a right-click then Esc without moving the mouse keeps a legitimate hover - and
-is used by both the frame-viewer thumbnails (`#framedThumbnail`) and the grid cards (`#videoCard`). Both set
+is used by both the frame-viewer thumbnails (`#framedThumbnail`) and the grid cards (`#mediaItemCard`). Both set
 `WA_Hover`, which is what makes a plain styled `QWidget` repaint on real hover changes in the first place; the
 stuck-state fix is separate from that. When the menu action can delete the spawning widget mid-`exec()` (grid
 cards get rebuilt by their own menu actions), guard the widget with a `QPointer` before the post-`exec()` re-sync.

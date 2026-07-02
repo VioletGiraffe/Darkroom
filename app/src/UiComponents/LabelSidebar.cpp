@@ -26,7 +26,7 @@
 
 namespace {
 constexpr int kLabelIdRole     = Qt::UserRole;       // QString: label id ("" == the All row)
-constexpr int kCountRole       = Qt::UserRole + 1;   // QString: the per-row video count, painted right-aligned
+constexpr int kCountRole       = Qt::UserRole + 1;   // QString: the per-row item count, painted right-aligned
 constexpr int kSwatchColorRole = Qt::UserRole + 2;   // QColor: leading dot color (invalid == no dot, e.g. the All row)
 constexpr int kActiveRole      = Qt::UserRole + 3;   // bool: row is in the active filter (painted highlighted)
 constexpr int kStarRole        = Qt::UserRole + 4;   // bool: draw a gold star after the dot (the Best row)

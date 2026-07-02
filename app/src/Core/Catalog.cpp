@@ -106,8 +106,8 @@ void Catalog::ensureBestAndFolderLabels()
 {
 	bool changed = ensureBestLabelExists();
 
-	// Folder labels come from the collections videos actually live in (the distinct collection segment of each
-	// video's folder), not from a disk walk - so an empty collection folder no longer yields a label.
+	// Folder labels come from the collections items actually live in (the distinct collection segment of each
+	// item's folder), not from a disk walk - so an empty collection folder no longer yields a label.
 	MetadataStore& store = MetadataStore::instance();
 	QSet<QString> collections;
 	for (const MediaId& id : store.allMediaIds())
@@ -176,7 +176,7 @@ QString Catalog::generateLabelId() const
 	return id;
 }
 
-// --- Per-video stored label ids (MetadataStore "labels" field) ------------------------------------------
+// --- Per-item stored label ids (MetadataStore "labels" field) ------------------------------------------
 
 QStringList Catalog::readStoredLabelIds(const MediaId& id)
 {
@@ -201,7 +201,7 @@ void Catalog::writeStoredLabelIds(const MediaId& id, const QStringList& labelIds
 QString Catalog::collectionNameOf(const QString& folderAbs)
 {
 	// The frame folder lives at <root>/<collection>/<videoFolder>; the collection-folder name is the
-	// display name of this video's folder label.
+	// display name of this item's folder label.
 	return QFileInfo(folderAbs).dir().dirName();
 }
 
@@ -239,7 +239,7 @@ QStringList Catalog::computeLabelIds(const MediaId& id, const QString& folderAbs
 
 void Catalog::rebuildIndex()
 {
-	ensureBestAndFolderLabels();  // every collection a video lives in + Best has a registry label before labels resolve
+	ensureBestAndFolderLabels();  // every collection an item lives in + Best has a registry label before labels resolve
 
 	_mediaItems.clear();
 	MetadataStore& store = MetadataStore::instance();
@@ -247,7 +247,7 @@ void Catalog::rebuildIndex()
 	{
 		const QString folderRel = store.get(id, kFolderField).toString();
 		if (folderRel.isEmpty())
-			continue;  // a record with no folder isn't a catalog video (e.g. a legacy orphan carrying only labels)
+			continue;  // a record with no folder isn't a catalog item (e.g. a legacy orphan carrying only labels)
 
 		Entry e;
 		e.folder          = absoluteFolder(folderRel);
@@ -320,7 +320,7 @@ QString Catalog::anySourceDir() const
 	return {};
 }
 
-// --- Per-video membership (MediaId-anchored) -----------------------------------------------------------
+// --- Per-item membership (MediaId-anchored) -----------------------------------------------------------
 
 void Catalog::addLabel(const MediaId& id, const QString& labelId)
 {
@@ -346,7 +346,7 @@ void Catalog::removeLabel(const MediaId& id, const QString& labelId)
 		return;
 	}
 
-	// Removing the ordinary label that names this video's storage folder is a folder relocation, not a metadata
+	// Removing the ordinary label that names this item's storage folder is a folder relocation, not a metadata
 	// edit. A virtual label (Best) never names a folder, so it always falls through to the stored-id strip below.
 	const Label* label = labelById(labelId);
 	if (label && !label->isVirtual())
@@ -387,7 +387,7 @@ bool Catalog::addMediaItem(const MediaId& id, const QString& sourcePath, const Q
 		return false;
 	}
 
-	// A name+size collision with a video already tracked under a *different* folder is a genuine duplicate
+	// A name+size collision with an item already tracked under a *different* folder is a genuine duplicate
 	// (or two distinct files that happen to collide) - refuse rather than silently overwriting the existing
 	// entry's folder, which would orphan that folder and its labels. Re-registering the same id at the same
 	// folder (re-export) is not a collision and falls through normally.
@@ -424,7 +424,7 @@ void Catalog::removeMediaItem(const MediaId& id)
 
 bool Catalog::applyRename(const MediaId& oldId, const MediaId& newId, const QString& newSourcePath, const QString& newFolderAbs)
 {
-	// A rename landing on an id already tracked as a *different* video (the new name + size matching one
+	// A rename landing on an id already tracked as a *different* item (the new name + size matching one
 	// elsewhere in the library) would silently overwrite that entry and orphan its folder - refuse instead,
 	// mirroring addMediaItem. oldId == newId (a folder-only rename) is the entry itself, never a collision.
 	if (oldId != newId && _mediaItems.contains(newId))
@@ -531,7 +531,7 @@ bool Catalog::relinkPlaceholder(const MediaId& placeholderId, const QString& con
 	}
 	const QString folderAbs = placeholderEntry->folder;
 
-	// A name+size collision with a video already tracked under a *different* folder is a separate, unrelated
+	// A name+size collision with an item already tracked under a *different* folder is a separate, unrelated
 	// problem (not the placeholder being relinked) - refuse rather than clobbering that entry, mirroring addMediaItem.
 	const auto existingReal = _mediaItems.constFind(realId);
 	if (existingReal != _mediaItems.cend() && existingReal->folder != folderAbs)
@@ -572,7 +572,7 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, const QString& removedLa
 {
 	const QString folderAbs = folderForMediaItem(id);
 
-	// Destination = the alphabetically-first of the video's *remaining* ordinary (non-virtual) labels.
+	// Destination = the alphabetically-first of the item's *remaining* ordinary (non-virtual) labels.
 	const Label* dest = nullptr;
 	for (const QString& labelId : labelsForMediaItem(id))
 	{
@@ -652,7 +652,7 @@ bool Catalog::renameLabel(const QString& labelId, const QString& newDisplayName)
 			return false;
 		}
 
-	// Rename the backing collection folder if it exists (a freshly created label may have none yet). Every video
+	// Rename the backing collection folder if it exists (a freshly created label may have none yet). Every item
 	// under it rides along in one directory rename; associations are by id, so nothing else changes.
 	const QString oldName = label->displayName;
 	const QString oldFolder = rootFolder() + "/" + oldName;
@@ -671,7 +671,7 @@ bool Catalog::renameLabel(const QString& labelId, const QString& newDisplayName)
 		}
 	}
 
-	// The collection folder moved, so every video stored in it now lives under newName: rewrite the stored folder
+	// The collection folder moved, so every item stored in it now lives under newName: rewrite the stored folder
 	// of each before re-deriving the model (otherwise rebuildIndex would re-seed a stale oldName folder label).
 	// Case-insensitive, like labelIdForFolderName: a stored folder whose case drifted from the label's display
 	// name still just moved on disk, and skipping it here would leave its stored path pointing at the old name.
@@ -750,7 +750,7 @@ bool Catalog::deleteLabel(const QString& labelId)
 
 	const QString displayName = label->displayName;
 
-	// Relocate every video stored under the label off it. Collect first: relocateFolderOffLabel mutates _mediaItems.
+	// Relocate every item stored under the label off it. Collect first: relocateFolderOffLabel mutates _mediaItems.
 	QList<MediaId> storedHere;
 	for (const MediaId& id : mediaItemsForLabel(labelId))
 		if (labelIdForFolderName(collectionNameOf(folderForMediaItem(id))) == labelId)

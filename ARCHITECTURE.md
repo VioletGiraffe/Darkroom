@@ -20,10 +20,10 @@ orient, then follow the link for the subsystem you're touching.
   headers — every `.cpp`/`.h` under `src/` is auto-included, so **adding a new source file needs no `.pro`
   edit**. `Q_OBJECT` types are moc'd automatically because headers are listed.
 - **Source layout** (under `app/src/`): reusable UI widgets in `UiComponents/` (`ThumbnailWidget`,
-  `VideoItemWidget`, `MarkerSlider`, `SortControl`, `SegmentedToggle`, `LabelSidebar`) plus their close UI
+  `MediaItemWidget`, `MarkerSlider`, `SortControl`, `SegmentedToggle`, `LabelSidebar`) plus their close UI
   helpers (`LabelVisuals`, `DragGestureHelper`, `LabelMimeType`); top-level windows + dialogs in `Windows/`
   (`MainWindow`, `CompareWindow`, `FrameViewerWindow`, `VideoPlayerWindow`, the `*Dialog`s); the non-UI core
-  model in `Core/` (`Catalog`, `MetadataStore`, `VideoId`); and the visual theming in `Theme/` (`Theme`,
+  model in `Core/` (`Catalog`, `MetadataStore`, `MediaId`); and the visual theming in `Theme/` (`Theme`,
   `Style`). `Settings`, `Utils`, `Ffmpeg`, and `main.cpp` stay at the `src/` root.
 - **INCLUDEPATH**: `src` plus the submodules `qtutils`, `cpputils`, `cpp-template-utils`. With `src` on the
   path, app headers are included **layer-qualified** — `"UiComponents/ThumbnailWidget.h"`,
@@ -40,21 +40,21 @@ orient, then follow the link for the subsystem you're touching.
 A handful of cross-cutting rules that apply beyond any one subsystem. Check these before writing new code,
 not just when reading existing code.
 
-- **`Catalog` is the authoritative in-memory model of the video set, keyed by `VideoId`.** It is kept current
-  by its own mutation API (`addVideo`/`removeVideo`/`applyRename`/`addLabel`/...), not by re-deriving from
+- **`Catalog` is the authoritative in-memory model of the media-item set, keyed by `MediaId`.** It is kept current
+  by its own mutation API (`addMediaItem`/`removeMediaItem`/`applyRename`/`addLabel`/...), not by re-deriving from
   disk on every refresh — disk is only walked once, at the legacy seed. See
   [data-model.md](docs/architecture/data-model.md) and [catalog-and-labels.md](docs/architecture/catalog-and-labels.md).
-- **A label owns nothing on disk.** The folder a video's frames sit in happens to share a name with one of
-  the video's labels — that's a per-video storage detail, never a property stored on the label itself. See
+- **A label owns nothing on disk.** The folder an item's frames sit in happens to share a name with one of
+  the item's labels — that's a per-item storage detail, never a property stored on the label itself. See
   [catalog-and-labels.md](docs/architecture/catalog-and-labels.md).
 - **`Catalog`'s mutation API refuses or no-ops on ambiguity rather than silently deleting data.** No
-  operation will orphan a video (leave it with zero ordinary labels) or silently drop a registry entry that
+  operation will orphan an item (leave it with zero ordinary labels) or silently drop a registry entry that
   still has a backing folder. See
   [catalog-and-labels.md](docs/architecture/catalog-and-labels.md#fs-reconciliation-audit-done--findings).
 - **When swapping a container/widget for a different shape or look, list what the old one gave for free**
   (selection model, keyboard nav, drag-and-drop, focus handling) and confirm each still has an equivalent
   before calling the swap done. See
-  [main-window.md](docs/architecture/main-window.md#video-grid--multi-select) for the multi-select
+  [main-window.md](docs/architecture/main-window.md#media-grid--multi-select) for the multi-select
   regression this caught once already.
 
 ---
@@ -62,23 +62,23 @@ not just when reading existing code.
 ## Subsystems
 
 ### [Data model & identity](docs/architecture/data-model.md)
-The on-disk structure (`rootFolder()`, collection folders, frame folders), the `VideoId` identity scheme, and
-`MetadataStore` — the dumb `VideoId`-keyed persistence layer (with batched-write support) that `Catalog`
+The on-disk structure (`rootFolder()`, collection folders, frame folders), the `MediaId` identity scheme, and
+`MetadataStore` — the dumb `MediaId`-keyed persistence layer (with batched-write support) that `Catalog`
 loads itself from and writes through.
 
 ### [Catalog & labels](docs/architecture/catalog-and-labels.md)
-`Catalog`: the in-memory video-set model plus the label model layered over it. Stable label ids, the
-`labels.json` registry, the folder-reconciliation model (exactly 3 touch points), the `VideoId`-anchored
-query/mutation API, ingestion lifecycle (`addVideo`/`removeVideo`/`applyRename`, the duplicate-id guard,
+`Catalog`: the in-memory media-item-set model plus the label model layered over it. Stable label ids, the
+`labels.json` registry, the folder-reconciliation model (exactly 3 touch points), the `MediaId`-anchored
+query/mutation API, import lifecycle (`addMediaItem`/`removeMediaItem`/`applyRename`, the duplicate-id guard,
 `BatchScope`), the FS-reconciliation audit findings, the design rationale, and deferred post-v1 polish.
 
 ### [Main window](docs/architecture/main-window.md)
 `MainWindow`'s grid + sidebar layout, the name filter, label assignment (context menu + drag-from-sidebar),
-sidebar label management (rename/color/delete), the video grid's multi-select implementation (and the
-regression history behind it), and renaming a video on disk.
+sidebar label management (rename/color/delete), the media grid's multi-select implementation (and the
+regression history behind it), and renaming a media item on disk.
 
-### [Video card & thumbnail widgets](docs/architecture/video-widgets.md)
-`VideoItemWidget` (the grid card: label drop target, label dots, no longer a drag source),
+### [Media item card & thumbnail widgets](docs/architecture/media-widgets.md)
+`MediaItemWidget` (the grid card: label drop target, label dots, no longer a drag source),
 `ThumbnailWidget` (sizing model, intrinsic drag, two non-obvious rendering bug fixes), `DragGestureHelper`,
 and the card zoom/preview-count mechanism.
 
@@ -91,12 +91,12 @@ The `Settings.h`/`QSettings` key pattern, `SettingsDialog`, the `Theme` dark/lig
 app-wide `Accent`/`AccentBg` tokens), and the central `Style` stylesheet + custom-widget approach (e.g.
 `SegmentedToggle`) that gives the app its non-stock look.
 
-### [Ingestion: ffmpeg, Utils, QuickImportDialog](docs/architecture/ingestion.md)
+### [Import: ffmpeg, Utils, QuickImportDialog](docs/architecture/import.md)
 The `ffmpeg` invocation (`Ffmpeg::generatePreviewFrames` — a batch/concurrent preview extractor that
-`QuickImportDialog`'s staging runs across several videos at once, whose frames ingestion then reuses by copy
+`QuickImportDialog`'s staging runs across several videos at once, whose frames import then reuses by copy
 instead of re-extracting), `Utils.h`'s grab-bag of free functions, and `QuickImportDialog` itself: a staging
 grid + label-list panel mirroring the main window's own label model, duplicate detection at relocation, and the
-"Import" command that ingests every labeled card in one step.
+"Import" command that imports every labeled card in one step.
 
 ---
 

@@ -13,7 +13,7 @@ Convenience getters live in **`Utils.h`** when app-wide (`rootFolder()`, `ffmpeg
 inline helpers in the owning `.cpp` when narrower. A few keys are deliberately **kept out of Settings.h**
 because they're local to one UI/class (preview frame count, card zoom, frame-viewer thumbnail size), read
 directly via inline `QSettings{}`. The `MetadataStore`'s `catalog.json` (see [data-model.md](data-model.md))
-is separate from `QSettings` entirely — that's per-video data, not app configuration.
+is separate from `QSettings` entirely — that's per-item data, not app configuration.
 
 ## `SettingsDialog` (`src/Windows/SettingsDialog.h/.cpp`)
 
@@ -51,7 +51,7 @@ themed ramps too, instead of staying on the OS-default grey palette.
 builds one `Theme`-driven stylesheet and applies it to `qApp`: the shared non-stock vocabulary (rounded
 corners, hairline borders, roomy padding, soft hover/focus) for stock controls — `QPushButton`, `QLineEdit`,
 `QComboBox`, `QMenu`, `QScrollBar`. It also carries the **grid card, star and thumbnail** styles (by object
-name, e.g. `#videoCard`), moved here from per-instance `setStyleSheet` because those polished too slowly when
+name, e.g. `#mediaItemCard`), moved here from per-instance `setStyleSheet` because those polished too slowly when
 the grid and frame viewer build hundreds at once — and, being in this sheet, they now follow a live theme
 switch too. Every corner radius used anywhere in the app is a named constant in `Theme.h` rather than a
 literal, so the relationships between them (which are coincidentally equal vs. conceptually the same) live in

@@ -410,7 +410,7 @@ QString gridCaption(int displayNumber, const QString& name)
 }
 
 // Computes and applies one card's colored label-dot overlay from the catalog's current label set for
-// that video, including Best - the star button stays as a fast one-click toggle, but the dot strip still
+// that item, including Best - the star button stays as a fast one-click toggle, but the dot strip still
 // shows Best so the card's label display is uniform across all labels.
 void applyLabelDots(Catalog& catalog, const MediaId& id, MediaItemWidget* card)
 {
@@ -565,7 +565,7 @@ void MainWindow::refreshMediaGrid()
 		card->setOnLabelDropped([this, id](const QString& labelId) {
 			const QList<MediaId> targets = effectiveSelection(id);
 			QMetaObject::invokeMethod(this, [this, targets, labelId] {
-				Catalog::BatchScope batch;  // one store write for the whole selection instead of one per video
+				Catalog::BatchScope batch;  // one store write for the whole selection instead of one per item
 				for (const MediaId& target : targets)
 					Catalog::instance().addLabel(target, labelId);
 				refreshLibraryView();
@@ -728,7 +728,7 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 	});
 
 	// Labels submenu: a checklist of every ordinary label. Each row's color-tinted checkbox reflects the whole
-	// effective selection - checked when every selected video has the label, a dash when only some do, an empty box
+	// effective selection - checked when every selected item has the label, a dash when only some do, an empty box
 	// when none do. Toggling makes the selection uniform: strip the label when all already carry it, else add to all.
 	QMenu* labelsMenu = menu.addMenu(tr("Labels"));
 	{
@@ -749,7 +749,7 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 			QAction* action = labelsMenu->addAction(LabelVisuals::checkboxIcon(presence, QColor(label.color), labelsMenu), label.displayName);
 			const bool addToAll = presence != LabelVisuals::Presence::All;
 			connect(action, &QAction::triggered, this, [this, selection, labelId, addToAll] {
-				Catalog::BatchScope batch;  // one store write for the whole selection instead of one per video
+				Catalog::BatchScope batch;  // one store write for the whole selection instead of one per item
 				for (const MediaId& target : selection)
 				{
 					if (addToAll)
@@ -768,8 +768,8 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 	menu.addAction(selection.size() > 1 ? tr("Delete all (%1 items)").arg(selection.size()) : tr("Delete all"), [this, selection] {
 		Catalog& catalog = Catalog::instance();
 
-		// The confirmation lists what goes. A single video: its exact frame-folder + source paths. A
-		// multi-selection: the count plus the video names (capped, so a huge selection stays readable).
+		// The confirmation lists what goes. A single item: its exact frame-folder + source paths. A
+		// multi-selection: the count plus the item names (capped, so a huge selection stays readable).
 		QString message;
 		if (selection.size() == 1)
 		{
@@ -794,7 +794,7 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 			QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
 			return;
 
-		Catalog::BatchScope batch;  // one store write for the whole selection instead of one per video
+		Catalog::BatchScope batch;  // one store write for the whole selection instead of one per item
 		for (const MediaId& sel : selection)
 		{
 			const QString folderPath = catalog.folderForMediaItem(sel);
@@ -956,7 +956,7 @@ void MainWindow::splitVideoIntoFrames(const QString& videoFilePath, const QStrin
 	// Register the video in the catalog now that extraction has actually produced frames - doing it only on
 	// success avoids leaving "tracked" but empty/partial folders behind when ffmpeg fails partway through.
 	// The source file is present here, so its MediaId is real; addMediaItem persists the source path + folder and
-	// ensures the collection's folder label exists. It refuses if another video already owns this id (a
+	// ensures the collection's folder label exists. It refuses if another item already owns this id (a
 	// name+size collision) under a different folder - in that case don't leave the just-extracted frames
 	// behind as an untracked duplicate.
 	if (!Catalog::instance().addMediaItem(MediaId::fromFile(videoFilePath), videoFilePath, outputFolder, /*splitIntoFrames=*/true))
@@ -1164,7 +1164,7 @@ bool MainWindow::createCollection(const QString& name, bool refreshList)
 		return false;
 	}
 
-	// Register the folder label now: an empty collection has no video to derive it from, so the catalog
+	// Register the folder label now: an empty collection has no item to derive it from, so the catalog
 	// won't surface it otherwise.
 	Catalog::instance().createLabel(name);
 
@@ -1433,14 +1433,14 @@ void MainWindow::renameMediaItemInteractive(const MediaId& id)
 		return;
 	}
 
-	// Build the new video path (same directory and extension, new base name)
+	// Build the new source path (same directory and extension, new base name)
 	QString newSourcePath;
 	if (!oldSourcePath.isEmpty())
 	{
 		const QFileInfo oldSourceInfo{ oldSourcePath };
 		newSourcePath = oldSourceInfo.absolutePath() + "/" + newName + "." + oldSourceInfo.suffix();
 
-		// Make sure we would not overwrite a different existing video
+		// Make sure we would not overwrite a different existing file
 		if (sourceExists && QFile::exists(newSourcePath))
 		{
 			QMessageBox::warning(this, tr("Rename media file"), tr("A file with that name already exists:\n%1").arg(newSourcePath));
@@ -1510,7 +1510,7 @@ void MainWindow::renameMediaItem(const MediaId& oldId, const QString& newFolderP
 
 	// --- Step 3: update the catalog: carry the metadata record (loop intervals, labels incl. Best) to the new
 	// identity and record the new source path + frame folder. Replaces the old re-key + source_info.txt rewrite.
-	// Refused when the new name+size collides with another tracked video - undo the disk renames then, so disk
+	// Refused when the new name+size collides with another tracked item - undo the disk renames then, so disk
 	// and catalog stay in sync (a collision requires a changed id, so the source file was renamed here too).
 	if (!catalog.applyRename(oldId, newId, newSourcePath, newFolderPath))
 	{

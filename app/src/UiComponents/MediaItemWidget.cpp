@@ -80,7 +80,7 @@ private:
 };
 
 // A QLabel that elides its text to the available width, keeping the full string for the tooltip. Used for
-// the footer video name so a long name truncates instead of forcing the card wider.
+// the footer item name so a long name truncates instead of forcing the card wider.
 class ElidedLabel final : public QLabel {
 public:
 	using QLabel::QLabel;
