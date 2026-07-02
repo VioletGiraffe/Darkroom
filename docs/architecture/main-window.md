@@ -21,8 +21,11 @@ doesn't emit).
 (`Catalog::sourcePathForMediaItem`), no preview cache — an unloadable path (e.g. a referenced photo on an
 unmounted drive) renders a blank card rather than hiding the item (accepted v1 behavior). A photo's display
 name comes from its id's file name (`itemInfoFor`), since no frame folder names it; its date sort uses the
-same `getSourceFileDate` (file-name timestamp, then birth time). Per-type interaction gates (double-click
-player, middle-click frame viewer, delete semantics) are the next phase of the photos plan.
+same `getSourceFileDate` (file-name timestamp, then birth time). **Per-type gates**: a photo card's
+double-click opens the file in the system image viewer (`openSourceInSystemApp`) instead of the built-in
+player; middle-click (frame viewer) is not wired on photo cards — a photo has no frames; the split-pending
+badge never shows (photos report `isSplitIntoFrames() == true`); the context menu adapts per type — see
+`showMediaItemContextMenu` below.
 
 ## Name filter
 
@@ -67,7 +70,15 @@ restyle needs an app-wide styled `QCheckBox`.
 - `applyNameFilter()` — hides cards not matching the name box (`setHidden`, deselecting any it hides) and
   renumbers the visible ones; the cheap per-keystroke path. `renumberGridCaptions` numbers only visible
   cards.
-- `showMediaItemContextMenu()` — multi-select-aware right-click menu. Includes a **Labels** submenu: a checklist
+- `showMediaItemContextMenu()` — multi-select-aware right-click menu. **Per-type entries**: Inspect /
+  "Compare selected" (`CompareWindow` is frame-folder based) is offered only when nothing in the selection is
+  a photo; "Open in Explorer" (the item's folder) and "Rename media file" are videos-only — a photo's
+  `folderForMediaItem` is the shared `Photos/<label>` dir, or nothing when referenced; photos get "Open
+  photo" where videos get "Play source video" (both `openSourceInSystemApp`; a video's *double-click* opens
+  the built-in player instead). **"Delete all" is per-type**: a video loses its frame folder + source file;
+  an owned photo loses its file ONLY (never the shared label dir); a referenced photo is removed from the
+  catalog only, its file untouched — the confirmation message spells out exactly what applies to the
+  selection at hand. Includes a **Labels** submenu: a checklist
   of every ordinary label (check state from the right-clicked card via `Catalog::mediaItemHasLabel`); toggling
   one drives the whole effective selection to that state via `Catalog::addLabel`/`removeLabel`, then
   `refreshLibraryView()`.
@@ -136,7 +147,8 @@ up front and to show relocate/untag counts in a confirm dialog, then `deleteLabe
 
 ## Card interactions
 
-Middle-click → `FrameViewerWindow::showForFolder()`; double-click → play video; right-click → context menu;
+Middle-click → `FrameViewerWindow::showForFolder()` (videos only — not wired on photo cards); double-click →
+built-in player for a video, system image viewer for a photo; right-click → context menu;
 Ctrl/Shift-click and rubber-band → multi-select. (Single+double click on the same button proved unreliable;
 middle-click is the deliberate choice for "show frames".)
 
@@ -203,4 +215,7 @@ label-mutation paths in `Catalog` (which handle their own folder moves internall
 4. `refreshLibraryView()` + updates `FrameViewerWindow` if it's showing the renamed folder.
 
 `renameMediaItemInteractive(id)` is the UI-prompt wrapper (validate chars, check collisions, confirm) →
-`renameMediaItem(...)`, reached from the card's context menu ("Rename media file").
+`renameMediaItem(...)`, reached from the card's context menu ("Rename media file"). **Videos only** — the
+menu entry is hidden on photo cards (the flow derives video-shaped paths, and an owned photo's
+`folderForMediaItem` is the shared `Photos/<label>` dir, which would pass the folder-exists check);
+enforced by an assert at the top.

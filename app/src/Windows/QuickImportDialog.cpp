@@ -315,7 +315,9 @@ QuickImportDialog::QuickImportDialog(Callbacks callbacks, const QString& suggest
 	// --- Source file relocation row ---
 	QSettings relocateSettings;
 	m_relocateModeCombo = new QComboBox(this);
-	m_relocateModeCombo->addItem(tr("Leave source file in place"), int(RelocateMode::LeaveInPlace));
+	// The interim wording notes the photo meaning (Reference) in place; a deeper redesign of the whole
+	// owned/referenced model is a flagged post-v1 direction, so this stays a plain static label until then.
+	m_relocateModeCombo->addItem(tr("Leave source file in place (photos: reference, never touched)"), int(RelocateMode::LeaveInPlace));
 	m_relocateModeCombo->addItem(tr("Copy source file to:"), int(RelocateMode::Copy));
 	m_relocateModeCombo->addItem(tr("Move source file to:"), int(RelocateMode::Move));
 	const int savedRelocateMode = relocateSettings.value("quickImportDialog/relocateMode", int(RelocateMode::LeaveInPlace)).toInt();

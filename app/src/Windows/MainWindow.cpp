@@ -51,6 +51,7 @@
 #include <QScopeGuard>
 
 #include <algorithm>
+#include <assert.h>
 #include <functional>
 #include <utility>
 #include <vector>
@@ -474,6 +475,9 @@ void MainWindow::backfillMissingPreviews()
 	std::vector<MediaId> toBackfill;
 	for (const MediaId& id : catalog.allMediaItems())
 	{
+		if (catalog.mediaType(id) != Catalog::MediaType::Video)
+			continue;  // photo cards decode the photo file itself - no preview/ cache exists or is wanted
+
 		if (!catalog.isSplitIntoFrames(id))
 			continue;  // not-yet-split videos already got a real preview/ at import time
 
@@ -543,8 +547,9 @@ void MainWindow::refreshMediaGrid()
 	// GridItem::operator<) puts them in their final order; captions are numbered after that.
 	const auto addCard = [&](const MediaId& id) {
 		const QString folderPath = catalog.folderForMediaItem(id);
+		const bool isPhoto = catalog.mediaType(id) == Catalog::MediaType::Photo;
 		QStringList previewPaths;
-		if (catalog.mediaType(id) == Catalog::MediaType::Photo)
+		if (isPhoto)
 		{
 			// A photo card decodes the photo file itself - no preview cache (v1). An unloadable path (e.g. a
 			// referenced photo on an unmounted drive) renders a blank card rather than hiding the item.
@@ -568,14 +573,18 @@ void MainWindow::refreshMediaGrid()
 			id,
 			bestSet.contains(id),
 			[this, id] { toggleBestFolder(id); },
-			[this, id] { playVideo(id, false); },
+			// double-click: a video opens in the built-in player, a photo in the system image viewer
+			[this, id, isPhoto] { if (isPhoto) openSourceInSystemApp(id); else playVideo(id); },
 			[this, id](QPoint globalPos) { showMediaItemContextMenu(id, globalPos); },
 			/* dynamic size hint */false
 		);
-		card->setOnMiddleButtonClick([this, id, folderPath] {
-			ensureFramesSplit(id);  // transparently runs the full split first, if this video hasn't had one yet
-			m_frameViewer->showForFolder(folderPath);
-		});
+		if (!isPhoto)  // the frame viewer browses a video's frame folder; a photo has no frames, so no middle-click
+		{
+			card->setOnMiddleButtonClick([this, id, folderPath] {
+				ensureFramesSplit(id);  // transparently runs the full split first, if this video hasn't had one yet
+				m_frameViewer->showForFolder(folderPath);
+			});
+		}
 		card->setOnMouseWheelCallback([this](int steps) { zoomCards(steps); });
 		card->setSplitPending(!catalog.isSplitIntoFrames(id));
 
@@ -710,26 +719,39 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 	Catalog& catalog = Catalog::instance();
 	const QList<MediaId> selection = effectiveSelection(id);
 	const QString folderPath = catalog.folderForMediaItem(id);
+	const bool isPhoto = catalog.mediaType(id) == Catalog::MediaType::Photo;
 
 	QMenu menu(this);
 
-	menu.addAction(selection.size() > 1 ? tr("Compare selected") : tr("Inspect"), [this, selection] {
-		QStringList folders;
-		for (const MediaId& sel : selection)
-			folders << Catalog::instance().folderForMediaItem(sel);
-		auto* w = new CompareWindow(folders, this);
-		w->setAttribute(Qt::WA_DeleteOnClose);
-		w->show();
-	});
-	menu.addSeparator();
+	// CompareWindow browses frame folders, so it's videos-only (a photo comparison tool is a separate future
+	// feature, not an adaptation of it) - offered only when nothing in the selection is a photo.
+	const bool selectionAllVideos = std::all_of(selection.cbegin(), selection.cend(),
+		[&catalog](const MediaId& sel) { return catalog.mediaType(sel) == Catalog::MediaType::Video; });
+	if (selectionAllVideos)
+	{
+		menu.addAction(selection.size() > 1 ? tr("Compare selected") : tr("Inspect"), [this, selection] {
+			QStringList folders;
+			for (const MediaId& sel : selection)
+				folders << Catalog::instance().folderForMediaItem(sel);
+			auto* w = new CompareWindow(folders, this);
+			w->setAttribute(Qt::WA_DeleteOnClose);
+			w->show();
+		});
+		menu.addSeparator();
+	}
 
-	menu.addAction(tr("Open in Explorer"), [folderPath] {
-		openInExplorer(folderPath);
+	// A photo's folderForMediaItem is the shared Photos/<label> dir (or nothing when referenced), not a
+	// folder of its own to open - "Locate source file" below is how to reach the photo itself.
+	if (!isPhoto)
+	{
+		menu.addAction(tr("Open in Explorer"), [folderPath] {
+			openInExplorer(folderPath);
+		});
+	}
+	menu.addAction(isPhoto ? tr("Open photo") : tr("Play source video"), [this, id] {
+		openSourceInSystemApp(id);
 	});
-	menu.addAction(tr("Play source video"), [this, id] {
-		playVideo(id, true);
-	});
-	menu.addAction(tr("Locate source video"), [this, id] {
+	menu.addAction(tr("Locate source file"), [this, id] {
 		const QString sourcePath = Catalog::instance().sourcePathForMediaItem(id);
 		if (sourcePath.isEmpty())
 		{
@@ -743,9 +765,13 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 		if (!sourcePath.isEmpty())
 			QApplication::clipboard()->setText(QDir::toNativeSeparators(sourcePath));
 	});
-	menu.addAction(tr("Rename media file"), [this, id] {
-		renameMediaItemInteractive(id);
-	});
+	// Rename renames the frame folder + source file as one unit - video-shaped paths, no photo support (v1).
+	if (!isPhoto)
+	{
+		menu.addAction(tr("Rename media file"), [this, id] {
+			renameMediaItemInteractive(id);
+		});
+	}
 	menu.addSeparator();
 
 	const bool inBest = isInBest(id);
@@ -794,25 +820,68 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 	menu.addAction(selection.size() > 1 ? tr("Delete all (%1 items)").arg(selection.size()) : tr("Delete all"), [this, selection] {
 		Catalog& catalog = Catalog::instance();
 
-		// The confirmation lists what goes. A single item: its exact frame-folder + source paths. A
-		// multi-selection: the count plus the item names (capped, so a huge selection stays readable).
+		// What "delete" means per type: a video loses its frame folder and source file; an owned photo loses
+		// its file ONLY - its folderForMediaItem is the shared Photos/<label> dir, home to sibling photos,
+		// and must never be deleted; a referenced photo is only dropped from the catalog, its file untouched.
+
+		// The confirmation lists what goes. A single item: its exact paths. A multi-selection: the count plus
+		// the item names (capped, so a huge selection stays readable).
 		QString message;
 		if (selection.size() == 1)
 		{
 			const MediaId& sel = selection.constFirst();
-			message = tr("This will permanently delete:\n\n• %1").arg(catalog.folderForMediaItem(sel));
 			const QString sourcePath = catalog.sourcePathForMediaItem(sel);
-			if (!sourcePath.isEmpty())
-				message += "\n• " + sourcePath;
+			if (catalog.isReferenced(sel))
+			{
+				message = tr("This will remove the item from the catalog:\n\n• %1\n\nThe file itself will not be touched.").arg(sourcePath);
+			}
+			else if (catalog.mediaType(sel) == Catalog::MediaType::Photo)
+			{
+				message = tr("This will permanently delete:\n\n• %1").arg(sourcePath);
+			}
+			else
+			{
+				message = tr("This will permanently delete:\n\n• %1").arg(catalog.folderForMediaItem(sel));
+				if (!sourcePath.isEmpty())
+					message += "\n• " + sourcePath;
+			}
 		}
 		else
 		{
-			message = tr("This will permanently delete %1 items - each one's frame folder and source file:\n").arg(selection.size());
+			bool anyVideo = false, anyOwnedPhoto = false, anyReferencedPhoto = false;
+			for (const MediaId& sel : selection)
+			{
+				if (catalog.mediaType(sel) == Catalog::MediaType::Video)
+					anyVideo = true;
+				else if (catalog.isReferenced(sel))
+					anyReferencedPhoto = true;
+				else
+					anyOwnedPhoto = true;
+			}
+
+			QStringList deletedKinds;
+			if (anyVideo)
+				deletedKinds << tr("each video's frame folder and source file");
+			if (anyOwnedPhoto)
+				deletedKinds << tr("each owned photo's file");
+			if (!deletedKinds.isEmpty())
+				message = tr("This will permanently delete %1 items - %2:\n").arg(selection.size()).arg(deletedKinds.join(", "));
+			else  // nothing but referenced photos selected - no file is deleted at all
+				message = tr("This will remove %1 items from the catalog - their files will not be touched:\n").arg(selection.size());
+
 			constexpr qsizetype maxListed = 15;
 			for (qsizetype i = 0; i < qMin(maxListed, selection.size()); ++i)
-				message += "\n• " + QFileInfo(catalog.folderForMediaItem(selection[i])).fileName();
+			{
+				const MediaId& sel = selection[i];
+				// A video is named by its frame folder; a photo's folder is shared/empty, so use the id's file name.
+				message += "\n• " + (catalog.mediaType(sel) == Catalog::MediaType::Photo
+					? sel.name() : QFileInfo(catalog.folderForMediaItem(sel)).fileName());
+			}
 			if (selection.size() > maxListed)
 				message += "\n" + tr("... and %1 more").arg(selection.size() - maxListed);
+
+			if (anyReferencedPhoto && !deletedKinds.isEmpty())
+				message += "\n\n" + tr("Referenced photos in the selection are only removed from the catalog - their files are not touched.");
 		}
 		message += tr("\n\nThis cannot be undone. Continue?");
 
@@ -823,8 +892,16 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 		Catalog::BatchScope batch;  // one store write for the whole selection instead of one per item
 		for (const MediaId& sel : selection)
 		{
-			const QString folderPath = catalog.folderForMediaItem(sel);
 			const QString sourcePath = catalog.sourcePathForMediaItem(sel);
+			if (catalog.mediaType(sel) == Catalog::MediaType::Photo)
+			{
+				if (!catalog.isReferenced(sel))
+					QFile::remove(sourcePath);
+				catalog.removeMediaItem(sel);
+				continue;
+			}
+
+			const QString folderPath = catalog.folderForMediaItem(sel);
 			deleteFolderRecursively(folderPath);
 			if (!sourcePath.isEmpty())
 				QFile::remove(sourcePath);
@@ -840,7 +917,7 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 	menu.exec(globalPos);
 }
 
-void MainWindow::playVideo(const MediaId& id, bool systemPlayer)
+void MainWindow::playVideo(const MediaId& id)
 {
 	const QString sourcePath = Catalog::instance().sourcePathForMediaItem(id);
 	if (!QFile::exists(sourcePath))
@@ -849,14 +926,20 @@ void MainWindow::playVideo(const MediaId& id, bool systemPlayer)
 		return;
 	}
 
-	if (systemPlayer)
+	auto* playerWindow = new VideoPlayerWindow(sourcePath, id, nullptr);  // hand the player the catalog id directly
+	playerWindow->show();
+}
+
+void MainWindow::openSourceInSystemApp(const MediaId& id)
+{
+	const QString sourcePath = Catalog::instance().sourcePathForMediaItem(id);
+	if (!QFile::exists(sourcePath))
 	{
-		QDesktopServices::openUrl(QUrl::fromLocalFile(sourcePath));
+		QMessageBox::warning(this, tr("Error"), tr("Source file not found at:\n%1").arg(sourcePath));
 		return;
 	}
 
-	auto* playerWindow = new VideoPlayerWindow(sourcePath, id, nullptr);  // hand the player the catalog id directly
-	playerWindow->show();
+	QDesktopServices::openUrl(QUrl::fromLocalFile(sourcePath));
 }
 
 void MainWindow::resplitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder, bool preserveExistingPreview)
@@ -1130,6 +1213,9 @@ void MainWindow::reExportAllVideos()
 	Catalog& catalog = Catalog::instance();
 	for (const MediaId& id : catalog.allMediaItems())
 	{
+		if (catalog.mediaType(id) != Catalog::MediaType::Video)
+			continue;  // a photo has no frames to re-export - and its "folder" is the shared Photos/<label> dir, which resplit would wipe
+
 		const QString videoPath = catalog.sourcePathForMediaItem(id);
 		if (!videoPath.isEmpty() && QFile::exists(videoPath))
 			toReExport.push_back({ videoPath, catalog.folderForMediaItem(id) });
@@ -1419,6 +1505,10 @@ void MainWindow::toggleBestFolder(const MediaId& id)
 
 void MainWindow::renameMediaItemInteractive(const MediaId& id)
 {
+	// Videos only - the menu entry is hidden for photos. The rename below derives video-shaped paths; on an
+	// owned photo, folderForMediaItem is the SHARED Photos/<label> dir and would pass the exists-check.
+	assert(Catalog::instance().mediaType(id) == Catalog::MediaType::Video);
+
 	const QString originalFolderPath = Catalog::instance().folderForMediaItem(id);
 
 	// The frame folder must exist

@@ -8,6 +8,8 @@
 import anymore (see "Import: preview frames only" below) — only by `ensureFramesSplit` (the first time
 the user opens the frame viewer on a video that hasn't been split yet), `reExportAllVideos`, and the
 integrity tool's ghost-reimport, the latter two via the `resplitVideoIntoFrames` wrapper described below.
+`reExportAllVideos` skips photo entries when collecting its worklist — a photo has no frames, and its
+"folder" is the shared `Photos/<label>` dir, which the wipe-and-re-extract pattern would destroy.
 - Runs ffmpeg synchronously, freezing the UI during extraction — decided not worth making async (see
   [backlog](../../ARCHITECTURE.md#improvement-backlog)). Frame stepping (keep every Nth frame) and the
   user-configured full-split JPEG quality apply here; preview frames (below) are separate, with their own
@@ -123,7 +125,10 @@ grid only if `preview/` itself is empty.
 `MainWindow::backfillMissingPreviews()` runs once at startup, before the first grid build: every already-split
 legacy video (predating this feature) has real frames but no `preview/` yet, so it back-fills one via a plain
 file copy — no ffmpeg needed, since real frames already exist — selecting evenly-spaced real frames and copying
-them into `preview/`. Idempotent: once `preview/` exists, later startups skip it.
+them into `preview/`. Idempotent: once `preview/` exists, later startups skip it. Photo entries are skipped
+by type — a photo card decodes the photo file itself, and without that gate the scan would plant a `preview/`
+subfolder full of copies inside the shared `Photos/<label>` dir (photos report `isSplitIntoFrames() == true`,
+so that check alone doesn't exclude them).
 
 ## Other utilities
 

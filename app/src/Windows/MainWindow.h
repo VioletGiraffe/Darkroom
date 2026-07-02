@@ -37,7 +37,11 @@ private:
 	void saveSettings();
 	void restoreSettings();
 
-	void playVideo(const MediaId& id, bool systemPlayer);
+	// Opens the video in the built-in player window (after checking the source file exists).
+	void playVideo(const MediaId& id);
+	// Opens the item's source file in its OS-associated application - the system player for a video, the
+	// system image viewer for a photo (after checking the file exists).
+	void openSourceInSystemApp(const MediaId& id);
 	void refreshMediaGrid();
 	// Refreshes the grid AND the label sidebar (labels/counts). Use after structural changes (add/delete/
 	// rename an item, create a label); plain refreshMediaGrid is for filter/sort/zoom changes.
