@@ -6,7 +6,7 @@
 #include <functional>
 
 // Thin wrapper over invoking the ffmpeg binary (see Utils.h's ffmpegPath()) for the one operation shared
-// across ingestion, the legacy-preview backfill, and Quick Import's staging previews: pulling a handful of
+// across import, the legacy-preview backfill, and Quick Import's staging previews: pulling a handful of
 // evenly-spaced still frames out of a video file.
 namespace Ffmpeg {
 
@@ -33,7 +33,7 @@ struct PreviewJob
 void generatePreviewFrames(const QList<PreviewJob>& jobs, int frameCount, int maxConcurrentProcesses,
 	const std::function<void(int completedJobs, int totalJobs)>& onProgress = {});
 
-// Single-video convenience: the batch form with one job run one process at a time. Used by the ingestion
+// Single-video convenience: the batch form with one job run one process at a time. Used by the import
 // and re-split paths, which handle a single video.
 void generatePreviewFrames(const QString& videoFilePath, const QString& outputFolder, int frameCount);
 

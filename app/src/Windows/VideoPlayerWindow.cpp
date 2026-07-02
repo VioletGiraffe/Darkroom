@@ -34,12 +34,12 @@ enum LoopItemDataRole { LoopStartRole = Qt::UserRole, LoopEndRole = Qt::UserRole
 QList<VideoPlayerWindow*> VideoPlayerWindow::_instances;
 
 
-VideoPlayerWindow::VideoPlayerWindow(const QString& videoPath, const VideoId& videoId, QWidget* parent) : QMainWindow(parent) {
+VideoPlayerWindow::VideoPlayerWindow(const QString& videoPath, const MediaId& mediaId, QWidget* parent) : QMainWindow(parent) {
 	setAttribute(Qt::WA_DeleteOnClose);
 	setWindowTitle(QFileInfo{ videoPath }.completeBaseName());
 
 	_instances.push_back(this);
-	_videoId = videoId;
+	_mediaId = mediaId;
 
 	// Initialize Player & Output
 	_videoWidget = new QVideoWidget(this);
@@ -144,13 +144,13 @@ VideoPlayerWindow::VideoPlayerWindow(const QString& videoPath, const VideoId& vi
 			object.insert("name", loopCombo->itemText(i));
 			array.append(object);
 		}
-		MetadataStore::instance().set(_videoId, u"intervals", array);
+		MetadataStore::instance().set(_mediaId, u"intervals", array);
 	};
 
 	// Load this video's saved loops into the combo without firing the activation handler wired below.
 	{
 		const QSignalBlocker blocker{ loopCombo };
-		const QJsonArray saved = MetadataStore::instance().get(_videoId, u"intervals").toArray();
+		const QJsonArray saved = MetadataStore::instance().get(_mediaId, u"intervals").toArray();
 		for (const QJsonValue& value : saved)
 		{
 			const QJsonObject object = value.toObject();

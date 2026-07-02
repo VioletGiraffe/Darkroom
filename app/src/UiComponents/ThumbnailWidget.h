@@ -19,7 +19,7 @@ public:
 	// canvasSize is the card's image area: the frames are tiled across it (one slot each) and best-fit
 	// into their slot. The widget grows by its caption strip and content margins around that area.
 	// framed=false drops the border/hover/padding, leaving just the recessed matte image well — used by the
-	// grid card, which draws its own frame (and hover) around the thumbnail + footer in VideoItemWidget.
+	// grid card, which draws its own frame (and hover) around the thumbnail + footer in MediaItemWidget.
 	ThumbnailWidget(const QStringList& compositePaths, const QString& label, QWidget* parent, QSize canvasSize, bool dynamicSizeHint = true, bool framed = true);
 
 	~ThumbnailWidget() override;

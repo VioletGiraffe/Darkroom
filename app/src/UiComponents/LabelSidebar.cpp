@@ -237,7 +237,7 @@ void LabelSidebar::rebuildRows()
 {
 	m_list->clear();
 	Catalog& catalog = Catalog::instance();
-	const QHash<QString, int> counts = catalog.labelVideoCounts();
+	const QHash<QString, int> counts = catalog.labelMediaItemCounts();
 	const QList<Catalog::Label> labels = catalog.allLabels();
 
 	const auto addLabelRow = [&](const Catalog::Label& l, bool star) {
@@ -252,7 +252,7 @@ void LabelSidebar::rebuildRows()
 	// Pinned rows: All, then Best (gold dot + star), separated from the ordinary labels by a divider.
 	auto* allItem = new QListWidgetItem(tr("All"), m_list);
 	allItem->setData(kLabelIdRole, AllLabelId);
-	allItem->setData(kCountRole, QString::number(catalog.videoCount()));
+	allItem->setData(kCountRole, QString::number(catalog.mediaItemCount()));
 
 	for (const Catalog::Label& l : labels)
 		if (l.id == Catalog::BestLabelId)

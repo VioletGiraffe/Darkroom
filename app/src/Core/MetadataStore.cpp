@@ -48,7 +48,7 @@ void MetadataStore::save() const
 // Guarded on a non-empty name rather than isValid(): a source-unavailable placeholder (negative size, so
 // !isValid()) still has a stable key() and must be able to persist its folder/source-path fields. Only a
 // truly empty identity (no name) is rejected.
-QJsonValue MetadataStore::get(const VideoId& id, QStringView field) const
+QJsonValue MetadataStore::get(const MediaId& id, QStringView field) const
 {
 	if (id.name().isEmpty())
 		return {};
@@ -56,7 +56,7 @@ QJsonValue MetadataStore::get(const VideoId& id, QStringView field) const
 	return _records.value(id.key()).toObject().value(field.toString());
 }
 
-void MetadataStore::set(const VideoId& id, QStringView field, const QJsonValue& value)
+void MetadataStore::set(const MediaId& id, QStringView field, const QJsonValue& value)
 {
 	if (id.name().isEmpty())
 		return;
@@ -69,7 +69,7 @@ void MetadataStore::set(const VideoId& id, QStringView field, const QJsonValue& 
 	scheduleSave();
 }
 
-void MetadataStore::remove(const VideoId& id)
+void MetadataStore::remove(const MediaId& id)
 {
 	// QJsonObject::remove returns void; take() removes and hands back the old value (undefined if it wasn't
 	// there), so it doubles as the "was anything actually removed?" check that avoids a needless save.
@@ -99,9 +99,9 @@ void MetadataStore::endBatch()
 	}
 }
 
-QList<VideoId> MetadataStore::allVideoIds() const
+QList<MediaId> MetadataStore::allMediaIds() const
 {
-	QList<VideoId> ids;
+	QList<MediaId> ids;
 	ids.reserve(_records.size());
 	for (auto it = _records.begin(); it != _records.end(); ++it)
 	{
@@ -110,12 +110,12 @@ QList<VideoId> MetadataStore::allVideoIds() const
 		const QString name = it.value().toObject().value(QStringLiteral("name")).toString();
 		const qint64 size = it.key().section(':', 0, 0).toLongLong();
 		if (!name.isEmpty())
-			ids.append(VideoId::fromNameAndSize(name, size));
+			ids.append(MediaId::fromNameAndSize(name, size));
 	}
 	return ids;
 }
 
-void MetadataStore::rekey(const VideoId& oldId, const VideoId& newId)
+void MetadataStore::rekey(const MediaId& oldId, const MediaId& newId)
 {
 	if (!oldId.isValid() || !newId.isValid() || oldId == newId || !_records.contains(oldId.key()))
 		return;

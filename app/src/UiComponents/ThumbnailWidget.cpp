@@ -344,7 +344,7 @@ void ThumbnailWidget::applyStyleSettings()
 	// these in bulk (hundreds at a time).
 	if (!m_framed)
 	{
-		// Borderless: just the recessed matte well. The surrounding VideoItemWidget owns the card's border,
+		// Borderless: just the recessed matte well. The surrounding MediaItemWidget owns the card's border,
 		// background and hover, so the thumbnail carries no frame, no hover and no inset of its own.
 		setObjectName("cardThumbnailWell");
 		setContentsMargins(0, 0, 0, 0);

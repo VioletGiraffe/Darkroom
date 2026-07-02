@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/VideoId.h"
+#include "Core/MediaId.h"
 
 #include <QList>
 #include <QMainWindow>
@@ -11,9 +11,9 @@ class QVideoWidget;
 class VideoPlayerWindow final : public QMainWindow
 {
 public:
-	// videoId keys the saved loop intervals in MetadataStore; pass the catalog's id for a tracked video, or
-	// VideoId::fromFile(videoPath) for an ad-hoc one (a staging/untracked preview not in the catalog).
-	VideoPlayerWindow(const QString& videoPath, const VideoId& videoId, QWidget* parent);
+	// mediaId keys the saved loop intervals in MetadataStore; pass the catalog's id for a tracked video, or
+	// MediaId::fromFile(videoPath) for an ad-hoc one (a staging/untracked preview not in the catalog).
+	VideoPlayerWindow(const QString& videoPath, const MediaId& mediaId, QWidget* parent);
 	~VideoPlayerWindow() override;
 
 	static void restartAll();
@@ -29,7 +29,7 @@ private:
 private:
 	static QList<VideoPlayerWindow*> _instances;
 
-	VideoId _videoId; // identity of the played source video; keys its saved loops in MetadataStore
+	MediaId _mediaId; // identity of the played source video; keys its saved loops in MetadataStore
 
 	QMediaPlayer* _player = nullptr;
 	QVideoWidget* _videoWidget = nullptr;

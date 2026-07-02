@@ -56,12 +56,12 @@ void forEachFolder(const QString& root, F&& callback)
 [[nodiscard]] QDateTime parseTrailingTimestamp(const QString& text);
 
 // Best-effort recording date of the source video a frame folder was extracted from - a "video
-// date", deliberately not the folder's own creation time (that's the ingestion date). Prefers the
+// date", deliberately not the folder's own creation time (that's the import date). Prefers the
 // timestamp embedded in the video's filename (see parseTrailingTimestamp), which survives the file
 // being moved; falls back to the video file's creation time, and only as a last resort - when the
 // source video isn't recorded or no longer exists - to the folder's own timestamp. The caller supplies
 // both the source path (from the catalog) and the frame folder for the last-resort fallback.
-[[nodiscard]] QDateTime getSourceVideoDate(const QString& sourceVideoPath, const QString& folderPath);
+[[nodiscard]] QDateTime getSourceFileDate(const QString& sourcePath, const QString& folderPath);
 
 void openInExplorer(const QString& path);
 

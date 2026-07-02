@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/VideoId.h"
+#include "Core/MediaId.h"
 
 #include <QHash>
 #include <QList>
@@ -12,19 +12,19 @@
 // its display name never disturbs associations), a display name, a color, and a "virtual" flag. A video
 // carries a flat set of labels: its positional folder label (derived from which collection folder its
 // frames sit in) plus any extra labels assigned app-side. Extra labels are stored in MetadataStore under
-// the "labels" field - a list of label *ids* - keyed by VideoId. `Best` is the one virtual label (no
+// the "labels" field - a list of label *ids* - keyed by MediaId. `Best` is the one virtual label (no
 // backing folder; pure membership).
 //
-// Catalog is THE catalog: the authoritative in-memory model of the video set, keyed by VideoId. For each
+// Catalog is THE catalog: the authoritative in-memory model of the video set, keyed by MediaId. For each
 // video it holds its frame folder, source-video path, and full label-id set. Every video-set / label query
 // is answered from this in-memory model. MetadataStore is how the model is *persisted* - a dumb,
-// field-granular, VideoId-keyed store shared with other features (e.g. the player's loop intervals); the
+// field-granular, MediaId-keyed store shared with other features (e.g. the player's loop intervals); the
 // catalog loads itself from it once at construction and writes through on each mutation. Nothing treats
 // MetadataStore's records as the catalog - callers ask Catalog.
 //
-// Identity is minted from a file (a stat for name+size) at exactly two points: ingestion (addVideo, source
+// Identity is minted from a file (a stat for name+size) at exactly two points: import (addMediaItem, source
 // path in hand) and the one-time legacy seed (from each folder's source_info.txt). Everywhere else a video
-// is addressed by the VideoId it already carries; the disk is never walked except by that seed.
+// is addressed by the MediaId it already carries; the disk is never walked except by that seed.
 //
 // Single shared instance, GUI-thread only.
 class Catalog
@@ -56,38 +56,38 @@ public:
 	// store may have changed underneath - call it after a structural change if in doubt; it is idempotent.
 	void rebuildIndex();
 
-	// Queries - VideoId-anchored (a card carries its video's id directly).
-	[[nodiscard]] QStringList labelsForVideo(const VideoId& id) const;          // full label-id set of the video
-	[[nodiscard]] QSet<VideoId> videosForLabel(const QString& labelId) const;
-	[[nodiscard]] bool videoHasLabel(const VideoId& id, const QString& labelId) const;
+	// Queries - MediaId-anchored (a card carries its video's id directly).
+	[[nodiscard]] QStringList labelsForMediaItem(const MediaId& id) const;          // full label-id set of the video
+	[[nodiscard]] QSet<MediaId> mediaItemsForLabel(const QString& labelId) const;
+	[[nodiscard]] bool mediaItemHasLabel(const MediaId& id, const QString& labelId) const;
 
 	// Enumeration / counts.
-	[[nodiscard]] QList<VideoId> allVideos() const { return _videos.keys(); }
-	[[nodiscard]] int videoCount() const { return static_cast<int>(_videos.size()); }
+	[[nodiscard]] QList<MediaId> allMediaItems() const { return _mediaItems.keys(); }
+	[[nodiscard]] int mediaItemCount() const { return static_cast<int>(_mediaItems.size()); }
 	// labelId -> number of videos carrying it, computed in one pass (for the sidebar's per-label counts).
-	[[nodiscard]] QHash<QString, int> labelVideoCounts() const;
+	[[nodiscard]] QHash<QString, int> labelMediaItemCounts() const;
 
-	// Per-video disk facts the catalog tracks. folderForVideo is absolute; both are empty for an unknown id.
-	[[nodiscard]] QString folderForVideo(const VideoId& id) const;
-	[[nodiscard]] QString sourceVideoPathForVideo(const VideoId& id) const;
+	// Per-video disk facts the catalog tracks. folderForMediaItem is absolute; both are empty for an unknown id.
+	[[nodiscard]] QString folderForMediaItem(const MediaId& id) const;
+	[[nodiscard]] QString sourcePathForMediaItem(const MediaId& id) const;
 	// False once a video was registered with only preview frames (an on-demand split is still owed); true once
-	// the full frame set has been extracted. Unknown id -> true (nothing pending). See addVideo.
-	[[nodiscard]] bool isSplitIntoFrames(const VideoId& id) const;
+	// the full frame set has been extracted. Unknown id -> true (nothing pending). See addMediaItem.
+	[[nodiscard]] bool isSplitIntoFrames(const MediaId& id) const;
 	// Directory of the first video whose source file is currently present, in iteration order (a sensible
 	// default destination for relocating newly added source files). Empty if none is found.
-	[[nodiscard]] QString anySourceVideoDir() const;
+	[[nodiscard]] QString anySourceDir() const;
 
 	// Per-video membership. A missing source video has an invalid (placeholder) id and can't be labeled, so
 	// these no-op on one. addLabel only ever writes the stored id list. removeLabel is metadata-only too,
 	// EXCEPT when labelId is the label that happens to name the video's storage folder: then it relocates
 	// that folder on disk to the video's alphabetically-first remaining ordinary label (a video must always
 	// keep at least one ordinary label, so removing its last one is refused).
-	void addLabel(const VideoId& id, const QString& labelId);
-	void removeLabel(const VideoId& id, const QString& labelId);
+	void addLabel(const MediaId& id, const QString& labelId);
+	void removeLabel(const MediaId& id, const QString& labelId);
 
 	// RAII: collapses any number of video registrations/mutations made within this scope into a single store
 	// write at the end, instead of one per call. Nests freely - only the outermost scope flushes. Wrap any
-	// loop that touches many videos (seeding, batch ingestion, re-export); without this, each mutation rewrites
+	// loop that touches many videos (seeding, batch import, re-export); without this, each mutation rewrites
 	// the *entire* store, making an n-video loop write O(n^2) bytes overall instead of O(n).
 	class BatchScope
 	{
@@ -98,24 +98,24 @@ public:
 		BatchScope& operator=(const BatchScope&) = delete;
 	};
 
-	// Video lifecycle.
-	// addVideo registers a freshly ingested video (source path + frame folder both known); ensures the
+	// Media item lifecycle.
+	// addMediaItem registers a freshly imported video (source path + frame folder both known); ensures the
 	// collection's folder label exists. splitIntoFrames records whether the folder already holds the full
 	// real frame set (true) or only preview frames pending an on-demand split (false) - see isSplitIntoFrames.
 	// Returns false (no-op) if this id already names a video tracked under a different folder - a name+size
 	// collision with an existing video, which the caller must not paper over by leaving newly extracted frames
 	// on disk untracked. Re-registering the same id at its current folder (re-export, or a later on-demand
 	// split flipping splitIntoFrames to true) is not a collision and returns true, updating the entry's fields.
-	// removeVideo drops a video from the catalog entirely (delete-all), so it doesn't linger as a ghost now
+	// removeMediaItem drops a video from the catalog entirely (delete-all), so it doesn't linger as a ghost now
 	// that the catalog - not the disk walk - is the authoritative set.
-	bool addVideo(const VideoId& id, const QString& sourceVideoPath, const QString& folderAbs, bool splitIntoFrames);
-	void removeVideo(const VideoId& id);
+	bool addMediaItem(const MediaId& id, const QString& sourcePath, const QString& folderAbs, bool splitIntoFrames);
+	void removeMediaItem(const MediaId& id);
 	// Applies an in-app rename: carries the whole metadata record from oldId to newId (re-key; loop intervals
 	// and labels follow the new identity), updates the stored source path + frame folder, and re-keys the
 	// model entry. oldId == newId is allowed (the source file kept its name but the frame folder moved).
 	// Returns false (no-op) if newId already names a different tracked video - a name+size collision, the same
-	// guard as addVideo - so the caller can undo its on-disk renames instead of clobbering that entry.
-	bool applyRename(const VideoId& oldId, const VideoId& newId, const QString& newSourceVideoPath, const QString& newFolderAbs);
+	// guard as addMediaItem - so the caller can undo its on-disk renames instead of clobbering that entry.
+	bool applyRename(const MediaId& oldId, const MediaId& newId, const QString& newSourcePath, const QString& newFolderAbs);
 
 	// Registry mutations (the label objects themselves). renameLabel validates newDisplayName is unique, renames
 	// the matching on-disk collection folder if one exists, rewrites the frame folder of every video under it,
@@ -149,11 +149,11 @@ public:
 
 	// --- Integrity check (manual, user-triggered; the only other place besides the legacy seed that walks disk) ---
 
-	// A placeholder (source was missing when seeded/ingested) whose recorded source path now resolves to an
+	// A placeholder (source was missing when seeded/imported) whose recorded source path now resolves to an
 	// existing file - the source has reappeared and the video can be relinked to its real identity.
 	struct RelinkCandidate
 	{
-		VideoId placeholderId;
+		MediaId placeholderId;
 		QString folder;              // absolute, for display
 		QString recordedSourcePath;  // where the source was last known/expected to be; now exists
 	};
@@ -164,7 +164,7 @@ public:
 	{
 		QString folderPath;
 		QString candidateSourcePath;   // from a legacy source_info.txt, if present and that file still exists; else empty
-		VideoId clashId;               // the existing catalog id candidateSourcePath resolves to; invalid = no clash
+		MediaId clashId;               // the existing catalog id candidateSourcePath resolves to; invalid = no clash
 		bool    filesIdentical = false;  // meaningful only when clashId.isValid(): byte comparison against the existing entry's source
 	};
 
@@ -172,10 +172,10 @@ public:
 	// Never reported for a video that's merely awaiting its on-demand split - see isSplitIntoFrames.
 	struct GhostEntry
 	{
-		VideoId id;
+		MediaId id;
 		QString folder;              // the (missing/emptied) recorded folder
-		QString sourceVideoPath;
-		bool    sourcePresent = false;  // true if sourceVideoPath still points at an existing file - re-import is possible
+		QString sourcePath;
+		bool    sourcePresent = false;  // true if sourcePath still points at an existing file - re-import is possible
 	};
 
 	struct IntegrityReport
@@ -194,7 +194,7 @@ public:
 	// stored labels with any pre-existing (orphaned) record already under the real id - see data-model.md's
 	// "Legacy seed" note on how such an orphaned record can exist. Refuses (false, qWarning) if the real id
 	// already names a video tracked under a *different* folder - a separate, unrelated collision.
-	bool relinkPlaceholder(const VideoId& placeholderId, const QString& confirmedSourcePath);
+	bool relinkPlaceholder(const MediaId& placeholderId, const QString& confirmedSourcePath);
 
 	Catalog(const Catalog&) = delete;
 	Catalog& operator=(const Catalog&) = delete;
@@ -224,7 +224,7 @@ private:
 	struct Entry
 	{
 		QString     folder;           // absolute frame-folder path (stored relative-to-root in JSON)
-		QString     sourceVideoPath;  // absolute; may point at a missing/unmounted file
+		QString     sourcePath;       // absolute; may point at a missing/unmounted file
 		QStringList labelIds;         // derived folder-label id (first when known) + stored extra ids
 		bool        splitIntoFrames = true;  // false = only preview frames exist yet; see isSplitIntoFrames
 	};
@@ -232,18 +232,18 @@ private:
 	[[nodiscard]] static QString collectionNameOf(const QString& folderAbs);  // the collection-folder name (the storage label's display name)
 	[[nodiscard]] static QString relativeFolder(const QString& folderAbs);    // strip rootFolder() prefix for portable storage
 	[[nodiscard]] static QString absoluteFolder(const QString& folderRel);    // re-anchor a stored relative folder under rootFolder()
-	[[nodiscard]] QStringList computeLabelIds(const VideoId& id, const QString& folderAbs) const;  // derived folder-label + stored extras
-	void refreshVideoLabels(const VideoId& id);  // recompute one entry's labelIds after a mutation
+	[[nodiscard]] QStringList computeLabelIds(const MediaId& id, const QString& folderAbs) const;  // derived folder-label + stored extras
+	void refreshMediaItemLabels(const MediaId& id);  // recompute one entry's labelIds after a mutation
 
 	[[nodiscard]] Label* mutableLabelById(const QString& id);                // non-const finder for registry mutations
 	// Moves a video's frame folder off the label that currently names it, onto its alphabetically-first remaining
 	// ordinary label, and updates the model entry. Warns and does nothing if no other ordinary label remains.
-	void relocateFolderOffLabel(const VideoId& id, const QString& removedLabelId);
+	void relocateFolderOffLabel(const MediaId& id, const QString& removedLabelId);
 
-	[[nodiscard]] static QStringList readStoredLabelIds(const VideoId& id);
-	static void writeStoredLabelIds(const VideoId& id, const QStringList& labelIds);
+	[[nodiscard]] static QStringList readStoredLabelIds(const MediaId& id);
+	static void writeStoredLabelIds(const MediaId& id, const QStringList& labelIds);
 
 	QList<Label>          _labels;                  // registry, display order
-	QHash<VideoId, Entry> _videos;                  // the model: VideoId -> per-video facts
+	QHash<MediaId, Entry> _mediaItems;              // the model: MediaId -> per-item facts
 	bool                  _seededFromSourceInfo = false;  // legacy seed guard, persisted in labels.json
 };

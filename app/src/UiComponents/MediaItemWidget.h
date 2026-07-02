@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/VideoId.h"
+#include "Core/MediaId.h"
 
 #include <QColor>
 #include <QList>
@@ -16,12 +16,12 @@ class QDropEvent;
 class QLabel;
 class ThumbnailWidget;
 
-class VideoItemWidget final : public QWidget {
+class MediaItemWidget final : public QWidget {
 public:
 	// maxImageSize bounds the thumbnail's preview area; the actual size best-fits the loaded image within it.
-	VideoItemWidget(
+	MediaItemWidget(
 		QSize maxImageSize, const QStringList& previewPaths, const QString& label,
-		const VideoId& videoId,
+		const MediaId& mediaId,
 		bool inBest, std::function<void()> onToggleBest,
 		std::function<void()> onDoubleClick = {},
 		std::function<void(QPoint globalPos)> onContextMenu = {},
@@ -33,7 +33,7 @@ public:
 
 	// The card's stable identity (source video name + size). Carried so label ops and the label-drop target
 	// (see setOnLabelDropped) address the video directly. Invalid if the source video is missing.
-	[[nodiscard]] const VideoId& videoId() const { return m_videoId; }
+	[[nodiscard]] const MediaId& mediaId() const { return m_mediaId; }
 
 	// Updates the card's caption (the "N:  name" label) without re-rendering its thumbnail.
 	void setLabel(const QString& label);
@@ -73,7 +73,7 @@ private:
 	QLabel*                      m_name = nullptr;       // elided, right-aligned video name in the footer
 	QWidget*                     m_labelDots = nullptr;  // colored-dot strip (LabelDotStrip), child of m_footer
 	QWidget*                     m_splitPendingBadge = nullptr;  // top-right "not fully split" badge, child of m_thumb
-	VideoId                      m_videoId;
+	MediaId                      m_mediaId;
 	std::function<void()>               m_onMiddleButtonClick;
 	std::function<void()>               m_onDoubleClick;
 	std::function<void(QPoint)>         m_onContextMenu;

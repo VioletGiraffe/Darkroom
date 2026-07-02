@@ -43,11 +43,11 @@ QStringList FindUntrackedFilesDialog::scanAndShowUi(const QString& rootFolder, Q
 	// itself, which holds the organized collections rather than wherever the raw source footage actually lives.
 	QSet<QString> tracked;
 	Catalog& catalog = Catalog::instance();
-	for (const VideoId& id : catalog.allVideos())
+	for (const MediaId& id : catalog.allMediaItems())
 	{
-		const QString video = catalog.sourceVideoPathForVideo(id);
-		if (!video.isEmpty())
-			tracked.insert(normalizePath(video));
+		const QString sourcePath = catalog.sourcePathForMediaItem(id);
+		if (!sourcePath.isEmpty())
+			tracked.insert(normalizePath(sourcePath));
 	}
 
 	QSettings settings;
@@ -138,7 +138,7 @@ FindUntrackedFilesDialog::FindUntrackedFilesDialog(const QStringList& untrackedF
 
 		// Parented to the dialog so this modal window doesn't block it; closing
 		// the dialog therefore also closes any previews opened from it.
-		auto* player = new VideoPlayerWindow(path, VideoId::fromFile(path), this);
+		auto* player = new VideoPlayerWindow(path, MediaId::fromFile(path), this);
 		player->show();
 	});
 

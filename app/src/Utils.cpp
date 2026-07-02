@@ -99,19 +99,19 @@ QDateTime parseTrailingTimestamp(const QString& text)
 	return dt;
 }
 
-QDateTime getSourceVideoDate(const QString& sourceVideoPath, const QString& folderPath)
+QDateTime getSourceFileDate(const QString& sourcePath, const QString& folderPath)
 {
-	if (!sourceVideoPath.isEmpty())
+	if (!sourcePath.isEmpty())
 	{
-		const QDateTime fromName = parseTrailingTimestamp(QFileInfo(sourceVideoPath).completeBaseName());
+		const QDateTime fromName = parseTrailingTimestamp(QFileInfo(sourcePath).completeBaseName());
 		if (fromName.isValid())
 			return fromName;
 
-		const QFileInfo videoInfo(sourceVideoPath);
-		if (videoInfo.exists())
+		const QFileInfo sourceInfo(sourcePath);
+		if (sourceInfo.exists())
 		{
-			const QDateTime birth = videoInfo.birthTime();
-			return birth.isValid() ? birth : videoInfo.lastModified();
+			const QDateTime birth = sourceInfo.birthTime();
+			return birth.isValid() ? birth : sourceInfo.lastModified();
 		}
 	}
 

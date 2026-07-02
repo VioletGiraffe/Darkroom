@@ -1,4 +1,4 @@
-#include "UiComponents/VideoItemWidget.h"
+#include "UiComponents/MediaItemWidget.h"
 #include "UiComponents/LabelMimeType.h"
 #include "UiComponents/ThumbnailWidget.h"
 #include "Theme/Theme.h"
@@ -147,9 +147,9 @@ private:
 
 }  // namespace
 
-VideoItemWidget::VideoItemWidget(
+MediaItemWidget::MediaItemWidget(
 	QSize maxImageSize, const QStringList& previewPaths, const QString& label,
-	const VideoId& videoId,
+	const MediaId& mediaId,
 	bool inBest, std::function<void()> onToggleBest,
 	std::function<void()> onDoubleClick,
 	std::function<void(QPoint)> onContextMenu,
@@ -157,7 +157,7 @@ VideoItemWidget::VideoItemWidget(
 	QWidget* parent
 )
 	: QWidget{ parent }
-	, m_videoId{ videoId }
+	, m_mediaId{ mediaId }
 	, m_onDoubleClick{ std::move(onDoubleClick) }
 	, m_onContextMenu{ std::move(onContextMenu) }
 {
@@ -191,7 +191,7 @@ VideoItemWidget::VideoItemWidget(
 		connect(m_thumb, &QWidget::customContextMenuRequested, this, [this](const QPoint& pos) {
 			// m_onContextMenu runs the menu's exec() synchronously, and a menu action (e.g. Labels/Delete) can
 			// rebuild the grid and delete this very card mid-call - so guard with QPointer before touching it.
-			QPointer<VideoItemWidget> self(this);
+			QPointer<MediaItemWidget> self(this);
 			m_onContextMenu(m_thumb->mapToGlobal(pos));
 			if (self)
 				clearStuckHoverIfCursorLeft(self);  // else the popup grab leaves #videoCard:hover stuck on
@@ -239,12 +239,12 @@ VideoItemWidget::VideoItemWidget(
 	layout->addWidget(m_footer, 0);
 }
 
-void VideoItemWidget::setLabel(const QString& label)
+void MediaItemWidget::setLabel(const QString& label)
 {
 	static_cast<ElidedLabel*>(m_name)->setFullText(label);
 }
 
-void VideoItemWidget::setLabelDots(const QList<QColor>& colors, const QString& tooltip)
+void MediaItemWidget::setLabelDots(const QList<QColor>& colors, const QString& tooltip)
 {
 	auto* strip = static_cast<LabelDotStrip*>(m_labelDots);
 	strip->setColors(colors);            // updates its sizeHint; the footer layout re-fits it
@@ -252,7 +252,7 @@ void VideoItemWidget::setLabelDots(const QList<QColor>& colors, const QString& t
 	m_thumb->setToolTip(tooltip);        // hovering the card lists its label names
 }
 
-void VideoItemWidget::setSplitPending(bool pending)
+void MediaItemWidget::setSplitPending(bool pending)
 {
 	m_splitPendingBadge->setVisible(pending);
 	if (pending)
@@ -262,42 +262,42 @@ void VideoItemWidget::setSplitPending(bool pending)
 	}
 }
 
-void VideoItemWidget::repositionSplitPendingBadge()
+void MediaItemWidget::repositionSplitPendingBadge()
 {
 	static constexpr int MARGIN = 4;
 	m_splitPendingBadge->move(m_thumb->width() - m_splitPendingBadge->width() - MARGIN, MARGIN);
 }
 
-void VideoItemWidget::setOnMiddleButtonClick(std::function<void()> onClick)
+void MediaItemWidget::setOnMiddleButtonClick(std::function<void()> onClick)
 {
 	m_onMiddleButtonClick = std::move(onClick);
 	m_thumb->installEventFilter(this); // idempotent; ensures filter is active
 }
 
-void VideoItemWidget::setOnMouseWheelCallback(std::function<void(int)> handler)
+void MediaItemWidget::setOnMouseWheelCallback(std::function<void(int)> handler)
 {
 	m_thumb->setOnMouseWheelCallback(std::move(handler));
 }
 
-void VideoItemWidget::setOnLabelDropped(std::function<void(const QString&)> handler)
+void MediaItemWidget::setOnLabelDropped(std::function<void(const QString&)> handler)
 {
 	m_onLabelDropped = std::move(handler);
 }
 
-void VideoItemWidget::dragEnterEvent(QDragEnterEvent* event)
+void MediaItemWidget::dragEnterEvent(QDragEnterEvent* event)
 {
 	if (m_onLabelDropped && event->mimeData()->hasFormat(LabelMimeType))
 		event->acceptProposedAction();
 }
 
-void VideoItemWidget::dragMoveEvent(QDragMoveEvent* event)
+void MediaItemWidget::dragMoveEvent(QDragMoveEvent* event)
 {
 	// Re-accept across the whole card (the child thumbnail doesn't accept drops, so events bubble up here).
 	if (m_onLabelDropped && event->mimeData()->hasFormat(LabelMimeType))
 		event->acceptProposedAction();
 }
 
-void VideoItemWidget::dropEvent(QDropEvent* event)
+void MediaItemWidget::dropEvent(QDropEvent* event)
 {
 	if (!m_onLabelDropped || !event->mimeData()->hasFormat(LabelMimeType))
 		return;
@@ -310,7 +310,7 @@ void VideoItemWidget::dropEvent(QDropEvent* event)
 	m_onLabelDropped(labelId);  // the handler defers the catalog mutation + grid rebuild (which deletes this card)
 }
 
-QSize VideoItemWidget::sizeHint() const
+QSize MediaItemWidget::sizeHint() const
 {
 	if (!m_thumb)
 		return QWidget::sizeHint();
@@ -324,7 +324,7 @@ QSize VideoItemWidget::sizeHint() const
 	            thumb.height() + CARD_FOOTER_SPACING + footerHeight + m.top() + m.bottom());
 }
 
-bool VideoItemWidget::eventFilter(QObject* watched, QEvent* event)
+bool MediaItemWidget::eventFilter(QObject* watched, QEvent* event)
 {
 	if (watched != m_thumb)
 		return QWidget::eventFilter(watched, event);

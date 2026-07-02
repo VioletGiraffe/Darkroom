@@ -22,7 +22,7 @@ constexpr const char* VIDEO_FILE_FILTER = "Video files (*.mp4 *.mov *.avi *.mkv 
 // doesn't have to exist - only its directory is used) if given, else a sensible catalog-wide default.
 QString browseForSourceVideo(QWidget* parent, const QString& hint)
 {
-	const QString startDir = hint.isEmpty() ? Catalog::instance().anySourceVideoDir() : QFileInfo(hint).absolutePath();
+	const QString startDir = hint.isEmpty() ? Catalog::instance().anySourceDir() : QFileInfo(hint).absolutePath();
 	return QFileDialog::getOpenFileName(parent, QObject::tr("Select source video"), startDir, QObject::tr(VIDEO_FILE_FILTER));
 }
 
@@ -116,7 +116,7 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog::IntegrityReport& repor
 			rowLayout->addWidget(browseButton);
 			rowLayout->addWidget(skipButton);
 
-			const VideoId placeholderId = candidate.placeholderId;
+			const MediaId placeholderId = candidate.placeholderId;
 			const QString recordedPath = candidate.recordedSourcePath;
 			const QList<QPushButton*> rowButtons{ relinkButton, browseButton, skipButton };
 
@@ -220,11 +220,11 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog::IntegrityReport& repor
 		{
 			QString detail;
 			if (ghost.sourcePresent)
-				detail = tr("Source still present at %1").arg(ghost.sourceVideoPath);
-			else if (ghost.sourceVideoPath.isEmpty())
+				detail = tr("Source still present at %1").arg(ghost.sourcePath);
+			else if (ghost.sourcePath.isEmpty())
 				detail = tr("Source is also missing");
 			else
-				detail = tr("Source is also missing (%1)").arg(ghost.sourceVideoPath);
+				detail = tr("Source is also missing (%1)").arg(ghost.sourcePath);
 			const QString status = QFileInfo(ghost.folder).fileName() + "<br>" + detail;
 
 			const auto [row, statusLabel] = addRow(status);
@@ -241,7 +241,7 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog::IntegrityReport& repor
 			rowLayout->addWidget(removeButton);
 			rowLayout->addWidget(skipButton);
 
-			const VideoId ghostId = ghost.id;
+			const MediaId ghostId = ghost.id;
 			QList<QPushButton*> rowButtons{ removeButton, skipButton };
 			if (reimportButton)
 				rowButtons.prepend(reimportButton);

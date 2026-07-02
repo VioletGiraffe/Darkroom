@@ -10,8 +10,8 @@
 #include "Windows/QuickImportDialog.h"
 #include "Windows/SettingsDialog.h"
 #include "UiComponents/SortControl.h"
-#include "Core/VideoId.h"
-#include "UiComponents/VideoItemWidget.h"
+#include "Core/MediaId.h"
+#include "UiComponents/MediaItemWidget.h"
 #include "Windows/VideoPlayerWindow.h"
 #include "Theme/Theme.h"
 #include "Utils.h"
@@ -79,7 +79,7 @@ inline int     frameStep()   { return QSettings{}.value(Settings::FrameStep,    
 inline int     cardImageHeight() { return QSettings{}.value(CARD_IMAGE_HEIGHT_KEY, DEFAULT_CARD_IMAGE_HEIGHT).toInt(); }
 
 // Copies preview frames from an existing preview/ dir into a fresh one at the destination (created as needed),
-// returning true only if at least one frame was copied. A false return - nothing to reuse - tells ingestion
+// returning true only if at least one frame was copied. A false return - nothing to reuse - tells import
 // to fall back to a fresh ffmpeg extraction. The destination is always a just-created empty folder here
 // (callers wipe/recreate the output folder first), so QFile::copy never has to overwrite.
 static bool copyPreviewFrames(const QString& srcPreviewDir, const QString& dstPreviewDir)
@@ -110,7 +110,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
 	backfillMissingPreviews();
 
 	// The one initial grid build is deliberately deferred to restoreSettings() below (queued): it applies the
-	// persisted label filter and calls refreshVideoGrid() once. Building here too would construct every card
+	// persisted label filter and calls refreshMediaGrid() once. Building here too would construct every card
 	// twice on startup - once with the default filter, then again with the restored one.
 	QMetaObject::invokeMethod(this, [this] {
 		restoreSettings();
@@ -140,7 +140,7 @@ void MainWindow::setupUI()
 
 	// Left: the label sidebar (filter), replacing the old per-collection tab bar.
 	m_labelSidebar = new LabelSidebar();
-	connect(m_labelSidebar, &LabelSidebar::filterChanged, this, &MainWindow::refreshVideoGrid);
+	connect(m_labelSidebar, &LabelSidebar::filterChanged, this, &MainWindow::refreshMediaGrid);
 	connect(m_labelSidebar, &LabelSidebar::addLabelRequested, this, &MainWindow::createLabelInteractive);
 	connect(m_labelSidebar, &LabelSidebar::renameLabelRequested, this, &MainWindow::renameLabelInteractive);
 	connect(m_labelSidebar, &LabelSidebar::setLabelColorRequested, this, &MainWindow::setLabelColorInteractive);
@@ -195,49 +195,49 @@ void MainWindow::setupUI()
 
 	connect(m_previewFrameCountCombo, &QComboBox::currentIndexChanged, this, [this] {
 		QSettings{}.setValue(Settings::PreviewFrameCount, m_previewFrameCountCombo->currentData().toInt());
-		refreshVideoGrid();
+		refreshMediaGrid();
 	});
 	headerLayout->addWidget(m_previewFrameCountCombo, 0, Qt::AlignVCenter);
 
 	// Sort control: one chip-button showing the current field + direction; clicking opens a popover with
 	// every ordering option (field, direction, favorites-first). It owns its own persistence and just tells
-	// us when the order changed - the sort itself stays in resortVideoGrid(). Favorites-first is a no-op
+	// us when the order changed - the sort itself stays in resortMediaGrid(). Favorites-first is a no-op
 	// while viewing the Best tab (everything there is already a favorite, so its partition collapses).
 	m_sortControl = new SortControl();
-	connect(m_sortControl, &SortControl::changed, this, &MainWindow::resortVideoGrid);
+	connect(m_sortControl, &SortControl::changed, this, &MainWindow::resortMediaGrid);
 	headerLayout->addWidget(m_sortControl, 0, Qt::AlignVCenter);
 
 	mainLayout->addWidget(headerWidget);
 
-	// Video card grid
-	m_videoGrid = new QListWidget();
-	m_videoGrid->setViewMode(QListView::IconMode);
-	m_videoGrid->setFlow(QListView::LeftToRight);
-	m_videoGrid->setWrapping(true);
-	m_videoGrid->setResizeMode(QListView::Adjust);
+	// Media item card grid
+	m_mediaGrid = new QListWidget();
+	m_mediaGrid->setViewMode(QListView::IconMode);
+	m_mediaGrid->setFlow(QListView::LeftToRight);
+	m_mediaGrid->setWrapping(true);
+	m_mediaGrid->setResizeMode(QListView::Adjust);
 	// Every card in a refresh is built to the same size (shared card-image height x preview-frame count, plus a
 	// fixed footer), so the view can skip per-item size accounting during layout - a large win when populating
 	// hundreds of items, since otherwise each addItem re-measures the wrapping grid. Precondition: keep cards
 	// uniformly sized; revisit if variable-size cards are ever introduced.
-	m_videoGrid->setUniformItemSizes(true);
-	m_videoGrid->setMovement(QListView::Static);
-	m_videoGrid->setSelectionMode(QAbstractItemView::ExtendedSelection);
+	m_mediaGrid->setUniformItemSizes(true);
+	m_mediaGrid->setMovement(QListView::Static);
+	m_mediaGrid->setSelectionMode(QAbstractItemView::ExtendedSelection);
 	// Without this, the view reads "button-held + mouse moving" as a rubber-band reselection, which collapses an
 	// existing multi-selection to the single item under the cursor before our custom card drag can even start.
 	// With drag enabled, the view defers the collapse (it's expecting a drag), so a multi-selection survives the
 	// press+move long enough for ThumbnailWidget's QDrag to take over. The view itself never starts a drag — our
 	// ThumbnailWidget consumes the threshold-crossing move first.
-	m_videoGrid->setDragEnabled(true);
-	m_videoGrid->setSpacing(10);
-	m_videoGrid->setStyleSheet(QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().AccentBg));
+	m_mediaGrid->setDragEnabled(true);
+	m_mediaGrid->setSpacing(10);
+	m_mediaGrid->setStyleSheet(QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().AccentBg));
 
-	mainLayout->addWidget(m_videoGrid, 1);
+	mainLayout->addWidget(m_mediaGrid, 1);
 
 	// Ctrl+wheel over a card adjusts the preview height; coalesce a burst of wheel steps into one rebuild.
 	m_gridZoomDebounce = new QTimer(this);
 	m_gridZoomDebounce->setSingleShot(true);
 	m_gridZoomDebounce->setInterval(80);
-	connect(m_gridZoomDebounce, &QTimer::timeout, this, &MainWindow::refreshVideoGrid);
+	connect(m_gridZoomDebounce, &QTimer::timeout, this, &MainWindow::refreshMediaGrid);
 
 	// Assemble the window as a resizable [sidebar | right panel] split.
 	auto* splitter = new QSplitter(Qt::Horizontal);
@@ -297,7 +297,7 @@ void MainWindow::restoreSettings()
 	const QStringList activeIds = QSettings{}.value("mainWindow/activeLabelIds").toStringList();
 	const bool andMode = QSettings{}.value("mainWindow/labelsAndMode", false).toBool();
 	m_labelSidebar->setActiveFilter(activeIds, andMode);  // silent; the grid refresh below applies it
-	refreshVideoGrid();
+	refreshMediaGrid();
 }
 
 void MainWindow::openSettings()
@@ -348,7 +348,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
 
 void MainWindow::refreshLibraryView()
 {
-	refreshVideoGrid();          // rebuilds the card grid from the (already-current) catalog model
+	refreshMediaGrid();          // rebuilds the card grid from the (already-current) catalog model
 	m_labelSidebar->refresh();   // pull the now-current labels/counts into the sidebar
 }
 
@@ -384,7 +384,7 @@ public:
 	static bool descending;
 	static bool favoritesFirst;
 
-	VideoId videoId;  // the card's identity; the grid is enumerated and addressed by this, not by folder path
+	MediaId mediaId;  // the card's identity; the grid is enumerated and addressed by this, not by folder path
 	ItemInfo info;
 
 	bool operator<(const QListWidgetItem& other) const override {
@@ -412,11 +412,11 @@ QString gridCaption(int displayNumber, const QString& name)
 // Computes and applies one card's colored label-dot overlay from the catalog's current label set for
 // that video, including Best - the star button stays as a fast one-click toggle, but the dot strip still
 // shows Best so the card's label display is uniform across all labels.
-void applyLabelDots(Catalog& catalog, const VideoId& id, VideoItemWidget* card)
+void applyLabelDots(Catalog& catalog, const MediaId& id, MediaItemWidget* card)
 {
 	QList<QColor> dotColors;
 	QStringList dotNames;
-	for (const QString& labelId : catalog.labelsForVideo(id))
+	for (const QString& labelId : catalog.labelsForMediaItem(id))
 	{
 		const Catalog::Label* label = catalog.labelById(labelId);
 		if (!label)
@@ -438,7 +438,7 @@ void renumberGridCaptions(QListWidget* grid)
 		QListWidgetItem* item = grid->item(row);
 		if (item->isHidden())
 			continue;
-		auto* card = static_cast<VideoItemWidget*>(grid->itemWidget(item));
+		auto* card = static_cast<MediaItemWidget*>(grid->itemWidget(item));
 		card->setLabel(gridCaption(++visibleNumber, static_cast<GridItem*>(item)->info.name));
 	}
 }
@@ -460,13 +460,13 @@ bool nameMatchesFilter(const QString& name, const QString& query)
 void MainWindow::backfillMissingPreviews()
 {
 	Catalog& catalog = Catalog::instance();
-	std::vector<VideoId> toBackfill;
-	for (const VideoId& id : catalog.allVideos())
+	std::vector<MediaId> toBackfill;
+	for (const MediaId& id : catalog.allMediaItems())
 	{
 		if (!catalog.isSplitIntoFrames(id))
-			continue;  // not-yet-split videos already got a real preview/ at ingestion time
+			continue;  // not-yet-split videos already got a real preview/ at import time
 
-		const QString previewFolder = catalog.folderForVideo(id) + "/preview";
+		const QString previewFolder = catalog.folderForMediaItem(id) + "/preview";
 		if (QDir(previewFolder).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty())
 			toBackfill.push_back(id);
 	}
@@ -487,7 +487,7 @@ void MainWindow::backfillMissingPreviews()
 		progressBox.setText(tr("Updating preview %1/%2...").arg(i + 1).arg(toBackfill.size()));
 		QApplication::processEvents();
 
-		const QString folderPath = catalog.folderForVideo(toBackfill[i]);
+		const QString folderPath = catalog.folderForMediaItem(toBackfill[i]);
 		QDir folderDir(folderPath);
 		const QStringList realFrames = folderDir.entryList(IMAGE_FILE_FILTERS, QDir::Files, QDir::Name);
 		if (realFrames.isEmpty())
@@ -500,9 +500,9 @@ void MainWindow::backfillMissingPreviews()
 	}
 }
 
-void MainWindow::refreshVideoGrid()
+void MainWindow::refreshMediaGrid()
 {
-	m_videoGrid->clear();
+	m_mediaGrid->clear();
 
 	const int previewFrameCount = m_previewFrameCountCombo->currentData().toInt();
 	const int imageHeight = cardImageHeight();
@@ -511,7 +511,7 @@ void MainWindow::refreshVideoGrid()
 	// directly - no per-refresh re-derivation. Look up the Best set once: the per-card star state and the
 	// favorites-first sort below share it.
 	Catalog& catalog = Catalog::instance();
-	const QSet<VideoId> bestSet = catalog.videosForLabel(Catalog::BestLabelId);
+	const QSet<MediaId> bestSet = catalog.mediaItemsForLabel(Catalog::BestLabelId);
 
 	GridItem::favoritesFirst = m_sortControl->favoritesFirst();
 	GridItem::sortBy = m_sortControl->sortBy();
@@ -521,7 +521,7 @@ void MainWindow::refreshVideoGrid()
 	// Card widgets are attached in a second pass (after the addItem loop and sortItems), not inline: interleaving
 	// setItemWidget with addItem makes each insert's endInsertRows walk every persistent editor index created so
 	// far -> O(N^2). This list carries each item and its not-yet-attached card between the two passes.
-	std::vector<std::pair<GridItem*, VideoItemWidget*>> pendingAttach;
+	std::vector<std::pair<GridItem*, MediaItemWidget*>> pendingAttach;
 
 	// Every card in a refresh is the same size (fixed size-hint mode; shared image height x frame count, plus a
 	// constant footer), so the hint is computed once from the first built card and reused - the same uniformity
@@ -530,8 +530,8 @@ void MainWindow::refreshVideoGrid()
 
 	// Cards are added in catalog order with their sort info attached, then sortItems() (using
 	// GridItem::operator<) puts them in their final order; captions are numbered after that.
-	const auto addCard = [&](const VideoId& id) {
-		const QString folderPath = catalog.folderForVideo(id);
+	const auto addCard = [&](const MediaId& id) {
+		const QString folderPath = catalog.folderForMediaItem(id);
 		// Cards always render from the permanent preview/ subfolder, never the real frame folder directly -
 		// this is what lets a not-yet-split video (no real frames yet) still show a real thumbnail.
 		QDir previewDir(folderPath + "/preview");
@@ -541,14 +541,14 @@ void MainWindow::refreshVideoGrid()
 
 		const QStringList previewPaths = pickEvenlySpacedFrames(previewDir, imageFiles, previewFrameCount);
 
-		auto* card = new VideoItemWidget(
+		auto* card = new MediaItemWidget(
 			QSize{ imageHeight * previewFrameCount, imageHeight },
 			previewPaths, QString(),
 			id,
 			bestSet.contains(id),
 			[this, id] { toggleBestFolder(id); },
 			[this, id] { playVideo(id, false); },
-			[this, id](QPoint globalPos) { showVideoContextMenu(id, globalPos); },
+			[this, id](QPoint globalPos) { showMediaItemContextMenu(id, globalPos); },
 			/* dynamic size hint */false
 		);
 		card->setOnMiddleButtonClick([this, id, folderPath] {
@@ -563,10 +563,10 @@ void MainWindow::refreshVideoGrid()
 		// Deferred: refreshLibraryView rebuilds the grid, deleting this very card mid-dropEvent, so the mutation
 		// runs after the drop event unwinds (same reason MainWindow::dropEvent defers Quick Import).
 		card->setOnLabelDropped([this, id](const QString& labelId) {
-			const QList<VideoId> targets = effectiveSelection(id);
+			const QList<MediaId> targets = effectiveSelection(id);
 			QMetaObject::invokeMethod(this, [this, targets, labelId] {
 				Catalog::BatchScope batch;  // one store write for the whole selection instead of one per video
-				for (const VideoId& target : targets)
+				for (const MediaId& target : targets)
 					Catalog::instance().addLabel(target, labelId);
 				refreshLibraryView();
 			}, Qt::QueuedConnection);
@@ -575,50 +575,50 @@ void MainWindow::refreshVideoGrid()
 		applyLabelDots(catalog, id, card);
 
 		auto* item = new GridItem();
-		item->videoId = id;
-		item->info = { bestSet.contains(id), sortByDate ? getSourceVideoDate(catalog.sourceVideoPathForVideo(id), folderPath) : QDateTime{}, QFileInfo(folderPath).fileName() };
+		item->mediaId = id;
+		item->info = { bestSet.contains(id), sortByDate ? getSourceFileDate(catalog.sourcePathForMediaItem(id), folderPath) : QDateTime{}, QFileInfo(folderPath).fileName() };
 		if (!uniformCardHint.isValid())
 			uniformCardHint = card->sizeHint();
 		item->setSizeHint(uniformCardHint);
-		m_videoGrid->addItem(item);
+		m_mediaGrid->addItem(item);
 
 		pendingAttach.emplace_back(item, card);   // widget attached in the second pass, after sortItems()
 	};
 
-	// Videos to show = the sidebar's active label filter applied to the catalog (final order comes from
+	// Media items to show = the sidebar's active label filter applied to the catalog (final order comes from
 	// sortItems() below, so the enumeration order here doesn't matter).
 	const QStringList activeLabelIds = m_labelSidebar->activeLabelIds();
-	QList<VideoId> videos;
+	QList<MediaId> mediaItems;
 	if (activeLabelIds.isEmpty())
 	{
-		videos = catalog.allVideos();  // no filter ("All"): every catalog video
+		mediaItems = catalog.allMediaItems();  // no filter ("All"): the whole catalog
 	}
 	else
 	{
-		QSet<VideoId> matched = catalog.videosForLabel(activeLabelIds.first());
+		QSet<MediaId> matched = catalog.mediaItemsForLabel(activeLabelIds.first());
 		for (qsizetype i = 1; i < activeLabelIds.size(); ++i)
 		{
-			const QSet<VideoId> next = catalog.videosForLabel(activeLabelIds[i]);
+			const QSet<MediaId> next = catalog.mediaItemsForLabel(activeLabelIds[i]);
 			if (m_labelSidebar->isAndMode())
-				matched.intersect(next);   // AND: videos carrying every selected label
+				matched.intersect(next);   // AND: items carrying every selected label
 			else
-				matched.unite(next);       // OR: videos carrying any selected label
+				matched.unite(next);       // OR: items carrying any selected label
 		}
-		videos = QList<VideoId>(matched.cbegin(), matched.cend());
+		mediaItems = QList<MediaId>(matched.cbegin(), matched.cend());
 	}
 
-	pendingAttach.reserve(videos.size());
+	pendingAttach.reserve(mediaItems.size());
 
-	for (const VideoId& id : videos)   // pass 1: build cards + insert bare items (editor-free, so O(N))
+	for (const MediaId& id : mediaItems)   // pass 1: build cards + insert bare items (editor-free, so O(N))
 		addCard(id);
 
-	m_videoGrid->sortItems(Qt::AscendingOrder);   // sorts bare items, no editors to reposition -> cheap
+	m_mediaGrid->sortItems(Qt::AscendingOrder);   // sorts bare items, no editors to reposition -> cheap
 
 	// Pass 2: attach the card widgets, now that all items exist and are sorted. Interleaving this with the
 	// addItem loop above made each insert's endInsertRows walk every persistent editor index created so far
 	// -> O(N^2); deferring it keeps the inserts editor-free.
 	for (const auto& [item, card] : pendingAttach)
-		m_videoGrid->setItemWidget(item, card);
+		m_mediaGrid->setItemWidget(item, card);
 
 	// The name filter is a view-level hide/show over these cards (applied here too so a structural rebuild
 	// keeps honouring the active filter); renumberGridCaptions runs inside applyNameFilter.
@@ -627,16 +627,16 @@ void MainWindow::refreshVideoGrid()
 
 // Reorders the existing cards in place to match the current sort controls, without rebuilding any
 // widgets (which would re-decode every thumbnail). Each card's ItemInfo is refreshed from the catalog
-// via its stored VideoId, then GridItem::operator< does the ordering via sortItems() - each item's
+// via its stored MediaId, then GridItem::operator< does the ordering via sortItems() - each item's
 // setItemWidget() card moves with it through the model's persistent indexes.
-void MainWindow::resortVideoGrid()
+void MainWindow::resortMediaGrid()
 {
-	const int count = m_videoGrid->count();
+	const int count = m_mediaGrid->count();
 	if (count == 0)
 		return;
 
 	Catalog& catalog = Catalog::instance();
-	const QSet<VideoId> bestSet = catalog.videosForLabel(Catalog::BestLabelId);
+	const QSet<MediaId> bestSet = catalog.mediaItemsForLabel(Catalog::BestLabelId);
 
 	GridItem::favoritesFirst = m_sortControl->favoritesFirst();
 	GridItem::sortBy = m_sortControl->sortBy();
@@ -645,52 +645,52 @@ void MainWindow::resortVideoGrid()
 
 	for (int row = 0; row < count; ++row)
 	{
-		auto* item = static_cast<GridItem*>(m_videoGrid->item(row));
-		const VideoId id = item->videoId;
-		const QString folderPath = catalog.folderForVideo(id);
-		item->info = { bestSet.contains(id), sortByDate ? getSourceVideoDate(catalog.sourceVideoPathForVideo(id), folderPath) : QDateTime{}, QFileInfo(folderPath).fileName() };
+		auto* item = static_cast<GridItem*>(m_mediaGrid->item(row));
+		const MediaId id = item->mediaId;
+		const QString folderPath = catalog.folderForMediaItem(id);
+		item->info = { bestSet.contains(id), sortByDate ? getSourceFileDate(catalog.sourcePathForMediaItem(id), folderPath) : QDateTime{}, QFileInfo(folderPath).fileName() };
 	}
 
-	m_videoGrid->sortItems(Qt::AscendingOrder);
-	renumberGridCaptions(m_videoGrid);
+	m_mediaGrid->sortItems(Qt::AscendingOrder);
+	renumberGridCaptions(m_mediaGrid);
 }
 
 void MainWindow::applyNameFilter()
 {
 	const QString query = m_nameFilter->text().trimmed();
-	for (int row = 0; row < m_videoGrid->count(); ++row)
+	for (int row = 0; row < m_mediaGrid->count(); ++row)
 	{
-		auto* item = static_cast<GridItem*>(m_videoGrid->item(row));
+		auto* item = static_cast<GridItem*>(m_mediaGrid->item(row));
 		const bool hide = !nameMatchesFilter(item->info.name, query);
 		item->setHidden(hide);
 		if (hide)
 			item->setSelected(false);  // don't leave a hidden card in the selection (effectiveSelection walks it)
 	}
-	renumberGridCaptions(m_videoGrid);
+	renumberGridCaptions(m_mediaGrid);
 }
 
-QList<VideoId> MainWindow::effectiveSelection(const VideoId& id) const
+QList<MediaId> MainWindow::effectiveSelection(const MediaId& id) const
 {
-	QList<VideoId> selected;
-	for (const QListWidgetItem* item : m_videoGrid->selectedItems())
-		selected.append(static_cast<const GridItem*>(item)->videoId);
+	QList<MediaId> selected;
+	for (const QListWidgetItem* item : m_mediaGrid->selectedItems())
+		selected.append(static_cast<const GridItem*>(item)->mediaId);
 	if (!selected.contains(id))
 		selected = { id };
 	return selected;
 }
 
-void MainWindow::showVideoContextMenu(const VideoId& id, const QPoint& globalPos)
+void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globalPos)
 {
 	Catalog& catalog = Catalog::instance();
-	const QList<VideoId> selection = effectiveSelection(id);
-	const QString folderPath = catalog.folderForVideo(id);
+	const QList<MediaId> selection = effectiveSelection(id);
+	const QString folderPath = catalog.folderForMediaItem(id);
 
 	QMenu menu(this);
 
 	menu.addAction(selection.size() > 1 ? tr("Compare selected") : tr("Inspect"), [this, selection] {
 		QStringList folders;
-		for (const VideoId& sel : selection)
-			folders << Catalog::instance().folderForVideo(sel);
+		for (const MediaId& sel : selection)
+			folders << Catalog::instance().folderForMediaItem(sel);
 		auto* w = new CompareWindow(folders, this);
 		w->setAttribute(Qt::WA_DeleteOnClose);
 		w->show();
@@ -704,21 +704,21 @@ void MainWindow::showVideoContextMenu(const VideoId& id, const QPoint& globalPos
 		playVideo(id, true);
 	});
 	menu.addAction(tr("Locate source video"), [this, id] {
-		const QString videoPath = Catalog::instance().sourceVideoPathForVideo(id);
-		if (videoPath.isEmpty())
+		const QString sourcePath = Catalog::instance().sourcePathForMediaItem(id);
+		if (sourcePath.isEmpty())
 		{
 			QMessageBox::warning(this, tr("Error"), tr("No source video is recorded for this video."));
 			return;
 		}
-		openInExplorer(videoPath);
+		openInExplorer(sourcePath);
 	});
 	menu.addAction(tr("Copy video path to clipboard"), [id] {
-		const QString videoPath = Catalog::instance().sourceVideoPathForVideo(id);
-		if (!videoPath.isEmpty())
-			QApplication::clipboard()->setText(QDir::toNativeSeparators(videoPath));
+		const QString sourcePath = Catalog::instance().sourcePathForMediaItem(id);
+		if (!sourcePath.isEmpty())
+			QApplication::clipboard()->setText(QDir::toNativeSeparators(sourcePath));
 	});
 	menu.addAction(tr("Rename video"), [this, id] {
-		renameVideoInteractive(id);
+		renameMediaItemInteractive(id);
 	});
 	menu.addSeparator();
 
@@ -741,8 +741,8 @@ void MainWindow::showVideoContextMenu(const VideoId& id, const QPoint& globalPos
 			const QString labelId = label.id;
 
 			int haveCount = 0;
-			for (const VideoId& sel : selection)
-				if (catalog.videoHasLabel(sel, labelId))
+			for (const MediaId& sel : selection)
+				if (catalog.mediaItemHasLabel(sel, labelId))
 					++haveCount;
 			const LabelVisuals::Presence presence = LabelVisuals::presenceForCount(haveCount, static_cast<int>(selection.size()));
 
@@ -750,7 +750,7 @@ void MainWindow::showVideoContextMenu(const VideoId& id, const QPoint& globalPos
 			const bool addToAll = presence != LabelVisuals::Presence::All;
 			connect(action, &QAction::triggered, this, [this, selection, labelId, addToAll] {
 				Catalog::BatchScope batch;  // one store write for the whole selection instead of one per video
-				for (const VideoId& target : selection)
+				for (const MediaId& target : selection)
 				{
 					if (addToAll)
 						Catalog::instance().addLabel(target, labelId);
@@ -773,18 +773,18 @@ void MainWindow::showVideoContextMenu(const VideoId& id, const QPoint& globalPos
 		QString message;
 		if (selection.size() == 1)
 		{
-			const VideoId& sel = selection.constFirst();
-			message = tr("This will permanently delete:\n\n• %1").arg(catalog.folderForVideo(sel));
-			const QString videoPath = catalog.sourceVideoPathForVideo(sel);
-			if (!videoPath.isEmpty())
-				message += "\n• " + videoPath;
+			const MediaId& sel = selection.constFirst();
+			message = tr("This will permanently delete:\n\n• %1").arg(catalog.folderForMediaItem(sel));
+			const QString sourcePath = catalog.sourcePathForMediaItem(sel);
+			if (!sourcePath.isEmpty())
+				message += "\n• " + sourcePath;
 		}
 		else
 		{
 			message = tr("This will permanently delete %1 videos - each one's frame folder and source video file:\n").arg(selection.size());
 			constexpr qsizetype maxListed = 15;
 			for (qsizetype i = 0; i < qMin(maxListed, selection.size()); ++i)
-				message += "\n• " + QFileInfo(catalog.folderForVideo(selection[i])).fileName();
+				message += "\n• " + QFileInfo(catalog.folderForMediaItem(selection[i])).fileName();
 			if (selection.size() > maxListed)
 				message += "\n" + tr("... and %1 more").arg(selection.size() - maxListed);
 		}
@@ -795,14 +795,14 @@ void MainWindow::showVideoContextMenu(const VideoId& id, const QPoint& globalPos
 			return;
 
 		Catalog::BatchScope batch;  // one store write for the whole selection instead of one per video
-		for (const VideoId& sel : selection)
+		for (const MediaId& sel : selection)
 		{
-			const QString folderPath = catalog.folderForVideo(sel);
-			const QString videoPath = catalog.sourceVideoPathForVideo(sel);
+			const QString folderPath = catalog.folderForMediaItem(sel);
+			const QString sourcePath = catalog.sourcePathForMediaItem(sel);
 			deleteFolderRecursively(folderPath);
-			if (!videoPath.isEmpty())
-				QFile::remove(videoPath);
-			catalog.removeVideo(sel);  // drop it from the catalog so it doesn't linger as a ghost
+			if (!sourcePath.isEmpty())
+				QFile::remove(sourcePath);
+			catalog.removeMediaItem(sel);  // drop it from the catalog so it doesn't linger as a ghost
 
 			if (m_frameViewer->currentFolder() == folderPath)
 				m_frameViewer->showForFolder({});
@@ -814,22 +814,22 @@ void MainWindow::showVideoContextMenu(const VideoId& id, const QPoint& globalPos
 	menu.exec(globalPos);
 }
 
-void MainWindow::playVideo(const VideoId& id, bool systemPlayer)
+void MainWindow::playVideo(const MediaId& id, bool systemPlayer)
 {
-	const QString videoPath = Catalog::instance().sourceVideoPathForVideo(id);
-	if (!QFile::exists(videoPath))
+	const QString sourcePath = Catalog::instance().sourcePathForMediaItem(id);
+	if (!QFile::exists(sourcePath))
 	{
-		QMessageBox::warning(this, tr("Error"), tr("Source video not found at:\n%1").arg(videoPath));
+		QMessageBox::warning(this, tr("Error"), tr("Source video not found at:\n%1").arg(sourcePath));
 		return;
 	}
 
 	if (systemPlayer)
 	{
-		QDesktopServices::openUrl(QUrl::fromLocalFile(videoPath));
+		QDesktopServices::openUrl(QUrl::fromLocalFile(sourcePath));
 		return;
 	}
 
-	auto* playerWindow = new VideoPlayerWindow(videoPath, id, nullptr);  // hand the player the catalog id directly
+	auto* playerWindow = new VideoPlayerWindow(sourcePath, id, nullptr);  // hand the player the catalog id directly
 	playerWindow->show();
 }
 
@@ -858,16 +858,16 @@ void MainWindow::resplitVideoIntoFrames(const QString& videoFilePath, const QStr
 	}
 }
 
-void MainWindow::ensureFramesSplit(const VideoId& id)
+void MainWindow::ensureFramesSplit(const MediaId& id)
 {
 	Catalog& catalog = Catalog::instance();
 	if (catalog.isSplitIntoFrames(id))
 		return;
 
-	// The folder already holds preview/ frames from ingestion, freshly generated and still valid - preserve
+	// The folder already holds preview/ frames from import, freshly generated and still valid - preserve
 	// them across the wipe rather than redoing that work (unlike re-export/reimport, nothing changed that
 	// would make them stale).
-	resplitVideoIntoFrames(catalog.sourceVideoPathForVideo(id), catalog.folderForVideo(id), /*preserveExistingPreview=*/true);
+	resplitVideoIntoFrames(catalog.sourcePathForMediaItem(id), catalog.folderForMediaItem(id), /*preserveExistingPreview=*/true);
 }
 
 void MainWindow::splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder)
@@ -955,11 +955,11 @@ void MainWindow::splitVideoIntoFrames(const QString& videoFilePath, const QStrin
 
 	// Register the video in the catalog now that extraction has actually produced frames - doing it only on
 	// success avoids leaving "tracked" but empty/partial folders behind when ffmpeg fails partway through.
-	// The source file is present here, so its VideoId is real; addVideo persists the source path + folder and
+	// The source file is present here, so its MediaId is real; addMediaItem persists the source path + folder and
 	// ensures the collection's folder label exists. It refuses if another video already owns this id (a
 	// name+size collision) under a different folder - in that case don't leave the just-extracted frames
 	// behind as an untracked duplicate.
-	if (!Catalog::instance().addVideo(VideoId::fromFile(videoFilePath), videoFilePath, outputFolder, /*splitIntoFrames=*/true))
+	if (!Catalog::instance().addMediaItem(MediaId::fromFile(videoFilePath), videoFilePath, outputFolder, /*splitIntoFrames=*/true))
 	{
 		QMessageBox::critical(this, tr("Error"),
 			tr("A video with the same name and file size is already tracked in a different collection:\n%1").arg(videoFilePath));
@@ -1005,14 +1005,14 @@ void MainWindow::processVideoFile(const QString& videoPath, const QString& colle
 		return;
 	}
 
-	// The full frame set is extracted on demand (see ensureFramesSplit), not here - ingestion only needs a few
+	// The full frame set is extracted on demand (see ensureFramesSplit), not here - import only needs a few
 	// permanent preview frames up front, then registers the video right away. Quick Import already extracted
 	// exactly these for its staging card, so reuse them by copy; fall back to a fresh ffmpeg pass only when
 	// there's nothing staged to reuse (not reached via Quick Import, or staging's probe produced no frames).
 	if (stagedPreviewDir.isEmpty() || !copyPreviewFrames(stagedPreviewDir + "/preview", outputFolder + "/preview"))
 		Ffmpeg::generatePreviewFrames(videoPath, outputFolder, m_previewFrameCountCombo->currentData().toInt());
 
-	if (!Catalog::instance().addVideo(VideoId::fromFile(videoPath), videoPath, outputFolder, /*splitIntoFrames=*/false))
+	if (!Catalog::instance().addMediaItem(MediaId::fromFile(videoPath), videoPath, outputFolder, /*splitIntoFrames=*/false))
 	{
 		QMessageBox::critical(this, tr("Error"),
 			tr("A video with the same name and file size is already tracked in a different collection:\n%1").arg(videoPath));
@@ -1020,7 +1020,7 @@ void MainWindow::processVideoFile(const QString& videoPath, const QString& colle
 	}
 }
 
-void MainWindow::processBatch(QStringList videoPaths, const QString& collectionPath, const QHash<VideoId, QString>& stagedPreviewDirs)
+void MainWindow::processBatch(QStringList videoPaths, const QString& collectionPath, const QHash<MediaId, QString>& stagedPreviewDirs)
 {
 	if (videoPaths.empty())
 		return;
@@ -1033,7 +1033,7 @@ void MainWindow::processBatch(QStringList videoPaths, const QString& collectionP
 	m_isProcessing = true;
 	const auto processingGuard = qScopeGuard([this] { m_isProcessing = false; });
 
-	// Each extracted video below registers via Catalog::addVideo (a couple of store writes); batch them into
+	// Each extracted video below registers via Catalog::addMediaItem (a couple of store writes); batch them into
 	// one write for the whole call instead of one per video.
 	Catalog::BatchScope batch;
 
@@ -1060,8 +1060,8 @@ void MainWindow::processBatch(QStringList videoPaths, const QString& collectionP
 		{
 			progressBox.setText(tr("Adding video %1/%2...").arg(++i).arg(totalSize));
 			QApplication::processEvents();
-			// Staged frames are keyed by the stable VideoId (re-derived here from the possibly-relocated path).
-			processVideoFile(videoPath, collectionPath, stagedPreviewDirs.value(VideoId::fromFile(videoPath)), overwriteExisting);
+			// Staged frames are keyed by the stable MediaId (re-derived here from the possibly-relocated path).
+			processVideoFile(videoPath, collectionPath, stagedPreviewDirs.value(MediaId::fromFile(videoPath)), overwriteExisting);
 		}
 	};
 
@@ -1113,11 +1113,11 @@ void MainWindow::reExportAllVideos()
 	};
 	std::vector<VideoItem> toReExport;
 	Catalog& catalog = Catalog::instance();
-	for (const VideoId& id : catalog.allVideos())
+	for (const MediaId& id : catalog.allMediaItems())
 	{
-		const QString videoPath = catalog.sourceVideoPathForVideo(id);
+		const QString videoPath = catalog.sourcePathForMediaItem(id);
 		if (!videoPath.isEmpty() && QFile::exists(videoPath))
-			toReExport.push_back({ videoPath, catalog.folderForVideo(id) });
+			toReExport.push_back({ videoPath, catalog.folderForMediaItem(id) });
 	}
 
 	if (toReExport.empty())
@@ -1129,7 +1129,7 @@ void MainWindow::reExportAllVideos()
 	m_isProcessing = true;
 	const auto processingGuard = qScopeGuard([this] { m_isProcessing = false; });
 
-	// Each re-extracted video below re-registers via Catalog::addVideo; batch the whole pass into one write.
+	// Each re-extracted video below re-registers via Catalog::addMediaItem; batch the whole pass into one write.
 	Catalog::BatchScope batch;
 
 	QMessageBox progressBox(this);
@@ -1147,7 +1147,7 @@ void MainWindow::reExportAllVideos()
 		resplitVideoIntoFrames(videoPath, folderPath, /*preserveExistingPreview=*/false);
 	}
 
-	refreshVideoGrid();
+	refreshMediaGrid();
 }
 
 bool MainWindow::createCollection(const QString& name, bool refreshList)
@@ -1259,53 +1259,53 @@ void MainWindow::quickImportToCollections(const QStringList& initialStaging)
 					options << QuickImportDialog::LabelOption{ label.id, label.displayName, label.color };
 			return options;
 		},
-		.addVideosRequested = [this](const QString& collectionName, const QStringList& videoPaths,
-				const QHash<VideoId, QString>& stagedPreviewDirs) {
+		.addMediaItemsRequested = [this](const QString& collectionName, const QStringList& videoPaths,
+				const QHash<MediaId, QString>& stagedPreviewDirs) {
 			processBatch(videoPaths, rootFolder() + "/" + collectionName, stagedPreviewDirs);
 		},
 		.createCollectionRequested = [this](const QString& name) -> bool {
 			return createCollection(name, false);
 		},
-		.isVideoTrackedInCollection = [](const VideoId& id, const QString& collectionName) {
+		.isMediaItemTrackedInCollection = [](const MediaId& id, const QString& collectionName) {
 			// Compare against the exact folder this import derives (processVideoFile's outputFolder): on a
 			// name+size collision the id is tracked under some *other* folder - the staged copy was refused,
-			// so a plain "tracked at all" check would misreport it as ingested.
+			// so a plain "tracked at all" check would misreport it as imported.
 			const QString expectedFolder = rootFolder() + "/" + collectionName + "/" + QFileInfo(id.name()).completeBaseName();
-			return QString::compare(Catalog::instance().folderForVideo(id), expectedFolder, Qt::CaseInsensitive) == 0;
+			return QString::compare(Catalog::instance().folderForMediaItem(id), expectedFolder, Qt::CaseInsensitive) == 0;
 		},
-		.markBestRequested = [this](const QHash<QString, QList<VideoId>>& bestVideosByCollection) {
+		.markBestRequested = [this](const QHash<QString, QList<MediaId>>& bestMediaItemsByCollection) {
 			// Each added video's frame folder is <collection>/<baseName>; add the Best label to the
 			// flagged ones now that they've been tracked (addLabel dedups and persists per video). The base
-			// name comes from the VideoId itself (id.name()) - the source file may already have been moved
+			// name comes from the MediaId itself (id.name()) - the source file may already have been moved
 			// away from its staged path by relocation, so it can't be re-read from disk here.
 			Catalog::BatchScope batch;  // one store write for the whole flush instead of one per video
-			for (auto it = bestVideosByCollection.constBegin(); it != bestVideosByCollection.constEnd(); ++it)
+			for (auto it = bestMediaItemsByCollection.constBegin(); it != bestMediaItemsByCollection.constEnd(); ++it)
 			{
 				const QString collectionPath = rootFolder() + "/" + it.key();
-				for (const VideoId& videoId : it.value())
+				for (const MediaId& mediaId : it.value())
 				{
-					const QString folderPath = collectionPath + "/" + QFileInfo(videoId.name()).completeBaseName();
+					const QString folderPath = collectionPath + "/" + QFileInfo(mediaId.name()).completeBaseName();
 					if (QDir(folderPath).exists())  // only if extraction landed (so the video is in the catalog)
-						Catalog::instance().addLabel(videoId, Catalog::BestLabelId);
+						Catalog::instance().addLabel(mediaId, Catalog::BestLabelId);
 				}
 			}
 		},
 		.assignExtraLabelsRequested = [this](const QList<QuickImportDialog::ExtraLabelAssignment>& assignments) {
-			// Mirrors markBestRequested above: same folder derivation (from the VideoId), same "only if it landed" guard.
+			// Mirrors markBestRequested above: same folder derivation (from the MediaId), same "only if it landed" guard.
 			Catalog::BatchScope batch;  // one store write for the whole flush instead of one per assignment
 			for (const QuickImportDialog::ExtraLabelAssignment& assignment : assignments)
 			{
-				const QString folderPath = rootFolder() + "/" + assignment.collectionName + "/" + QFileInfo(assignment.videoId.name()).completeBaseName();
+				const QString folderPath = rootFolder() + "/" + assignment.collectionName + "/" + QFileInfo(assignment.mediaId.name()).completeBaseName();
 				if (!QDir(folderPath).exists())  // only if extraction landed (so the video is in the catalog)
 					continue;
 				for (const QString& labelId : assignment.labelIds)
-					Catalog::instance().addLabel(assignment.videoId, labelId);
+					Catalog::instance().addLabel(assignment.mediaId, labelId);
 			}
 		},
 		.viewChanged = [this] { refreshLibraryView(); }
 	};
 
-	QuickImportDialog dialog(std::move(callbacks), Catalog::instance().anySourceVideoDir(), this);
+	QuickImportDialog dialog(std::move(callbacks), Catalog::instance().anySourceDir(), this);
 	if (!initialStaging.isEmpty())
 		dialog.addToStaging(initialStaging);
 	dialog.exec();   // each "Import" inside the dialog already applies its batch synchronously via the callbacks above
@@ -1318,38 +1318,38 @@ void MainWindow::quickImportToCollections(const QStringList& initialStaging)
 
 void MainWindow::scanForUntrackedFiles()
 {
-	const QStringList untrackedVideos = FindUntrackedFilesDialog::scanAndShowUi(rootFolder(), this);
-	if (!untrackedVideos.isEmpty())
-		quickImportToCollections(untrackedVideos);
+	const QStringList untrackedFiles = FindUntrackedFilesDialog::scanAndShowUi(rootFolder(), this);
+	if (!untrackedFiles.isEmpty())
+		quickImportToCollections(untrackedFiles);
 }
 
 void MainWindow::checkCatalogIntegrity()
 {
 	IntegrityCheckDialog::Callbacks callbacks{
-		.relinkRequested = [this](const VideoId& placeholderId, const QString& sourcePath) {
+		.relinkRequested = [this](const MediaId& placeholderId, const QString& sourcePath) {
 			const bool ok = Catalog::instance().relinkPlaceholder(placeholderId, sourcePath);
 			if (ok)
 				refreshLibraryView();
 			return ok;
 		},
 		.registerRequested = [this](const QString& folderPath, const QString& sourcePath) {
-			const bool ok = Catalog::instance().addVideo(VideoId::fromFile(sourcePath), sourcePath, folderPath, /*splitIntoFrames=*/true);
+			const bool ok = Catalog::instance().addMediaItem(MediaId::fromFile(sourcePath), sourcePath, folderPath, /*splitIntoFrames=*/true);
 			if (ok)
 				refreshLibraryView();
 			return ok;
 		},
-		.reimportRequested = [this](const VideoId& ghostId) {
+		.reimportRequested = [this](const MediaId& ghostId) {
 			// Same re-extraction path reExportAllVideos uses for any catalog video, just for this one: clear
 			// the (already empty/missing) folder, re-run ffmpeg, and report whether frames actually landed.
 			Catalog& catalog = Catalog::instance();
-			const QString folder = catalog.folderForVideo(ghostId);
-			const QString sourcePath = catalog.sourceVideoPathForVideo(ghostId);
+			const QString folder = catalog.folderForMediaItem(ghostId);
+			const QString sourcePath = catalog.sourcePathForMediaItem(ghostId);
 			resplitVideoIntoFrames(sourcePath, folder, /*preserveExistingPreview=*/false);
 			refreshLibraryView();
 			return !QDir(folder).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty();
 		},
-		.removeGhostRequested = [this](const VideoId& ghostId) {
-			Catalog::instance().removeVideo(ghostId);
+		.removeGhostRequested = [this](const MediaId& ghostId) {
+			Catalog::instance().removeMediaItem(ghostId);
 			refreshLibraryView();
 			return true;
 		},
@@ -1357,15 +1357,15 @@ void MainWindow::checkCatalogIntegrity()
 	IntegrityCheckDialog::scanAndShowUi(std::move(callbacks), this);
 }
 
-bool MainWindow::isInBest(const VideoId& id)
+bool MainWindow::isInBest(const MediaId& id)
 {
-	return Catalog::instance().videoHasLabel(id, Catalog::BestLabelId);
+	return Catalog::instance().mediaItemHasLabel(id, Catalog::BestLabelId);
 }
 
-void MainWindow::toggleBestFolder(const VideoId& id)
+void MainWindow::toggleBestFolder(const MediaId& id)
 {
 	Catalog& catalog = Catalog::instance();
-	if (catalog.videoHasLabel(id, Catalog::BestLabelId))
+	if (catalog.mediaItemHasLabel(id, Catalog::BestLabelId))
 		catalog.removeLabel(id, Catalog::BestLabelId);
 	else
 		catalog.addLabel(id, Catalog::BestLabelId);
@@ -1373,12 +1373,12 @@ void MainWindow::toggleBestFolder(const VideoId& id)
 	// The star's own checked state updates itself (it's a checkable QPushButton), but the dot strip needs
 	// an explicit refresh - the resort/no-op branches below don't recreate the card, so without this the
 	// dot would stay stale until the next full grid rebuild.
-	for (int row = 0; row < m_videoGrid->count(); ++row)
+	for (int row = 0; row < m_mediaGrid->count(); ++row)
 	{
-		auto* item = static_cast<GridItem*>(m_videoGrid->item(row));
-		if (item->videoId == id)
+		auto* item = static_cast<GridItem*>(m_mediaGrid->item(row));
+		if (item->mediaId == id)
 		{
-			applyLabelDots(catalog, id, static_cast<VideoItemWidget*>(m_videoGrid->itemWidget(item)));
+			applyLabelDots(catalog, id, static_cast<MediaItemWidget*>(m_mediaGrid->itemWidget(item)));
 			break;
 		}
 	}
@@ -1386,14 +1386,14 @@ void MainWindow::toggleBestFolder(const VideoId& id)
 	// If the Best filter is currently active, toggling Best changes which cards match - rebuild the grid;
 	// otherwise just reposition under favorites-first (cheap reorder, no rebuild).
 	if (m_labelSidebar->activeLabelIds().contains(Catalog::BestLabelId))
-		QMetaObject::invokeMethod(this, &MainWindow::refreshVideoGrid, Qt::QueuedConnection);
+		QMetaObject::invokeMethod(this, &MainWindow::refreshMediaGrid, Qt::QueuedConnection);
 	else if (m_sortControl->favoritesFirst())
-		QMetaObject::invokeMethod(this, &MainWindow::resortVideoGrid, Qt::QueuedConnection);
+		QMetaObject::invokeMethod(this, &MainWindow::resortMediaGrid, Qt::QueuedConnection);
 }
 
-void MainWindow::renameVideoInteractive(const VideoId& id)
+void MainWindow::renameMediaItemInteractive(const MediaId& id)
 {
-	const QString originalFolderPath = Catalog::instance().folderForVideo(id);
+	const QString originalFolderPath = Catalog::instance().folderForMediaItem(id);
 
 	// The frame folder must exist
 	if (originalFolderPath.isEmpty() || !QDir(originalFolderPath).exists())
@@ -1402,8 +1402,8 @@ void MainWindow::renameVideoInteractive(const VideoId& id)
 		return;
 	}
 
-	const QString oldVideoPath = Catalog::instance().sourceVideoPathForVideo(id);
-	const bool videoExists = !oldVideoPath.isEmpty() && QFile::exists(oldVideoPath);
+	const QString oldSourcePath = Catalog::instance().sourcePathForMediaItem(id);
+	const bool sourceExists = !oldSourcePath.isEmpty() && QFile::exists(oldSourcePath);
 
 	const QString oldName = QFileInfo(originalFolderPath).fileName();
 	const QString parentPath = QFileInfo(originalFolderPath).absolutePath();
@@ -1434,27 +1434,27 @@ void MainWindow::renameVideoInteractive(const VideoId& id)
 	}
 
 	// Build the new video path (same directory and extension, new base name)
-	QString newVideoPath;
-	if (!oldVideoPath.isEmpty())
+	QString newSourcePath;
+	if (!oldSourcePath.isEmpty())
 	{
-		const QFileInfo oldVideoInfo{ oldVideoPath };
-		newVideoPath = oldVideoInfo.absolutePath() + "/" + newName + "." + oldVideoInfo.suffix();
+		const QFileInfo oldSourceInfo{ oldSourcePath };
+		newSourcePath = oldSourceInfo.absolutePath() + "/" + newName + "." + oldSourceInfo.suffix();
 
 		// Make sure we would not overwrite a different existing video
-		if (videoExists && QFile::exists(newVideoPath))
+		if (sourceExists && QFile::exists(newSourcePath))
 		{
-			QMessageBox::warning(this, tr("Rename video"), tr("A video file with that name already exists:\n%1").arg(newVideoPath));
+			QMessageBox::warning(this, tr("Rename video"), tr("A video file with that name already exists:\n%1").arg(newSourcePath));
 			return;
 		}
 	}
 
 	// Build a confirmation message that spells out every change
 	QString message = tr("Rename \u201c%1\u201d to \u201c%2\u201d?\n\n").arg(oldName, newName);
-	if (videoExists)
+	if (sourceExists)
 	{
-		message += tr("\u2022 Video file:\n  %1\n  \u2192 %2\n\n").arg(oldVideoPath, newVideoPath);
+		message += tr("\u2022 Video file:\n  %1\n  \u2192 %2\n\n").arg(oldSourcePath, newSourcePath);
 	}
-	else if (!oldVideoPath.isEmpty())
+	else if (!oldSourcePath.isEmpty())
 	{
 		message += tr("\u2022 Source video not found at stored path \u2014 it will not be renamed.\n"
 			"  The stored path will be updated to reflect the new name.\n\n");
@@ -1468,42 +1468,42 @@ void MainWindow::renameVideoInteractive(const VideoId& id)
 		QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes) != QMessageBox::Yes)
 		return;
 
-	renameVideo(id, newFolderPath);
+	renameMediaItem(id, newFolderPath);
 }
 
-void MainWindow::renameVideo(const VideoId& oldId, const QString& newFolderPath)
+void MainWindow::renameMediaItem(const MediaId& oldId, const QString& newFolderPath)
 {
 	const QString dialogTitle = tr("Rename video");
 	Catalog& catalog = Catalog::instance();
-	const QString oldFolderPath = catalog.folderForVideo(oldId);
-	const QString oldVideoPath = catalog.sourceVideoPathForVideo(oldId);
+	const QString oldFolderPath = catalog.folderForMediaItem(oldId);
+	const QString oldSourcePath = catalog.sourcePathForMediaItem(oldId);
 
 	// --- Step 1: rename the source video file (if one is recorded and present) ---
-	QString newVideoPath;
-	bool videoWasRenamed = false;
-	VideoId newId = oldId;  // identity only changes if the source file itself is renamed (below)
-	if (!oldVideoPath.isEmpty())
+	QString newSourcePath;
+	bool sourceWasRenamed = false;
+	MediaId newId = oldId;  // identity only changes if the source file itself is renamed (below)
+	if (!oldSourcePath.isEmpty())
 	{
-		const QFileInfo oldVideoInfo{ oldVideoPath };
-		newVideoPath = oldVideoInfo.absolutePath() + "/" + QFileInfo(newFolderPath).fileName() + "." + oldVideoInfo.suffix();
+		const QFileInfo oldSourceInfo{ oldSourcePath };
+		newSourcePath = oldSourceInfo.absolutePath() + "/" + QFileInfo(newFolderPath).fileName() + "." + oldSourceInfo.suffix();
 
-		if (QFile::exists(oldVideoPath))
+		if (QFile::exists(oldSourcePath))
 		{
-			if (!QFile::rename(oldVideoPath, newVideoPath))
+			if (!QFile::rename(oldSourcePath, newSourcePath))
 			{
-				QMessageBox::critical(this, dialogTitle, tr("Failed to rename the video file:\n%1\n\u2192 %2").arg(oldVideoPath, newVideoPath));
+				QMessageBox::critical(this, dialogTitle, tr("Failed to rename the video file:\n%1\n\u2192 %2").arg(oldSourcePath, newSourcePath));
 				return;
 			}
-			videoWasRenamed = true;
-			newId = VideoId::fromFile(newVideoPath);  // renaming the file changes its name and thus its VideoId
+			sourceWasRenamed = true;
+			newId = MediaId::fromFile(newSourcePath);  // renaming the file changes its name and thus its MediaId
 		}
 	}
 
 	// --- Step 2: rename the frame folder ---
 	if (!QFile::rename(oldFolderPath, newFolderPath))
 	{
-		if (videoWasRenamed)
-			QFile::rename(newVideoPath, oldVideoPath);
+		if (sourceWasRenamed)
+			QFile::rename(newSourcePath, oldSourcePath);
 		QMessageBox::critical(this, dialogTitle, tr("Failed to rename the frame folder:\n%1\n\u2192 %2").arg(oldFolderPath, newFolderPath));
 		return;
 	}
@@ -1512,13 +1512,13 @@ void MainWindow::renameVideo(const VideoId& oldId, const QString& newFolderPath)
 	// identity and record the new source path + frame folder. Replaces the old re-key + source_info.txt rewrite.
 	// Refused when the new name+size collides with another tracked video - undo the disk renames then, so disk
 	// and catalog stay in sync (a collision requires a changed id, so the source file was renamed here too).
-	if (!catalog.applyRename(oldId, newId, newVideoPath, newFolderPath))
+	if (!catalog.applyRename(oldId, newId, newSourcePath, newFolderPath))
 	{
 		QFile::rename(newFolderPath, oldFolderPath);
-		if (videoWasRenamed)
-			QFile::rename(newVideoPath, oldVideoPath);
+		if (sourceWasRenamed)
+			QFile::rename(newSourcePath, oldSourcePath);
 		QMessageBox::critical(this, dialogTitle,
-			tr("A video with the same name and file size is already tracked in a different collection:\n%1").arg(newVideoPath));
+			tr("A video with the same name and file size is already tracked in a different collection:\n%1").arg(newSourcePath));
 		return;
 	}
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/VideoId.h"
+#include "Core/MediaId.h"
 
 #include <QHash>
 #include <QList>
@@ -35,40 +35,40 @@ private:
 	void saveSettings();
 	void restoreSettings();
 
-	void playVideo(const VideoId& id, bool systemPlayer);
-	void refreshVideoGrid();
+	void playVideo(const MediaId& id, bool systemPlayer);
+	void refreshMediaGrid();
 	// Refreshes the grid AND the label sidebar (labels/counts). Use after structural changes (add/delete/
-	// rename a video, create a label); plain refreshVideoGrid is for filter/sort/zoom changes.
+	// rename a video, create a label); plain refreshMediaGrid is for filter/sort/zoom changes.
 	void refreshLibraryView();
 	// Reorders the existing grid cards to the current sort settings without rebuilding them (no
-	// thumbnail re-decode). Use for sort/order changes; structural changes still call refreshVideoGrid.
-	void resortVideoGrid();
+	// thumbnail re-decode). Use for sort/order changes; structural changes still call refreshMediaGrid.
+	void resortMediaGrid();
 	// Hides grid cards whose name doesn't match the toolbar name-filter box and renumbers the visible
-	// ones. Cheap (no catalog rebuild, no thumbnail decode), so it runs on every keystroke; refreshVideoGrid
+	// ones. Cheap (no catalog rebuild, no thumbnail decode), so it runs on every keystroke; refreshMediaGrid
 	// also calls it after a rebuild to apply the active filter to the freshly built cards.
 	void applyNameFilter();
 	// Ctrl+wheel handler from the cards: steps the preview image height and rebuilds the grid (debounced).
 	void zoomCards(int steps);
-	void showVideoContextMenu(const VideoId& id, const QPoint& globalPos);
+	void showMediaItemContextMenu(const MediaId& id, const QPoint& globalPos);
 	// If id is part of the current multi-selection, returns all selected videos' ids; otherwise just id alone.
-	[[nodiscard]] QList<VideoId> effectiveSelection(const VideoId& id) const;
+	[[nodiscard]] QList<MediaId> effectiveSelection(const MediaId& id) const;
 	void splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder);
 	// Wipes and fully re-extracts an already-tracked video's frames. preserveExistingPreview controls what
 	// happens to its preview/ subfolder across that wipe: true carries the existing one through unchanged
-	// (used by ensureFramesSplit, whose preview/ is still fresh from ingestion); false regenerates a fresh
+	// (used by ensureFramesSplit, whose preview/ is still fresh from import); false regenerates a fresh
 	// one from the new real frames once the split succeeds (used by reExportAllVideos and the integrity
 	// tool's ghost reimport, where the old preview/ may be stale or the source content may have changed).
 	void resplitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder, bool preserveExistingPreview);
 	// If id hasn't had its full frame set extracted yet, does so now (synchronously, same as a normal split).
 	// Called right before opening the frame viewer on a card - the one and only on-demand split trigger.
-	void ensureFramesSplit(const VideoId& id);
-	// One-time migration, run at startup before the first refreshVideoGrid: every already-split video that
+	void ensureFramesSplit(const MediaId& id);
+	// One-time migration, run at startup before the first refreshMediaGrid: every already-split video that
 	// predates this feature has real frames but no preview/ subfolder yet - the grid now reads only from
 	// preview/, so back-fill it via a plain file copy (no ffmpeg needed; real frames already exist).
 	void backfillMissingPreviews();
 	void processVideoFile(const QString& videoPath, const QString& collectionPath, const QString& stagedPreviewDir, bool overwriteAllExisting = false);
 	void reExportAllVideos();
-	void processBatch(QStringList videoPaths, const QString& collectionPath, const QHash<VideoId, QString>& stagedPreviewDirs);
+	void processBatch(QStringList videoPaths, const QString& collectionPath, const QHash<MediaId, QString>& stagedPreviewDirs);
 	bool createCollection(const QString& name, bool refreshList = true);
 	// Sidebar "+ Add label": prompts for a name and creates a folder-backed label (a collection folder).
 	void createLabelInteractive();
@@ -85,12 +85,12 @@ private:
 	void checkCatalogIntegrity();
 
 	// Best helpers (Best is a label in the Catalog; these are thin wrappers over it)
-	[[nodiscard]] static bool isInBest(const VideoId& id);
-	void toggleBestFolder(const VideoId& id);
+	[[nodiscard]] static bool isInBest(const MediaId& id);
+	void toggleBestFolder(const MediaId& id);
 
 	void openSettings();
-	void renameVideoInteractive(const VideoId& id);
-	void renameVideo(const VideoId& oldId, const QString& newFolderPath);
+	void renameMediaItemInteractive(const MediaId& id);
+	void renameMediaItem(const MediaId& oldId, const QString& newFolderPath);
 	void deleteFolderRecursively(const QString& folderPath);
 
 private:
@@ -98,7 +98,7 @@ private:
 	QLineEdit*         m_nameFilter   = nullptr;
 	QComboBox*         m_previewFrameCountCombo = nullptr;
 	SortControl*       m_sortControl  = nullptr;
-	QListWidget*       m_videoGrid    = nullptr;
+	QListWidget*       m_mediaGrid    = nullptr;
 	QTimer*            m_gridZoomDebounce = nullptr;
 	FrameViewerWindow* m_frameViewer  = nullptr;
 

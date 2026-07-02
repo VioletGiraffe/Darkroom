@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Core/Catalog.h"
-#include "Core/VideoId.h"
+#include "Core/MediaId.h"
 
 #include <QDialog>
 
@@ -22,15 +22,15 @@ public:
 	{
 		// Attempts to relink a placeholder to the (now-confirmed-to-exist) source path; returns whether it
 		// succeeded (Catalog::relinkPlaceholder refuses if that identity is already tracked elsewhere).
-		std::function<bool(const VideoId& placeholderId, const QString& confirmedSourcePath)> relinkRequested;
+		std::function<bool(const MediaId& placeholderId, const QString& confirmedSourcePath)> relinkRequested;
 		// Attempts to register an untracked folder at the given source path; returns whether it succeeded
-		// (Catalog::addVideo refuses on an id clash with a different folder).
+		// (Catalog::addMediaItem refuses on an id clash with a different folder).
 		std::function<bool(const QString& folderPath, const QString& sourcePath)> registerRequested;
 		// Re-extracts frames for a ghost whose source is still present, landing back in its existing folder;
 		// returns whether frames actually exist there afterwards.
-		std::function<bool(const VideoId& ghostId)> reimportRequested;
+		std::function<bool(const MediaId& ghostId)> reimportRequested;
 		// Drops a ghost entry from the catalog outright (its folder is already gone); always succeeds.
-		std::function<bool(const VideoId& ghostId)> removeGhostRequested;
+		std::function<bool(const MediaId& ghostId)> removeGhostRequested;
 	};
 
 	// Scans the catalog for drift against disk and, if anything was found, shows this dialog so the user can
