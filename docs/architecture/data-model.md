@@ -11,9 +11,17 @@ re-deriving from disk on every refresh — the filesystem is walked in full only
 seed described below. `MetadataStore` (below) is how the model is *persisted*, not a second source of truth;
 nothing treats `MetadataStore`'s records as the catalog — callers ask `Catalog`.
 
-- `rootFolder()` (configured, default `H:/VideoFrames`) contains one **subfolder per collection**.
+- `rootFolder()` (configured, default `H:/VideoFrames`) contains one **subfolder per collection**, plus the
+  reserved **`Photos/`** tree for owned photos (below).
 - Each collection folder contains **frame folders** — one per imported video — holding the extracted frame
   images. A frame folder is what the UI shows as a card.
+- **Photos** are first-class catalog items beside videos (`Catalog::MediaType`; the record's `"type"` field,
+  absent = video). An **owned** photo's file lives at `<root>/Photos/<label>/<file>` (label subdir mirroring
+  video collections, created lazily on first photo import to that label); a **referenced** photo (the
+  record's `"referenced"` field) stays wherever the user keeps it — the catalog tracks it in place, never
+  moves or deletes its file, and it has no storage folder (all its labels are stored ids). `"Photos"` is a
+  reserved label/collection name for this reason (see
+  [catalog-and-labels.md](catalog-and-labels.md)).
 - The link from a frame folder back to its source video is recorded in the catalog (`Catalog::addMediaItem`
   persists it via `MetadataStore`), not read from disk per-card. `source_info.txt` files from before this
   model existed are left on disk untouched but are never read again post-seed (see "Legacy seed" below).

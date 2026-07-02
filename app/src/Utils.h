@@ -68,3 +68,11 @@ void openInExplorer(const QString& path);
 [[nodiscard]] QString ffmpegPath();
 
 [[nodiscard]] QString rootFolder();
+
+// The reserved directory under rootFolder() where owned photos are stored, one subfolder per label:
+// <photosRootFolder()>/<label>/<photo file>. Created lazily on first photo import to a label. Because it
+// shares the namespace of collection folders, "Photos" is a reserved name - no ordinary label may use it
+// (createCollection and Catalog::renameLabel refuse it), or its collection folder would intermingle with
+// the photo storage.
+extern const QString PHOTOS_DIR_NAME;
+[[nodiscard]] QString photosRootFolder();

@@ -3,9 +3,13 @@
 [← Back to architecture index](../../ARCHITECTURE.md)
 
 `Catalog` (`src/Core/Catalog.h/.cpp`) is **the authoritative in-memory model of the media-item set**, keyed by
-`MediaId`, plus the **label model** layered over it. For every item it holds its frame folder, source
+`MediaId`, plus the **label model** layered over it. For every item it holds its storage folder, source
 path, and full label-id set (`QHash<MediaId, Entry>`); every item-set/label query is answered from this
-in-memory model, not by walking disk. Where `MetadataStore` is dumb `MediaId`-keyed byte persistence,
+in-memory model, not by walking disk. An item is a **video or a photo** (`Catalog::MediaType`, persisted as a
+`"type"` record field — absent means video, so pre-photos catalogs need no migration): a video's folder is its
+frame folder; an **owned** photo's folder is the `<root>/Photos/<label>` dir its file sits in; a **referenced**
+photo (`"referenced"` field, `Catalog::isReferenced`) is tracked in place — no storage folder at all, every
+label a stored extra, and no label operation or deletion ever touches its file. Where `MetadataStore` is dumb `MediaId`-keyed byte persistence,
 `Catalog` knows what an item and a label *are*: it owns the **label registry** (`labels.json`), the
 `"labels"` field's id-list (de)serialization, and the model's lifecycle. Callers talk to `Catalog`, never to
 `MetadataStore`, for anything item- or label-related. Meyers singleton, GUI-thread.
@@ -59,18 +63,25 @@ the label itself changing identity).
 
 ## The reconciliation model
 
-An item's labels = the label whose `displayName` names its collection folder (the model's `folder` field)
-**∪** the stored label ids. The app reconciles the folder coincidence at **exactly three points, and nowhere
-else**:
+An item's labels = the label its storage location implies (`storageLabelNameOf`: the collection segment of a
+video's folder, the label-dir name of an owned photo's `Photos/<label>` folder, nothing for a referenced
+photo) **∪** the stored label ids. The app reconciles the folder coincidence at **exactly three points, and
+nowhere else** — photos joined the same three points, no fourth was added:
 
-1. **Model→registry seed on rebuild** (`ensureBestAndFolderLabels`/`ensureFolderLabelExists`) — a collection
-   an item lives in implies its label exists; only ever *adds* missing registry entries, never removes them
-   (see "Known accepted gap" below).
-2. **`renameLabel`** — renames the backing collection folder (if one exists), rewrites the stored `folder`
-   field of every item that was under it, then updates the registry `displayName`, keeping the id.
-   Associations are by id, so nothing else changes.
-3. **`removeLabel`/`deleteLabel` of the label naming a folder** — relocates the affected folder(s) (see
-   "Mutations" below).
+1. **Model→registry seed on rebuild** (`ensureBestAndFolderLabels`/`ensureFolderLabelExists`) — a storage
+   location an item lives in implies its label exists; only ever *adds* missing registry entries, never
+   removes them (see "Known accepted gap" below). Referenced photos seed nothing — their stored label ids
+   must already exist in the registry.
+2. **`renameLabel`** — renames the backing folders (up to two: the collection folder and the label's
+   `<root>/Photos/<label>` dir, both collision-checked before either rename runs, with a rollback if the
+   second rename fails), rewrites the stored `folder` field of every item that was under them (plus the
+   source path of owned photos — their file lives inside the renamed dir), then updates the registry
+   `displayName`, keeping the id. Associations are by id, so nothing else changes.
+3. **`removeLabel`/`deleteLabel` of the label naming an item's storage** — relocates the affected storage (a
+   video's frame folder / an owned photo's file; see "Mutations" below).
+
+Every disk-touching label path skips referenced photos by construction: with no storage folder they never
+classify as "stored under" a label, so only their stored id list is ever edited.
 
 Nothing else ever touches folders. This is the load-bearing invariant for the whole label system: if new
 code needs to touch a folder for label-related reasons, it almost certainly belongs at one of these three
@@ -89,13 +100,18 @@ still has a usable (if `!isValid()`) id, so even that case stays clean.
   currently present).
 - **Mutations**: `addLabel`/`removeLabel`. `addLabel` only writes the stored id list (no-op on an invalid id —
   a missing-source item can't be labeled). `removeLabel` is metadata-only too, **except** when the label
-  names the item's storage folder: then it relocates that folder to the item's alphabetically-first
-  remaining ordinary label, **refusing** to remove an item's last ordinary label (an item must always keep ≥1
-  ordinary label).
+  names the item's storage location: then it relocates that storage (a video's frame folder into the
+  destination collection; an owned photo's file into the destination's `Photos/<label>` dir, updating its
+  source path too) to the item's alphabetically-first remaining ordinary label. The **≥1-ordinary-label
+  invariant is uniform**: the relocate path refuses to remove a stored-under item's last ordinary label, and
+  `removeLabel` equally refuses to strip the last ordinary label of a folder-less item (a referenced photo,
+  where every label is stored) even though no storage rationale applies — uniformity was an explicit design
+  decision.
 
 ## Import lifecycle
 
-- **`addMediaItem(id, sourcePath, folderAbs, splitIntoFrames)`** registers a freshly imported item. Ensures
+- **`addMediaItem(id, sourcePath, folderAbs, splitIntoFrames)`** registers a freshly imported **video**
+  (photo registration arrives with the photo import path; nothing writes photo records yet). Ensures
   the collection's folder label exists. **Refuses** (returns `false`, logs a `qWarning`, leaves the existing
   entry untouched) if `id` already names an item tracked under a *different* folder — a name+size collision
   with an existing item. `splitVideoIntoFrames` (the one caller that calls this after a real, full
@@ -139,29 +155,40 @@ re-export-all, and the post-Import Best/extra-label flush.
 - **`createLabel(displayName)`** — creates a folder-backed label with this name if none exists yet. Exists
   because empty collections have no item to derive a folder-label from (see "Persistence" above);
   `createCollection` calls it explicitly after creating the on-disk folder. No-op if the name is taken.
-- **`renameLabel(labelId, newName)`** — uniqueness-checked (case-insensitive); renames the backing
-  collection folder if one exists, then updates `displayName` keeping the id. Refuses: Best, empty name,
-  duplicate name, or a colliding/failed folder rename.
+- **`renameLabel(labelId, newName)`** — uniqueness-checked (case-insensitive); renames the backing folders
+  if they exist (see reconciliation point 2 above), then updates `displayName` keeping the id. Refuses: Best,
+  empty name, duplicate name, the reserved name `"Photos"` (see below), or a colliding/failed folder rename.
 - **`setColor(labelId, color)`** — registry-only, no folder involvement.
 - **`deleteLabel(labelId)`** — the destructive one. User explicitly chose **delete-and-relocate** over
   refuse-if-used (see "Design rationale" below): it relocates every item stored under the label off it
   (reusing the per-item relocate), untags any item that merely carried it as an extra, removes the
-  now-empty collection folder, then drops the registry entry. **Refuses** (no-op on the registry) for:
-  Best, an unknown id, if any stored-under item would be orphaned (no other ordinary label to fall back
-  on), or if a relocation was blocked (e.g. a name collision) — in the last case the folder still names the
-  label, so the registry entry is deliberately *kept* (a rebuild would just re-seed it from the leftover
-  folder anyway; dropping it would just create churn). `deleteLabelImpact` is a const pre-flight (relocate/untag
-  counts + whether anything would be orphaned) used by the confirmation dialog and to refuse orphaning up front
-  with a clear message before any mutation happens.
+  now-empty backing folders (the collection folder and the label's `Photos/<label>` dir, each only if
+  empty), then drops the registry entry. **Refuses** (no-op on the registry) for:
+  Best, an unknown id, if any item would be orphaned (a stored-under item with no other ordinary label to
+  fall back on, or a folder-less referenced photo carrying this as its last ordinary label — untagging it
+  would orphan it just as surely), or if a relocation was blocked (e.g. a name collision) — in the last case
+  the folder still names the label, so the registry entry is deliberately *kept* (a rebuild would just
+  re-seed it from the leftover folder anyway; dropping it would just create churn). `deleteLabelImpact` is a
+  const pre-flight (relocate/untag counts + whether anything would be orphaned) used by the confirmation
+  dialog and to refuse orphaning up front with a clear message before any mutation happens.
 
 All registry mutations persist `labels.json`.
 
+**`"Photos"` is a reserved name**: `<root>/Photos` is the owned-photo storage tree (one subdir per label —
+see [data-model.md](data-model.md)), living in the same namespace as collection folders. `createCollection`
+(UI side) and `renameLabel` (catalog side) both refuse it case-insensitively. A *legacy* collection folder
+literally named `Photos` predating this rule is not auto-migrated — accepted as a non-case for this
+library; the guards only prevent creating the conflict from here on.
+
 ## In-memory model
 
-`QHash<MediaId, Entry>` where `Entry{folder (abs), sourcePath, labelIds}` — this **is** the catalog; see
-"Catalog is the authoritative in-memory model" in [data-model.md](data-model.md). `rebuildIndex()` re-seeds
-the registry from the model (`ensureBestAndFolderLabels`) and reloads every entry fresh from
-`MetadataStore::allMediaIds()` + per-id field reads. It runs at construction and inside
+`QHash<MediaId, Entry>` where `Entry{folder (abs; empty for a referenced photo), sourcePath, labelIds,
+splitIntoFrames, type, referenced}` — this **is** the catalog; see "Catalog is the authoritative in-memory
+model" in [data-model.md](data-model.md). `rebuildIndex()` re-seeds the registry from the model
+(`ensureBestAndFolderLabels`) and reloads every entry fresh from `MetadataStore::allMediaIds()` + per-id
+field reads. A folder-less record is skipped as a non-item (a legacy orphan carrying only labels — see
+[data-model.md](data-model.md)'s "Legacy seed" note) **unless** its `type` says photo: a folder-less photo
+is a referenced photo, a real item tracked in place. It runs at construction and inside
 `renameLabel`/`deleteLabel` (many folder paths can change at once there, so a full reload is simpler than
 incremental surgery) — **not** on every grid refresh. `MainWindow::refreshMediaGrid` deliberately does **not**
 call it: the model is kept current by its own mutation API (`addMediaItem`/`removeMediaItem`/`applyRename`/
@@ -276,8 +303,12 @@ above doesn't carry the reasoning behind forks that were considered and rejected
 
 Tools menu → "Check catalog integrity..." (`MainWindow::checkCatalogIntegrity`) reconciles the catalog
 against disk on demand — the only other place besides the legacy seed that walks disk, and only ever on
-explicit user request, never part of the normal refresh path. `Catalog::scanIntegrity()` is read-only and
-returns an `IntegrityReport` of three kinds of drift, each with its own resolution:
+explicit user request, never part of the normal refresh path. **Video-only in v1**: photo entries are skipped
+outright (every check reasons about frame folders — a referenced photo's empty folder would misread as a
+ghost), and the untracked-folder walk skips the `<root>/Photos` tree (it holds owned photo files, not frame
+folders). Photo integrity (missing owned file / vanished referenced file) is deferred backlog.
+`Catalog::scanIntegrity()` is read-only and returns an `IntegrityReport` of three kinds of drift, each with
+its own resolution:
 - **`RelinkCandidate`** — an orphaned placeholder (`MediaId::fromNameAndSize(name, -1)`, from when the source
   was missing at seed/import time) whose recorded source path now resolves to an existing file. Resolved via
   `Catalog::relinkPlaceholder`, which unions the placeholder's stored labels with any pre-existing orphaned

@@ -1097,9 +1097,11 @@ void MainWindow::reExportAllVideos()
 
 bool MainWindow::createCollection(const QString& name, bool refreshList)
 {
-	if (name.compare(BEST_COLLECTION_NAME, Qt::CaseInsensitive) == 0)
+	// "Photos" is reserved for the owned-photo storage dir (<root>/Photos/<label>) - a collection folder by
+	// that name would intermingle with it. Catalog::renameLabel refuses the same name.
+	if (name.compare(BEST_COLLECTION_NAME, Qt::CaseInsensitive) == 0 || name.compare(PHOTOS_DIR_NAME, Qt::CaseInsensitive) == 0)
 	{
-		QMessageBox::warning(this, tr("Error"), tr("\"%1\" is a reserved name.").arg(BEST_COLLECTION_NAME));
+		QMessageBox::warning(this, tr("Error"), tr("\"%1\" is a reserved name.").arg(name));
 		return false;
 	}
 

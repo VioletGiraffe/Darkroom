@@ -16,8 +16,10 @@
 // backing folder; pure membership).
 //
 // Catalog is THE catalog: the authoritative in-memory model of the media-item set, keyed by MediaId. For each
-// item it holds its frame folder, source path, and full label-id set. Every item-set / label query
-// is answered from this in-memory model. MetadataStore is how the model is *persisted* - a dumb,
+// item it holds its storage folder, source path, and full label-id set. An item is a video or a photo
+// (MediaType): a video's folder is its frame folder (<root>/<collection>/<name>); an owned photo's folder is
+// the <root>/Photos/<label> dir its file sits in; a referenced photo is tracked in place - no storage folder
+// at all, every label a stored extra. Every item-set / label query is answered from this in-memory model. MetadataStore is how the model is *persisted* - a dumb,
 // field-granular, MediaId-keyed store shared with other features (e.g. the player's loop intervals); the
 // catalog loads itself from it once at construction and writes through on each mutation. Nothing treats
 // MetadataStore's records as the catalog - callers ask Catalog.
@@ -47,6 +49,9 @@ public:
 		[[nodiscard]] bool isVirtual() const { return id == BestLabelId; }
 	};
 
+	// Persisted per record as a "type" field; absent = video, so pre-photos catalogs need no migration.
+	enum class MediaType { Video, Photo };
+
 	// The label registry in display order. Best is pinned first.
 	[[nodiscard]] const QList<Label>& allLabels() const { return _labels; }
 	[[nodiscard]] const Label* labelById(const QString& id) const;
@@ -71,17 +76,25 @@ public:
 	[[nodiscard]] QString folderForMediaItem(const MediaId& id) const;
 	[[nodiscard]] QString sourcePathForMediaItem(const MediaId& id) const;
 	// False once a video was registered with only preview frames (an on-demand split is still owed); true once
-	// the full frame set has been extracted. Unknown id -> true (nothing pending). See addMediaItem.
+	// the full frame set has been extracted. Unknown id -> true (nothing pending; photos always report true,
+	// there is nothing to split). See addMediaItem.
 	[[nodiscard]] bool isSplitIntoFrames(const MediaId& id) const;
-	// Directory of the first item whose source file is currently present, in iteration order (a sensible
-	// default destination for relocating newly added source files). Empty if none is found.
+	// Unknown id -> Video.
+	[[nodiscard]] MediaType mediaType(const MediaId& id) const;
+	// True for a photo tracked in place (catalog-only): label operations never move its file, deleting it
+	// never touches the file, and it has no storage folder - all its labels are stored ids. Unknown id / video -> false.
+	[[nodiscard]] bool isReferenced(const MediaId& id) const;
+	// Directory of the first video whose source file is currently present, in iteration order (a sensible
+	// default destination for relocating newly added source files; photos are skipped - an owned photo's
+	// source lives inside the library itself). Empty if none is found.
 	[[nodiscard]] QString anySourceDir() const;
 
-	// Per-video membership. A missing source video has an invalid (placeholder) id and can't be labeled, so
+	// Per-item membership. A missing source file has an invalid (placeholder) id and can't be labeled, so
 	// these no-op on one. addLabel only ever writes the stored id list. removeLabel is metadata-only too,
-	// EXCEPT when labelId is the label that happens to name the item's storage folder: then it relocates
-	// that folder on disk to the item's alphabetically-first remaining ordinary label (an item must always
-	// keep at least one ordinary label, so removing its last one is refused).
+	// EXCEPT when labelId is the label that happens to name the item's storage location: then it relocates
+	// the item on disk (a video's frame folder / an owned photo's file) to the item's alphabetically-first
+	// remaining ordinary label. An item must always keep at least one ordinary label, so removing its last
+	// one is refused - including for a referenced photo, whose labels are all stored ids.
 	void addLabel(const MediaId& id, const QString& labelId);
 	void removeLabel(const MediaId& id, const QString& labelId);
 
@@ -118,9 +131,10 @@ public:
 	bool applyRename(const MediaId& oldId, const MediaId& newId, const QString& newSourcePath, const QString& newFolderAbs);
 
 	// Registry mutations (the label objects themselves). renameLabel validates newDisplayName is unique, renames
-	// the matching on-disk collection folder if one exists, rewrites the frame folder of every item under it,
-	// and updates the registry display name - the id and every association are preserved. Returns false (no-op)
-	// for Best, an empty/duplicate name, or a failed or colliding folder rename. setColor stores a hex color
+	// the matching on-disk folders if they exist (the collection folder and the <root>/Photos/<label> dir),
+	// rewrites the stored folder (and, for owned photos, source path) of every item under it, and updates the
+	// registry display name - the id and every association are preserved. Returns false (no-op) for Best, an
+	// empty/duplicate/reserved name, or a failed or colliding folder rename. setColor stores a hex color
 	// ("" = unset). Both persist labels.json.
 	bool renameLabel(const QString& labelId, const QString& newDisplayName);
 	void setColor(const QString& labelId, const QString& color);
@@ -134,9 +148,10 @@ public:
 	// What deleting a label would do, for a confirmation dialog / pre-flight check (computed, no mutation).
 	struct DeleteImpact
 	{
-		int  relocateCount = 0;      // items stored under the label (their frame folder will be moved)
+		int  relocateCount = 0;      // items stored under the label (their frame folder / photo file will be moved)
 		int  untagCount    = 0;      // items carrying it only as an extra tag (just untagged)
-		bool wouldOrphan   = false;  // a stored-under item has no other ordinary label to fall back on -> delete refused
+		bool wouldOrphan   = false;  // an item would lose its last ordinary label (a stored-under item with no
+		                             // fallback, or a folder-less referenced photo tagged only this) -> delete refused
 	};
 	[[nodiscard]] DeleteImpact deleteLabelImpact(const QString& labelId) const;
 
@@ -223,21 +238,33 @@ private:
 
 	struct Entry
 	{
-		QString     folder;           // absolute frame-folder path (stored relative-to-root in JSON)
-		QString     sourcePath;       // absolute; may point at a missing/unmounted file
-		QStringList labelIds;         // derived folder-label id (first when known) + stored extra ids
-		bool        splitIntoFrames = true;  // false = only preview frames exist yet; see isSplitIntoFrames
+		QString     folder;           // absolute; a video's frame folder, an owned photo's <root>/Photos/<label> dir (both stored relative-to-root in JSON), empty for a referenced photo
+		QString     sourcePath;       // absolute; may point at a missing/unmounted file. An owned photo's file lives inside its folder
+		QStringList labelIds;         // derived storage-label id (first when known) + stored extra ids
+		bool        splitIntoFrames = true;  // false = only preview frames exist yet; see isSplitIntoFrames. Video-only; photos keep the default
+		MediaType   type = MediaType::Video;
+		bool        referenced = false;      // photos only; see isReferenced
 	};
 
-	[[nodiscard]] static QString collectionNameOf(const QString& folderAbs);  // the collection-folder name (the storage label's display name)
+	[[nodiscard]] static QString collectionNameOf(const QString& folderAbs);  // the collection-folder name (a *video's* storage-label display name)
+	// The label display name the entry's storage location implies: the collection-folder name for a video
+	// (<root>/<collection>/<frameFolder>), the label-dir name for an owned photo (<root>/Photos/<label>).
+	// Empty when the entry has no storage folder (a referenced photo).
+	[[nodiscard]] static QString storageLabelNameOf(const Entry& e);
+	// Id of the ordinary label naming the entry's storage location; empty if none (incl. referenced photos).
+	[[nodiscard]] QString storageLabelIdOf(const Entry& e) const;
+	// True if the item carries an ordinary (non-virtual) label other than excludedLabelId - the ">= 1
+	// ordinary label" invariant check shared by the relocate/untag refusal paths.
+	[[nodiscard]] bool hasOtherOrdinaryLabel(const MediaId& id, const QString& excludedLabelId) const;
 	[[nodiscard]] static QString relativeFolder(const QString& folderAbs);    // strip rootFolder() prefix for portable storage
 	[[nodiscard]] static QString absoluteFolder(const QString& folderRel);    // re-anchor a stored relative folder under rootFolder()
-	[[nodiscard]] QStringList computeLabelIds(const MediaId& id, const QString& folderAbs) const;  // derived folder-label + stored extras
+	[[nodiscard]] QStringList computeLabelIds(const MediaId& id, const Entry& e) const;  // derived storage-label + stored extras (reads e.folder + e.type)
 	void refreshMediaItemLabels(const MediaId& id);  // recompute one entry's labelIds after a mutation
 
 	[[nodiscard]] Label* mutableLabelById(const QString& id);                // non-const finder for registry mutations
-	// Moves an item's frame folder off the label that currently names it, onto its alphabetically-first remaining
-	// ordinary label, and updates the model entry. Warns and does nothing if no other ordinary label remains.
+	// Moves an item's storage (a video's frame folder / an owned photo's file) off the label that currently
+	// names it, onto its alphabetically-first remaining ordinary label, and updates the model entry. Warns and
+	// does nothing if no other ordinary label remains. Never reached by referenced photos (no storage label).
 	void relocateFolderOffLabel(const MediaId& id, const QString& removedLabelId);
 
 	[[nodiscard]] static QStringList readStoredLabelIds(const MediaId& id);

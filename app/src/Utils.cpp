@@ -140,3 +140,10 @@ QString rootFolder()
 {
 	return QSettings{}.value(Settings::RootFolder, Defaults::RootFolder).toString();
 }
+
+const QString PHOTOS_DIR_NAME = "Photos";
+
+QString photosRootFolder()
+{
+	return rootFolder() + "/" + PHOTOS_DIR_NAME;
+}
