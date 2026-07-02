@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<!--
+  Planning mockup for the Darkroom labels redesign (the label sidebar that replaces the collection
+  tab bar). Produced during the design discussion; this is the visual reference for the deferred
+  "restyle the app to approximate this look" task. Open in a browser. Ships both themes: a toggle (top of
+  page) flips the <html data-theme> attribute between light and dark. Both palettes are the design target
+  here, not the app's current Theme — light is warm paper, dark is a matching warm-neutral ramp with the
+  same slightly-olive cast (app/src/Theme.cpp will be tuned to these, not the reverse). A leaf green is only the
+  selection accent; the gold star and the label swatch colors are identities and stay constant across themes.
+-->
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Darkroom — label sidebar mockup</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
+<style>
+  :root {
+    --color-background-primary: #faf5f0;   /* warm off-white surface — lighter than background-secondary/tertiary
+                                               (as it must be in this theme), just a visible step below the page */
+    --color-background-secondary: #edefe1;  /* sage-shifted (hue ~70, off the neutral's ~47) and a clearer
+                                                step down from background-primary, so a selected row visibly
+                                                stands out instead of nearly matching the surface */
+    --color-background-tertiary: #e7e4db;
+    --color-border-tertiary: rgba(20, 20, 16, 0.12);
+    --color-border-secondary: rgba(20, 20, 16, 0.22);
+    --color-border-info: #588a30;
+    --color-background-info: #e9f1da;
+    --color-text-primary: #1a1a18;
+    --color-text-secondary: #5f5e5a;
+    --color-text-tertiary: #7b815f;         /* same sage-shifted hue as background-secondary, darkened for
+                                                real contrast against the page (was near-zero saturation, a
+                                                plain gray indistinguishable in character from the neutral ramp) */
+    --color-text-info: #3f6a1c;
+    --color-star-active: #BA7517;   /* filled Best star — amber reads better on light */
+    --color-page: #ffffff;          /* pure white so the backdrop doesn't tint perception of the mockup colors */
+    --color-shadow: rgba(20, 20, 16, 0.14);
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+  }
+  /* Warm dark ramp — the sibling of the warm-paper light palette above, not a derivative of the app's
+     current Theme. Neutrals lean warm brown/taupe (R > G > B, hue ~33 deg) so they read warm without the
+     yellow-green/olive tint that R=G would give; leaf green stays the selection accent only (offset ~a quarter
+     of the wheel from the neutrals' hue — related enough to harmonize, far enough to highlight by hue rather
+     than by saturation alone; the warm-brown + green earthy pairing). Lightness by
+     semantics: secondary (raised rows) > primary (surface) > tertiary (recessed thumbnail wells); page
+     sits behind the surface so the frame reads as a panel on it. */
+  :root[data-theme="dark"] {
+    --color-background-primary: #1f1b16;
+    --color-background-secondary: #3c2528;  /* wine-shifted (hue ~353, off the neutral's ~33) and a clearer
+                                                step up from background-primary, so a selected row visibly
+                                                stands out instead of nearly matching the surface */
+    --color-background-tertiary: #16120d;
+    --color-border-tertiary: rgba(244, 238, 228, 0.10);
+    --color-border-secondary: rgba(244, 238, 228, 0.20);
+    --color-border-info: #6db04f;
+    --color-background-info: #2a3c1c;
+    --color-text-primary: #ece5da;
+    --color-text-secondary: #bab2a7;        /* brightened (+8 L) for more contrast against the dark surface;
+                                                text-primary is left alone, it's already near-white */
+    --color-text-tertiary: #a97e84;         /* same wine-shifted hue as background-secondary, lightened for
+                                                real contrast against the page (was near-neutral, a plain
+                                                gray indistinguishable in character from the neutral ramp);
+                                                brightened further (+8 L) for legibility */
+    --color-text-info: #c9e7b6;             /* brightened (+8 L) for more contrast against the dark surface */
+    --color-star-active: #e2a32b;
+    --color-page: #000000;          /* pure black so the backdrop doesn't tint perception of the mockup colors */
+    --color-shadow: rgba(0, 0, 0, 0.5);
+  }
+  body {
+    margin: 0;
+    padding: 2rem 1rem;
+    background: var(--color-page);
+    color: var(--color-text-primary);
+    font-family: -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+    line-height: 1.5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+  .mockup { width: 100%; max-width: 720px; }
+  .caption { max-width: 720px; font-size: 13px; color: var(--color-text-secondary); }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+</style>
+</head>
+<body>
+
+<div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+  <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:center;">
+    <button id="themeToggle" type="button" style="padding:6px 12px; font:inherit; font-size:12px; cursor:pointer; border-radius:var(--border-radius-md); border:0.5px solid var(--color-border-secondary); background:var(--color-background-primary); color:var(--color-text-primary);">Switch to dark</button>
+    <button id="rollAccent" type="button" style="padding:6px 12px; font:inherit; font-size:12px; cursor:pointer; border-radius:var(--border-radius-md); border:0.5px solid var(--color-border-info); background:var(--color-background-info); color:var(--color-text-info);">🎲 Roll 20 colors</button>
+  </div>
+  <!-- Swatch strip: hover any chip to live-preview that color on the mockup below (sticks until you hover
+       another, so moving the mouse away leaves the last one applied). Click locks in a visible "selected" ring. -->
+  <div id="accentSwatches" style="display:grid; grid-template-columns:repeat(20, 26px); gap:2px; justify-content:center;"></div>
+  <!-- Readout of the currently-applied swatch so a keeper can be copied straight into the :root blocks / Theme.cpp. -->
+  <span id="accentReadout" style="font-size:12px; color:var(--color-text-secondary); font-variant-numeric:tabular-nums;">hover a swatch…</span>
+</div>
+
+<div class="mockup">
+<div style="display:flex; flex-direction:column; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-lg); overflow:hidden; background:var(--color-background-primary);">
+<h2 class="sr-only">Mockup of the Darkroom main window: a left sidebar of colored, multi-selectable labels replacing the tab bar, a name-filter and sort toolbar, and a grid of video cards with a label being dragged onto one.</h2>
+
+  <div style="display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:0.5px solid var(--color-border-tertiary); font-size:12px; color:var(--color-text-tertiary);">
+    <i class="ti ti-movie" aria-hidden="true" style="font-size:16px;"></i><span>Darkroom</span>
+  </div>
+
+  <div style="display:flex; min-height:430px;">
+
+    <div style="width:178px; flex:0 0 178px; border-right:0.5px solid var(--color-border-tertiary); padding:10px 8px; display:flex; flex-direction:column; gap:2px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:0 6px 6px;">
+        <span style="font-size:12px; color:var(--color-text-secondary);">Labels</span>
+        <span style="display:inline-flex; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-md); overflow:hidden; font-size:11px;">
+          <span style="padding:2px 7px; background:var(--color-background-info); color:var(--color-text-info);">OR</span>
+          <span style="padding:2px 7px; color:var(--color-text-tertiary);">AND</span>
+        </span>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--border-radius-md); font-size:13px;">
+        <i class="ti ti-stack-2" aria-hidden="true" style="font-size:16px; color:var(--color-text-tertiary);"></i>
+        <span style="flex:1;">All</span><span style="font-size:11px; color:var(--color-text-tertiary);">212</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--border-radius-md); font-size:13px;">
+        <i class="ti ti-star" aria-hidden="true" style="font-size:16px; color:var(--color-star-active);"></i>
+        <span style="flex:1;">Best</span><span style="font-size:11px; color:var(--color-text-tertiary);">9</span>
+      </div>
+
+      <div style="height:1px; background:var(--color-border-tertiary); margin:5px 6px;"></div>
+
+      <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--border-radius-md); font-size:13px; background:var(--color-background-secondary); box-shadow:inset 2px 0 0 #378ADD;">
+        <span style="width:10px; height:10px; border-radius:50%; background:#378ADD;"></span>
+        <span style="flex:1; font-weight:500;">beach</span><span style="font-size:11px; color:var(--color-text-tertiary);">40</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--border-radius-md); font-size:13px; background:var(--color-background-secondary); box-shadow:inset 2px 0 0 #7F77DD;">
+        <span style="width:10px; height:10px; border-radius:50%; background:#7F77DD;"></span>
+        <span style="flex:1; font-weight:500;">night</span><span style="font-size:11px; color:var(--color-text-tertiary);">23</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--border-radius-md); font-size:13px;">
+        <span style="width:10px; height:10px; border-radius:50%; background:#888780;"></span>
+        <span style="flex:1;">city</span><span style="font-size:11px; color:var(--color-text-tertiary);">61</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--border-radius-md); font-size:13px;">
+        <span style="width:10px; height:10px; border-radius:50%; background:#D85A30;"></span>
+        <span style="flex:1;">sunset</span><span style="font-size:11px; color:var(--color-text-tertiary);">18</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--border-radius-md); font-size:13px;">
+        <span style="width:10px; height:10px; border-radius:50%; background:#639922;"></span>
+        <span style="flex:1;">forest</span><span style="font-size:11px; color:var(--color-text-tertiary);">31</span>
+      </div>
+
+      <div style="margin-top:auto; display:flex; align-items:center; gap:6px; padding:6px 8px; font-size:12px; color:var(--color-text-secondary); border:0.5px dashed var(--color-border-secondary); border-radius:var(--border-radius-md);">
+        <i class="ti ti-plus" aria-hidden="true" style="font-size:15px;"></i><span>Add label</span>
+      </div>
+    </div>
+
+    <div style="flex:1; min-width:0; display:flex; flex-direction:column;">
+
+      <div style="display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:0.5px solid var(--color-border-tertiary);">
+        <div style="flex:1; display:flex; align-items:center; gap:6px; height:32px; padding:0 10px; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-md); color:var(--color-text-tertiary); font-size:13px;">
+          <i class="ti ti-search" aria-hidden="true" style="font-size:15px;"></i><span>filter by name…</span>
+        </div>
+
+        <!-- Card-density control: its own inline control, separate from sort. Opens a 1..N dropdown
+             (MIN_PREVIEW_FRAME_COUNT..MAX_PREVIEW_FRAME_COUNT) picking how many preview frames each card shows. -->
+        <div style="display:flex; align-items:center; gap:6px; height:32px; padding:0 9px; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-md); font-size:12px; color:var(--color-text-secondary);">
+          <i class="ti ti-layout-columns" aria-hidden="true" style="font-size:15px;"></i><span>3 frames</span>
+          <i class="ti ti-chevron-down" aria-hidden="true" style="font-size:13px; color:var(--color-text-tertiary);"></i>
+        </div>
+
+        <!-- Sort control: a single button whose face shows the current field + direction. Clicking opens the
+             popover below; it holds every ordering option (field, direction, favorites-first). -->
+        <div style="position:relative;">
+          <div style="display:flex; align-items:center; gap:6px; height:32px; padding:0 10px; border:0.5px solid var(--color-border-info); background:var(--color-background-info); border-radius:var(--border-radius-md); font-size:12px; color:var(--color-text-info);">
+            <i class="ti ti-arrows-sort" aria-hidden="true" style="font-size:15px;"></i><span>Date</span>
+            <i class="ti ti-arrow-down" aria-hidden="true" style="font-size:14px;"></i>
+          </div>
+
+          <!-- Drawn open to specify the options the popover contains (it is dismissible in the real app). -->
+          <div style="position:absolute; top:38px; right:0; z-index:5; width:196px; padding:10px; background:var(--color-background-primary); border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-lg); box-shadow:0 6px 20px var(--color-shadow);">
+            <div style="font-size:11px; color:var(--color-text-tertiary); padding:0 2px 5px;">Sort by</div>
+            <div style="display:flex; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-md); overflow:hidden; font-size:12px; margin-bottom:9px;">
+              <span style="flex:1; text-align:center; padding:5px 0; color:var(--color-text-secondary);">Name</span>
+              <span style="flex:1; text-align:center; padding:5px 0; background:var(--color-background-info); color:var(--color-text-info);">Date</span>
+            </div>
+
+            <div style="font-size:11px; color:var(--color-text-tertiary); padding:0 2px 5px;">Direction</div>
+            <div style="display:flex; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-md); overflow:hidden; font-size:12px; margin-bottom:10px;">
+              <span style="flex:1; text-align:center; padding:5px 0; color:var(--color-text-secondary);">↑ Ascending</span>
+              <span style="flex:1; text-align:center; padding:5px 0; background:var(--color-background-info); color:var(--color-text-info);">↓ Descending</span>
+            </div>
+
+            <div style="height:1px; background:var(--color-border-tertiary); margin:0 2px 9px;"></div>
+
+            <div style="display:flex; align-items:center; gap:8px; padding:0 2px; font-size:12px;">
+              <span style="display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; border-radius:4px; background:var(--color-border-info); color:#fff;"><i class="ti ti-check" aria-hidden="true" style="font-size:11px;"></i></span>
+              <span style="flex:1;">Favorites first</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="position:relative; padding:12px; display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
+
+        <div style="border:0.5px solid var(--color-border-tertiary); border-radius:var(--border-radius-md); padding:7px;">
+          <div style="display:flex; gap:3px;">
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+          </div>
+          <!-- Footer is a single row, left to right: Best-star toggle, label dots, then the name (filling
+               the rest). The card is wide enough they never overlap. Star is filled/gold when in Best, a
+               faint outline otherwise. -->
+          <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+            <i class="ti ti-star-filled" aria-hidden="true" style="font-size:13px; color:var(--color-star-active);"></i>
+            <span style="display:flex; gap:4px;"><span style="width:7px;height:7px;border-radius:50%;background:#378ADD;"></span><span style="width:7px;height:7px;border-radius:50%;background:#7F77DD;"></span></span>
+            <div style="flex:1; min-width:0; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:right;">clip_44_2026…</div>
+          </div>
+        </div>
+
+        <div style="border:0.5px solid var(--color-border-tertiary); border-radius:var(--border-radius-md); padding:7px;">
+          <div style="display:flex; gap:3px;">
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+            <i class="ti ti-star" aria-hidden="true" style="font-size:13px; color:var(--color-text-tertiary); opacity:0.4;"></i>
+            <span style="display:flex; gap:4px;"><span style="width:7px;height:7px;border-radius:50%;background:#378ADD;"></span></span>
+            <div style="flex:1; min-width:0; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:right;">beach_morning…</div>
+          </div>
+        </div>
+
+        <div style="border:2px solid var(--color-border-info); border-radius:var(--border-radius-md); padding:6px; position:relative; background:var(--color-background-info);">
+          <div style="display:flex; gap:3px;">
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+            <i class="ti ti-star" aria-hidden="true" style="font-size:13px; color:var(--color-text-tertiary); opacity:0.4;"></i>
+            <span style="display:flex; gap:4px;"><span style="width:7px;height:7px;border-radius:50%;background:#888780;"></span></span>
+            <div style="flex:1; min-width:0; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:right;">harbor_dusk…</div>
+          </div>
+        </div>
+
+        <div style="border:0.5px solid var(--color-border-tertiary); border-radius:var(--border-radius-md); padding:7px;">
+          <div style="display:flex; gap:3px;">
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+            <i class="ti ti-star" aria-hidden="true" style="font-size:13px; color:var(--color-text-tertiary); opacity:0.4;"></i>
+            <span style="display:flex; gap:4px;"><span style="width:7px;height:7px;border-radius:50%;background:#7F77DD;"></span><span style="width:7px;height:7px;border-radius:50%;background:#888780;"></span></span>
+            <div style="flex:1; min-width:0; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:right;">night_market…</div>
+          </div>
+        </div>
+
+        <div style="border:0.5px solid var(--color-border-tertiary); border-radius:var(--border-radius-md); padding:7px;">
+          <div style="display:flex; gap:3px;">
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+            <i class="ti ti-star" aria-hidden="true" style="font-size:13px; color:var(--color-text-tertiary); opacity:0.4;"></i>
+            <span style="display:flex; gap:4px;"><span style="width:7px;height:7px;border-radius:50%;background:#378ADD;"></span><span style="width:7px;height:7px;border-radius:50%;background:#639922;"></span></span>
+            <div style="flex:1; min-width:0; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:right;">coast_pan_03…</div>
+          </div>
+        </div>
+
+        <div style="border:0.5px solid var(--color-border-tertiary); border-radius:var(--border-radius-md); padding:7px;">
+          <div style="display:flex; gap:3px;">
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+            <i class="ti ti-star" aria-hidden="true" style="font-size:13px; color:var(--color-text-tertiary); opacity:0.4;"></i>
+            <span style="display:flex; gap:4px;"><span style="width:7px;height:7px;border-radius:50%;background:#D85A30;"></span></span>
+            <div style="flex:1; min-width:0; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:right;">pier_sunset…</div>
+          </div>
+        </div>
+
+        <div style="position:absolute; left:230px; top:74px; display:flex; align-items:center; gap:6px; padding:4px 9px; border-radius:14px; background:#7F77DD; color:#26215C; font-size:12px; font-weight:500; border:0.5px solid #534AB7;">
+          <span style="width:8px; height:8px; border-radius:50%; background:#26215C;"></span>night
+          <i class="ti ti-pointer" aria-hidden="true" style="font-size:13px; position:absolute; right:-13px; bottom:-13px; color:var(--color-text-primary);"></i>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<p class="caption">
+  Left: the label sidebar (color swatch + name + count) replacing the collection tab bar, with
+  <code>All</code> + <code>Best</code> pinned and an OR/AND combine toggle. Top: the toolbar — a name
+  filter (replaces the separate Ctrl+F search dialog), an inline <code>frames-per-preview</code> picker
+  (card density), and a single <code>Sort</code> button whose face shows the current field + direction
+  and opens the popover (field, direction, favorites-first), drawn open here. Each card's footer is a single
+  row filling the former empty caption space — the Best-star toggle (filled/gold when in Best, faint outline
+  otherwise), then the label dots, then the name filling the rest. The highlighted card with the floating
+  <code>night</code> pill shows the drag-a-label-onto-cards assignment gesture. Sketch, not pixel-final.
+</p>
+
+<script>
+  const root = document.documentElement;
+  const themeToggle = document.getElementById("themeToggle");
+  themeToggle.addEventListener("click", () => {
+    const goingDark = root.getAttribute("data-theme") !== "dark";
+    root.setAttribute("data-theme", goingDark ? "dark" : "light");
+    themeToggle.textContent = goingDark ? "Switch to light" : "Switch to dark";
+    rerenderSwatches();   // recolor chips for the new theme's bounds and re-apply whichever one was active
+  });
+
+  // --- Randomized accent swatches ------------------------------------------------------------------------
+  // Rolls a batch of 60 candidate accents (3 rows x 20), hue uniform over the full 0-360 range — no
+  // offset-from-neutral constraint, so it can land anywhere including the cold blue/teal zone. Saturation
+  // and lightness are randomized within per-role/per-theme bounds so every roll still guarantees the
+  // contrast the hand-picked palette had (readable text on fill, fill visibly distinct from surface).
+  const SWATCH_COUNT = 60;
+
+  // [min, max] per role, per theme. Each roll picks within these instead of a fixed point.
+  // satBorder/lightBorder (the headline swatch color) are tuned so the brightest worst-case combo peaks
+  // around RGB 235/255 (~92% peak channel) — bright and vivid, just short of pure neon/blown-out white.
+  // satBackground/satText keep their original ranges: their lightness is fixed at the opposite extreme on
+  // purpose (pale tint / dark-or-light readable text), so "brighter" doesn't apply to them the same way.
+  const BOUNDS = {
+    light: {
+      satBorder: [60, 85], lightBorder: [36, 55],
+      satBackground: [25, 55], lightBackground: [86, 95],
+      satText: [45, 75], lightText: [18, 32],
+    },
+    dark: {
+      satBorder: [55, 80], lightBorder: [48, 60],
+      satBackground: [25, 50], lightBackground: [14, 24],
+      satText: [38, 65], lightText: [70, 90],   // +8 vs. light theme's range, for more contrast on dark
+    },
+  };
+
+  function hslToHex(h, s, l) {
+    s /= 100; l /= 100;
+    const k = n => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+    const toHex = x => Math.round(x * 255).toString(16).padStart(2, "0");
+    return "#" + toHex(f(0)) + toHex(f(8)) + toHex(f(4));
+  }
+  const lerp = (min, max, t) => min + (max - min) * t;
+
+  // Each swatch stores theme-independent 0..1 draws, not raw H/S/L — so toggling theme recolors the same
+  // swatch consistently instead of re-randomizing it.
+  //
+  // Every parameter is stratified, not freely drawn: n independent Math.random() calls reliably cluster
+  // (birthday-paradox effect) and leave gaps, which is why same-ish swatches kept showing up despite being
+  // "random". Instead each parameter is divided into n equal bins, the bins are shuffled and handed out one
+  // per swatch, and the value jitters within its assigned bin — full-range coverage on every parameter,
+  // every roll, with each parameter shuffled independently so swatches don't form a correlated gradient
+  // (e.g. swatch #1 always dim, swatch #60 always bright). Hue additionally gets a random rotation since
+  // it's circular, so the bin edges themselves move from roll to roll.
+  function makeStratified(n) {
+    const bins = Array.from({ length: n }, (_, i) => i);
+    for (let i = bins.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [bins[i], bins[j]] = [bins[j], bins[i]];
+    }
+    return bins.map(bin => (bin + Math.random()) / n);
+  }
+
+  function rollSwatches(n) {
+    const hueRotation = Math.random();
+    const hueT = makeStratified(n).map(t => (t + hueRotation) % 1);
+    const satBorderT = makeStratified(n), lightBorderT = makeStratified(n);
+    const satBackgroundT = makeStratified(n), lightBackgroundT = makeStratified(n);
+    const satTextT = makeStratified(n), lightTextT = makeStratified(n);
+    const result = Array.from({ length: n }, (_, i) => ({
+      hueT: hueT[i],
+      satBorderT: satBorderT[i], lightBorderT: lightBorderT[i],
+      satBackgroundT: satBackgroundT[i], lightBackgroundT: lightBackgroundT[i],
+      satTextT: satTextT[i], lightTextT: lightTextT[i],
+    }));
+    result.sort((a, b) => a.hueT - b.hueT);   // lay out the strip as a hue gradient, easier to scan/compare
+    return result;
+  }
+
+  function computeSwatchColors(swatch, theme) {
+    const hue = swatch.hueT * 360;
+    const b = BOUNDS[theme];
+    const border = hslToHex(hue, lerp(...b.satBorder, swatch.satBorderT), lerp(...b.lightBorder, swatch.lightBorderT));
+    const background = hslToHex(hue, lerp(...b.satBackground, swatch.satBackgroundT), lerp(...b.lightBackground, swatch.lightBackgroundT));
+    const text = hslToHex(hue, lerp(...b.satText, swatch.satTextT), lerp(...b.lightText, swatch.lightTextT));
+    return { hue, border, background, text };
+  }
+
+  let swatches = [];
+  let activeIndex = null;
+
+  function currentTheme() {
+    return root.getAttribute("data-theme") === "dark" ? "dark" : "light";
+  }
+
+  function applySwatch(index) {
+    activeIndex = index;
+    const colors = computeSwatchColors(swatches[index], currentTheme());
+    root.style.setProperty("--color-border-info", colors.border);
+    root.style.setProperty("--color-background-info", colors.background);
+    root.style.setProperty("--color-text-info", colors.text);
+    document.getElementById("accentReadout").textContent =
+      `#${index + 1} · hue ${Math.round(colors.hue)}° · border ${colors.border} · bg ${colors.background} · text ${colors.text}`;
+    document.querySelectorAll("#accentSwatches > span").forEach((chip, i) => {
+      chip.style.outline = i === index ? "2px solid var(--color-text-primary)" : "none";
+    });
+  }
+
+  function renderSwatches() {
+    const theme = currentTheme();
+    const container = document.getElementById("accentSwatches");
+    container.innerHTML = "";
+    swatches.forEach((swatch, i) => {
+      const colors = computeSwatchColors(swatch, theme);
+      const chip = document.createElement("span");
+      chip.title = `#${i + 1} · hue ${Math.round(colors.hue)}° · ${colors.border}`;
+      chip.style.cssText = `width:26px; height:26px; border-radius:3px; cursor:pointer; display:inline-block; background:${colors.border}; outline-offset:1px;`;
+      chip.addEventListener("mouseenter", () => applySwatch(i));
+      container.appendChild(chip);
+    });
+    if (activeIndex !== null) applySwatch(activeIndex);
+  }
+
+  // Recolor chips for the new theme's bounds (and re-apply the active one) without re-rolling the batch.
+  function rerenderSwatches() { renderSwatches(); }
+
+  document.getElementById("rollAccent").addEventListener("click", () => {
+    swatches = rollSwatches(SWATCH_COUNT);
+    activeIndex = null;
+    document.getElementById("accentReadout").textContent = "hover a swatch…";
+    renderSwatches();
+  });
+
+  swatches = rollSwatches(SWATCH_COUNT);
+  renderSwatches();
+</script>
+
+</body>
+</html>

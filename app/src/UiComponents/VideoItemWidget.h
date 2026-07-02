@@ -1,0 +1,81 @@
+#pragma once
+
+#include "Core/VideoId.h"
+
+#include <QColor>
+#include <QList>
+#include <QSize>
+#include <QStringList>
+#include <QWidget>
+
+#include <functional>
+
+class QDragEnterEvent;
+class QDragMoveEvent;
+class QDropEvent;
+class QLabel;
+class ThumbnailWidget;
+
+class VideoItemWidget final : public QWidget {
+public:
+	// maxImageSize bounds the thumbnail's preview area; the actual size best-fits the loaded image within it.
+	VideoItemWidget(
+		QSize maxImageSize, const QStringList& previewPaths, const QString& label,
+		const VideoId& videoId,
+		bool inBest, std::function<void()> onToggleBest,
+		std::function<void()> onDoubleClick = {},
+		std::function<void(QPoint globalPos)> onContextMenu = {},
+		bool dynamicSizeHint = true,
+		QWidget* parent = nullptr
+	);
+
+	[[nodiscard]] QSize sizeHint() const override;
+
+	// The card's stable identity (source video name + size). Carried so label ops and the label-drop target
+	// (see setOnLabelDropped) address the video directly. Invalid if the source video is missing.
+	[[nodiscard]] const VideoId& videoId() const { return m_videoId; }
+
+	// Updates the card's caption (the "N:  name" label) without re-rendering its thumbnail.
+	void setLabel(const QString& label);
+
+	// Sets the colored dots overlaid on the thumbnail (one per label the video carries, including Best);
+	// tooltip lists their names. An empty list hides the overlay. Colors are computed by the caller
+	// (MainWindow) from the Catalog.
+	void setLabelDots(const QList<QColor>& colors, const QString& tooltip);
+
+	// Shows/hides a small top-right badge marking a video that hasn't had its full frame set extracted yet
+	// (only its permanent preview frames exist so far) - see Catalog::isSplitIntoFrames.
+	void setSplitPending(bool pending);
+
+	void setOnMiddleButtonClick(std::function<void()> onClick);
+
+	// See ThumbnailWidget::setOnMouseWheelCallback — Ctrl+wheel over the card delegates the zoom policy here.
+	void setOnMouseWheelCallback(std::function<void(int steps)> handler);
+
+	// Makes the card a drop target for a label dragged from the LabelSidebar: dropping invokes handler with
+	// the dropped label's id (the caller assigns it). Only set on grid cards; unset cards reject the drop.
+	void setOnLabelDropped(std::function<void(const QString& labelId)> handler);
+
+protected:
+	bool eventFilter(QObject* watched, QEvent* event) override;
+	void dragEnterEvent(QDragEnterEvent* event) override;
+	void dragMoveEvent(QDragMoveEvent* event) override;
+	void dropEvent(QDropEvent* event) override;
+
+private:
+	// Keeps the badge pinned to the thumbnail's top-right corner across resizes (unlike the top-left label
+	// dots, its position depends on the thumbnail's width).
+	void repositionSplitPendingBadge();
+
+private:
+	ThumbnailWidget*             m_thumb = nullptr;
+	QWidget*                     m_footer = nullptr;     // bottom row: star + dots + name (sibling of m_thumb)
+	QLabel*                      m_name = nullptr;       // elided, right-aligned video name in the footer
+	QWidget*                     m_labelDots = nullptr;  // colored-dot strip (LabelDotStrip), child of m_footer
+	QWidget*                     m_splitPendingBadge = nullptr;  // top-right "not fully split" badge, child of m_thumb
+	VideoId                      m_videoId;
+	std::function<void()>               m_onMiddleButtonClick;
+	std::function<void()>               m_onDoubleClick;
+	std::function<void(QPoint)>         m_onContextMenu;
+	std::function<void(const QString&)> m_onLabelDropped;
+};

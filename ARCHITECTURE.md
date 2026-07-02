@@ -1,0 +1,112 @@
+# Darkroom — Architecture
+
+C++/Qt6 desktop app (Windows primary target) for organizing video-frame collections and extracting frames
+from source videos via ffmpeg. Requires Qt 6.5+ (uses `QGuiApplication::styleHints()->colorScheme()`).
+
+This document is the living architectural reference: a high-level index plus the core cross-cutting
+principles. Per-subsystem depth lives in `docs/architecture/*.md`, linked below — read this file first to
+orient, then follow the link for the subsystem you're touching.
+
+> **Keep this file and the linked docs in sync.** When a change alters architecture, a module's behavior, a
+> convention, or the backlog, update the relevant doc in the same change. An out-of-date doc is worse than
+> none — treat the update as part of the work, not an afterthought. General cross-project working
+> principles live in the global `~/.claude/CLAUDE.md`.
+
+---
+
+## Build & dependencies
+
+- **Build system**: `app/app.pro` (qmake). `SOURCES += $$files(src/*.cpp, true)` and the equivalent for
+  headers — every `.cpp`/`.h` under `src/` is auto-included, so **adding a new source file needs no `.pro`
+  edit**. `Q_OBJECT` types are moc'd automatically because headers are listed.
+- **Source layout** (under `app/src/`): reusable UI widgets in `UiComponents/` (`ThumbnailWidget`,
+  `VideoItemWidget`, `MarkerSlider`, `SortControl`, `SegmentedToggle`, `LabelSidebar`) plus their close UI
+  helpers (`LabelVisuals`, `DragGestureHelper`, `LabelMimeType`); top-level windows + dialogs in `Windows/`
+  (`MainWindow`, `CompareWindow`, `FrameViewerWindow`, `VideoPlayerWindow`, the `*Dialog`s); the non-UI core
+  model in `Core/` (`Catalog`, `MetadataStore`, `VideoId`); and the visual theming in `Theme/` (`Theme`,
+  `Style`). `Settings`, `Utils`, `Ffmpeg`, and `main.cpp` stay at the `src/` root.
+- **INCLUDEPATH**: `src` plus the submodules `qtutils`, `cpputils`, `cpp-template-utils`. With `src` on the
+  path, app headers are included **layer-qualified** — `"UiComponents/ThumbnailWidget.h"`,
+  `"Windows/MainWindow.h"`, `"Core/Catalog.h"`, and the few root headers as `"Utils.h"` — regardless of the
+  including file's location; submodule headers likewise drop their prefix (`qtutils/widgets/layouts/cflowlayout.h`
+  → `"widgets/layouts/cflowlayout.h"`).
+- Don't build/compile here — the toolchain (Qt, compiler) isn't in this environment by design; reason about
+  correctness by inspection and hand off.
+
+---
+
+## Core principles
+
+A handful of cross-cutting rules that apply beyond any one subsystem. Check these before writing new code,
+not just when reading existing code.
+
+- **`Catalog` is the authoritative in-memory model of the video set, keyed by `VideoId`.** It is kept current
+  by its own mutation API (`addVideo`/`removeVideo`/`applyRename`/`addLabel`/...), not by re-deriving from
+  disk on every refresh — disk is only walked once, at the legacy seed. See
+  [data-model.md](docs/architecture/data-model.md) and [catalog-and-labels.md](docs/architecture/catalog-and-labels.md).
+- **A label owns nothing on disk.** The folder a video's frames sit in happens to share a name with one of
+  the video's labels — that's a per-video storage detail, never a property stored on the label itself. See
+  [catalog-and-labels.md](docs/architecture/catalog-and-labels.md).
+- **`Catalog`'s mutation API refuses or no-ops on ambiguity rather than silently deleting data.** No
+  operation will orphan a video (leave it with zero ordinary labels) or silently drop a registry entry that
+  still has a backing folder. See
+  [catalog-and-labels.md](docs/architecture/catalog-and-labels.md#fs-reconciliation-audit-done--findings).
+- **When swapping a container/widget for a different shape or look, list what the old one gave for free**
+  (selection model, keyboard nav, drag-and-drop, focus handling) and confirm each still has an equivalent
+  before calling the swap done. See
+  [main-window.md](docs/architecture/main-window.md#video-grid--multi-select) for the multi-select
+  regression this caught once already.
+
+---
+
+## Subsystems
+
+### [Data model & identity](docs/architecture/data-model.md)
+The on-disk structure (`rootFolder()`, collection folders, frame folders), the `VideoId` identity scheme, and
+`MetadataStore` — the dumb `VideoId`-keyed persistence layer (with batched-write support) that `Catalog`
+loads itself from and writes through.
+
+### [Catalog & labels](docs/architecture/catalog-and-labels.md)
+`Catalog`: the in-memory video-set model plus the label model layered over it. Stable label ids, the
+`labels.json` registry, the folder-reconciliation model (exactly 3 touch points), the `VideoId`-anchored
+query/mutation API, ingestion lifecycle (`addVideo`/`removeVideo`/`applyRename`, the duplicate-id guard,
+`BatchScope`), the FS-reconciliation audit findings, the design rationale, and deferred post-v1 polish.
+
+### [Main window](docs/architecture/main-window.md)
+`MainWindow`'s grid + sidebar layout, the name filter, label assignment (context menu + drag-from-sidebar),
+sidebar label management (rename/color/delete), the video grid's multi-select implementation (and the
+regression history behind it), and renaming a video on disk.
+
+### [Video card & thumbnail widgets](docs/architecture/video-widgets.md)
+`VideoItemWidget` (the grid card: label drop target, label dots, no longer a drag source),
+`ThumbnailWidget` (sizing model, intrinsic drag, two non-obvious rendering bug fixes), `DragGestureHelper`,
+and the card zoom/preview-count mechanism.
+
+### [Frame viewer & video player](docs/architecture/playback.md)
+`FrameViewerWindow` (persistent per-folder thumbnail popup), `VideoPlayerWindow` (built-in player: seek,
+A–B loop, saved loops persisted per-video), and `MarkerSlider`.
+
+### [Settings & theme](docs/architecture/settings-and-theme.md)
+The `Settings.h`/`QSettings` key pattern, `SettingsDialog`, the `Theme` dark/light color system (incl. the
+app-wide `Accent`/`AccentBg` tokens), and the central `Style` stylesheet + custom-widget approach (e.g.
+`SegmentedToggle`) that gives the app its non-stock look.
+
+### [Ingestion: ffmpeg, Utils, QuickImportDialog](docs/architecture/ingestion.md)
+The `ffmpeg` invocation (`Ffmpeg::generatePreviewFrames` — a batch/concurrent preview extractor that
+`QuickImportDialog`'s staging runs across several videos at once, whose frames ingestion then reuses by copy
+instead of re-extracting), `Utils.h`'s grab-bag of free functions, and `QuickImportDialog` itself: a staging
+grid + label-list panel mirroring the main window's own label model, duplicate detection at relocation, and the
+"Import" command that ingests every labeled card in one step.
+
+---
+
+## Improvement backlog
+
+**Open:**
+- *Batch ffmpeg failures*: `processBatch` pops one modal `QMessageBox` per failure inside the loop, blocking
+  the batch. Collect failures, show one summary at the end.
+
+**Decided against / deferred (don't re-litigate without new info):**
+- *Async ffmpeg* — synchronous `waitForFinished` blocking the GUI was judged a non-issue, not worth doing.
+- *Dedup the 2× zoom bound/persist/debounce shape* — deferred; 2 short obvious methods beat the indirection.
+  Revisit at a 4th consumer or if the shape grows.

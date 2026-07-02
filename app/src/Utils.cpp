@@ -1,0 +1,142 @@
+#include "Utils.h"
+#include "Settings.h"
+
+#include <QByteArray>
+#include <QCursor>
+#include <QDateTime>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QProcess>
+#include <QRegularExpression>
+#include <QSettings>
+#include <QStringList>
+#include <QWidget>
+
+void saveWindowGeometry(QWidget* w, const QString& key)
+{
+	QSettings{}.setValue(key + "/geometry", w->saveGeometry());
+}
+
+bool restoreWindowGeometry(QWidget* w, const QString& key)
+{
+	const QByteArray ba = QSettings{}.value(key + "/geometry").toByteArray();
+	return !ba.isEmpty() ? w->restoreGeometry(ba) : false;
+}
+
+void clearStuckHoverIfCursorLeft(QWidget* w)
+{
+	if (!w->rect().contains(w->mapFromGlobal(QCursor::pos())))
+	{
+		w->setAttribute(Qt::WA_UnderMouse, false);
+		w->update();
+	}
+}
+
+QStringList pickEvenlySpacedFrames(const QDir& dir, const QStringList& files, int maxFrames)
+{
+	const int count = static_cast<int>(files.size());
+	const int n = qMin(count, maxFrames);
+
+	const int startIdx = static_cast<int>(count * 0.1f);
+	const int endIdx   = static_cast<int>(count * 0.9f);
+
+	QStringList out;
+	out.reserve(n);
+	for (int i = 0; i < n; ++i)
+	{
+		const int idx = (n == 1) ? startIdx : startIdx + i * (endIdx - startIdx) / (n - 1);
+		out << dir.filePath(files[idx]);
+	}
+	return out;
+}
+
+bool isSupportedVideoFile(const QString& filePath)
+{
+	static const QStringList supportedExtensions { "mp4", "mov", "avi", "mkv", "flv" };
+	const QString extension = QFileInfo(filePath).suffix().toLower();
+	return supportedExtensions.contains(extension);
+}
+
+bool filesAreIdentical(const QString& pathA, const QString& pathB)
+{
+	if (QFileInfo(pathA).size() != QFileInfo(pathB).size())
+		return false;
+
+	QFile fileA(pathA);
+	QFile fileB(pathB);
+	if (!fileA.open(QIODevice::ReadOnly) || !fileB.open(QIODevice::ReadOnly))
+		return false;
+
+	constexpr qint64 chunkSize = 4 * 1024 * 1024;
+	while (!fileA.atEnd())
+	{
+		if (fileA.read(chunkSize) != fileB.read(chunkSize))
+			return false;
+	}
+	return true;
+}
+
+const QStringList IMAGE_FILE_FILTERS { "*.jpg", "*.jpeg", "*.tif", "*.tiff", "*.png" };
+
+QDateTime parseTrailingTimestamp(const QString& text)
+{
+	static const QRegularExpression re(R"((\d{14})\d*$)");
+	const QRegularExpressionMatch match = re.match(text);
+	if (!match.hasMatch())
+		return {};
+
+	const QDateTime dt = QDateTime::fromString(match.captured(1), "yyyyMMddHHmmss");
+	if (!dt.isValid())
+		return {};
+
+	// Guards against an unrelated 14+ digit trailing run (e.g. a device serial) that
+	// happens to parse as a syntactically valid date.
+	const int year = dt.date().year();
+	if (year < 1990 || year > QDate::currentDate().year() + 1)
+		return {};
+
+	return dt;
+}
+
+QDateTime getSourceVideoDate(const QString& sourceVideoPath, const QString& folderPath)
+{
+	if (!sourceVideoPath.isEmpty())
+	{
+		const QDateTime fromName = parseTrailingTimestamp(QFileInfo(sourceVideoPath).completeBaseName());
+		if (fromName.isValid())
+			return fromName;
+
+		const QFileInfo videoInfo(sourceVideoPath);
+		if (videoInfo.exists())
+		{
+			const QDateTime birth = videoInfo.birthTime();
+			return birth.isValid() ? birth : videoInfo.lastModified();
+		}
+	}
+
+	const QFileInfo folderInfo(folderPath);
+	const QDateTime birth = folderInfo.birthTime();
+	return birth.isValid() ? birth : folderInfo.lastModified();
+}
+
+void openInExplorer(const QString& path)
+{
+	const QFileInfo fi{ path };
+	if (fi.exists())
+	{
+		const QStringList param{ "/select,", QDir::toNativeSeparators(fi.canonicalFilePath()) };
+		QProcess::startDetached("explorer.exe", param);
+	}
+}
+
+QString ffmpegPath()
+{
+	const QString configured = QSettings{}.value(Settings::FfmpegPath).toString();
+	return (configured.isEmpty() || !QFile::exists(configured)) ? "ffmpeg" : configured;
+}
+
+QString rootFolder()
+{
+	return QSettings{}.value(Settings::RootFolder, Defaults::RootFolder).toString();
+}

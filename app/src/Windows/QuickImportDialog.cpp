@@ -1,0 +1,831 @@
+#include "Windows/QuickImportDialog.h"
+#include "Ffmpeg.h"
+#include "UiComponents/LabelMimeType.h"
+#include "UiComponents/LabelVisuals.h"
+#include "Settings.h"
+#include "Theme/Theme.h"
+#include "Utils.h"
+#include "UiComponents/VideoItemWidget.h"
+#include "Windows/VideoPlayerWindow.h"
+
+#include <QAbstractItemView>
+#include <QApplication>
+#include <QColor>
+#include <QComboBox>
+#include <QDir>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QFile>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QFrame>
+#include <QHBoxLayout>
+#include <QIcon>
+#include <QInputDialog>
+#include <QLabel>
+#include <QLineEdit>
+#include <QListWidget>
+#include <QListWidgetItem>
+#include <QMenu>
+#include <QMessageBox>
+#include <QMimeData>
+#include <QMouseEvent>
+#include <QPainter>
+#include <QPixmap>
+#include <QPushButton>
+#include <QSettings>
+#include <QSplitter>
+#include <QThread>
+#include <QUuid>
+#include <QVBoxLayout>
+
+namespace {
+
+constexpr int kLabelIdRole = Qt::UserRole;
+
+// Staged cards render at a fixed size - this dialog has no zoom control like the main grid's Ctrl+wheel.
+constexpr int STAGED_CARD_IMAGE_HEIGHT = 120;
+
+// A small filled circle, used as each label-list row's leading icon - the flat, non-interactive cousin of
+// LabelRowDelegate's dot (no active/hover states to paint here, so a plain decoration icon suffices).
+QIcon colorDotIcon(const QColor& color)
+{
+	QPixmap pixmap(12, 12);
+	pixmap.fill(Qt::transparent);
+	QPainter p(&pixmap);
+	p.setRenderHint(QPainter::Antialiasing);
+	p.setPen(Qt::NoPen);
+	p.setBrush(color.isValid() ? color : QColor("#888888"));
+	p.drawEllipse(1, 1, 10, 10);
+	return QIcon(pixmap);
+}
+
+// A fresh, unique scratch directory for one staged video's temp preview frames.
+QString uniqueTempPreviewDir()
+{
+	return QDir::tempPath() + "/darkroom_quickimport/" + QUuid::createUuid().toString(QUuid::Id128);
+}
+
+// ============================================================================
+// Source video relocation - optionally copy/move the dropped source video
+// file into a chosen folder when it's added to a collection, and ingest from
+// the new location instead of the original.
+// ============================================================================
+
+enum class RelocateMode { LeaveInPlace, Copy, Move };
+
+// Performs the actual copy/move; on failure, warns and falls back to leaving
+// the video at srcPath so the caller can still ingest it from there.
+[[nodiscard]] QString copyOrMove(QWidget* dialogParent, const QString& srcPath, const QString& destPath, bool isMove)
+{
+	const bool ok = isMove ? QFile::rename(srcPath, destPath) : QFile::copy(srcPath, destPath);
+	if (!ok)
+	{
+		QMessageBox::warning(dialogParent, QObject::tr("Error"), QObject::tr("Failed to %1:\n%2\nto:\n%3")
+			.arg(isMove ? QObject::tr("move") : QObject::tr("copy"), srcPath, destPath));
+		return srcPath;
+	}
+	return destPath;
+}
+
+// ============================================================================
+// FileCollisionDialog - shown when the relocation destination already has a
+// file with the same name as the one being added.
+//
+// Not a plain QMessageBox because the "files differ" case offers Play buttons
+// that must NOT close the dialog (they let the user preview both files before
+// deciding), alongside the decision buttons that do.
+// ============================================================================
+
+class FileCollisionDialog final : public QDialog
+{
+public:
+	enum class Result { Overwrite, Skip, SkipAndDelete, Cancel };
+
+	FileCollisionDialog(const QString& stagedPath, const QString& destPath, bool isDuplicate, QWidget* parent)
+		: QDialog(parent)
+	{
+		setWindowTitle(isDuplicate ? tr("Duplicate File Found") : tr("File Already Exists"));
+
+		// WindowModal (not the exec()-default ApplicationModal) blocks only this
+		// dialog's parent (QuickImportDialog) and up - it deliberately leaves sibling
+		// top-level windows, such as the VideoPlayerWindow opened by the Play
+		// buttons below, interactive.
+		setWindowModality(Qt::WindowModal);
+
+		QVBoxLayout* layout = new QVBoxLayout(this);
+
+		QLabel* message = new QLabel(isDuplicate
+			? tr("An identical file is already at the destination:\n\n%1\n\nIt won't be imported again. You can optionally delete the redundant staged copy:\n\n%2").arg(destPath, stagedPath)
+			: tr("A different file with the same name already exists at the destination:\n\n%1\n\nOverwrite it with the staged file, skip importing this one, or cancel to leave it staged and decide later:\n\n%2").arg(destPath, stagedPath),
+			this);
+		message->setWordWrap(true);
+		layout->addWidget(message);
+
+		QHBoxLayout* buttonRow = new QHBoxLayout;
+
+		if (!isDuplicate)
+		{
+			// Play buttons open a preview parented to the outer QuickImportDialog
+			// (this dialog's parent), not to this dialog - this dialog is
+			// destroyed as soon as Overwrite/Skip is clicked, which would
+			// otherwise kill an in-progress preview along with it.
+			QWidget* previewParent = parent;
+
+			QPushButton* playStaged = new QPushButton(tr("Play Staged File"), this);
+			connect(playStaged, &QPushButton::clicked, this, [previewParent, stagedPath] {
+				auto* player = new VideoPlayerWindow(stagedPath, VideoId::fromFile(stagedPath), previewParent);
+				player->show();
+			});
+			buttonRow->addWidget(playStaged);
+
+			QPushButton* playExisting = new QPushButton(tr("Play Existing File"), this);
+			connect(playExisting, &QPushButton::clicked, this, [previewParent, destPath] {
+				auto* player = new VideoPlayerWindow(destPath, VideoId::fromFile(destPath), previewParent);
+				player->show();
+			});
+			buttonRow->addWidget(playExisting);
+		}
+
+		buttonRow->addStretch(1);
+
+		if (isDuplicate)
+		{
+			QPushButton* skip = new QPushButton(tr("Skip"), this);
+			connect(skip, &QPushButton::clicked, this, [this] { m_result = Result::Skip; accept(); });
+			buttonRow->addWidget(skip);
+
+			QPushButton* skipDelete = new QPushButton(tr("Skip and Delete Duplicate"), this);
+			connect(skipDelete, &QPushButton::clicked, this, [this] { m_result = Result::SkipAndDelete; accept(); });
+			buttonRow->addWidget(skipDelete);
+		}
+		else
+		{
+			QPushButton* overwrite = new QPushButton(tr("Overwrite"), this);
+			connect(overwrite, &QPushButton::clicked, this, [this] { m_result = Result::Overwrite; accept(); });
+			buttonRow->addWidget(overwrite);
+
+			QPushButton* skip = new QPushButton(tr("Skip"), this);
+			connect(skip, &QPushButton::clicked, this, [this] { m_result = Result::Skip; accept(); });
+			buttonRow->addWidget(skip);
+
+			// Defer: import nothing, touch no file, and leave the entry staged so
+			// the user can deal with the name clash later.
+			QPushButton* cancel = new QPushButton(tr("Cancel"), this);
+			connect(cancel, &QPushButton::clicked, this, [this] { m_result = Result::Cancel; accept(); });
+			buttonRow->addWidget(cancel);
+		}
+
+		layout->addLayout(buttonRow);
+	}
+
+	[[nodiscard]] Result result() const { return m_result; }
+
+private:
+	// Cancel is the default so dismissing the dialog (Escape / window close) defers
+	// rather than taking any action - the safe no-op for either flavor.
+	Result m_result = Result::Cancel;
+};
+
+// Outcome of relocating one video. ingestPath empty => don't ingest it; of those, keepStaged true => the
+// user deferred (Cancel), so leave it staged for a later retry, while keepStaged false => the collision was
+// resolved as "don't import" (Skip / Skip and Delete), so the entry should be cleared from staging.
+struct RelocationOutcome
+{
+	QString ingestPath;
+	bool keepStaged = false;
+};
+
+// Resolves relocation (including any naming collision) for a single video.
+// On a collision "Skip"/"Skip and Delete" the destination is treated as the
+// already-catalogued copy and this video is not ingested; "Cancel" additionally
+// keeps it staged. File-operation *failures* fall back to ingesting from the
+// original path, so an I/O error never silently drops a video the user wanted.
+[[nodiscard]] RelocationOutcome performRelocation(QWidget* dialogParent, const QString& path, RelocateMode mode, const QString& destFolder)
+{
+	const QString destPath = destFolder + "/" + QFileInfo(path).fileName();
+	const bool isMove = (mode == RelocateMode::Move);
+
+	// Already at the destination - e.g. a retry after an earlier Copy/Move whose ingest was declined (the
+	// staged entry follows the file, see runImport) - so there is nothing to relocate and, critically, no
+	// "collision": without this the file would be compared against itself and offered up as a duplicate.
+	if (QFileInfo(path) == QFileInfo(destPath))
+		return { path, false };
+
+	if (!QFile::exists(destPath))
+		return { copyOrMove(dialogParent, path, destPath, isMove), false };
+
+	// A name+size match (VideoId) is the cheap first gate; on that collision a full byte comparison confirms
+	// a genuine duplicate, so the astronomically-rare same-name/same-size/different-content case is still
+	// classified as "files differ". The && short-circuits the byte read when the VideoIds (sizes) differ.
+	const bool isDuplicate = (VideoId::fromFile(path) == VideoId::fromFile(destPath)) && filesAreIdentical(path, destPath);
+	FileCollisionDialog collisionDialog(path, destPath, isDuplicate, dialogParent);
+	collisionDialog.exec();
+
+	switch (collisionDialog.result())
+	{
+	case FileCollisionDialog::Result::Overwrite:
+		if (!QFile::remove(destPath))
+		{
+			QMessageBox::warning(dialogParent, QObject::tr("Error"), QObject::tr("Failed to overwrite existing file:\n%1").arg(destPath));
+			return { path, false }; // I/O failure - fall back to ingesting from the original
+		}
+		return { copyOrMove(dialogParent, path, destPath, isMove), false };
+
+	case FileCollisionDialog::Result::SkipAndDelete:
+		if (!QFile::remove(path))
+			QMessageBox::warning(dialogParent, QObject::tr("Error"), QObject::tr("Failed to delete duplicate file:\n%1").arg(path));
+		return { {}, false }; // not imported, removed from staging
+
+	case FileCollisionDialog::Result::Skip:
+		return { {}, false }; // not imported, removed from staging
+
+	case FileCollisionDialog::Result::Cancel:
+		break;
+	}
+
+	return { {}, true }; // deferred - not imported, kept staged
+}
+
+// Result of relocating a whole drop batch, reported per original path so the caller can update its staging
+// state. toIngest is what to hand to ingestion. Each original path additionally lands in at most one of:
+// keepStaged (the user deferred via Cancel - leave the entry staged untouched), skipped (collision resolved
+// as "don't import" via Skip / Skip and Delete - clear the entry from staging), or relocatedTo (the file was
+// actually copied/moved - point the staged entry at the new location, so a retry after a failed/declined
+// ingest starts from where the file really is; a Move deletes the original).
+struct BatchRelocation
+{
+	QStringList toIngest;
+	QStringList keepStaged;
+	QStringList skipped;
+	QHash<QString, QString> relocatedTo;
+};
+
+// Batch entry point - no-op when relocation is disabled. Validates the
+// destination folder once per batch (rather than once per file) to avoid
+// repeating the same warning for every dropped video.
+[[nodiscard]] BatchRelocation relocateIfNeeded(QWidget* dialogParent, const QStringList& paths, RelocateMode mode, const QString& destFolder)
+{
+	if (mode == RelocateMode::LeaveInPlace)
+		return { paths, {} };
+
+	if (destFolder.isEmpty())
+	{
+		QMessageBox::warning(dialogParent, QObject::tr("Error"), QObject::tr("No destination folder is set for relocating source videos - they will be left in their original location."));
+		return { paths, {} };
+	}
+	if (!QDir{}.mkpath(destFolder))
+	{
+		QMessageBox::warning(dialogParent, QObject::tr("Error"), QObject::tr("Could not create or access destination folder:\n%1").arg(destFolder));
+		return { paths, {} };
+	}
+
+	BatchRelocation result;
+	result.toIngest.reserve(paths.size());
+	for (const QString& path : paths)
+	{
+		const RelocationOutcome outcome = performRelocation(dialogParent, path, mode, destFolder);
+		if (!outcome.ingestPath.isEmpty())
+		{
+			result.toIngest.append(outcome.ingestPath);
+			if (outcome.ingestPath != path)
+				result.relocatedTo.insert(path, outcome.ingestPath);
+		}
+		else if (outcome.keepStaged)
+			result.keepStaged.append(path);
+		else
+			result.skipped.append(path);
+	}
+	return result;
+}
+
+} // namespace
+
+QuickImportDialog::QuickImportDialog(Callbacks callbacks, const QString& suggestedRelocateFolder, QWidget* parent)
+	: QDialog(parent)
+	, m_callbacks(std::move(callbacks))
+{
+	setWindowTitle(tr("Quick Import"));
+	setAcceptDrops(true);  // video files dropped anywhere on the dialog are staged - see dragEnterEvent/dropEvent
+
+	QVBoxLayout* outerLayout = new QVBoxLayout(this);
+
+	// --- Source video relocation row ---
+	QSettings relocateSettings;
+	m_relocateModeCombo = new QComboBox(this);
+	m_relocateModeCombo->addItem(tr("Leave source file in place"), int(RelocateMode::LeaveInPlace));
+	m_relocateModeCombo->addItem(tr("Copy source file to:"), int(RelocateMode::Copy));
+	m_relocateModeCombo->addItem(tr("Move source file to:"), int(RelocateMode::Move));
+	const int savedRelocateMode = relocateSettings.value("quickImportDialog/relocateMode", int(RelocateMode::LeaveInPlace)).toInt();
+	m_relocateModeCombo->setCurrentIndex(qMax(0, m_relocateModeCombo->findData(savedRelocateMode)));
+
+	// Persisted choice wins; the caller's suggestion only seeds the field on first use.
+	QString relocateFolder = relocateSettings.value("quickImportDialog/relocateFolder").toString();
+	if (relocateFolder.isEmpty())
+		relocateFolder = suggestedRelocateFolder;
+	m_relocateFolderEdit = new QLineEdit(relocateFolder, this);
+	QPushButton* relocateBrowseButton = new QPushButton(tr("Browse..."), this);
+
+	const auto updateRelocateRowEnabled = [this, relocateBrowseButton] {
+		const bool enabled = m_relocateModeCombo->currentData().toInt() != int(RelocateMode::LeaveInPlace);
+		m_relocateFolderEdit->setEnabled(enabled);
+		relocateBrowseButton->setEnabled(enabled);
+	};
+	updateRelocateRowEnabled();
+	connect(m_relocateModeCombo, &QComboBox::currentIndexChanged, this, updateRelocateRowEnabled);
+
+	connect(relocateBrowseButton, &QPushButton::clicked, this, [this] {
+		const QString path = QFileDialog::getExistingDirectory(this, tr("Select destination folder"), m_relocateFolderEdit->text());
+		if (!path.isEmpty())
+			m_relocateFolderEdit->setText(QDir::toNativeSeparators(path));
+	});
+
+	QHBoxLayout* relocateRow = new QHBoxLayout;
+	relocateRow->addWidget(new QLabel(tr("Source video file:"), this));
+	relocateRow->addWidget(m_relocateModeCombo);
+	relocateRow->addWidget(m_relocateFolderEdit, 1);
+	relocateRow->addWidget(relocateBrowseButton);
+	outerLayout->addLayout(relocateRow);
+
+	// --- Main area: [label list | staged video grid], mirroring MainWindow's [LabelSidebar | grid] split ---
+	m_splitter = new QSplitter(Qt::Horizontal, this);
+	outerLayout->addWidget(m_splitter, 1);
+
+	QWidget* labelPane = new QWidget();
+	QVBoxLayout* labelPaneLayout = new QVBoxLayout(labelPane);
+	labelPaneLayout->setContentsMargins(0, 0, 0, 0);
+	labelPaneLayout->addWidget(new QLabel(tr("Labels")));
+
+	m_labelList = new QListWidget();
+	m_labelList->setSelectionMode(QAbstractItemView::NoSelection);  // rows are dragged, never selected
+	m_labelList->setFrameShape(QFrame::NoFrame);
+	m_labelList->setMaximumWidth(220);
+	m_labelList->viewport()->installEventFilter(this);  // drives the row-drag gesture (see eventFilter)
+	labelPaneLayout->addWidget(m_labelList, 1);
+
+	QPushButton* addLabelButton = new QPushButton(tr("+ Add label"));
+	addLabelButton->setObjectName("addLabelButton");
+	connect(addLabelButton, &QPushButton::clicked, this, [this] {
+		const QString name = QInputDialog::getText(this, tr("New Label"), tr("Label name:")).trimmed();
+		if (!name.isEmpty() && m_callbacks.createCollectionRequested(name))
+			refreshLabelList();
+	});
+	labelPaneLayout->addWidget(addLabelButton);
+
+	m_splitter->addWidget(labelPane);
+
+	m_stagedGrid = new QListWidget();
+	m_stagedGrid->setViewMode(QListView::IconMode);
+	m_stagedGrid->setFlow(QListView::LeftToRight);
+	m_stagedGrid->setWrapping(true);
+	m_stagedGrid->setResizeMode(QListView::Adjust);
+	m_stagedGrid->setMovement(QListView::Static);
+	m_stagedGrid->setSelectionMode(QAbstractItemView::ExtendedSelection);
+	m_stagedGrid->setSpacing(10);
+	// The cards are transparent (see VideoItemWidget), so the selection highlight has to come from the list
+	// item behind them - same rule the main grid uses.
+	m_stagedGrid->setStyleSheet(QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().AccentBg));
+	m_splitter->addWidget(m_stagedGrid);
+
+	m_splitter->setStretchFactor(0, 0);
+	m_splitter->setStretchFactor(1, 1);
+	m_splitter->setCollapsible(0, false);
+
+	QLabel* instructions = new QLabel(
+		tr("Drop video files here to stage them, then drag labels from the list onto a card to tag it. "
+		   "Double-click a card to preview; right-click for more options. \"Import\" ingests every labeled card "
+		   "and clears it from staging."), this);
+	instructions->setWordWrap(true);
+	instructions->setStyleSheet(QStringLiteral("color: %1;").arg(Theme::current().MutedText));
+	outerLayout->addWidget(instructions);
+
+	QHBoxLayout* footer = new QHBoxLayout;
+	footer->addStretch(1);
+	QPushButton* importButton = new QPushButton(tr("Import"), this);
+	connect(importButton, &QPushButton::clicked, this, &QuickImportDialog::runImport);
+	footer->addWidget(importButton);
+	outerLayout->addLayout(footer);
+
+	refreshLabelList();
+
+	// Restore persisted window geometry and splitter position (no-ops on first run).
+	restoreWindowGeometry(this, "quickImportDialog");
+	const QByteArray splitterState = QSettings{}.value("quickImportDialog/splitter").toByteArray();
+	if (!splitterState.isEmpty())
+		m_splitter->restoreState(splitterState);
+}
+
+QuickImportDialog::~QuickImportDialog()
+{
+	saveWindowGeometry(this, "quickImportDialog");
+	QSettings{}.setValue("quickImportDialog/splitter", m_splitter->saveState());
+	QSettings{}.setValue("quickImportDialog/relocateMode", m_relocateModeCombo->currentData().toInt());
+	QSettings{}.setValue("quickImportDialog/relocateFolder", m_relocateFolderEdit->text());
+
+	// Best-effort: clean up whatever's still staged when the dialog closes (anything already unstaged or
+	// successfully added already removed its own temp dir).
+	for (const StagedEntry& entry : std::as_const(m_staged))
+		QDir(entry.tempPreviewDir).removeRecursively();
+}
+
+void QuickImportDialog::dragEnterEvent(QDragEnterEvent* event)
+{
+	if (event->mimeData()->hasUrls())
+	{
+		for (const QUrl& url : event->mimeData()->urls())
+		{
+			if (isSupportedVideoFile(url.toLocalFile()))
+			{
+				event->acceptProposedAction();
+				return;
+			}
+		}
+	}
+}
+
+void QuickImportDialog::dropEvent(QDropEvent* event)
+{
+	QStringList files;
+	for (const QUrl& url : event->mimeData()->urls())
+	{
+		QString path = url.toLocalFile();
+		if (isSupportedVideoFile(path))
+			files.push_back(std::move(path));
+	}
+	if (!files.isEmpty())
+		stageVideos(files);
+}
+
+bool QuickImportDialog::eventFilter(QObject* watched, QEvent* event)
+{
+	if (watched != m_labelList->viewport())
+		return QDialog::eventFilter(watched, event);
+
+	switch (event->type())
+	{
+	case QEvent::MouseButtonPress:
+	{
+		auto* me = static_cast<QMouseEvent*>(event);
+		m_labelDragHelper.mousePressed(me);
+		m_labelPressedItem = m_labelList->itemAt(me->pos());
+		break;
+	}
+	case QEvent::MouseMove:
+	{
+		if (!m_labelPressedItem)
+			break;
+		const QString labelId = m_labelPressedItem->data(kLabelIdRole).toString();
+		auto* me = static_cast<QMouseEvent*>(event);
+		const QPixmap rowPixmap = m_labelList->viewport()->grab(m_labelList->visualItemRect(m_labelPressedItem));
+		const bool started = m_labelDragHelper.tryStartDrag(
+			m_labelList->viewport(), me,
+			[labelId] {
+				auto* mime = new QMimeData();
+				mime->setData(LabelMimeType, labelId.toUtf8());
+				return mime;
+			},
+			Qt::CopyAction, rowPixmap);
+		if (started)
+		{
+			m_labelPressedItem = nullptr;
+			return true;
+		}
+		break;
+	}
+	case QEvent::MouseButtonRelease:
+		m_labelPressedItem = nullptr;
+		break;
+	default:
+		break;
+	}
+
+	return QDialog::eventFilter(watched, event);
+}
+
+void QuickImportDialog::refreshLabelList()
+{
+	m_labelList->clear();
+	m_labelOptions = m_callbacks.getLabelOptions();
+	for (const LabelOption& option : m_labelOptions)
+	{
+		auto* item = new QListWidgetItem(colorDotIcon(QColor(option.color)), option.displayName, m_labelList);
+		item->setData(kLabelIdRole, option.id);
+	}
+
+	m_labelList->adjustSize();
+}
+
+const QuickImportDialog::LabelOption* QuickImportDialog::findLabelOption(const QString& id) const
+{
+	for (const LabelOption& option : m_labelOptions)
+		if (option.id == id)
+			return &option;
+	return nullptr;
+}
+
+void QuickImportDialog::addToStaging(const QStringList& paths)
+{
+	// Deferred so the dialog can paint before stageVideos() blocks on ffmpeg preview extraction.
+	QMetaObject::invokeMethod(this, [this, paths] { stageVideos(paths); }, Qt::QueuedConnection);
+}
+
+void QuickImportDialog::stageVideos(const QStringList& paths)
+{
+	// Dedup by VideoId, both against already-staged entries and within this batch (m_staged is keyed by id,
+	// so accepting a second same-id file would silently overwrite the first entry, orphaning its card and
+	// leaking its temp dir). The id match (name+size) is the cheap gate; a byte comparison then classifies
+	// it, mirroring performRelocation's gate-then-verify shape: identical content is a plain duplicate,
+	// skipped silently, while different content is a genuine collision the user must know about - the
+	// catalog tracks at most one video per id, so the file can't be staged alongside its twin.
+	QHash<VideoId, QString> stagedPathById;
+	for (auto it = m_staged.constBegin(); it != m_staged.constEnd(); ++it)
+		stagedPathById.insert(it.key(), it->path);
+
+	QStringList newPaths;
+	QStringList collisionLines;
+	for (const QString& path : paths)
+	{
+		const VideoId id = VideoId::fromFile(path);
+		const QString existingPath = stagedPathById.value(id);
+		if (existingPath.isEmpty())
+		{
+			stagedPathById.insert(id, path);
+			newPaths << path;
+		}
+		else if (QFileInfo(path) != QFileInfo(existingPath) && !filesAreIdentical(path, existingPath))
+			collisionLines << tr("%1\n    collides with %2").arg(QDir::toNativeSeparators(path), QDir::toNativeSeparators(existingPath));
+	}
+
+	if (!collisionLines.isEmpty())
+		QMessageBox::warning(this, tr("Name collision"),
+			tr("Not staged - same name and size as an already staged video, but different content. "
+			   "Only one video per name+size can be tracked; rename the file if both are wanted.\n\n%1")
+			.arg(collisionLines.join("\n\n")));
+
+	if (newPaths.isEmpty())
+		return;
+
+	const int frameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
+
+	// One temp scratch dir per video, assembled up front so the batch can extract several videos at once and
+	// the card-building pass below can locate each video's frames.
+	QList<Ffmpeg::PreviewJob> jobs;
+	jobs.reserve(newPaths.size());
+	for (const QString& path : newPaths)
+		jobs.append({ path, uniqueTempPreviewDir() });
+
+	QMessageBox progressBox(this);
+	progressBox.setWindowTitle(tr("Staging"));
+	progressBox.setStandardButtons(QMessageBox::NoButton);
+	progressBox.setModal(true);
+	progressBox.setText(tr("Generating preview %1/%2...").arg(0).arg(jobs.size()));
+	progressBox.show();
+	QApplication::processEvents();  // paint the dialog before the batch blocks this thread
+
+	// Extract previews for several videos concurrently - each ffmpeg is its own OS process. Half the cores
+	// leaves headroom for ffmpeg's own internal threading and for the UI.
+	Ffmpeg::generatePreviewFrames(jobs, frameCount, qMax(1, QThread::idealThreadCount() / 3),
+		[&](int done, int total) {
+			progressBox.setText(tr("Generating preview %1/%2...").arg(done).arg(total));
+			QApplication::processEvents();
+		});
+
+	for (const Ffmpeg::PreviewJob& job : jobs)
+	{
+		const QString& path = job.videoFilePath;
+		const QString& tempDir = job.outputFolder;
+		const VideoId id = VideoId::fromFile(path);
+
+		QDir previewDir(tempDir + "/preview");
+		QStringList previewPaths;
+		for (const QString& file : previewDir.entryList(IMAGE_FILE_FILTERS, QDir::Files, QDir::Name))
+			previewPaths << previewDir.filePath(file);
+
+		auto* card = new VideoItemWidget(
+			QSize{ STAGED_CARD_IMAGE_HEIGHT * frameCount, STAGED_CARD_IMAGE_HEIGHT },
+			previewPaths, QFileInfo(path).fileName(),
+			id,
+			/*inBest*/ false,
+			[this, id] {
+				auto it = m_staged.find(id);
+				if (it != m_staged.end())
+					it->pendingBest = !it->pendingBest;  // the star button's own checked state is Qt's, not ours
+			},
+			[this, path] {
+				auto* player = new VideoPlayerWindow(path, VideoId::fromFile(path), this);
+				player->show();
+			},
+			[this, id](QPoint globalPos) { showStagedCardContextMenu(id, globalPos); },
+			/* dynamicSizeHint */ false
+		);
+
+		// A label dropped here tags just this card, or the whole selection if this card is part of one.
+		card->setOnLabelDropped([this, id](const QString& labelId) {
+			for (const VideoId& target : stagedSelection(id))
+			{
+				auto it = m_staged.find(target);
+				if (it != m_staged.end() && !it->pendingLabelIds.contains(labelId))
+					it->pendingLabelIds << labelId;
+				updateCardLabelDots(target);
+			}
+		});
+
+		auto* item = new QListWidgetItem();
+		item->setSizeHint(card->sizeHint());
+		m_stagedGrid->addItem(item);
+		m_stagedGrid->setItemWidget(item, card);
+
+		m_staged.insert(id, StagedEntry{ path, tempDir, /*pendingBest*/ false, /*pendingLabelIds*/ {}, item });
+	}
+}
+
+void QuickImportDialog::unstage(const VideoId& id)
+{
+	auto it = m_staged.find(id);
+	if (it == m_staged.end())
+		return;
+
+	QDir(it->tempPreviewDir).removeRecursively();
+	delete it->item;  // also removes the row from m_stagedGrid and deletes its embedded VideoItemWidget
+	m_staged.erase(it);
+}
+
+void QuickImportDialog::updateCardLabelDots(const VideoId& id)
+{
+	const auto it = m_staged.constFind(id);
+	if (it == m_staged.constEnd())
+		return;
+
+	QList<QColor> colors;
+	QStringList names;
+	for (const QString& labelId : it->pendingLabelIds)
+	{
+		if (const LabelOption* option = findLabelOption(labelId))
+		{
+			colors << QColor(option->color);
+			names << option->displayName;
+		}
+	}
+
+	auto* card = static_cast<VideoItemWidget*>(m_stagedGrid->itemWidget(it->item));
+	card->setLabelDots(colors, names.join(", "));
+}
+
+QList<VideoId> QuickImportDialog::stagedSelection(const VideoId& id) const
+{
+	const QList<QListWidgetItem*> selected = m_stagedGrid->selectedItems();
+	if (selected.size() <= 1 || !selected.contains(m_staged.value(id).item))
+		return { id };
+
+	QList<VideoId> targets;
+	for (auto it = m_staged.constBegin(); it != m_staged.constEnd(); ++it)
+		if (selected.contains(it->item))
+			targets << it.key();
+	return targets;
+}
+
+void QuickImportDialog::showStagedCardContextMenu(const VideoId& id, const QPoint& globalPos)
+{
+	if (!m_staged.contains(id))
+		return;
+	const QList<VideoId> selection = stagedSelection(id);
+
+	QMenu menu(this);
+
+	// Labels checklist - mirrors MainWindow's showVideoContextMenu, but toggles the staged cards' pendingLabelIds
+	// instead of the Catalog (nothing is written there until "Import" runs). Each row's color-tinted checkbox
+	// reflects the whole staged selection; toggling makes it uniform (strip when all carry it, else add to all).
+	QMenu* labelsMenu = menu.addMenu(tr("Labels"));
+	if (m_labelOptions.isEmpty())
+	{
+		labelsMenu->addAction(tr("(no labels yet)"))->setEnabled(false);
+	}
+	else
+	{
+		for (const LabelOption& option : m_labelOptions)
+		{
+			int haveCount = 0;
+			for (const VideoId& sel : selection)
+				if (m_staged.value(sel).pendingLabelIds.contains(option.id))
+					++haveCount;
+			const LabelVisuals::Presence presence = LabelVisuals::presenceForCount(haveCount, static_cast<int>(selection.size()));
+
+			QAction* action = labelsMenu->addAction(LabelVisuals::checkboxIcon(presence, QColor(option.color), labelsMenu), option.displayName);
+			const bool addToAll = presence != LabelVisuals::Presence::All;
+			connect(action, &QAction::triggered, this, [this, selection, labelId = option.id, addToAll] {
+				for (const VideoId& target : selection)
+				{
+					auto it = m_staged.find(target);
+					if (it == m_staged.end())
+						continue;
+					if (addToAll)
+					{
+						if (!it->pendingLabelIds.contains(labelId))
+							it->pendingLabelIds << labelId;
+					}
+					else
+						it->pendingLabelIds.removeAll(labelId);
+					updateCardLabelDots(target);
+				}
+			});
+		}
+	}
+
+	menu.addSeparator();
+	// Deferred: this menu was opened from the card's own customContextMenuRequested handler, still on the
+	// call stack here - unstage() deletes that very card, so the delete must happen after this unwinds
+	// (same reason MainWindow defers a card's own label-drop mutation).
+	menu.addAction(tr("Remove from staging"), this, [this, id] {
+		QMetaObject::invokeMethod(this, [this, id] { unstage(id); }, Qt::QueuedConnection);
+	});
+
+	menu.exec(globalPos);
+}
+
+void QuickImportDialog::runImport()
+{
+	// Group labeled entries by the first label dropped on them - the only place that ordering matters. Keyed
+	// by VideoId throughout (the stable m_staged key, captured while the source file still existed): a Move
+	// relocation deletes the source from its staged path before the post-ingest bookkeeping below runs, so
+	// re-deriving a VideoId from the path then would fail.
+	QHash<QString, QList<VideoId>> idsByLabelId;
+	for (auto it = m_staged.constBegin(); it != m_staged.constEnd(); ++it)
+		if (!it->pendingLabelIds.isEmpty())
+			idsByLabelId[it->pendingLabelIds.constFirst()] << it.key();
+
+	if (idsByLabelId.isEmpty())
+	{
+		QMessageBox::information(this, tr("Import"), tr("No staged video has been labeled yet."));
+		return;
+	}
+
+	const RelocateMode relocateMode = static_cast<RelocateMode>(m_relocateModeCombo->currentData().toInt());
+
+	QHash<QString, QList<VideoId>> bestVideosByCollection;
+	QList<ExtraLabelAssignment> extraLabelAssignments;
+	QList<VideoId> succeededIds;
+	QList<VideoId> skippedIds;  // collision resolved as "don't import" - cleared from staging like a success, minus the label flush
+
+	for (auto it = idsByLabelId.constBegin(); it != idsByLabelId.constEnd(); ++it)
+	{
+		const LabelOption* option = findLabelOption(it.key());
+		if (!option)
+			continue;  // the label vanished from the catalog mid-session - skip the group rather than guess
+
+		const QList<VideoId>& ids = it.value();
+		QStringList paths;
+		QHash<VideoId, QString> stagedPreviewDirs;  // by id: survives relocation rewriting the paths below
+		paths.reserve(ids.size());
+		stagedPreviewDirs.reserve(ids.size());
+		for (const VideoId& id : ids)
+		{
+			const StagedEntry entry = m_staged.value(id);
+			paths << entry.path;
+			stagedPreviewDirs.insert(id, entry.tempPreviewDir);
+		}
+
+		const BatchRelocation relocated = relocateIfNeeded(this, paths, relocateMode, m_relocateFolderEdit->text());
+		m_callbacks.addVideosRequested(option->displayName, relocated.toIngest, stagedPreviewDirs);
+
+		for (const VideoId& id : ids)
+		{
+			const StagedEntry entry = m_staged.value(id);
+			if (relocated.keepStaged.contains(entry.path))
+				continue;  // relocation deferred (Cancel) - stays staged untouched, try again later
+
+			if (relocated.skipped.contains(entry.path))
+			{
+				skippedIds << id;  // resolved as "don't import" (the destination copy stands in for it) - clear from staging
+				continue;
+			}
+
+			// The file was copied/moved: the staged entry follows it, so if the ingest below failed or was
+			// declined, a later retry starts from where the file actually is (a Move deleted the original).
+			if (const QString newPath = relocated.relocatedTo.value(entry.path); !newPath.isEmpty())
+				m_staged[id].path = newPath;
+
+			if (!m_callbacks.isVideoTrackedInCollection(id, option->displayName))
+				continue;  // ingestion declined/failed, or the id collided with a video tracked elsewhere - stays staged with its labels intact
+
+			succeededIds << id;
+
+			if (entry.pendingBest)
+				bestVideosByCollection[option->displayName] << id;
+			if (entry.pendingLabelIds.size() > 1)
+				extraLabelAssignments << ExtraLabelAssignment{ option->displayName, id, entry.pendingLabelIds.mid(1) };
+		}
+	}
+
+	if (m_callbacks.markBestRequested && !bestVideosByCollection.isEmpty())
+		m_callbacks.markBestRequested(bestVideosByCollection);
+	if (m_callbacks.assignExtraLabelsRequested && !extraLabelAssignments.isEmpty())
+		m_callbacks.assignExtraLabelsRequested(extraLabelAssignments);
+
+	for (const VideoId& id : succeededIds + skippedIds)
+		unstage(id);
+
+	// Repaint the host once with the fully-applied state - the dialog stays open, so the mid-Import refresh
+	// that addVideosRequested may have done only shows folder labels, not the Best/extra labels flushed just above.
+	if (!succeededIds.isEmpty() && m_callbacks.viewChanged)
+		m_callbacks.viewChanged();
+}

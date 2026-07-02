@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<!--
+  COPY of main-window-sidebar.html, kept to iterate on a from-scratch DARK color scheme without disturbing
+  the original design reference. The light palette below is unchanged from the original; only the dark ramp
+  (:root[data-theme="dark"]) is redesigned. Opens defaulting to dark so the proposal is visible immediately;
+  the toggle still flips to the (original) light palette for comparison.
+
+  New dark direction: a COOL slate/ink ramp (blue-gray, hue ~218, low chroma) — the deliberate opposite of
+  the original warm taupe/olive dark. Teal is the selection accent. The gold "Best" star and the
+  colored label swatches remain fixed identities; against the cool field they now read as intentional warm
+  accents, giving more contrast than the original all-warm scheme.
+-->
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Darkroom — label sidebar mockup (dark redesign)</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
+<style>
+  :root {
+    --color-background-primary: #faf5f0;   /* warm off-white surface — lighter than background-secondary/tertiary
+                                               (as it must be in this theme), just a visible step below the page */
+    --color-background-secondary: #edefe1;  /* sage-shifted (hue ~70, off the neutral's ~47) and a clearer
+                                                step down from background-primary, so a selected row visibly
+                                                stands out instead of nearly matching the surface */
+    --color-background-tertiary: #e7e4db;
+    --color-border-tertiary: rgba(20, 20, 16, 0.12);
+    --color-border-secondary: rgba(20, 20, 16, 0.22);
+    --color-border-info: #1aa6b5;
+    --color-background-info: #ddf3f5;
+    --color-text-primary: #1a1a18;
+    --color-text-secondary: #5f5e5a;
+    --color-text-tertiary: #7b815f;         /* same sage-shifted hue as background-secondary, darkened for
+                                                real contrast against the page (was near-zero saturation, a
+                                                plain gray indistinguishable in character from the neutral ramp) */
+    --color-text-info: #0e6873;
+    --color-star-active: #BA7517;   /* filled Best star — amber reads better on light */
+    --color-page: #ffffff;          /* pure white so the backdrop doesn't tint perception of the mockup colors */
+    --color-shadow: rgba(20, 20, 16, 0.14);
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+  }
+  /* Cool slate/ink dark ramp — derived from scratch, NOT a tweak of the original warm taupe dark. Neutrals
+     are blue-gray (hue ~218, low chroma; B >= G > R) so they read crisp and cool. Lightness encodes
+     semantics: secondary (raised rows) > primary (surface) > tertiary (recessed thumbnail wells) > page
+     (deepest, sits behind the surface so the frame reads as a panel floating on it). Text steps from a soft
+     off-white down through cool grays. Teal is the selection accent; the warm gold star and the label
+     swatch colors are fixed identities and now provide warm/cool contrast against this field. */
+  :root[data-theme="dark"] {
+    --color-background-primary: #121821;   /* surface / panel */
+    --color-background-secondary: #2d2442; /* raised rows — indigo-shifted (hue ~258, off the neutral's ~218,
+                                                clear of the teal accent and the gold star) and a bigger step
+                                                up from background-primary, so a selected row visibly stands
+                                                out instead of nearly matching the surface */
+    --color-background-tertiary: #0f131b;  /* recessed wells (thumbnails) */
+    --color-border-tertiary: rgba(206, 219, 238, 0.09);
+    --color-border-secondary: rgba(206, 219, 238, 0.18);
+    --color-border-info: #34bdd0;
+    --color-background-info: #133f48;       /* teal fill — a distinct hue from the blue-gray neutral, kept clean (not muddy) so selected segments pop */
+    --color-text-info: #c9f1f7;            /* bright teal active text — must override the light theme's dark navy
+                                                text-info; brightened (+8 L) for more contrast */
+    --color-text-primary: #e8edf4;
+    --color-text-secondary: #afb8c5;        /* brightened (+8 L) for more contrast against the dark surface;
+                                                text-primary is left alone, it's already near-white */
+    --color-text-tertiary: #9083b0;         /* same indigo-shifted hue as background-secondary, lightened for
+                                                real contrast against the page (was near-neutral, a plain
+                                                gray indistinguishable in character from the neutral ramp);
+                                                brightened further (+8 L) for legibility */
+    --color-star-active: #e2a32b;
+    --color-page: #000000;                  /* pure black so the backdrop doesn't tint perception of the mockup colors */
+    --color-shadow: rgba(0, 0, 0, 0.6);
+  }
+  body {
+    margin: 0;
+    padding: 6px 12px;
+    background: var(--color-page);
+    color: var(--color-text-primary);
+    font-family: -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+    line-height: 1.5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+  .mockup { width: 100%; max-width: 720px; }
+  .caption { max-width: 720px; font-size: 13px; color: var(--color-text-secondary); }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- #page: control rail (left) + main content (center) + the accent-swatch rail (far right). -->
+<div id="page" style="display:flex; gap:32px; align-items:flex-start; width:100%; justify-content:center;">
+
+<!-- Control rail: theme toggle, whole-theme roll, and the user-set primary-surface lightness slider. Kept off
+     to the side so the mockup grid gets the full vertical space. -->
+<div id="controlRail" style="display:flex; flex-direction:column; align-items:stretch; gap:10px; width:150px;">
+  <button id="themeToggle" type="button" style="padding:6px 12px; font:inherit; font-size:12px; cursor:pointer; border-radius:var(--border-radius-md); border:0.5px solid var(--color-border-secondary); background:var(--color-background-primary); color:var(--color-text-primary);">Switch to light</button>
+  <button id="rollTheme" type="button" style="padding:6px 12px; font:inherit; font-size:12px; cursor:pointer; border-radius:var(--border-radius-md); border:0.5px solid var(--color-border-info); background:var(--color-background-info); color:var(--color-text-info);">🎲 Roll whole theme</button>
+
+  <!-- Primary-surface lightness (1..14): user-driven, not rolled. It feeds deriveTokens() for both the live
+       update (slider drives commit()) and every roll, in both themes (up = lighter surface). Shown as a
+       vertical slider; the readout shows the resolved surface L for the current theme. -->
+  <div style="display:flex; flex-direction:column; align-items:center; gap:6px; padding:8px; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-md);">
+    <span style="font-size:11px; color:var(--color-text-secondary); text-align:center;">Surface lightness</span>
+    <input type="range" id="lightnessSlider" min="1" max="14" step="1" value="7" style="writing-mode:vertical-lr; direction:rtl; height:150px; width:8px; cursor:pointer; accent-color:var(--color-border-info);">
+    <span id="lightnessReadout" style="font-size:12px; color:var(--color-text-primary); font-variant-numeric:tabular-nums;">L 7</span>
+  </div>
+</div>
+
+<div id="mainColumn" style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+
+<!-- 4 independent rolled themes, 2x2 grid. #instance0 below is the template: script.js clones it 3 more
+     times into #instances so all 4 copies share identical markup and only their theme tokens differ. -->
+<div id="instances" style="display:grid; grid-template-columns:repeat(2, 520px); gap:24px; justify-content:center;">
+
+<div class="instance" id="instance0" style="display:flex; flex-direction:column; align-items:center; gap:6px;">
+  <span class="instance-index" style="font-size:11px; color:var(--color-text-secondary); font-variant-numeric:tabular-nums;">#1</span>
+  <div class="mockup" style="width:520px;">
+<div style="display:flex; flex-direction:column; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-lg); overflow:hidden; background:var(--color-background-primary);">
+<h2 class="sr-only">Mockup of the Darkroom main window: a left sidebar of colored, multi-selectable labels replacing the tab bar, a name-filter and sort toolbar, and a grid of video cards with a label being dragged onto one.</h2>
+
+  <div style="display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:0.5px solid var(--color-border-tertiary); font-size:12px; color:var(--color-text-tertiary);">
+    <i class="ti ti-movie" aria-hidden="true" style="font-size:16px;"></i><span>Darkroom</span>
+  </div>
+
+  <div style="display:flex; min-height:430px;">
+
+    <div style="width:178px; flex:0 0 178px; border-right:0.5px solid var(--color-border-tertiary); padding:10px 8px; display:flex; flex-direction:column; gap:2px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:0 6px 6px;">
+        <span style="font-size:12px; color:var(--color-text-secondary);">Labels</span>
+        <span style="display:inline-flex; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-md); overflow:hidden; font-size:11px;">
+          <span style="padding:2px 7px; background:var(--color-background-info); color:var(--color-text-info);">OR</span>
+          <span style="padding:2px 7px; color:var(--color-text-tertiary);">AND</span>
+        </span>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--border-radius-md); font-size:13px;">
+        <i class="ti ti-stack-2" aria-hidden="true" style="font-size:16px; color:var(--color-text-tertiary);"></i>
+        <span style="flex:1;">All</span><span style="font-size:11px; color:var(--color-text-tertiary);">212</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--border-radius-md); font-size:13px;">
+        <i class="ti ti-star" aria-hidden="true" style="font-size:16px; color:var(--color-star-active);"></i>
+        <span style="flex:1;">Best</span><span style="font-size:11px; color:var(--color-text-tertiary);">9</span>
+      </div>
+
+      <div style="height:1px; background:var(--color-border-tertiary); margin:5px 6px;"></div>
+
+      <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--border-radius-md); font-size:13px; background:var(--color-background-secondary); box-shadow:inset 2px 0 0 #378ADD;">
+        <span style="width:10px; height:10px; border-radius:50%; background:#378ADD;"></span>
+        <span style="flex:1; font-weight:500;">beach</span><span style="font-size:11px; color:var(--color-text-tertiary);">40</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--border-radius-md); font-size:13px; background:var(--color-background-secondary); box-shadow:inset 2px 0 0 #7F77DD;">
+        <span style="width:10px; height:10px; border-radius:50%; background:#7F77DD;"></span>
+        <span style="flex:1; font-weight:500;">night</span><span style="font-size:11px; color:var(--color-text-tertiary);">23</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--border-radius-md); font-size:13px;">
+        <span style="width:10px; height:10px; border-radius:50%; background:#888780;"></span>
+        <span style="flex:1;">city</span><span style="font-size:11px; color:var(--color-text-tertiary);">61</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--border-radius-md); font-size:13px;">
+        <span style="width:10px; height:10px; border-radius:50%; background:#D85A30;"></span>
+        <span style="flex:1;">sunset</span><span style="font-size:11px; color:var(--color-text-tertiary);">18</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--border-radius-md); font-size:13px;">
+        <span style="width:10px; height:10px; border-radius:50%; background:#639922;"></span>
+        <span style="flex:1;">forest</span><span style="font-size:11px; color:var(--color-text-tertiary);">31</span>
+      </div>
+
+      <div style="margin-top:auto; display:flex; align-items:center; gap:6px; padding:6px 8px; font-size:12px; color:var(--color-text-secondary); border:0.5px dashed var(--color-border-secondary); border-radius:var(--border-radius-md);">
+        <i class="ti ti-plus" aria-hidden="true" style="font-size:15px;"></i><span>Add label</span>
+      </div>
+    </div>
+
+    <div style="flex:1; min-width:0; display:flex; flex-direction:column;">
+
+      <div style="display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:0.5px solid var(--color-border-tertiary);">
+        <div style="flex:1; display:flex; align-items:center; gap:6px; height:32px; padding:0 10px; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-md); color:var(--color-text-tertiary); font-size:13px;">
+          <i class="ti ti-search" aria-hidden="true" style="font-size:15px;"></i><span>filter by name…</span>
+        </div>
+
+        <!-- Card-density control: its own inline control, separate from sort. Opens a 1..N dropdown
+             (MIN_PREVIEW_FRAME_COUNT..MAX_PREVIEW_FRAME_COUNT) picking how many preview frames each card shows. -->
+        <div style="display:flex; align-items:center; gap:6px; height:32px; padding:0 9px; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-md); font-size:12px; color:var(--color-text-secondary);">
+          <i class="ti ti-layout-columns" aria-hidden="true" style="font-size:15px;"></i><span>3 frames</span>
+          <i class="ti ti-chevron-down" aria-hidden="true" style="font-size:13px; color:var(--color-text-tertiary);"></i>
+        </div>
+
+        <!-- Sort control: a single button whose face shows the current field + direction. Clicking opens the
+             popover below; it holds every ordering option (field, direction, favorites-first). -->
+        <div style="position:relative;">
+          <div style="display:flex; align-items:center; gap:6px; height:32px; padding:0 10px; border:0.5px solid var(--color-border-info); background:var(--color-background-info); border-radius:var(--border-radius-md); font-size:12px; color:var(--color-text-info);">
+            <i class="ti ti-arrows-sort" aria-hidden="true" style="font-size:15px;"></i><span>Date</span>
+            <i class="ti ti-arrow-down" aria-hidden="true" style="font-size:14px;"></i>
+          </div>
+
+          <!-- Drawn open to specify the options the popover contains (it is dismissible in the real app). -->
+          <div style="position:absolute; top:38px; right:0; z-index:5; width:196px; padding:10px; background:var(--color-background-primary); border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-lg); box-shadow:0 6px 20px var(--color-shadow);">
+            <div style="font-size:11px; color:var(--color-text-tertiary); padding:0 2px 5px;">Sort by</div>
+            <div style="display:flex; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-md); overflow:hidden; font-size:12px; margin-bottom:9px;">
+              <span style="flex:1; text-align:center; padding:5px 0; color:var(--color-text-secondary);">Name</span>
+              <span style="flex:1; text-align:center; padding:5px 0; background:var(--color-background-info); color:var(--color-text-info);">Date</span>
+            </div>
+
+            <div style="font-size:11px; color:var(--color-text-tertiary); padding:0 2px 5px;">Direction</div>
+            <div style="display:flex; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-md); overflow:hidden; font-size:12px; margin-bottom:10px;">
+              <span style="flex:1; text-align:center; padding:5px 0; color:var(--color-text-secondary);">↑ Ascending</span>
+              <span style="flex:1; text-align:center; padding:5px 0; background:var(--color-background-info); color:var(--color-text-info);">↓ Descending</span>
+            </div>
+
+            <div style="height:1px; background:var(--color-border-tertiary); margin:0 2px 9px;"></div>
+
+            <div style="display:flex; align-items:center; gap:8px; padding:0 2px; font-size:12px;">
+              <span style="display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; border-radius:4px; background:var(--color-border-info); color:#fff;"><i class="ti ti-check" aria-hidden="true" style="font-size:11px;"></i></span>
+              <span style="flex:1;">Favorites first</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="position:relative; padding:12px; display:grid; grid-template-columns:repeat(3,1fr); gap:10px;">
+
+        <div style="border:0.5px solid var(--color-border-tertiary); border-radius:var(--border-radius-md); padding:7px;">
+          <div style="display:flex; gap:3px;">
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+          </div>
+          <!-- Footer is a single row, left to right: Best-star toggle, label dots, then the name (filling
+               the rest). The card is wide enough they never overlap. Star is filled/gold when in Best, a
+               faint outline otherwise. -->
+          <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+            <i class="ti ti-star-filled" aria-hidden="true" style="font-size:13px; color:var(--color-star-active);"></i>
+            <span style="display:flex; gap:4px;"><span style="width:7px;height:7px;border-radius:50%;background:#378ADD;"></span><span style="width:7px;height:7px;border-radius:50%;background:#7F77DD;"></span></span>
+            <div style="flex:1; min-width:0; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:right;">clip_44_2026…</div>
+          </div>
+        </div>
+
+        <div style="border:0.5px solid var(--color-border-tertiary); border-radius:var(--border-radius-md); padding:7px;">
+          <div style="display:flex; gap:3px;">
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+            <i class="ti ti-star" aria-hidden="true" style="font-size:13px; color:var(--color-text-tertiary); opacity:0.4;"></i>
+            <span style="display:flex; gap:4px;"><span style="width:7px;height:7px;border-radius:50%;background:#378ADD;"></span></span>
+            <div style="flex:1; min-width:0; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:right;">beach_morning…</div>
+          </div>
+        </div>
+
+        <div style="border:2px solid var(--color-border-info); border-radius:var(--border-radius-md); padding:6px; position:relative; background:var(--color-background-info);">
+          <div style="display:flex; gap:3px;">
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+            <i class="ti ti-star" aria-hidden="true" style="font-size:13px; color:var(--color-text-tertiary); opacity:0.4;"></i>
+            <span style="display:flex; gap:4px;"><span style="width:7px;height:7px;border-radius:50%;background:#888780;"></span></span>
+            <div style="flex:1; min-width:0; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:right;">harbor_dusk…</div>
+          </div>
+        </div>
+
+        <div style="border:0.5px solid var(--color-border-tertiary); border-radius:var(--border-radius-md); padding:7px;">
+          <div style="display:flex; gap:3px;">
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+            <i class="ti ti-star" aria-hidden="true" style="font-size:13px; color:var(--color-text-tertiary); opacity:0.4;"></i>
+            <span style="display:flex; gap:4px;"><span style="width:7px;height:7px;border-radius:50%;background:#7F77DD;"></span><span style="width:7px;height:7px;border-radius:50%;background:#888780;"></span></span>
+            <div style="flex:1; min-width:0; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:right;">night_market…</div>
+          </div>
+        </div>
+
+        <div style="border:0.5px solid var(--color-border-tertiary); border-radius:var(--border-radius-md); padding:7px;">
+          <div style="display:flex; gap:3px;">
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+            <i class="ti ti-star" aria-hidden="true" style="font-size:13px; color:var(--color-text-tertiary); opacity:0.4;"></i>
+            <span style="display:flex; gap:4px;"><span style="width:7px;height:7px;border-radius:50%;background:#378ADD;"></span><span style="width:7px;height:7px;border-radius:50%;background:#639922;"></span></span>
+            <div style="flex:1; min-width:0; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:right;">coast_pan_03…</div>
+          </div>
+        </div>
+
+        <div style="border:0.5px solid var(--color-border-tertiary); border-radius:var(--border-radius-md); padding:7px;">
+          <div style="display:flex; gap:3px;">
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+            <div style="flex:1; height:46px; background:var(--color-background-tertiary); border-radius:3px;"></div>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+            <i class="ti ti-star" aria-hidden="true" style="font-size:13px; color:var(--color-text-tertiary); opacity:0.4;"></i>
+            <span style="display:flex; gap:4px;"><span style="width:7px;height:7px;border-radius:50%;background:#D85A30;"></span></span>
+            <div style="flex:1; min-width:0; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:right;">pier_sunset…</div>
+          </div>
+        </div>
+
+        <div style="position:absolute; left:230px; top:74px; display:flex; align-items:center; gap:6px; padding:4px 9px; border-radius:14px; background:#7F77DD; color:#26215C; font-size:12px; font-weight:500; border:0.5px solid #534AB7;">
+          <span style="width:8px; height:8px; border-radius:50%; background:#26215C;"></span>night
+          <i class="ti ti-pointer" aria-hidden="true" style="font-size:13px; position:absolute; right:-13px; bottom:-13px; color:var(--color-text-primary);"></i>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+</div>
+
+<p class="caption">
+  Dark redesign: a cool slate/ink neutral ramp with a teal selection accent, replacing the original warm
+  taupe dark. The gold <code>Best</code> star and the colored label swatches stay fixed identities and read
+  as warm accents against the cool field. Layout is identical to the original reference — only the dark
+  palette changed. Toggle (left) flips between the rolled light and dark themes. Sketch, not pixel-final.
+</p>
+
+</div>
+
+<!-- Accent-swatch rail: pushed to the far right of #page, columns instead of rows so it reads top-to-bottom. -->
+<div id="swatchRail" style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+  <button id="rollAccent" type="button" style="padding:6px 12px; font:inherit; font-size:12px; cursor:pointer; border-radius:var(--border-radius-md); border:0.5px solid var(--color-border-info); background:var(--color-background-info); color:var(--color-text-info);">🎲 Roll accent colors</button>
+  <!-- Swatch strip: 60 candidate accents. The roll above also paints four of them onto the mockups (one distinct
+       accent each); hovering any chip auditions that single accent across all four (sticks until you hover another). -->
+  <div id="accentSwatches" style="display:grid; grid-template-rows:repeat(20, 26px); grid-auto-flow:column; gap:2px; justify-content:center;"></div>
+  <!-- Readout of the currently-applied swatch so a keeper can be copied straight into the :root blocks / Theme.cpp. -->
+  <span id="accentReadout" style="font-size:12px; color:var(--color-text-secondary); font-variant-numeric:tabular-nums; max-width:80px; text-align:center;">hover a swatch…</span>
+</div>
+
+</div>
+
+<!-- Per-mockup color readout: every token applied to each of the 4 mockups (backgrounds, text, borders and the
+     accent), rebuilt by renderColorList() on every roll / slider / accent change so it always matches what's shown. -->
+<div id="colorListSection" style="width:100%; max-width:1080px; margin-top:14px;">
+  <div style="font-size:12px; color:var(--color-text-secondary); text-align:center; margin-bottom:8px;">Colors per mockup</div>
+  <div id="colorList" style="display:flex; gap:24px; flex-wrap:wrap; justify-content:center;"></div>
+</div>
+
+<script>
+  /* ===== Mockup playground ================================================================================
+     Single source of truth: each mockup has one `state` of generative params (hues, sats, 0..1 draws) held
+     in states[i]. The ONLY code that writes --color-* tokens is applyInstance(); every user action mutates
+     state then calls commit() (apply all four + refresh the color list + readout). Both light and dark are
+     derived from the same state via per-theme lightness bounds (RAMP), so toggling re-derives rather than
+     wiping. Sections: [color math] [per-theme bounds] [state + generation] [derivation] [state/apply/commit]
+     [actions] [accent strip] [color list] [init]. */
+  const root = document.documentElement;
+  const themeToggle = document.getElementById("themeToggle");
+  const TOKENS = [
+    "--color-background-primary", "--color-background-secondary", "--color-background-tertiary", "--color-page",
+    "--color-text-primary", "--color-text-secondary", "--color-text-tertiary",
+    "--color-border-tertiary", "--color-border-secondary",
+    "--color-border-info", "--color-background-info", "--color-text-info", "--color-star-active",
+  ];
+
+  // 4 side-by-side copies of the same markup, each with its own independently rolled theme. #instance0 in the
+  // HTML is the template; the other 3 are clones appended here. CSS custom properties cascade, so setting
+  // TOKENS on an .instance wrapper overrides the global :root values for everything inside that one copy.
+  const INSTANCE_COUNT = 4;
+  const instancesContainer = document.getElementById("instances");
+  const instanceTemplate = document.getElementById("instance0");
+  const instances = [instanceTemplate];
+  for (let i = 1; i < INSTANCE_COUNT; i++) {
+    const clone = instanceTemplate.cloneNode(true);
+    clone.id = `instance${i}`;
+    clone.querySelector(".instance-index").textContent = `#${i + 1}`;
+    instancesContainer.appendChild(clone);
+    instances.push(clone);
+  }
+
+  // Theme toggle: both light and dark are fully rolled now (light is no longer the static authored palette),
+  // so this just flips the mode and re-derives every mockup from its persistent state for the new theme.
+  themeToggle.addEventListener("click", () => {
+    const goingDark = currentTheme() !== "dark";
+    root.setAttribute("data-theme", goingDark ? "dark" : "light");
+    themeToggle.textContent = goingDark ? "Switch to light" : "Switch to dark";
+    renderSwatchStrip();   // recolor the accent strip chips for the new theme's bounds
+    commit();              // re-derive all four mockups (state persists across the toggle)
+  });
+
+  // ===== Color math =======================================================================================
+  function hslToHex(h, s, l) {
+    s /= 100; l /= 100;
+    const k = n => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+    const toHex = x => Math.round(x * 255).toString(16).padStart(2, "0");
+    return "#" + toHex(f(0)) + toHex(f(8)) + toHex(f(4));
+  }
+  const rand = (min, max) => min + Math.random() * (max - min);
+  const hueDist = (a, b) => { const d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; };
+  const lerp = (min, max, t) => min + (max - min) * t;
+
+  // ===== Per-theme bounds =================================================================================
+  // A mockup's hues, sats, and relative structure are theme-independent (stored in state); only the LIGHTNESS
+  // rules differ between light and dark. RAMP covers the background/text/star/border ramps (bgRamp and
+  // textRamp both return [primary, secondary, tertiary]); BOUNDS just below covers the accent, which is
+  // hue-free and parameterized differently (flat sat/light min-max per role). Both are derived from the
+  // original light/dark reference palettes -- tune the numbers to taste.
+  const RAMP = {
+    dark: {
+      page: "#000000", borderTintL: 85, borderAlpha: [0.09, 0.18], starL: [55, 68],
+      primaryL: v => v,                                                  // slider value IS the dark surface L (1..14)
+      bgRamp: (p, terD, secD) => [p, p + secD, Math.max(0, p - terD)],   // raised rows lighter, wells darkest (clamped >= 0)
+      textRamp: (t1, t2, t3) => {                                        // bright text: tertiary < secondary < primary
+        const ter = lerp(52, 64, t1), sec = ter + lerp(15, 25, t2);
+        return [Math.min(97, sec + lerp(18, 28, t3)), sec, ter];
+      },
+    },
+    light: {
+      page: "#ffffff", borderTintL: 15, borderAlpha: [0.12, 0.22], starL: [40, 52],
+      primaryL: v => lerp(86, 99, (v - 1) / 13),                         // surface near white; slider still reads "up = lighter"
+      bgRamp: (p, terD, secD) => [p, p - secD, p - secD - terD],         // raised rows + wells step DOWN from the light surface
+      textRamp: (t1, t2, t3) => {                                        // dark text: primary < secondary < tertiary
+        const pri = lerp(8, 18, t1), sec = pri + lerp(16, 26, t2);
+        return [pri, sec, Math.min(72, sec + lerp(10, 20, t3))];
+      },
+    },
+  };
+
+  // [min, max] per accent role, per theme. Each swatch/accent picks within these instead of a fixed point.
+  const BOUNDS = {
+    light: {
+      satBorder: [60, 85], lightBorder: [36, 55],
+      satBackground: [25, 55], lightBackground: [86, 95],
+      satText: [45, 75], lightText: [18, 32],
+    },
+    dark: {
+      satBorder: [55, 80], lightBorder: [48, 60],
+      satBackground: [25, 50], lightBackground: [14, 24],
+      satText: [38, 65], lightText: [70, 90],   // +8 vs. light theme's range, for more contrast on dark
+    },
+  };
+
+  // ===== Instance state + generation ======================================================================
+  // rollState() produces one mockup's theme-independent generative params. forcedNeutralHue lets
+  // rollAllThemes() stratify the four hues so they never land close by chance. The accent is stored as a
+  // swatch-shaped object so the per-mockup accent, the strip, and the audition all share one representation
+  // and one colorizer (computeSwatchColors).
+  function accentDraw(hueT) {
+    return {
+      hueT,
+      satBorderT: Math.random(), lightBorderT: Math.random(),
+      satBackgroundT: Math.random(), lightBackgroundT: Math.random(),
+      satTextT: Math.random(), lightTextT: Math.random(),
+    };
+  }
+
+  function rollState(forcedNeutralHue) {
+    const neutralHue = forcedNeutralHue !== undefined ? forcedNeutralHue : rand(0, 360);
+    const neutralSat = rand(15, 32);
+
+    // Accent hue: offset 50-180deg from the neutral so it always reads as a distinct selection color rather
+    // than a brighter version of the background (the failure mode from an earlier roll).
+    const accentHue = (neutralHue + rand(50, 180) * (Math.random() < 0.5 ? -1 : 1) + 360) % 360;
+
+    // Star hue: a minimum angular distance from both neutral and accent so it never blends into either. The
+    // retry is capped; starHue is drawn from the full circle so it's safe by construction (its two 80deg
+    // exclusion zones can never cover more than 160deg), but the cap is cheap insurance.
+    let starHue, guard = 0;
+    do { starHue = rand(0, 360); guard++; }
+    while (guard < 50 && (hueDist(starHue, neutralHue) < 40 || hueDist(starHue, accentHue) < 40));
+
+    // Minor hue (drives background-secondary and text-tertiary): a wide 35-150deg offset from the neutral so
+    // those two aren't just lighter/darker copies of it, kept clear of accent and star. The band must stay
+    // wide: a narrow one is reachable only across two thin arcs that accent+star can fully block, which once
+    // spun this loop forever and hung the page. The wide band plus the cap fixes it.
+    let minorHue; guard = 0;
+    do { minorHue = (neutralHue + rand(35, 150) * (Math.random() < 0.5 ? -1 : 1) + 360) % 360; guard++; }
+    while (guard < 50 && (hueDist(minorHue, accentHue) < 35 || hueDist(minorHue, starHue) < 35));
+
+    return {
+      neutralHue, neutralSat,
+      minorHue, minorSat: neutralSat + rand(10, 18),
+      tertiaryDelta: rand(2, 5), secondaryDelta: rand(6, 10),   // background ramp gaps (used in both themes)
+      textT: [Math.random(), Math.random(), Math.random()],     // text ramp draws, mapped through RAMP[theme]
+      accent: accentDraw(accentHue / 360),
+      starHue, starSatT: Math.random(), starLT: Math.random(),
+    };
+  }
+
+  // ===== Derivation ========================================================================================
+  // Pure: state + slider value + theme -> the 13 CSS tokens. The single place the token mapping lives, so
+  // both themes (and the live lightness slider) flow through exactly the same code.
+  function deriveTokens(s, v, theme) {
+    const r = RAMP[theme];
+    const [bgP, bgS, bgT] = r.bgRamp(r.primaryL(v), s.tertiaryDelta, s.secondaryDelta);
+    const [txP, txS, txT] = r.textRamp(s.textT[0], s.textT[1], s.textT[2]);
+    const acc = computeSwatchColors(s.accent, theme);
+    const borderHex = hslToHex(s.neutralHue, Math.min(45, s.neutralSat + 12), r.borderTintL);
+    const [br, bg, bb] = [borderHex.slice(1, 3), borderHex.slice(3, 5), borderHex.slice(5, 7)].map(h => parseInt(h, 16));
+    return {
+      "--color-background-primary": hslToHex(s.neutralHue, s.neutralSat, bgP),
+      "--color-background-secondary": hslToHex(s.minorHue, s.minorSat, bgS),
+      "--color-background-tertiary": hslToHex(s.neutralHue, s.neutralSat, bgT),
+      "--color-page": r.page,
+      "--color-text-primary": hslToHex(s.neutralHue, s.neutralSat, txP),
+      "--color-text-secondary": hslToHex(s.neutralHue, s.neutralSat, txS),
+      "--color-text-tertiary": hslToHex(s.minorHue, s.minorSat, txT),
+      "--color-border-tertiary": `rgba(${br}, ${bg}, ${bb}, ${r.borderAlpha[0]})`,
+      "--color-border-secondary": `rgba(${br}, ${bg}, ${bb}, ${r.borderAlpha[1]})`,
+      "--color-border-info": acc.border,
+      "--color-background-info": acc.background,
+      "--color-text-info": acc.text,
+      "--color-star-active": hslToHex(s.starHue, lerp(55, 80, s.starSatT), lerp(...r.starL, s.starLT)),
+    };
+  }
+
+  // ===== State + apply + commit ===========================================================================
+  // states[i] is the one source of truth per mockup. applyInstance() is the ONLY writer of --color-* tokens;
+  // commit() re-applies all four and refreshes the views. Every action below is "mutate state, then commit".
+  let states = [];
+  const lightnessSlider = document.getElementById("lightnessSlider");
+  const lightnessReadout = document.getElementById("lightnessReadout");
+  const lightnessValue = () => Number(lightnessSlider.value);
+
+  function applyInstance(i) {
+    const tokens = deriveTokens(states[i], lightnessValue(), currentTheme());
+    TOKENS.forEach(t => instances[i].style.setProperty(t, tokens[t]));
+  }
+
+  function updateLightnessReadout() {
+    lightnessReadout.textContent = `L ${Math.round(RAMP[currentTheme()].primaryL(lightnessValue()))}`;
+  }
+
+  function commit() {
+    states.forEach((_, i) => applyInstance(i));
+    updateLightnessReadout();
+    renderColorList();
+  }
+
+  // ===== Actions ==========================================================================================
+  // Roll a fresh independent theme per mockup; stratified neutral hues keep the four visually distinct.
+  function rollAllThemes() {
+    const hues = makeStratified(instances.length).map(t => t * 360);
+    states = instances.map((_, i) => rollState(hues[i]));
+    activeIndex = null;
+    commit();
+  }
+
+  lightnessSlider.addEventListener("input", commit);              // live: applyInstance reads the slider value
+  document.getElementById("rollTheme").addEventListener("click", rollAllThemes);
+
+  // ===== Accent swatch strip ===============================================================================
+  // A second, finer-grained way to explore just the accent (border/background/text-info), independent of the
+  // whole-theme roller above. Rolls a batch of 60 candidate accents (3 rows x 20), hue uniform over the full
+  // 0-360 range. Saturation and lightness are randomized within BOUNDS (per accent role, per theme) so every
+  // roll still guarantees the contrast the hand-picked palette had (readable text on fill, fill visibly
+  // distinct from surface), and every parameter is stratified rather than freely drawn so 60 independent
+  // Math.random() calls don't cluster (birthday-paradox effect) and leave gaps.
+  const SWATCH_COUNT = 60;
+
+  // Each swatch stores theme-independent 0..1 draws, not raw H/S/L — so toggling theme recolors the same
+  // swatch consistently instead of re-randomizing it. Every parameter is divided into n equal bins, the bins
+  // are shuffled and handed out one per swatch, and the value jitters within its assigned bin — full-range
+  // coverage on every parameter, every roll, with each parameter shuffled independently so swatches don't
+  // form a correlated gradient (e.g. swatch #1 always dim, swatch #60 always bright). Hue additionally gets
+  // a random rotation since it's circular, so the bin edges themselves move from roll to roll.
+  function makeStratified(n) {
+    const bins = Array.from({ length: n }, (_, i) => i);
+    for (let i = bins.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [bins[i], bins[j]] = [bins[j], bins[i]];
+    }
+    return bins.map(bin => (bin + Math.random()) / n);
+  }
+
+  function rollSwatches(n) {
+    const hueRotation = Math.random();
+    const hueT = makeStratified(n).map(t => (t + hueRotation) % 1);
+    const satBorderT = makeStratified(n), lightBorderT = makeStratified(n);
+    const satBackgroundT = makeStratified(n), lightBackgroundT = makeStratified(n);
+    const satTextT = makeStratified(n), lightTextT = makeStratified(n);
+    const result = Array.from({ length: n }, (_, i) => ({
+      hueT: hueT[i],
+      satBorderT: satBorderT[i], lightBorderT: lightBorderT[i],
+      satBackgroundT: satBackgroundT[i], lightBackgroundT: lightBackgroundT[i],
+      satTextT: satTextT[i], lightTextT: lightTextT[i],
+    }));
+    result.sort((a, b) => a.hueT - b.hueT);   // lay out the strip as a hue gradient, easier to scan/compare
+    return result;
+  }
+
+  function computeSwatchColors(swatch, theme) {
+    const hue = swatch.hueT * 360;
+    const b = BOUNDS[theme];
+    const border = hslToHex(hue, lerp(...b.satBorder, swatch.satBorderT), lerp(...b.lightBorder, swatch.lightBorderT));
+    const background = hslToHex(hue, lerp(...b.satBackground, swatch.satBackgroundT), lerp(...b.lightBackground, swatch.lightBackgroundT));
+    const text = hslToHex(hue, lerp(...b.satText, swatch.satTextT), lerp(...b.lightText, swatch.lightTextT));
+    return { hue, border, background, text };
+  }
+
+  let swatches = [];
+  let activeIndex = null;
+
+  function currentTheme() {
+    return root.getAttribute("data-theme") === "dark" ? "dark" : "light";
+  }
+
+  // ===== Accent strip =====================================================================================
+  // Audition: paint one accent across all four mockups (each over its own ramp). The choice is written into
+  // every instance's state so it persists across theme toggles, overriding the per-mockup accents until the
+  // next "Roll accent colors" or whole-theme roll.
+  function auditionAccent(index) {
+    activeIndex = index;
+    states.forEach(s => s.accent = swatches[index]);
+    commit();
+    updateStripOutline();
+    const c = computeSwatchColors(swatches[index], currentTheme());
+    document.getElementById("accentReadout").textContent =
+      `#${index + 1} · hue ${Math.round(c.hue)}° · border ${c.border} · bg ${c.background} · text ${c.text}`;
+  }
+
+  function updateStripOutline() {
+    document.querySelectorAll("#accentSwatches > span").forEach((chip, i) => {
+      chip.style.outline = i === activeIndex ? "2px solid var(--color-text-primary)" : "none";
+    });
+  }
+
+  // Full rebuild of the 60-chip strip for the current theme's accent bounds. Only called on a new batch or a
+  // theme toggle (not on hover or slider). The active accent is applied by commit(), not here, so this just
+  // redraws the chips and restores the outline.
+  function renderSwatchStrip() {
+    const theme = currentTheme();
+    const container = document.getElementById("accentSwatches");
+    container.innerHTML = "";
+    swatches.forEach((swatch, i) => {
+      const colors = computeSwatchColors(swatch, theme);
+      const chip = document.createElement("span");
+      chip.title = `#${i + 1} · hue ${Math.round(colors.hue)}° · ${colors.border}`;
+      chip.style.cssText = `width:26px; height:26px; border-radius:3px; cursor:pointer; display:inline-block; background:${colors.border}; outline-offset:1px;`;
+      chip.addEventListener("mouseenter", () => auditionAccent(i));
+      container.appendChild(chip);
+    });
+    updateStripOutline();
+  }
+
+  // ===== Per-mockup color list =============================================================================
+  // Dumps every applied token for each mockup, read live via getComputedStyle so it reflects whole-theme rolls,
+  // the lightness slider, and accent changes alike. Rebuilt wholesale on each change; cheap at 4 x 13 rows.
+  function renderColorList() {
+    const container = document.getElementById("colorList");
+    container.innerHTML = "";
+    instances.forEach((el, i) => {
+      const cs = getComputedStyle(el);
+      const col = document.createElement("div");
+      col.style.cssText = "display:flex; flex-direction:column; gap:3px; min-width:208px;";
+      const head = document.createElement("div");
+      head.textContent = `#${i + 1}`;
+      head.style.cssText = "font-size:12px; font-weight:600; color:var(--color-text-primary); font-variant-numeric:tabular-nums; margin-bottom:2px;";
+      col.appendChild(head);
+      TOKENS.forEach(token => {
+        const value = cs.getPropertyValue(token).trim();
+        const row = document.createElement("div");
+        row.style.cssText = "display:flex; align-items:center; gap:6px; font-size:11px;";
+        const chip = document.createElement("span");
+        chip.style.cssText = `width:12px; height:12px; border-radius:3px; flex:0 0 auto; border:0.5px solid var(--color-border-secondary); background:${value};`;
+        const name = document.createElement("span");
+        name.textContent = token.replace("--color-", "");
+        name.style.cssText = "flex:1; color:var(--color-text-tertiary);";
+        const val = document.createElement("code");
+        val.textContent = value;
+        val.style.cssText = "color:var(--color-text-secondary); font-variant-numeric:tabular-nums;";
+        row.append(chip, name, val);
+        col.appendChild(row);
+      });
+      container.appendChild(col);
+    });
+  }
+
+  // "Roll accent colors": fresh strip batch for auditioning, plus an independent random accent per mockup
+  // (free hue, random sat/light draws). No separation guard -- purely at the mercy of the RNG, so the four can
+  // occasionally land on similar hues. Hovering the strip still auditions a single accent across all four.
+  document.getElementById("rollAccent").addEventListener("click", () => {
+    swatches = rollSwatches(SWATCH_COUNT);
+    activeIndex = null;
+    renderSwatchStrip();
+    states.forEach(s => s.accent = accentDraw(Math.random()));
+    commit();
+    document.getElementById("accentReadout").textContent = "a random accent per mockup";
+  });
+
+  // ===== Init =============================================================================================
+  swatches = rollSwatches(SWATCH_COUNT);
+  renderSwatchStrip();
+  rollAllThemes();   // fills states for the four mockups and commits (applies tokens + renders the color list)
+</script>
+
+</body>
+</html>
