@@ -2,6 +2,7 @@
 #include "Core/Catalog.h"
 #include "Windows/CompareWindow.h"
 #include "Ffmpeg.h"
+#include "Import.h"
 #include "Windows/FrameViewerWindow.h"
 #include "Windows/FindUntrackedFilesDialog.h"
 #include "Windows/IntegrityCheckDialog.h"
@@ -77,24 +78,6 @@ inline bool    useTiff()     { return QSettings{}.value(Settings::UseTiff,      
 inline int     jpegQuality() { return QSettings{}.value(Settings::JpegQuality,  Defaults::JpegQuality).toInt(); }
 inline int     frameStep()   { return QSettings{}.value(Settings::FrameStep,    Defaults::FrameStep).toInt(); }
 inline int     cardImageHeight() { return QSettings{}.value(CARD_IMAGE_HEIGHT_KEY, DEFAULT_CARD_IMAGE_HEIGHT).toInt(); }
-
-// Copies preview frames from an existing preview/ dir into a fresh one at the destination (created as needed),
-// returning true only if at least one frame was copied. A false return - nothing to reuse - tells import
-// to fall back to a fresh ffmpeg extraction. The destination is always a just-created empty folder here
-// (callers wipe/recreate the output folder first), so QFile::copy never has to overwrite.
-static bool copyPreviewFrames(const QString& srcPreviewDir, const QString& dstPreviewDir)
-{
-	const QDir src{ srcPreviewDir };
-	const QStringList frames = src.entryList(IMAGE_FILE_FILTERS, QDir::Files);
-	if (frames.isEmpty() || !QDir{}.mkpath(dstPreviewDir))
-		return false;
-
-	bool copiedAny = false;
-	for (const QString& frame : frames)
-		copiedAny |= QFile::copy(src.filePath(frame), dstPreviewDir + "/" + frame);
-	return copiedAny;
-}
-
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
 {
@@ -967,59 +950,6 @@ void MainWindow::splitVideoIntoFrames(const QString& videoFilePath, const QStrin
 	}
 }
 
-void MainWindow::processVideoFile(const QString& videoPath, const QString& collectionPath, const QString& stagedPreviewDir, bool overwriteAllExisting)
-{
-	QFileInfo videoInfo(videoPath);
-	if (!videoInfo.exists())
-	{
-		QMessageBox::warning(this, tr("Error"), tr("Video file does not exist:\n%1").arg(videoPath));
-		return;
-	}
-
-	// Create output folder
-	const QString baseName = videoInfo.completeBaseName();
-	const QString outputFolder = collectionPath + "/" + baseName;
-	if (!QDir{}.mkpath(collectionPath))
-	{
-		QMessageBox::critical(this, tr("Error"), tr("Failed to create collection folder:\n%1").arg(collectionPath));
-		return;
-	}
-
-	if (QDir{ outputFolder }.exists())
-	{
-		if (!overwriteAllExisting)
-		{
-			const QMessageBox::StandardButton reply = QMessageBox::question(this, tr("Folder Exists"),
-				tr("Folder already exists:\n%1\n\nOverwrite?").arg(outputFolder),
-				QMessageBox::Yes | QMessageBox::No);
-			if (reply == QMessageBox::No)
-				return;
-		}
-		// Clean existing files
-		deleteFolderRecursively(outputFolder);
-	}
-
-	if (!QDir{}.mkpath(outputFolder))
-	{
-		QMessageBox::critical(this, tr("Error"), tr("Failed to create output folder:\n%1").arg(outputFolder));
-		return;
-	}
-
-	// The full frame set is extracted on demand (see ensureFramesSplit), not here - import only needs a few
-	// permanent preview frames up front, then registers the video right away. Quick Import already extracted
-	// exactly these for its staging card, so reuse them by copy; fall back to a fresh ffmpeg pass only when
-	// there's nothing staged to reuse (not reached via Quick Import, or staging's probe produced no frames).
-	if (stagedPreviewDir.isEmpty() || !copyPreviewFrames(stagedPreviewDir + "/preview", outputFolder + "/preview"))
-		Ffmpeg::generatePreviewFrames(videoPath, outputFolder, m_previewFrameCountCombo->currentData().toInt());
-
-	if (!Catalog::instance().addMediaItem(MediaId::fromFile(videoPath), videoPath, outputFolder, /*splitIntoFrames=*/false))
-	{
-		QMessageBox::critical(this, tr("Error"),
-			tr("An item with the same name and file size is already tracked in a different collection:\n%1").arg(videoPath));
-		deleteFolderRecursively(outputFolder);
-	}
-}
-
 void MainWindow::processBatch(QStringList videoPaths, const QString& collectionPath, const QHash<MediaId, QString>& stagedPreviewDirs)
 {
 	if (videoPaths.empty())
@@ -1061,7 +991,22 @@ void MainWindow::processBatch(QStringList videoPaths, const QString& collectionP
 			progressBox.setText(tr("Adding video %1/%2...").arg(++i).arg(totalSize));
 			QApplication::processEvents();
 			// Staged frames are keyed by the stable MediaId (re-derived here from the possibly-relocated path).
-			processVideoFile(videoPath, collectionPath, stagedPreviewDirs.value(MediaId::fromFile(videoPath)), overwriteExisting);
+			const QString stagedPreviewDir = stagedPreviewDirs.value(MediaId::fromFile(videoPath));
+			Import::Result result = Import::importVideo(videoPath, collectionPath, stagedPreviewDir, overwriteExisting);
+			if (result.status == Import::Status::FolderConflict)
+			{
+				// Reached via the "decide one by one" batch choice below (or when two videos in one batch
+				// share a base name, so the folder appeared after partitioning): ask about this one item,
+				// then retry the call with overwrite granted.
+				const QString outputFolder = collectionPath + "/" + QFileInfo(videoPath).completeBaseName();
+				if (QMessageBox::question(this, tr("Folder Exists"),
+						tr("Folder already exists:\n%1\n\nOverwrite?").arg(outputFolder),
+						QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes)
+					continue;
+				result = Import::importVideo(videoPath, collectionPath, stagedPreviewDir, /*overwriteExisting=*/true);
+			}
+			if (result.status == Import::Status::Error)
+				QMessageBox::critical(this, tr("Error"), result.errorMessage);
 		}
 	};
 
@@ -1267,7 +1212,7 @@ void MainWindow::quickImportToCollections(const QStringList& initialStaging)
 			return createCollection(name, false);
 		},
 		.isMediaItemTrackedInCollection = [](const MediaId& id, const QString& collectionName) {
-			// Compare against the exact folder this import derives (processVideoFile's outputFolder): on a
+			// Compare against the exact folder this import derives (Import::importVideo's outputFolder): on a
 			// name+size collision the id is tracked under some *other* folder - the staged copy was refused,
 			// so a plain "tracked at all" check would misreport it as imported.
 			const QString expectedFolder = rootFolder() + "/" + collectionName + "/" + QFileInfo(id.name()).completeBaseName();

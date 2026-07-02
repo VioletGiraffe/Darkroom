@@ -24,7 +24,7 @@ orient, then follow the link for the subsystem you're touching.
   helpers (`LabelVisuals`, `DragGestureHelper`, `LabelMimeType`); top-level windows + dialogs in `Windows/`
   (`MainWindow`, `CompareWindow`, `FrameViewerWindow`, `VideoPlayerWindow`, the `*Dialog`s); the non-UI core
   model in `Core/` (`Catalog`, `MetadataStore`, `MediaId`); and the visual theming in `Theme/` (`Theme`,
-  `Style`). `Settings`, `Utils`, `Ffmpeg`, and `main.cpp` stay at the `src/` root.
+  `Style`). `Settings`, `Utils`, `Ffmpeg`, `Import`, and `main.cpp` stay at the `src/` root.
 - **INCLUDEPATH**: `src` plus the submodules `qtutils`, `cpputils`, `cpp-template-utils`. With `src` on the
   path, app headers are included **layer-qualified** — `"UiComponents/ThumbnailWidget.h"`,
   `"Windows/MainWindow.h"`, `"Core/Catalog.h"`, and the few root headers as `"Utils.h"` — regardless of the
@@ -91,8 +91,9 @@ The `Settings.h`/`QSettings` key pattern, `SettingsDialog`, the `Theme` dark/lig
 app-wide `Accent`/`AccentBg` tokens), and the central `Style` stylesheet + custom-widget approach (e.g.
 `SegmentedToggle`) that gives the app its non-stock look.
 
-### [Import: ffmpeg, Utils, QuickImportDialog](docs/architecture/import.md)
-The `ffmpeg` invocation (`Ffmpeg::generatePreviewFrames` — a batch/concurrent preview extractor that
+### [Import: the Import module, ffmpeg, Utils, QuickImportDialog](docs/architecture/import.md)
+`Import::importVideo` — the per-item import worker (`MainWindow::processBatch` remains the batch coordinator
+over it), the `ffmpeg` invocation (`Ffmpeg::generatePreviewFrames` — a batch/concurrent preview extractor that
 `QuickImportDialog`'s staging runs across several videos at once, whose frames import then reuses by copy
 instead of re-extracting), `Utils.h`'s grab-bag of free functions, and `QuickImportDialog` itself: a staging
 grid + label-list panel mirroring the main window's own label model, duplicate detection at relocation, and the

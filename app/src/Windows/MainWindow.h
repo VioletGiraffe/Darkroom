@@ -66,7 +66,6 @@ private:
 	// predates this feature has real frames but no preview/ subfolder yet - the grid now reads only from
 	// preview/, so back-fill it via a plain file copy (no ffmpeg needed; real frames already exist).
 	void backfillMissingPreviews();
-	void processVideoFile(const QString& videoPath, const QString& collectionPath, const QString& stagedPreviewDir, bool overwriteAllExisting = false);
 	void reExportAllVideos();
 	void processBatch(QStringList videoPaths, const QString& collectionPath, const QHash<MediaId, QString>& stagedPreviewDirs);
 	bool createCollection(const QString& name, bool refreshList = true);

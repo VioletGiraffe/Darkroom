@@ -1,4 +1,4 @@
-# Import: ffmpeg, Utils, QuickImportDialog
+# Import: the Import module, ffmpeg, Utils, QuickImportDialog
 
 [← Back to architecture index](../../ARCHITECTURE.md)
 
@@ -41,13 +41,24 @@ picks between two ways of avoiding that:
   `outputFolder` empty via `splitVideoIntoFrames`'s own cleanup — regenerating a preview over no real content
   would be misleading).
 
-Neither path is used by `processVideoFile`'s own overwrite-existing-folder path, which can be wiping a stale
+Neither path is used by `Import::importVideo`'s own overwrite-existing-folder path, which can be wiping a stale
 folder left behind by a completely different prior video — there's no related `preview/` worth preserving or
 regenerating-in-place there; it just goes through the normal import flow from scratch.
 
 ## Import: preview frames only, full split deferred
 
-`MainWindow::processVideoFile` no longer extracts the full frame set. It creates the output folder, puts a few
+`Import::importVideo` (`src/Import.h/.cpp`, a free-function module in the same style as `Ffmpeg`) is the
+per-item import worker. It is deliberately UI-free — it never prompts or pops a message box; every outcome
+comes back as an `Import::Result` (`Success` / `FolderConflict` / `Error` with a user-presentable message).
+`MainWindow::processBatch` stays the batch coordinator on top of it and owns all the import UI: the app-wide
+`m_isProcessing` lock shared with `reExportAllVideos`, the progress modal, the folder-conflict
+partition/prompt (a `FolderConflict` result — the output folder exists and overwrite wasn't granted, nothing
+touched — is resolved by asking the user about that one item and retrying the call with
+`overwriteExisting = true`), the per-item error boxes, `Catalog::BatchScope`, and the view refresh. The
+worker reads the preview frame count straight from `Settings::PreviewFrameCount` — the same source Quick
+Import's staging uses (the main window's combo persists every change there immediately).
+
+It does not extract the full frame set. It creates the output folder, puts a few
 permanent preview frames into `outputFolder/preview/`, then registers the video via `Catalog::addMediaItem(...,
 /*splitIntoFrames=*/false)` immediately — the video appears in the grid right away, with a small "split
 pending" badge (see [media-widgets.md](media-widgets.md)) on its card, and the expensive full extraction only
@@ -164,7 +175,7 @@ just an ordinary additional tag, applied the same way Best is.
    skipped entirely, left staged.
 2. Per group: resolves the label's display name, relocates the group's source files if relocation is enabled
    (`performRelocation`/`FileCollisionDialog`, "Duplicate detection" above, unchanged), then calls
-   `addMediaItemsRequested` — `MainWindow`'s `processBatch`/`processVideoFile` apply path (also where a file dropped
+   `addMediaItemsRequested` — the `processBatch`/`Import::importVideo` apply path (also where a file dropped
    on the main window ends up, since a drop just opens this dialog pre-staged). It passes along each video's
    staging temp dir so import can reuse the already-extracted preview frames (see "Import: preview frames
    only" above).

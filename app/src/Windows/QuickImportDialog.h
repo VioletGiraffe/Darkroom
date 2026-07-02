@@ -60,7 +60,7 @@ public:
 		std::function<QList<LabelOption>()> getLabelOptions;
 		// Adds the given video files to the named collection. stagedPreviewDirs maps each staged video's MediaId
 		// to the temp dir whose preview/ holds the frames already extracted for its staging card, so import
-		// can reuse them by copy instead of re-running ffmpeg (see MainWindow::processVideoFile); a video absent
+		// can reuse them by copy instead of re-running ffmpeg (see Import::importVideo); a video absent
 		// from the map, or whose staged frames are gone, is extracted fresh.
 		std::function<void(const QString& collectionName, const QStringList& videoPaths,
 			const QHash<MediaId, QString>& stagedPreviewDirs)> addMediaItemsRequested;
