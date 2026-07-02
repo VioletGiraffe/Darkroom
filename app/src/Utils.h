@@ -26,6 +26,7 @@ void clearStuckHoverIfCursorLeft(QWidget* w);
 [[nodiscard]] QStringList pickEvenlySpacedFrames(const QDir& dir, const QStringList& files, int maxFrames);
 
 [[nodiscard]] bool isSupportedVideoFile(const QString& filePath);
+[[nodiscard]] bool isSupportedImageFile(const QString& filePath);
 
 // Byte-for-byte comparison of two files; the size check short-circuits the common case where the
 // names collide but the content doesn't.

@@ -68,6 +68,7 @@ public:
 
 	// Enumeration / counts.
 	[[nodiscard]] QList<MediaId> allMediaItems() const { return _mediaItems.keys(); }
+	[[nodiscard]] bool containsMediaItem(const MediaId& id) const { return _mediaItems.contains(id); }
 	[[nodiscard]] int mediaItemCount() const { return static_cast<int>(_mediaItems.size()); }
 	// labelId -> number of items carrying it, computed in one pass (for the sidebar's per-label counts).
 	[[nodiscard]] QHash<QString, int> labelMediaItemCounts() const;
@@ -122,6 +123,11 @@ public:
 	// removeMediaItem drops an item from the catalog entirely (delete-all), so it doesn't linger as a ghost now
 	// that the catalog - not the disk walk - is the authoritative set.
 	bool addMediaItem(const MediaId& id, const QString& sourcePath, const QString& folderAbs, bool splitIntoFrames);
+	// addPhoto is addMediaItem's photo counterpart, same collision rule. labelDirAbs is the <root>/Photos/<label>
+	// dir the (owned) photo's file sits in, empty for a referenced photo - which is registered with no labels
+	// at all, so the caller must follow up with addLabel for the initial label (an owned photo derives its
+	// storage label from labelDirAbs like a video does from its collection folder).
+	bool addPhoto(const MediaId& id, const QString& sourcePath, const QString& labelDirAbs, bool referenced);
 	void removeMediaItem(const MediaId& id);
 	// Applies an in-app rename: carries the whole metadata record from oldId to newId (re-key; loop intervals
 	// and labels follow the new identity), updates the stored source path + frame folder, and re-keys the

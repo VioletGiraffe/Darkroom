@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Core/MediaId.h"
+
 #include <QString>
 
 // The per-item import worker: registers one source video file into a collection. UI-free by design -
@@ -29,5 +31,36 @@ struct Result
 // deferred. A registration refusal (name+size collision with an item tracked elsewhere) deletes the
 // just-created folder again and reports as an Error.
 [[nodiscard]] Result importVideo(const QString& videoPath, const QString& collectionPath, const QString& stagedPreviewDir, bool overwriteExisting);
+
+// How a photo enters the library: its file copied or moved into <root>/Photos/<label>/ (owned), or left
+// where it is and merely tracked (referenced).
+enum class PhotoImportMode { Copy, Move, Reference };
+
+enum class PhotoStatus
+{
+	Success,
+	// Reference mode only: the file's name+size id is already tracked as a different item, and a referenced
+	// photo has no file of its own to rename the collision away on. Nothing was registered - the caller may
+	// offer importing an owned copy instead (the Copy path auto-renames, resolving the collision).
+	IdCollision,
+	Error,
+};
+
+struct PhotoResult
+{
+	PhotoStatus status = PhotoStatus::Success;
+	QString errorMessage;  // user-presentable; set iff status == Error
+	// The identity actually registered (valid iff Success). After an owned-import auto-rename this differs
+	// from the source file's own id - callers keying per-item state on the staged id must re-key to this.
+	MediaId registeredId;
+};
+
+// Imports one photo under the given label. Owned modes copy/move the file into <root>/Photos/<label>/
+// (created lazily), auto-renaming the incoming file (name_2.ext, name_3.ext, ...) when its name collides on
+// disk or its name+size id collides with a differently-stored catalog item - one rename resolves both. A
+// byte-identical file already at the destination is adopted as-is instead of copied again. Reference mode
+// touches no files: it registers the photo at photoPath with the referenced flag; the caller applies the
+// initial label afterwards (a referenced photo has no storage folder to derive it from).
+[[nodiscard]] PhotoResult importPhoto(const QString& photoPath, const QString& labelDisplayName, PhotoImportMode mode);
 
 } // namespace Import

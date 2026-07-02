@@ -73,9 +73,10 @@ query/mutation API, import lifecycle (`addMediaItem`/`removeMediaItem`/`applyRen
 `BatchScope`), the FS-reconciliation audit findings, the design rationale, and deferred post-v1 polish.
 
 ### [Main window](docs/architecture/main-window.md)
-`MainWindow`'s grid + sidebar layout, the name filter, label assignment (context menu + drag-from-sidebar),
-sidebar label management (rename/color/delete), the media grid's multi-select implementation (and the
-regression history behind it), and renaming a media item on disk.
+`MainWindow`'s grid + sidebar layout, the name filter, the All/Videos/Photos media-type switch (and how
+photo cards render), label assignment (context menu + drag-from-sidebar), sidebar label management
+(rename/color/delete), the media grid's multi-select implementation (and the regression history behind it),
+and renaming a media item on disk.
 
 ### [Media item card & thumbnail widgets](docs/architecture/media-widgets.md)
 `MediaItemWidget` (the grid card: label drop target, label dots, no longer a drag source),
@@ -92,12 +93,14 @@ app-wide `Accent`/`AccentBg` tokens), and the central `Style` stylesheet + custo
 `SegmentedToggle`) that gives the app its non-stock look.
 
 ### [Import: the Import module, ffmpeg, Utils, QuickImportDialog](docs/architecture/import.md)
-`Import::importVideo` — the per-item import worker (`MainWindow::processBatch` remains the batch coordinator
-over it), the `ffmpeg` invocation (`Ffmpeg::generatePreviewFrames` — a batch/concurrent preview extractor that
-`QuickImportDialog`'s staging runs across several videos at once, whose frames import then reuses by copy
-instead of re-extracting), `Utils.h`'s grab-bag of free functions, and `QuickImportDialog` itself: a staging
-grid + label-list panel mirroring the main window's own label model, duplicate detection at relocation, and the
-"Import" command that imports every labeled card in one step.
+`Import::importVideo` and `Import::importPhoto` — the per-item import workers (`MainWindow::processBatch` /
+`processPhotoBatch` remain the batch coordinators over them; photos land in `<root>/Photos/<label>/` or are
+referenced in place, with collision auto-rename), the `ffmpeg` invocation (`Ffmpeg::generatePreviewFrames` —
+a batch/concurrent preview extractor that `QuickImportDialog`'s staging runs across several videos at once,
+whose frames import then reuses by copy instead of re-extracting), `Utils.h`'s grab-bag of free functions,
+and `QuickImportDialog` itself: a staging grid + label-list panel mirroring the main window's own label
+model, duplicate detection at staging and relocation, and the "Import" command that imports every labeled
+card in one step.
 
 ---
 

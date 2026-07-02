@@ -9,6 +9,7 @@
 #include "UiComponents/LabelSidebar.h"
 #include "UiComponents/LabelVisuals.h"
 #include "Windows/QuickImportDialog.h"
+#include "UiComponents/SegmentedToggle.h"
 #include "Windows/SettingsDialog.h"
 #include "UiComponents/SortControl.h"
 #include "Core/MediaId.h"
@@ -59,6 +60,8 @@ static MainWindow* s_instance = nullptr;
 // Per-frame preview image height (px); card width is this × the frame count. User-adjustable via Ctrl+wheel
 // over a card, persisted under a settings key local to this UI (not hoisted into the shared Settings.h).
 static const QString CARD_IMAGE_HEIGHT_KEY = "mainWindow/cardImageHeight";
+// The header's All/Videos/Photos switch, persisted as its segment index (0 = All).
+static const QString MEDIA_TYPE_FILTER_KEY = "mainWindow/mediaTypeFilter";
 static constexpr int DEFAULT_CARD_IMAGE_HEIGHT = 120;
 static constexpr int MIN_CARD_IMAGE_HEIGHT = 60;
 static constexpr int MAX_CARD_IMAGE_HEIGHT = 360;
@@ -149,6 +152,18 @@ void MainWindow::setupUI()
 	m_nameFilter->setMinimumWidth(220);
 	connect(m_nameFilter, &QLineEdit::textChanged, this, &MainWindow::applyNameFilter);
 	headerLayout->addWidget(m_nameFilter, 0, Qt::AlignVCenter);
+
+	// Media-type filter beside the name filter: All / Videos / Photos, ANDed with the other filters. A
+	// structural filter (changes which items are enumerated), so it rebuilds the grid, unlike the name
+	// filter's cheap hide/show. setCurrentIndex is silent, so restoring the persisted choice here doesn't
+	// fire a redundant refresh during setup.
+	m_mediaTypeFilter = new SegmentedToggle({ tr("All"), tr("Videos"), tr("Photos") });
+	m_mediaTypeFilter->setCurrentIndex(qBound(0, QSettings{}.value(MEDIA_TYPE_FILTER_KEY, 0).toInt(), 2));
+	connect(m_mediaTypeFilter, &SegmentedToggle::currentChanged, this, [this](int index) {
+		QSettings{}.setValue(MEDIA_TYPE_FILTER_KEY, index);
+		refreshMediaGrid();
+	});
+	headerLayout->addWidget(m_mediaTypeFilter, 0, Qt::AlignVCenter);
 
 	// Ctrl+F focuses the name filter (app-wide, like the menu shortcuts) instead of opening a search dialog.
 	// Surface the main window first, since the shortcut can fire while a player/frame-viewer window is on top.
@@ -296,7 +311,8 @@ void MainWindow::dragEnterEvent(QDragEnterEvent* event)
 	{
 		for (const QUrl& url : event->mimeData()->urls())
 		{
-			if (isSupportedVideoFile(url.toLocalFile()))
+			const QString path = url.toLocalFile();
+			if (isSupportedVideoFile(path) || isSupportedImageFile(path))
 			{
 				event->acceptProposedAction();
 				return;
@@ -311,7 +327,7 @@ void MainWindow::dropEvent(QDropEvent* event)
 	for (const QUrl& url : event->mimeData()->urls())
 	{
 		QString path = url.toLocalFile();
-		if (isSupportedVideoFile(path))
+		if (isSupportedVideoFile(path) || isSupportedImageFile(path))
 			files.push_back(std::move(path));
 	}
 
@@ -355,6 +371,18 @@ struct ItemInfo {
 	QDateTime date; // resolved only when sorting by date
 	QString name;
 };
+
+// The display name + sort keys for one item, shared by the grid build and the in-place resort. A video is
+// named after its frame folder; a photo has none that names it (an owned photo's folder is the shared label
+// dir, a referenced photo's is empty), so its name comes from the id's file name.
+ItemInfo itemInfoFor(Catalog& catalog, const MediaId& id, bool isBest, bool sortByDate)
+{
+	const QString folderPath = catalog.folderForMediaItem(id);
+	const QString name = catalog.mediaType(id) == Catalog::MediaType::Photo
+		? QFileInfo(id.name()).completeBaseName()
+		: QFileInfo(folderPath).fileName();
+	return { isBest, sortByDate ? getSourceFileDate(catalog.sourcePathForMediaItem(id), folderPath) : QDateTime{}, name };
+}
 
 // A grid item that orders itself by its bundled ItemInfo. The sort mode (sortBy/descending/
 // favoritesFirst) is the same for every item during a given sort, so it's set on these static
@@ -515,14 +543,24 @@ void MainWindow::refreshMediaGrid()
 	// GridItem::operator<) puts them in their final order; captions are numbered after that.
 	const auto addCard = [&](const MediaId& id) {
 		const QString folderPath = catalog.folderForMediaItem(id);
-		// Cards always render from the permanent preview/ subfolder, never the real frame folder directly -
-		// this is what lets a not-yet-split video (no real frames yet) still show a real thumbnail.
-		QDir previewDir(folderPath + "/preview");
-		const QStringList imageFiles = previewDir.entryList(IMAGE_FILE_FILTERS, QDir::Files, QDir::Name);
-		if (imageFiles.isEmpty())
-			return;  // preview/ missing or empty (externally deleted folder, or preview generation failed outright) - don't show a frameless ghost card
+		QStringList previewPaths;
+		if (catalog.mediaType(id) == Catalog::MediaType::Photo)
+		{
+			// A photo card decodes the photo file itself - no preview cache (v1). An unloadable path (e.g. a
+			// referenced photo on an unmounted drive) renders a blank card rather than hiding the item.
+			previewPaths << catalog.sourcePathForMediaItem(id);
+		}
+		else
+		{
+			// Video cards always render from the permanent preview/ subfolder, never the real frame folder
+			// directly - this is what lets a not-yet-split video (no real frames yet) still show a real thumbnail.
+			QDir previewDir(folderPath + "/preview");
+			const QStringList imageFiles = previewDir.entryList(IMAGE_FILE_FILTERS, QDir::Files, QDir::Name);
+			if (imageFiles.isEmpty())
+				return;  // preview/ missing or empty (externally deleted folder, or preview generation failed outright) - don't show a frameless ghost card
 
-		const QStringList previewPaths = pickEvenlySpacedFrames(previewDir, imageFiles, previewFrameCount);
+			previewPaths = pickEvenlySpacedFrames(previewDir, imageFiles, previewFrameCount);
+		}
 
 		auto* card = new MediaItemWidget(
 			QSize{ imageHeight * previewFrameCount, imageHeight },
@@ -559,7 +597,7 @@ void MainWindow::refreshMediaGrid()
 
 		auto* item = new GridItem();
 		item->mediaId = id;
-		item->info = { bestSet.contains(id), sortByDate ? getSourceFileDate(catalog.sourcePathForMediaItem(id), folderPath) : QDateTime{}, QFileInfo(folderPath).fileName() };
+		item->info = itemInfoFor(catalog, id, bestSet.contains(id), sortByDate);
 		if (!uniformCardHint.isValid())
 			uniformCardHint = card->sizeHint();
 		item->setSizeHint(uniformCardHint);
@@ -588,6 +626,13 @@ void MainWindow::refreshMediaGrid()
 				matched.unite(next);       // OR: items carrying any selected label
 		}
 		mediaItems = QList<MediaId>(matched.cbegin(), matched.cend());
+	}
+
+	// The header's All/Videos/Photos switch, ANDed with the label filter above.
+	if (const int typeFilterIdx = m_mediaTypeFilter->currentIndex(); typeFilterIdx != 0)
+	{
+		const Catalog::MediaType wanted = typeFilterIdx == 2 ? Catalog::MediaType::Photo : Catalog::MediaType::Video;
+		mediaItems.removeIf([&](const MediaId& id) { return catalog.mediaType(id) != wanted; });
 	}
 
 	pendingAttach.reserve(mediaItems.size());
@@ -629,9 +674,7 @@ void MainWindow::resortMediaGrid()
 	for (int row = 0; row < count; ++row)
 	{
 		auto* item = static_cast<GridItem*>(m_mediaGrid->item(row));
-		const MediaId id = item->mediaId;
-		const QString folderPath = catalog.folderForMediaItem(id);
-		item->info = { bestSet.contains(id), sortByDate ? getSourceFileDate(catalog.sourcePathForMediaItem(id), folderPath) : QDateTime{}, QFileInfo(folderPath).fileName() };
+		item->info = itemInfoFor(catalog, item->mediaId, bestSet.contains(item->mediaId), sortByDate);
 	}
 
 	m_mediaGrid->sortItems(Qt::AscendingOrder);
@@ -1036,6 +1079,33 @@ void MainWindow::processBatch(QStringList videoPaths, const QString& collectionP
 	refreshLibraryView();
 }
 
+QList<Import::PhotoResult> MainWindow::processPhotoBatch(const QString& labelId, const QStringList& photoPaths, Import::PhotoImportMode mode)
+{
+	Catalog& catalog = Catalog::instance();
+	const Catalog::Label* label = catalog.labelById(labelId);
+	if (!label || label->isVirtual())
+		return {};  // the label vanished from the catalog mid-session; the caller leaves everything staged
+
+	Catalog::BatchScope batch;  // one store write for the whole batch instead of one per photo
+
+	QList<Import::PhotoResult> results;
+	results.reserve(photoPaths.size());
+	for (const QString& path : photoPaths)
+	{
+		const Import::PhotoResult result = Import::importPhoto(path, label->displayName, mode);
+		if (result.status == Import::PhotoStatus::Error)
+			QMessageBox::critical(this, tr("Error"), result.errorMessage);
+		// A referenced photo has no storage folder to derive its first label from - store it explicitly.
+		// (An owned photo's label derives from the Photos/<label> dir its file just landed in.)
+		if (result.status == Import::PhotoStatus::Success && mode == Import::PhotoImportMode::Reference)
+			catalog.addLabel(result.registeredId, labelId);
+		results << result;
+	}
+
+	refreshLibraryView();
+	return results;
+}
+
 void MainWindow::reExportAllVideos()
 {
 	if (m_isProcessing)
@@ -1210,6 +1280,24 @@ void MainWindow::quickImportToCollections(const QStringList& initialStaging)
 				const QHash<MediaId, QString>& stagedPreviewDirs) {
 			processBatch(videoPaths, rootFolder() + "/" + collectionName, stagedPreviewDirs);
 		},
+		.importPhotosRequested = [this](const QString& labelId, const QStringList& photoPaths, Import::PhotoImportMode mode) {
+			return processPhotoBatch(labelId, photoPaths, mode);
+		},
+		.findAlreadyImportedDuplicatePhoto = [](const QString& photoPath) -> QString {
+			// Byte-identical content already tracked as a photo, matched by size regardless of name - this is
+			// what catches renamed duplicates. The size gate keeps the byte comparison rare.
+			Catalog& catalog = Catalog::instance();
+			const qint64 photoSize = QFileInfo(photoPath).size();
+			for (const MediaId& id : catalog.allMediaItems())
+			{
+				if (catalog.mediaType(id) != Catalog::MediaType::Photo || id.size() != photoSize)
+					continue;
+				const QString existingPath = catalog.sourcePathForMediaItem(id);
+				if (filesAreIdentical(photoPath, existingPath))
+					return existingPath;
+			}
+			return {};
+		},
 		.createCollectionRequested = [this](const QString& name) -> bool {
 			return createCollection(name, false);
 		},
@@ -1220,30 +1308,21 @@ void MainWindow::quickImportToCollections(const QStringList& initialStaging)
 			const QString expectedFolder = rootFolder() + "/" + collectionName + "/" + QFileInfo(id.name()).completeBaseName();
 			return QString::compare(Catalog::instance().folderForMediaItem(id), expectedFolder, Qt::CaseInsensitive) == 0;
 		},
-		.markBestRequested = [this](const QHash<QString, QList<MediaId>>& bestMediaItemsByCollection) {
-			// Each added video's frame folder is <collection>/<baseName>; add the Best label to the
-			// flagged ones now that they've been tracked (addLabel dedups and persists per video). The base
-			// name comes from the MediaId itself (id.name()) - the source file may already have been moved
-			// away from its staged path by relocation, so it can't be re-read from disk here.
-			Catalog::BatchScope batch;  // one store write for the whole flush instead of one per video
-			for (auto it = bestMediaItemsByCollection.constBegin(); it != bestMediaItemsByCollection.constEnd(); ++it)
-			{
-				const QString collectionPath = rootFolder() + "/" + it.key();
-				for (const MediaId& mediaId : it.value())
-				{
-					const QString folderPath = collectionPath + "/" + QFileInfo(mediaId.name()).completeBaseName();
-					if (QDir(folderPath).exists())  // only if extraction landed (so the video is in the catalog)
-						Catalog::instance().addLabel(mediaId, Catalog::BestLabelId);
-				}
-			}
+		.markBestRequested = [](const QList<MediaId>& bestItems) {
+			// Items only reach this list after their import was confirmed, so "tracked in the catalog" is the
+			// guard against a stray id - uniform across videos and photos (a photo has no per-item folder whose
+			// existence could stand in for it).
+			Catalog::BatchScope batch;  // one store write for the whole flush instead of one per item
+			for (const MediaId& mediaId : bestItems)
+				if (Catalog::instance().containsMediaItem(mediaId))
+					Catalog::instance().addLabel(mediaId, Catalog::BestLabelId);
 		},
-		.assignExtraLabelsRequested = [this](const QList<QuickImportDialog::ExtraLabelAssignment>& assignments) {
-			// Mirrors markBestRequested above: same folder derivation (from the MediaId), same "only if it landed" guard.
+		.assignExtraLabelsRequested = [](const QList<QuickImportDialog::ExtraLabelAssignment>& assignments) {
+			// Mirrors markBestRequested above, same "tracked" guard.
 			Catalog::BatchScope batch;  // one store write for the whole flush instead of one per assignment
 			for (const QuickImportDialog::ExtraLabelAssignment& assignment : assignments)
 			{
-				const QString folderPath = rootFolder() + "/" + assignment.collectionName + "/" + QFileInfo(assignment.mediaId.name()).completeBaseName();
-				if (!QDir(folderPath).exists())  // only if extraction landed (so the video is in the catalog)
+				if (!Catalog::instance().containsMediaItem(assignment.mediaId))
 					continue;
 				for (const QString& labelId : assignment.labelIds)
 					Catalog::instance().addLabel(assignment.mediaId, labelId);

@@ -72,3 +72,85 @@ Import::Result Import::importVideo(const QString& videoPath, const QString& coll
 
 	return {};
 }
+
+Import::PhotoResult Import::importPhoto(const QString& photoPath, const QString& labelDisplayName, PhotoImportMode mode)
+{
+	const QFileInfo photoInfo(photoPath);
+	if (!photoInfo.isFile())
+		return { PhotoStatus::Error, QObject::tr("Photo file does not exist:\n%1").arg(photoPath), {} };
+
+	Catalog& catalog = Catalog::instance();
+
+	if (mode == PhotoImportMode::Reference)
+	{
+		const MediaId id = MediaId::fromFile(photoPath);
+		// A same-path re-import (this exact file already tracked in place) falls through to the upsert below;
+		// any other tracked use of the id is a collision Reference mode cannot resolve - there is no owned
+		// copy whose name a rename could change.
+		if (catalog.containsMediaItem(id) && !(catalog.isReferenced(id) && catalog.sourcePathForMediaItem(id) == photoPath))
+			return { PhotoStatus::IdCollision, {}, {} };
+
+		if (!catalog.addPhoto(id, photoPath, /*labelDirAbs=*/{}, /*referenced=*/true))
+			return { PhotoStatus::Error, QObject::tr("An item with the same name and file size is already tracked:\n%1").arg(photoPath), {} };
+		return { PhotoStatus::Success, {}, id };
+	}
+
+	// Owned import: land the file in the label's photo dir, auto-renaming around collisions.
+	const QString destDir = photosRootFolder() + "/" + labelDisplayName;
+	if (!QDir{}.mkpath(destDir))
+		return { PhotoStatus::Error, QObject::tr("Failed to create photo folder:\n%1").arg(destDir), {} };
+
+	// Pick a destination name that is free both on disk and in the catalog - the id is name+size and a
+	// copy/move preserves the size, so one rename resolves a path collision and an id collision alike. A
+	// byte-identical file already at the destination (including this very file on a re-import) is adopted
+	// as-is instead of being copied again.
+	const QString baseName = photoInfo.completeBaseName();
+	const QString suffix   = photoInfo.suffix();
+	QString destPath;
+	bool adoptExisting = false;
+	for (int attempt = 1; ; ++attempt)
+	{
+		if (attempt > 9999)
+			return { PhotoStatus::Error, QObject::tr("Could not find a free file name for:\n%1\nin:\n%2").arg(photoPath, destDir), {} };
+
+		const QString candidateName = attempt == 1 ? photoInfo.fileName()
+		                                           : baseName + "_" + QString::number(attempt) + "." + suffix;
+		const QString candidatePath = destDir + "/" + candidateName;
+		if (QFile::exists(candidatePath))
+		{
+			if (!filesAreIdentical(photoPath, candidatePath))
+				continue;  // the name is taken by different content - try the next numbered name
+			destPath = candidatePath;
+			adoptExisting = true;
+			break;
+		}
+		if (catalog.containsMediaItem(MediaId::fromNameAndSize(candidateName, photoInfo.size())))
+			continue;  // the id is taken by an item stored elsewhere (or a drifted record) - a fresh name sidesteps it
+		destPath = candidatePath;
+		break;
+	}
+
+	if (!adoptExisting)
+	{
+		const bool isMove = mode == PhotoImportMode::Move;
+		if (!(isMove ? QFile::rename(photoPath, destPath) : QFile::copy(photoPath, destPath)))
+			return { PhotoStatus::Error, QObject::tr("Failed to %1:\n%2\nto:\n%3")
+				.arg(isMove ? QObject::tr("move") : QObject::tr("copy"), photoPath, destPath), {} };
+	}
+
+	const MediaId registeredId = MediaId::fromFile(destPath);
+	if (!catalog.addPhoto(registeredId, destPath, destDir, /*referenced=*/false))
+	{
+		// Undo the relocation rather than leave an untracked copy behind (mirrors importVideo's cleanup).
+		if (!adoptExisting)
+		{
+			if (mode == PhotoImportMode::Move)
+				QFile::rename(destPath, photoPath);
+			else
+				QFile::remove(destPath);
+		}
+		return { PhotoStatus::Error, QObject::tr("An item with the same name and file size is already tracked elsewhere:\n%1").arg(photoPath), {} };
+	}
+
+	return { PhotoStatus::Success, {}, registeredId };
+}

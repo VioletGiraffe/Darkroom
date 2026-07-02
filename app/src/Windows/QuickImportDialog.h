@@ -2,6 +2,7 @@
 
 #include "UiComponents/DragGestureHelper.h"
 #include "Core/MediaId.h"
+#include "Import.h"  // Import::PhotoImportMode / PhotoResult, used in the importPhotosRequested callback
 
 #include <QDialog>
 #include <QHash>
@@ -18,7 +19,8 @@ class QSplitter;
 class QWidget;
 
 // ============================================================================
-// QuickImportDialog - stage new video files, label them, then import everything labeled in one "Import" step.
+// QuickImportDialog - stage new video and photo files, label them, then import everything labeled in one
+// "Import" step.
 //
 // Mirrors the main window's own label model: a small label-list panel (like LabelSidebar, minus
 // filtering) sits next to a big grid of staged item cards (MediaItemWidget, same as the main grid).
@@ -42,13 +44,11 @@ public:
 		QString color;  // hex string e.g. "#378ADD"; empty = unset - mirrors Catalog::Label::color
 	};
 
-	// One staged item's extra-label picks, resolved against the collection it landed in (needed to derive
-	// its frame folder, the same way markBestRequested's per-collection grouping does for Best). Identified by
-	// MediaId, not path: relocation (Move) deletes the source from its staged path before this is applied, so
-	// the path can no longer be resolved to the file - the stable id is what addLabel needs.
+	// One staged item's extra-label picks (every pending label beyond the destination-deciding first one).
+	// Identified by MediaId, not path: relocation (Move) deletes the source from its staged path before this
+	// is applied, so the path can no longer be resolved to the file - the stable id is what addLabel needs.
 	struct ExtraLabelAssignment
 	{
-		QString collectionName;
 		MediaId mediaId;
 		QStringList labelIds;
 	};
@@ -64,6 +64,18 @@ public:
 		// from the map, or whose staged frames are gone, is extracted fresh.
 		std::function<void(const QString& collectionName, const QStringList& videoPaths,
 			const QHash<MediaId, QString>& stagedPreviewDirs)> addMediaItemsRequested;
+		// Imports the given photos under the label (owned modes copy/move each file into the label's photo
+		// dir, Reference tracks them in place - see Import::importPhoto). Returns one result per path, in
+		// order; the host reports Error results itself, so the dialog only branches on the status (an
+		// IdCollision in Reference mode gets the "import an owned copy instead?" escape hatch). A result's
+		// registeredId is the identity actually registered - an owned-import auto-rename changes it from the
+		// staged id, so all post-import bookkeeping (Best, extra labels) must use it.
+		std::function<QList<Import::PhotoResult>(const QString& labelId, const QStringList& photoPaths,
+			Import::PhotoImportMode mode)> importPhotosRequested;
+		// The source path of an already-imported photo with byte-identical content (matched by size, any
+		// name - catches renamed duplicates), or empty if none. Checked when staging a photo, so a duplicate
+		// is flagged before it can be labeled and imported.
+		std::function<QString(const QString& photoPath)> findAlreadyImportedDuplicatePhoto;
 		// Creates a new collection with the given name; returns true on success
 		std::function<bool(const QString& name)> createCollectionRequested;
 		// True iff the item is now tracked by the Catalog at the frame folder this import derives for it
@@ -75,12 +87,12 @@ public:
 		// dropping its pending labels. By MediaId, not path: Move relocation has already deleted the source
 		// from its staged path by now.
 		std::function<bool(const MediaId&, const QString& collectionName)> isMediaItemTrackedInCollection;
-		// Called once per successful Import, with the items flagged "Best" keyed by the collection they were
-		// added to (may be empty). The flagged items have already been added - and are therefore tracked -
-		// via addMediaItemsRequested. By MediaId for the same reason as ExtraLabelAssignment above.
-		std::function<void(const QHash<QString, QList<MediaId>>& bestMediaItemsByCollection)> markBestRequested;
+		// Called once per successful Import, with the items flagged "Best" (may be empty). The flagged items
+		// have already been added - and are therefore tracked - via their type's apply path above. By MediaId
+		// for the same reason as ExtraLabelAssignment above.
+		std::function<void(const QList<MediaId>& bestItems)> markBestRequested;
 		// Called once per successful Import, with every imported item's extra-label picks (may be empty).
-		// Mirrors markBestRequested above: the items have already been added via addMediaItemsRequested by then.
+		// Mirrors markBestRequested above: the items have already been added via their type's apply path.
 		std::function<void(const QList<ExtraLabelAssignment>& assignments)> assignExtraLabelsRequested;
 		// Called once at the end of an Import that imported at least one item, after the Best/extra-label flush
 		// above. addMediaItemsRequested may refresh the host view mid-Import (it imports folder-by-folder), but the
@@ -134,7 +146,7 @@ private:
 	struct StagedEntry
 	{
 		QString path;
-		QString tempPreviewDir;      // this video's temp N-frame preview; deleted on unstage/dialog close
+		QString tempPreviewDir;      // a video's temp N-frame preview, deleted on unstage/dialog close; empty for a photo (its card decodes the file directly)
 		bool pendingBest = false;
 		QStringList pendingLabelIds;
 		QListWidgetItem* item = nullptr;  // the grid item carrying this entry's MediaItemWidget card

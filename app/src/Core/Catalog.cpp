@@ -463,6 +463,44 @@ bool Catalog::addMediaItem(const MediaId& id, const QString& sourcePath, const Q
 	return true;
 }
 
+bool Catalog::addPhoto(const MediaId& id, const QString& sourcePath, const QString& labelDirAbs, bool referenced)
+{
+	if (!id.isValid())
+	{
+		qWarning() << "Catalog: cannot add photo with an invalid id, source" << sourcePath;
+		return false;
+	}
+
+	// Same collision rule as addMediaItem: an id already tracked under a different folder is a genuine
+	// name+size duplicate - refuse rather than orphan the existing entry's storage. (The import path resolves
+	// owned-import collisions by auto-renaming the incoming file before ever calling this.)
+	const auto existing = _mediaItems.constFind(id);
+	if (existing != _mediaItems.constEnd() && existing->folder != labelDirAbs)
+	{
+		qWarning() << "Catalog: refusing to add photo, id" << id.key() << "is already tracked at" << existing->folder
+		           << "- collides with" << sourcePath;
+		return false;
+	}
+
+	MetadataStore& store = MetadataStore::instance();
+	store.set(id, kSourcePathField, sourcePath);
+	store.set(id, kFolderField, relativeFolder(labelDirAbs));
+	store.set(id, kTypeField, kPhotoTypeValue.toString());
+	store.set(id, kReferencedField, referenced);  // always written, so a re-import under the other mode can't leave a stale flag
+
+	if (!labelDirAbs.isEmpty() && ensureFolderLabelExists(QFileInfo(labelDirAbs).fileName()))
+		saveRegistry();
+
+	Entry e;
+	e.folder     = labelDirAbs;
+	e.sourcePath = sourcePath;
+	e.type       = MediaType::Photo;
+	e.referenced = referenced;
+	e.labelIds   = computeLabelIds(id, e);
+	_mediaItems.insert(id, e);
+	return true;
+}
+
 void Catalog::removeMediaItem(const MediaId& id)
 {
 	MetadataStore::instance().remove(id);

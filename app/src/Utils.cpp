@@ -58,6 +58,14 @@ bool isSupportedVideoFile(const QString& filePath)
 	return supportedExtensions.contains(extension);
 }
 
+bool isSupportedImageFile(const QString& filePath)
+{
+	// Importable photo formats - bounded by what Qt's image plugins decode (cards render via QImage).
+	static const QStringList supportedExtensions { "jpg", "jpeg", "png", "tif", "tiff", "webp", "bmp" };
+	const QString extension = QFileInfo(filePath).suffix().toLower();
+	return supportedExtensions.contains(extension);
+}
+
 bool filesAreIdentical(const QString& pathA, const QString& pathB)
 {
 	if (QFileInfo(pathA).size() != QFileInfo(pathB).size())

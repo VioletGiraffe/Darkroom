@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/MediaId.h"
+#include "Import.h"  // Import::PhotoImportMode / PhotoResult (processPhotoBatch's interface)
 
 #include <QHash>
 #include <QList>
@@ -14,6 +15,7 @@ class QLineEdit;
 class QListWidget;
 class QTimer;
 class QWidget;
+class SegmentedToggle;
 class SortControl;
 
 class MainWindow final : public QMainWindow
@@ -68,6 +70,11 @@ private:
 	void backfillMissingPreviews();
 	void reExportAllVideos();
 	void processBatch(QStringList videoPaths, const QString& collectionPath, const QHash<MediaId, QString>& stagedPreviewDirs);
+	// The photo counterpart to processBatch: imports each photo under the label via Import::importPhoto,
+	// reports errors, applies a referenced photo's initial label (it has no storage folder to derive it
+	// from), and refreshes the view. Returns one result per path, in order - Quick Import's bookkeeping
+	// branches on them (see QuickImportDialog::Callbacks::importPhotosRequested).
+	QList<Import::PhotoResult> processPhotoBatch(const QString& labelId, const QStringList& photoPaths, Import::PhotoImportMode mode);
 	bool createCollection(const QString& name, bool refreshList = true);
 	// Sidebar "+ Add label": prompts for a name and creates a folder-backed label (a collection folder).
 	void createLabelInteractive();
@@ -95,6 +102,7 @@ private:
 private:
 	LabelSidebar*      m_labelSidebar = nullptr;
 	QLineEdit*         m_nameFilter   = nullptr;
+	SegmentedToggle*   m_mediaTypeFilter = nullptr;  // All / Videos / Photos grid filter
 	QComboBox*         m_previewFrameCountCombo = nullptr;
 	SortControl*       m_sortControl  = nullptr;
 	QListWidget*       m_mediaGrid    = nullptr;

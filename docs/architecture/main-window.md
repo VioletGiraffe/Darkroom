@@ -4,10 +4,25 @@
 
 `MainWindow.h/.cpp`: a left **`LabelSidebar`** (label filter) and a toolbar of view controls above a
 `QListWidget` grid of `MediaItemWidget` cards, in a horizontal `QSplitter`. The card set is the sidebar's
-label filter ∩ the name-filter box.
+label filter ∩ the media-type switch ∩ the name-filter box.
 
-The window owns the sidebar, the toolbar controls (name filter, frames-per-card density combo, sort control),
-the card grid, and a persistent `FrameViewerWindow` (reused, not recreated).
+The window owns the sidebar, the toolbar controls (name filter, media-type switch, frames-per-card density
+combo, sort control), the card grid, and a persistent `FrameViewerWindow` (reused, not recreated).
+
+## Media-type switch
+
+`m_mediaTypeFilter` (a `SegmentedToggle`, right of the name filter): **All / Videos / Photos**, ANDed with
+the other filters. A *structural* filter — changing it rebuilds the grid (`refreshMediaGrid` post-filters
+the enumerated ids by `Catalog::mediaType`), unlike the name filter's cheap hide/show. Persisted as its
+segment index under a MainWindow-local settings key; restored silently during setup (`setCurrentIndex`
+doesn't emit).
+
+**Photo cards** in the grid: the card's image strip is the decoded photo file itself
+(`Catalog::sourcePathForMediaItem`), no preview cache — an unloadable path (e.g. a referenced photo on an
+unmounted drive) renders a blank card rather than hiding the item (accepted v1 behavior). A photo's display
+name comes from its id's file name (`itemInfoFor`), since no frame folder names it; its date sort uses the
+same `getSourceFileDate` (file-name timestamp, then birth time). Per-type interaction gates (double-click
+player, middle-click frame viewer, delete semantics) are the next phase of the photos plan.
 
 ## Name filter
 

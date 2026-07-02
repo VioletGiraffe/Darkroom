@@ -94,10 +94,10 @@ stores it as a member), so nothing needs to bridge folder→id at call sites any
 still has a usable (if `!isValid()`) id, so even that case stays clean.
 
 - **Queries**: `labelsForMediaItem`, `mediaItemsForLabel`, `mediaItemHasLabel`; enumeration via `allMediaItems`,
-  `mediaItemCount`, `labelMediaItemCounts` (per-label counts in one pass, for the sidebar); per-item disk facts via
-  `folderForMediaItem` (absolute), `sourcePathForMediaItem`, and `anySourceDir` (a sensible default
-  destination for relocating newly added source files — the directory of the first item whose source file is
-  currently present).
+  `containsMediaItem`, `mediaItemCount`, `labelMediaItemCounts` (per-label counts in one pass, for the
+  sidebar); per-item facts via `folderForMediaItem` (absolute), `sourcePathForMediaItem`, `mediaType`,
+  `isReferenced`, and `anySourceDir` (a sensible default destination for relocating newly added source
+  files — the directory of the first *video* whose source file is currently present).
 - **Mutations**: `addLabel`/`removeLabel`. `addLabel` only writes the stored id list (no-op on an invalid id —
   a missing-source item can't be labeled). `removeLabel` is metadata-only too, **except** when the label
   names the item's storage location: then it relocates that storage (a video's frame folder into the
@@ -110,9 +110,11 @@ still has a usable (if `!isValid()`) id, so even that case stays clean.
 
 ## Import lifecycle
 
-- **`addMediaItem(id, sourcePath, folderAbs, splitIntoFrames)`** registers a freshly imported **video**
-  (photo registration arrives with the photo import path; nothing writes photo records yet). Ensures
-  the collection's folder label exists. **Refuses** (returns `false`, logs a `qWarning`, leaves the existing
+- **`addMediaItem(id, sourcePath, folderAbs, splitIntoFrames)`** registers a freshly imported **video**;
+  **`addPhoto(id, sourcePath, labelDirAbs, referenced)`** is its photo counterpart (same collision rule,
+  writes the `"type"`/`"referenced"` fields; `labelDirAbs` is empty for a referenced photo, which is
+  registered label-less — the import coordinator applies its first label via `addLabel` right after, see
+  [import.md](import.md)). `addMediaItem` ensures the collection's folder label exists. **Refuses** (returns `false`, logs a `qWarning`, leaves the existing
   entry untouched) if `id` already names an item tracked under a *different* folder — a name+size collision
   with an existing item. `splitVideoIntoFrames` (the one caller that calls this after a real, full
   extraction) treats refusal as a failure: it deletes the just-extracted frames rather than leave them on
