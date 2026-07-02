@@ -707,17 +707,17 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 		const QString sourcePath = Catalog::instance().sourcePathForMediaItem(id);
 		if (sourcePath.isEmpty())
 		{
-			QMessageBox::warning(this, tr("Error"), tr("No source video is recorded for this video."));
+			QMessageBox::warning(this, tr("Error"), tr("No source file is recorded for this item."));
 			return;
 		}
 		openInExplorer(sourcePath);
 	});
-	menu.addAction(tr("Copy video path to clipboard"), [id] {
+	menu.addAction(tr("Copy source path to clipboard"), [id] {
 		const QString sourcePath = Catalog::instance().sourcePathForMediaItem(id);
 		if (!sourcePath.isEmpty())
 			QApplication::clipboard()->setText(QDir::toNativeSeparators(sourcePath));
 	});
-	menu.addAction(tr("Rename video"), [this, id] {
+	menu.addAction(tr("Rename media file"), [this, id] {
 		renameMediaItemInteractive(id);
 	});
 	menu.addSeparator();
@@ -765,7 +765,7 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 	}
 	menu.addSeparator();
 
-	menu.addAction(selection.size() > 1 ? tr("Delete all (%1 videos)").arg(selection.size()) : tr("Delete all"), [this, selection] {
+	menu.addAction(selection.size() > 1 ? tr("Delete all (%1 items)").arg(selection.size()) : tr("Delete all"), [this, selection] {
 		Catalog& catalog = Catalog::instance();
 
 		// The confirmation lists what goes. A single video: its exact frame-folder + source paths. A
@@ -781,7 +781,7 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 		}
 		else
 		{
-			message = tr("This will permanently delete %1 videos - each one's frame folder and source video file:\n").arg(selection.size());
+			message = tr("This will permanently delete %1 items - each one's frame folder and source file:\n").arg(selection.size());
 			constexpr qsizetype maxListed = 15;
 			for (qsizetype i = 0; i < qMin(maxListed, selection.size()); ++i)
 				message += "\n• " + QFileInfo(catalog.folderForMediaItem(selection[i])).fileName();
@@ -962,7 +962,7 @@ void MainWindow::splitVideoIntoFrames(const QString& videoFilePath, const QStrin
 	if (!Catalog::instance().addMediaItem(MediaId::fromFile(videoFilePath), videoFilePath, outputFolder, /*splitIntoFrames=*/true))
 	{
 		QMessageBox::critical(this, tr("Error"),
-			tr("A video with the same name and file size is already tracked in a different collection:\n%1").arg(videoFilePath));
+			tr("An item with the same name and file size is already tracked in a different collection:\n%1").arg(videoFilePath));
 		cleanupAfterFailure();
 	}
 }
@@ -1015,7 +1015,7 @@ void MainWindow::processVideoFile(const QString& videoPath, const QString& colle
 	if (!Catalog::instance().addMediaItem(MediaId::fromFile(videoPath), videoPath, outputFolder, /*splitIntoFrames=*/false))
 	{
 		QMessageBox::critical(this, tr("Error"),
-			tr("A video with the same name and file size is already tracked in a different collection:\n%1").arg(videoPath));
+			tr("An item with the same name and file size is already tracked in a different collection:\n%1").arg(videoPath));
 		deleteFolderRecursively(outputFolder);
 	}
 }
@@ -1227,23 +1227,23 @@ void MainWindow::deleteLabelInteractive(const QString& labelId)
 	if (impact.wouldOrphan)
 	{
 		QMessageBox::warning(this, tr("Delete label"),
-			tr("Cannot delete \"%1\": some videos are stored only under this label, with no other label to "
-			   "fall back on. Give those videos another label first, then delete this one.").arg(name));
+			tr("Cannot delete \"%1\": some items are stored only under this label, with no other label to "
+			   "fall back on. Give those items another label first, then delete this one.").arg(name));
 		return;
 	}
 
 	QString message = tr("Delete the label \"%1\"?").arg(name);
 	if (impact.relocateCount > 0)
-		message += tr("\n\n%1 video(s) stored under it will be moved to another of their labels.").arg(impact.relocateCount);
+		message += tr("\n\n%1 item(s) stored under it will be moved to another of their labels.").arg(impact.relocateCount);
 	if (impact.untagCount > 0)
-		message += tr("\n%1 video(s) tagged with it will lose the tag.").arg(impact.untagCount);
+		message += tr("\n%1 item(s) tagged with it will lose the tag.").arg(impact.untagCount);
 	message += tr("\n\nThis cannot be undone. Continue?");
 
 	if (QMessageBox::warning(this, tr("Delete label"), message, QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
 		return;
 
 	if (!catalog.deleteLabel(labelId))
-		QMessageBox::warning(this, tr("Delete label"), tr("Could not fully delete \"%1\" - some videos may not have been moved.").arg(name));
+		QMessageBox::warning(this, tr("Delete label"), tr("Could not fully delete \"%1\" - some items may not have been moved.").arg(name));
 	refreshLibraryView();
 }
 
@@ -1398,7 +1398,7 @@ void MainWindow::renameMediaItemInteractive(const MediaId& id)
 	// The frame folder must exist
 	if (originalFolderPath.isEmpty() || !QDir(originalFolderPath).exists())
 	{
-		QMessageBox::critical(this, tr("Rename video"), tr("Frame folder does not exist:\n%1").arg(originalFolderPath));
+		QMessageBox::critical(this, tr("Rename media file"), tr("Frame folder does not exist:\n%1").arg(originalFolderPath));
 		return;
 	}
 
@@ -1409,7 +1409,7 @@ void MainWindow::renameMediaItemInteractive(const MediaId& id)
 	const QString parentPath = QFileInfo(originalFolderPath).absolutePath();
 
 	// Ask for the new name
-	const QString newName = QInputDialog::getText(this, tr("Rename video"), tr("New name:"), QLineEdit::Normal, oldName).trimmed();
+	const QString newName = QInputDialog::getText(this, tr("Rename media file"), tr("New name:"), QLineEdit::Normal, oldName).trimmed();
 
 	if (newName.isEmpty() || newName == oldName)
 		return;
@@ -1420,7 +1420,7 @@ void MainWindow::renameMediaItemInteractive(const MediaId& id)
 	{
 		if (invalidChars.contains(c))
 		{
-			QMessageBox::warning(this, tr("Rename video"), tr("Name contains an invalid character: '%1'").arg(c));
+			QMessageBox::warning(this, tr("Rename media file"), tr("Name contains an invalid character: '%1'").arg(c));
 			return;
 		}
 	}
@@ -1429,7 +1429,7 @@ void MainWindow::renameMediaItemInteractive(const MediaId& id)
 	const QString newFolderPath = parentPath + "/" + newName;
 	if (QDir(newFolderPath).exists())
 	{
-		QMessageBox::warning(this, tr("Rename video"), tr("A folder with that name already exists:\n%1").arg(newFolderPath));
+		QMessageBox::warning(this, tr("Rename media file"), tr("A folder with that name already exists:\n%1").arg(newFolderPath));
 		return;
 	}
 
@@ -1443,7 +1443,7 @@ void MainWindow::renameMediaItemInteractive(const MediaId& id)
 		// Make sure we would not overwrite a different existing video
 		if (sourceExists && QFile::exists(newSourcePath))
 		{
-			QMessageBox::warning(this, tr("Rename video"), tr("A video file with that name already exists:\n%1").arg(newSourcePath));
+			QMessageBox::warning(this, tr("Rename media file"), tr("A file with that name already exists:\n%1").arg(newSourcePath));
 			return;
 		}
 	}
@@ -1452,11 +1452,11 @@ void MainWindow::renameMediaItemInteractive(const MediaId& id)
 	QString message = tr("Rename \u201c%1\u201d to \u201c%2\u201d?\n\n").arg(oldName, newName);
 	if (sourceExists)
 	{
-		message += tr("\u2022 Video file:\n  %1\n  \u2192 %2\n\n").arg(oldSourcePath, newSourcePath);
+		message += tr("\u2022 Source file:\n  %1\n  \u2192 %2\n\n").arg(oldSourcePath, newSourcePath);
 	}
 	else if (!oldSourcePath.isEmpty())
 	{
-		message += tr("\u2022 Source video not found at stored path \u2014 it will not be renamed.\n"
+		message += tr("\u2022 Source file not found at stored path \u2014 it will not be renamed.\n"
 			"  The stored path will be updated to reflect the new name.\n\n");
 	}
 	message += tr("\u2022 Frame folder:\n  %1\n  \u2192 %2").arg(originalFolderPath, newFolderPath);
@@ -1464,7 +1464,7 @@ void MainWindow::renameMediaItemInteractive(const MediaId& id)
 	if (isInBest(id))
 		message += tr("\n\n\u2022 Best collection reference will be updated.");
 
-	if (QMessageBox::question(this, tr("Rename video"), message,
+	if (QMessageBox::question(this, tr("Rename media file"), message,
 		QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes) != QMessageBox::Yes)
 		return;
 
@@ -1473,7 +1473,7 @@ void MainWindow::renameMediaItemInteractive(const MediaId& id)
 
 void MainWindow::renameMediaItem(const MediaId& oldId, const QString& newFolderPath)
 {
-	const QString dialogTitle = tr("Rename video");
+	const QString dialogTitle = tr("Rename media file");
 	Catalog& catalog = Catalog::instance();
 	const QString oldFolderPath = catalog.folderForMediaItem(oldId);
 	const QString oldSourcePath = catalog.sourcePathForMediaItem(oldId);
@@ -1491,7 +1491,7 @@ void MainWindow::renameMediaItem(const MediaId& oldId, const QString& newFolderP
 		{
 			if (!QFile::rename(oldSourcePath, newSourcePath))
 			{
-				QMessageBox::critical(this, dialogTitle, tr("Failed to rename the video file:\n%1\n\u2192 %2").arg(oldSourcePath, newSourcePath));
+				QMessageBox::critical(this, dialogTitle, tr("Failed to rename the source file:\n%1\n\u2192 %2").arg(oldSourcePath, newSourcePath));
 				return;
 			}
 			sourceWasRenamed = true;
@@ -1518,7 +1518,7 @@ void MainWindow::renameMediaItem(const MediaId& oldId, const QString& newFolderP
 		if (sourceWasRenamed)
 			QFile::rename(newSourcePath, oldSourcePath);
 		QMessageBox::critical(this, dialogTitle,
-			tr("A video with the same name and file size is already tracked in a different collection:\n%1").arg(newSourcePath));
+			tr("An item with the same name and file size is already tracked in a different collection:\n%1").arg(newSourcePath));
 		return;
 	}
 

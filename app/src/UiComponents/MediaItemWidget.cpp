@@ -161,10 +161,10 @@ MediaItemWidget::MediaItemWidget(
 	, m_onDoubleClick{ std::move(onDoubleClick) }
 	, m_onContextMenu{ std::move(onContextMenu) }
 {
-	setObjectName("videoCard");
+	setObjectName("mediaItemCard");
 	setAcceptDrops(true);  // accept a label dragged from the sidebar (see dropEvent / setOnLabelDropped)
 
-	// The card owns the frame: a bordered, rounded container that highlights on hover - styled by #videoCard in
+	// The card owns the frame: a bordered, rounded container that highlights on hover - styled by #mediaItemCard in
 	// the central sheet (Style.cpp), not per-instance (which polished slowly at grid scale). The thumbnail inside
 	// is borderless (just the matte well); the footer below carries the star, label dots and name. The normal
 	// background stays transparent so the grid's item-selection highlight shows through behind it.
@@ -194,7 +194,7 @@ MediaItemWidget::MediaItemWidget(
 			QPointer<MediaItemWidget> self(this);
 			m_onContextMenu(m_thumb->mapToGlobal(pos));
 			if (self)
-				clearStuckHoverIfCursorLeft(self);  // else the popup grab leaves #videoCard:hover stuck on
+				clearStuckHoverIfCursorLeft(self);  // else the popup grab leaves #mediaItemCard:hover stuck on
 		});
 	}
 

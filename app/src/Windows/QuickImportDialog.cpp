@@ -271,7 +271,7 @@ struct BatchRelocation
 
 	if (destFolder.isEmpty())
 	{
-		QMessageBox::warning(dialogParent, QObject::tr("Error"), QObject::tr("No destination folder is set for relocating source videos - they will be left in their original location."));
+		QMessageBox::warning(dialogParent, QObject::tr("Error"), QObject::tr("No destination folder is set for relocating source files - they will be left in their original location."));
 		return { paths, {} };
 	}
 	if (!QDir{}.mkpath(destFolder))
@@ -341,7 +341,7 @@ QuickImportDialog::QuickImportDialog(Callbacks callbacks, const QString& suggest
 	});
 
 	QHBoxLayout* relocateRow = new QHBoxLayout;
-	relocateRow->addWidget(new QLabel(tr("Source video file:"), this));
+	relocateRow->addWidget(new QLabel(tr("Source file:"), this));
 	relocateRow->addWidget(m_relocateModeCombo);
 	relocateRow->addWidget(m_relocateFolderEdit, 1);
 	relocateRow->addWidget(relocateBrowseButton);
@@ -558,8 +558,8 @@ void QuickImportDialog::stageMediaItems(const QStringList& paths)
 
 	if (!collisionLines.isEmpty())
 		QMessageBox::warning(this, tr("Name collision"),
-			tr("Not staged - same name and size as an already staged video, but different content. "
-			   "Only one video per name+size can be tracked; rename the file if both are wanted.\n\n%1")
+			tr("Not staged - same name and size as an already staged file, but different content. "
+			   "Only one item per name+size can be tracked; rename the file if both are wanted.\n\n%1")
 			.arg(collisionLines.join("\n\n")));
 
 	if (newPaths.isEmpty())
@@ -755,7 +755,7 @@ void QuickImportDialog::runImport()
 
 	if (idsByLabelId.isEmpty())
 	{
-		QMessageBox::information(this, tr("Import"), tr("No staged video has been labeled yet."));
+		QMessageBox::information(this, tr("Import"), tr("No staged item has been labeled yet."));
 		return;
 	}
 

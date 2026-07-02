@@ -108,8 +108,8 @@ QString styleSheetString()
 	// the grid refresh). Centralized, they share one parsed ruleset matched by object name - and they now follow
 	// a light/dark switch, which the per-instance sheets (colors baked in at construction) did not.
 	sheet += QStringLiteral(R"(
-		QWidget#videoCard { background: transparent; border: 1px solid %1; border-radius: %5px; }
-		QWidget#videoCard:hover { background-color: %3; border-color: %2; }
+		QWidget#mediaItemCard { background: transparent; border: 1px solid %1; border-radius: %5px; }
+		QWidget#mediaItemCard:hover { background-color: %3; border-color: %2; }
 
 		QWidget#cardThumbnailWell { background-color: %4; border: none; border-radius: %6px; font-size: 9pt; }
 

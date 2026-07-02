@@ -326,7 +326,7 @@ void Catalog::addLabel(const MediaId& id, const QString& labelId)
 {
 	if (!id.isValid())
 	{
-		qWarning() << "Catalog: cannot add label" << labelId << "- invalid video id (source video missing?)";
+		qWarning() << "Catalog: cannot add label" << labelId << "- invalid media id (source file missing?)";
 		return;
 	}
 	QStringList ids = readStoredLabelIds(id);
@@ -342,7 +342,7 @@ void Catalog::removeLabel(const MediaId& id, const QString& labelId)
 {
 	if (!id.isValid())
 	{
-		qWarning() << "Catalog: cannot remove label" << labelId << "- invalid video id (source video missing?)";
+		qWarning() << "Catalog: cannot remove label" << labelId << "- invalid media id (source file missing?)";
 		return;
 	}
 
@@ -383,7 +383,7 @@ bool Catalog::addMediaItem(const MediaId& id, const QString& sourcePath, const Q
 {
 	if (!id.isValid())
 	{
-		qWarning() << "Catalog: cannot add video with an invalid id, source" << sourcePath;
+		qWarning() << "Catalog: cannot add media item with an invalid id, source" << sourcePath;
 		return false;
 	}
 
@@ -394,7 +394,7 @@ bool Catalog::addMediaItem(const MediaId& id, const QString& sourcePath, const Q
 	const auto existing = _mediaItems.constFind(id);
 	if (existing != _mediaItems.constEnd() && existing->folder != folderAbs)
 	{
-		qWarning() << "Catalog: refusing to add video, id" << id.key() << "is already tracked at" << existing->folder
+		qWarning() << "Catalog: refusing to add media item, id" << id.key() << "is already tracked at" << existing->folder
 		           << "- collides with" << sourcePath;
 		return false;
 	}
@@ -587,7 +587,7 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, const QString& removedLa
 
 	if (!dest)
 	{
-		qWarning() << "Catalog: refusing to remove the last ordinary label from" << folderAbs << "- a video must stay in some folder";
+		qWarning() << "Catalog: refusing to remove the last ordinary label from" << folderAbs << "- an item must stay in some folder";
 		return;
 	}
 

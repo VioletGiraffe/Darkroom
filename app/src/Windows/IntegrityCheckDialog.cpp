@@ -102,7 +102,7 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog::IntegrityReport& repor
 
 	if (!report.relinkable.isEmpty())
 	{
-		contentLayout->addWidget(new QLabel(tr("<b>Relink</b> - the source video reappeared"), content));
+		contentLayout->addWidget(new QLabel(tr("<b>Relink</b> - the source file reappeared"), content));
 		for (const Catalog::RelinkCandidate& candidate : report.relinkable)
 		{
 			const auto [row, statusLabel] = addRow(
@@ -121,7 +121,7 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog::IntegrityReport& repor
 			const QList<QPushButton*> rowButtons{ relinkButton, browseButton, skipButton };
 
 			wireAction(relinkButton, statusLabel, rowButtons, tr("Relinked."),
-				tr("Could not relink - that source video is already tracked under a different folder."),
+				tr("Could not relink - that source file is already tracked under a different folder."),
 				[this, placeholderId, recordedPath] { return m_callbacks.relinkRequested(placeholderId, recordedPath); });
 
 			connect(browseButton, &QPushButton::clicked, this, [this, placeholderId, recordedPath, relinkButton, browseButton, skipButton, statusLabel] {
@@ -159,7 +159,7 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog::IntegrityReport& repor
 			{
 				const QString clashDetail = u.filesIdentical
 					? tr("files are identical - likely already imported")
-					: tr("files differ - a name+size collision, not the same video");
+					: tr("files differ - a name+size collision, not the same file");
 				status += tr("<br>%1 is already tracked elsewhere (%2).").arg(u.candidateSourcePath, clashDetail);
 			}
 			else
@@ -188,7 +188,7 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog::IntegrityReport& repor
 			if (registerButton)
 			{
 				wireAction(registerButton, statusLabel, rowButtons, tr("Registered."),
-					tr("Could not register - that source video is already tracked under a different folder."),
+					tr("Could not register - that source file is already tracked under a different folder."),
 					[this, folderPath, candidatePath] { return m_callbacks.registerRequested(folderPath, candidatePath); });
 			}
 
