@@ -27,6 +27,8 @@ QString styleSheetString()
 			padding: 4px 12px;
 			background: palette(button);
 		}
+		/* QSS owns the button frame, so the native style's default-button ring is not drawn - mark it ourselves. */
+		QPushButton:default { border-color: %2; }
 		QPushButton:hover { border-color: %2; }
 		QPushButton:pressed, QPushButton:checked { background: %3; border-color: %2; }
 		QPushButton:disabled { color: palette(mid); }
