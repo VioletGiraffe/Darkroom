@@ -8,6 +8,8 @@
 #include <vector>
 
 class QLabel;
+class QSlider;
+class QStackedLayout;
 class PhotoComparePane;
 
 // N-way (2..4) photo comparison in a square grid of panes. All panes share ONE zoom+pan view, while each
@@ -24,7 +26,9 @@ class PhotoComparePane;
 //       first point becomes the reference; the distance ratio gives each other photo's relative scale, the
 //       midpoints its offset (right-click undoes a point, Esc cancels);
 //   hold 1..N = flicker: every pane temporarily renders photo N under the shared view, release to revert;
-//   Esc = close.
+//   bottom slider = full view: one pane covering the whole grid area, showing the photo at the slider's
+//       position (drag to scrub between photos; Left/Right step it; held digit keys still override);
+//   Esc = leave full view / cancel calibration / close.
 class PhotoCompareWindow final : public QWidget
 {
 public:
@@ -65,7 +69,7 @@ private:
 	// Shared-view mutations (all panes follow).
 	void zoomView(double factor, const QPointF& widgetAnchor);  // zoom keeping widgetAnchor fixed
 	void panView(const QPointF& widgetDelta);
-	void fitView();  // fit the reference photo's subject-space rect into a pane
+	void fitView();  // fit the reference photo's subject-space rect into the current viewport (grid cell or full-view pane)
 
 	// Per-photo alignment mutations (Ctrl+wheel / Ctrl+drag).
 	void adjustPaneScale(int index, double factor, const QPointF& widgetAnchor);
@@ -78,18 +82,26 @@ private:
 	void undoCalibrationPoint(int index);
 	void applyCalibration();  // called once every pane has 2 points
 
+	// Full (single-pane) view, driven by the bottom slider.
+	void setFullViewIndex(int index);  // switches the full view to this photo, entering the mode if the grid is showing
+	void exitFullView();
+
 	void onPaneResized();
 	void updateAllPanes();
 	void updateHintText();
 
 private:
 	std::vector<Pane> m_panes;
-	std::vector<PhotoComparePane*> m_paneWidgets;
+	std::vector<PhotoComparePane*> m_paneWidgets;  // the grid cells; the full-view pane is separate (m_fullPane)
+	PhotoComparePane* m_fullPane = nullptr;    // full-view page: one pane covering the whole grid area (index -1)
+	QStackedLayout* m_viewStack = nullptr;     // page 0: the pane grid, page 1: m_fullPane
+	QSlider* m_slider = nullptr;               // full-view photo picker; interacting with it enters the full view
 	QLabel* m_hintLabel = nullptr;
 
 	double m_viewZoom = 1.0;  // subject -> widget; 1.0 means the reference photo at 100% (1 image px = 1 widget px)
 	QPointF m_viewPan;
 	int m_flickerIndex = -1;   // >= 0: every pane renders this photo (a digit key is held)
+	int m_fullViewIndex = -1;  // >= 0: the full-view page is active, showing this photo (flicker keys still override)
 	int m_refIndex = 0;        // the pane others calibrate against; re-chosen by each calibration session's first point
 	bool m_calibrating = false;
 	bool m_viewTouched = false;  // until the user navigates, pane resizes keep re-fitting the view

@@ -11,6 +11,8 @@
 #include <QLineF>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QSlider>
+#include <QStackedLayout>
 #include <QVBoxLayout>
 #include <QWheelEvent>
 
@@ -19,6 +21,8 @@
 
 // One grid cell: a viewport onto the shared view. All state (images, alignment, the view itself) lives in
 // the owning PhotoCompareWindow; the pane renders and translates mouse input into owner calls.
+// The same class also serves as the full-view pane (index -1), which shows whatever photo the owner's
+// m_fullViewIndex selects - photoIndex() resolves that indirection.
 class PhotoComparePane final : public QWidget
 {
 public:
@@ -38,8 +42,11 @@ protected:
 	void resizeEvent(QResizeEvent* event) override { QWidget::resizeEvent(event); m_owner.onPaneResized(); }
 
 private:
+	// The photo this pane represents: its own grid position, or the slider-picked one for the full-view pane.
+	[[nodiscard]] int photoIndex() const { return m_index >= 0 ? m_index : m_owner.m_fullViewIndex; }
+
 	PhotoCompareWindow& m_owner;
-	const int m_index;
+	const int m_index;  // grid/photo index, or -1 for the full-view pane
 
 	// Click-vs-drag: a press starts drag tracking; a release that never crossed the threshold is a click
 	// (which is how calibration points are placed - so panning stays available while calibrating).
@@ -55,7 +62,7 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 	QPainter painter(this);
 	painter.fillRect(rect(), QColor(Theme::current().ThumbnailMatte));
 
-	const int renderIndex = m_owner.m_flickerIndex >= 0 ? m_owner.m_flickerIndex : m_index;
+	const int renderIndex = m_owner.m_flickerIndex >= 0 ? m_owner.m_flickerIndex : photoIndex();
 	PhotoCompareWindow::Pane& pane = m_owner.m_panes[renderIndex];
 
 	const double effectiveScale = m_owner.m_viewZoom * pane.alignScale;
@@ -75,9 +82,9 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 	if (m_owner.m_calibrating)
 	{
 		painter.setPen(QPen(QColor(Theme::current().AccentBorder), 2));
-		for (const QPointF& imagePos : m_owner.m_panes[m_index].calibPoints)
+		for (const QPointF& imagePos : m_owner.m_panes[photoIndex()].calibPoints)
 		{
-			const QPointF c = m_owner.widgetFromImage(m_owner.m_panes[m_index], imagePos);
+			const QPointF c = m_owner.widgetFromImage(m_owner.m_panes[photoIndex()], imagePos);
 			painter.drawLine(c - QPointF(8, 0), c + QPointF(8, 0));
 			painter.drawLine(c - QPointF(0, 8), c + QPointF(0, 8));
 		}
@@ -97,7 +104,7 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 	painter.drawText(textRect, Qt::AlignCenter, caption);
 
 	// A flickered pane shows a photo other than its own - flag it with an accent frame.
-	if (renderIndex != m_index)
+	if (renderIndex != photoIndex())
 	{
 		painter.setPen(QPen(QColor(Theme::current().AccentBorder), 3));
 		painter.setBrush(Qt::NoBrush);
@@ -112,7 +119,7 @@ void PhotoComparePane::wheelEvent(QWheelEvent* event)
 		return;
 	const double factor = std::pow(1.25, steps);
 	if (event->modifiers().testFlag(Qt::ControlModifier))
-		m_owner.adjustPaneScale(m_index, factor, event->position());
+		m_owner.adjustPaneScale(photoIndex(), factor, event->position());
 	else
 		m_owner.zoomView(factor, event->position());
 	event->accept();
@@ -128,7 +135,7 @@ void PhotoComparePane::mousePressEvent(QMouseEvent* event)
 		m_pressPos = m_lastDragPos = event->position();
 	}
 	else if (event->button() == Qt::RightButton && m_owner.m_calibrating)
-		m_owner.undoCalibrationPoint(m_index);
+		m_owner.undoCalibrationPoint(photoIndex());
 }
 
 void PhotoComparePane::mouseMoveEvent(QMouseEvent* event)
@@ -144,7 +151,7 @@ void PhotoComparePane::mouseMoveEvent(QMouseEvent* event)
 	if (m_dragConfirmed)
 	{
 		if (m_ctrlDrag)
-			m_owner.movePaneOffset(m_index, pos - m_lastDragPos);
+			m_owner.movePaneOffset(photoIndex(), pos - m_lastDragPos);
 		else
 			m_owner.panView(pos - m_lastDragPos);
 	}
@@ -158,7 +165,7 @@ void PhotoComparePane::mouseReleaseEvent(QMouseEvent* event)
 	m_leftButtonDown = false;
 	setCursor(m_owner.idleCursor());
 	if (!m_dragConfirmed && m_owner.m_calibrating)
-		m_owner.addCalibrationPoint(m_index, m_owner.imageFromWidget(m_owner.m_panes[m_index], m_pressPos));
+		m_owner.addCalibrationPoint(photoIndex(), m_owner.imageFromWidget(m_owner.m_panes[photoIndex()], m_pressPos));
 }
 
 void PhotoComparePane::mouseDoubleClickEvent(QMouseEvent* event)
@@ -219,7 +226,9 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 		const int paneCount = static_cast<int>(m_panes.size());
 		const int columns = static_cast<int>(std::ceil(std::sqrt(paneCount)));
 		const int rows = (paneCount + columns - 1) / columns;
-		QGridLayout* grid = new QGridLayout();
+		QWidget* gridPage = new QWidget(this);
+		QGridLayout* grid = new QGridLayout(gridPage);
+		grid->setContentsMargins(0, 0, 0, 0);
 		grid->setSpacing(4);
 		for (int i = 0; i < paneCount; ++i)
 		{
@@ -234,7 +243,24 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 			grid->setColumnStretch(c, 1);
 		for (int r = 0; r < rows; ++r)
 			grid->setRowStretch(r, 1);
-		mainLayout->addLayout(grid, 1);
+
+		m_fullPane = new PhotoComparePane(*this, -1);
+		m_viewStack = new QStackedLayout();
+		m_viewStack->addWidget(gridPage);
+		m_viewStack->addWidget(m_fullPane);
+		mainLayout->addLayout(m_viewStack, 1);
+
+		// Full-view picker: one detent per photo; pressing the handle or changing the value enters the full
+		// view, dragging back and forth scrubs between the aligned photos (a flicker gesture at full size).
+		m_slider = new QSlider(Qt::Horizontal, this);
+		m_slider->setRange(0, paneCount - 1);
+		m_slider->setPageStep(1);
+		m_slider->setTickPosition(QSlider::TicksBelow);
+		m_slider->setTickInterval(1);
+		m_slider->setFocusPolicy(Qt::NoFocus);  // all keyboard input stays on the window
+		connect(m_slider, &QSlider::sliderPressed, this, [this] { setFullViewIndex(m_slider->value()); });
+		connect(m_slider, &QSlider::valueChanged, this, [this](int value) { setFullViewIndex(value); });
+		mainLayout->addWidget(m_slider, 0);
 	}
 
 	m_hintLabel = new QLabel(this);
@@ -259,15 +285,22 @@ void PhotoCompareWindow::keyPressEvent(QKeyEvent* event)
 	const int key = event->key();
 	if (key == Qt::Key_Escape)
 	{
-		if (m_calibrating)
+		if (m_fullViewIndex >= 0)
+			exitFullView();
+		else if (m_calibrating)
 			setCalibrating(false);
 		else
 			close();
 	}
 	else if (key == Qt::Key_A && !event->isAutoRepeat() && !m_panes.empty())
+	{
+		exitFullView();  // calibration points are placed per grid pane
 		setCalibrating(!m_calibrating);
+	}
 	else if (key == Qt::Key_F)
 		fitView();
+	else if (m_fullViewIndex >= 0 && (key == Qt::Key_Left || key == Qt::Key_Right))
+		m_slider->setValue(m_slider->value() + (key == Qt::Key_Right ? 1 : -1));  // setValue clamps to the range
 	else if (!m_calibrating && !event->isAutoRepeat() &&
 	         key >= Qt::Key_1 && key <= Qt::Key_9 && key < Qt::Key_1 + static_cast<int>(m_panes.size()))
 	{
@@ -350,7 +383,7 @@ void PhotoCompareWindow::fitView()
 {
 	if (m_panes.empty())
 		return;
-	const QSizeF paneSize = m_paneWidgets[0]->size();
+	const QSizeF paneSize = (m_fullViewIndex >= 0 ? m_fullPane : m_paneWidgets[0])->size();
 	if (paneSize.isEmpty())
 		return;
 	const Pane& ref = m_panes[m_refIndex];
@@ -389,6 +422,7 @@ Qt::CursorShape PhotoCompareWindow::idleCursor() const
 void PhotoCompareWindow::setCalibrating(bool calibrating)
 {
 	m_calibrating = calibrating;
+	m_slider->setEnabled(!calibrating);  // the full view has no per-pane clicks, so it is off-limits mid-calibration
 	// Calibration clicks map to the pane's own photo, so a still-held flicker override (panes showing some
 	// other photo) would have the user placing points against the wrong picture - drop it.
 	m_flickerIndex = -1;
@@ -457,6 +491,44 @@ void PhotoCompareWindow::applyCalibration()
 	setCalibrating(false);  // also repaints all panes
 }
 
+void PhotoCompareWindow::setFullViewIndex(int index)
+{
+	const bool entering = m_fullViewIndex < 0;
+	m_fullViewIndex = index;
+	m_slider->setValue(index);  // no-op when the slider itself is the source
+	if (entering)
+	{
+		// The viewport grows from one grid cell to the whole stack area. A touched view keeps the subject
+		// point at the viewport's center fixed (both sizes are current when read here, before the switch);
+		// an untouched one re-fits to the new viewport as it would on any resize.
+		const QSizeF oldSize = m_paneWidgets[0]->size();
+		const QSizeF newSize = m_viewStack->widget(0)->size();
+		m_viewStack->setCurrentIndex(1);
+		if (m_viewTouched)
+			m_viewPan += QPointF(newSize.width() - oldSize.width(), newSize.height() - oldSize.height()) / 2.0;
+		else
+			fitView();  // a stale m_fullPane size here self-corrects: the layout resizes it -> onPaneResized -> re-fit
+	}
+	updateHintText();  // mode line, and the "N/M" position readout on every switch
+	updateAllPanes();
+}
+
+void PhotoCompareWindow::exitFullView()
+{
+	if (m_fullViewIndex < 0)
+		return;
+	m_fullViewIndex = -1;
+	const QSizeF oldSize = m_fullPane->size();
+	const QSizeF newSize = m_paneWidgets[0]->size();  // grid panes keep their pre-full-view geometry while hidden
+	m_viewStack->setCurrentIndex(0);
+	if (m_viewTouched)
+		m_viewPan += QPointF(newSize.width() - oldSize.width(), newSize.height() - oldSize.height()) / 2.0;
+	else
+		fitView();
+	updateHintText();
+	updateAllPanes();
+}
+
 void PhotoCompareWindow::onPaneResized()
 {
 	// Until the user navigates, every layout change (first show, maximize, a later window resize) re-fits
@@ -469,6 +541,8 @@ void PhotoCompareWindow::updateAllPanes()
 {
 	for (PhotoComparePane* paneWidget : m_paneWidgets)
 		paneWidget->update();
+	if (m_fullPane)
+		m_fullPane->update();
 }
 
 void PhotoCompareWindow::updateHintText()
@@ -488,7 +562,10 @@ void PhotoCompareWindow::updateHintText()
 		m_hintLabel->setText(tr("Alignment: click the same two features in every photo · right-click: undo a point · Esc: cancel · %1")
 			.arg(progress.join("   ")));
 	}
+	else if (m_fullViewIndex >= 0)
+		m_hintLabel->setText(tr("Full view %1/%2 · slider / Left,Right: switch photo · hold 1..%2: flicker · wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust this photo · F: fit · Esc: back to grid")
+			.arg(m_fullViewIndex + 1).arg(m_panes.size()));
 	else
-		m_hintLabel->setText(tr("Wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust one photo · A: align by 2 points · hold 1..%1: flicker · F / double-click: fit · Esc: close")
+		m_hintLabel->setText(tr("Wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust one photo · A: align by 2 points · hold 1..%1: flicker · slider: full view · F / double-click: fit · Esc: close")
 			.arg(m_panes.size()));
 }
