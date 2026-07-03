@@ -14,6 +14,7 @@
 #include <QComboBox>
 #include <QDesktopServices>
 #include <QDir>
+#include <QDirIterator>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QFile>
@@ -66,6 +67,31 @@ QIcon colorDotIcon(const QColor& color)
 QString uniqueTempPreviewDir()
 {
 	return QDir::tempPath() + "/darkroom_quickimport/" + QUuid::createUuid().toString(QUuid::Id128);
+}
+
+// Expands a dropped path list to the media files to stage: a supported video/photo file passes through; a
+// directory is scanned recursively and contributes every supported file found under it (flattened); anything
+// else (unsupported file, dead path) is dropped. Folder handling lives here so it's uniform across every
+// staging entry point - the dialog's own drop, addToStaging (the main window's drop), and the untracked scan.
+QStringList flattenToSupportedMediaFiles(const QStringList& paths)
+{
+	QStringList files;
+	for (const QString& path : paths)
+	{
+		if (QFileInfo(path).isDir())
+		{
+			QDirIterator it(path, QDir::Files, QDirIterator::Subdirectories);
+			while (it.hasNext())
+			{
+				const QString file = it.next();
+				if (isSupportedVideoFile(file) || isSupportedImageFile(file))
+					files << file;
+			}
+		}
+		else if (isSupportedVideoFile(path) || isSupportedImageFile(path))
+			files << path;
+	}
+	return files;
 }
 
 // ============================================================================
@@ -441,7 +467,7 @@ void QuickImportDialog::dragEnterEvent(QDragEnterEvent* event)
 		for (const QUrl& url : event->mimeData()->urls())
 		{
 			const QString path = url.toLocalFile();
-			if (isSupportedVideoFile(path) || isSupportedImageFile(path))
+			if (QFileInfo(path).isDir() || isSupportedVideoFile(path) || isSupportedImageFile(path))
 			{
 				event->acceptProposedAction();
 				return;
@@ -452,15 +478,16 @@ void QuickImportDialog::dragEnterEvent(QDragEnterEvent* event)
 
 void QuickImportDialog::dropEvent(QDropEvent* event)
 {
-	QStringList files;
+	// Files and folders both accepted; stageMediaItems expands any folder into the supported files under it.
+	QStringList paths;
 	for (const QUrl& url : event->mimeData()->urls())
 	{
 		QString path = url.toLocalFile();
-		if (isSupportedVideoFile(path) || isSupportedImageFile(path))
-			files.push_back(std::move(path));
+		if (QFileInfo(path).isDir() || isSupportedVideoFile(path) || isSupportedImageFile(path))
+			paths.push_back(std::move(path));
 	}
-	if (!files.isEmpty())
-		stageMediaItems(files);
+	if (!paths.isEmpty())
+		stageMediaItems(paths);
 }
 
 bool QuickImportDialog::eventFilter(QObject* watched, QEvent* event)
@@ -538,6 +565,12 @@ void QuickImportDialog::addToStaging(const QStringList& paths)
 
 void QuickImportDialog::stageMediaItems(const QStringList& paths)
 {
+	// A dropped folder contributes every supported file under it (recursive, flattened); plain files pass
+	// through. Doing it here means folder-drop works from every entry point that reaches staging.
+	const QStringList mediaFiles = flattenToSupportedMediaFiles(paths);
+	if (mediaFiles.isEmpty())
+		return;
+
 	// Dedup by MediaId, both against already-staged entries and within this batch (m_staged is keyed by id,
 	// so accepting a second same-id file would silently overwrite the first entry, orphaning its card and
 	// leaking its temp dir). The id match (name+size) is the cheap gate; a byte comparison then classifies
@@ -550,7 +583,7 @@ void QuickImportDialog::stageMediaItems(const QStringList& paths)
 
 	QStringList newPaths;
 	QStringList collisionLines;
-	for (const QString& path : paths)
+	for (const QString& path : mediaFiles)
 	{
 		const MediaId id = MediaId::fromFile(path);
 		const QString existingPath = stagedPathById.value(id);

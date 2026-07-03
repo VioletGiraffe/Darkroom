@@ -29,8 +29,8 @@ class QWidget;
 // Catalog until "Import" runs: every staged item that's been labeled gets imported and removed from
 // staging on success, or stays staged (with its labels intact) on failure or a deferred (Cancel) relocation
 // collision; a collision resolved as Skip / "Skip and Delete" also clears the entry - the destination copy
-// stands in for it. Unlabeled items are left alone either way. Files can also be dropped straight onto
-// the dialog to stage them.
+// stands in for it. Unlabeled items are left alone either way. Files or folders can also be dropped straight
+// onto the dialog to stage them (a folder is scanned recursively for the supported files under it).
 // ============================================================================
 
 class QuickImportDialog final : public QDialog
@@ -107,14 +107,15 @@ public:
 	QuickImportDialog(Callbacks callbacks, const QString& suggestedRelocateFolder, QWidget* parent = nullptr);
 	~QuickImportDialog() override;
 
-	// Pre-populates the staging area with the given video files (used when
-	// handing files over from the "Scan for unknown files" tool). Deferred until
-	// the dialog is shown so it paints before the blocking thumbnail extraction.
+	// Pre-populates the staging area with the given files and/or folders (a folder is scanned recursively for
+	// the supported media under it). Used when handing paths over from the main window's drop or the "Scan for
+	// untracked files" tool. Deferred until the dialog is shown so it paints before the blocking thumbnail extraction.
 	void addToStaging(const QStringList& paths);
 
 protected:
-	// Accepts video files dropped anywhere on the dialog (mirrors MainWindow's own top-level drop handling),
-	// staging them directly - same entry point as addToStaging.
+	// Accepts files and folders dropped anywhere on the dialog (mirrors MainWindow's own top-level drop
+	// handling), staging them directly - same entry point as addToStaging (a folder is expanded to its
+	// supported files).
 	void dragEnterEvent(QDragEnterEvent* event) override;
 	void dropEvent(QDropEvent* event) override;
 	// Drives the label list's drag-out gesture (mirrors LabelSidebar::eventFilter), installed on its viewport.

@@ -168,8 +168,11 @@ Four independent layers, at different points and catching different things:
 
 The dialog is one big staging area (a media-item-card grid) plus a small label-list panel beside it — the same
 `[label list | grid]` split as `MainWindow`'s `[LabelSidebar | grid]`, and the same card widget
-(`MediaItemWidget`, reused unmodified). Dropping a file onto the dialog, or `addToStaging()` (used by
-`FindUntrackedFilesDialog`'s "send to staging"), calls `stageMediaItems()`: it extracts a temporary preview per new
+(`MediaItemWidget`, reused unmodified). Dropping a file or folder onto the dialog, or `addToStaging()` (used by
+`MainWindow`'s own drop and `FindUntrackedFilesDialog`'s "send to staging"), calls `stageMediaItems()`, which
+first flattens its input — a dropped **folder** is scanned recursively and contributes every supported
+video/photo file under it (`flattenToSupportedMediaFiles`), so a folder drops in exactly as if its files were
+selected individually. It then extracts a temporary preview per new
 video path (deduplicated by `MediaId` first — see "Duplicate detection" above) into a per-video temp dir via the
 batch `Ffmpeg::generatePreviewFrames`, so several videos are processed
 at once behind a modal progress box. A staged *photo* skips all of that: its card decodes the file directly

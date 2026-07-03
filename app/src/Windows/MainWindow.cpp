@@ -328,7 +328,7 @@ void MainWindow::dragEnterEvent(QDragEnterEvent* event)
 		for (const QUrl& url : event->mimeData()->urls())
 		{
 			const QString path = url.toLocalFile();
-			if (isSupportedVideoFile(path) || isSupportedImageFile(path))
+			if (QFileInfo(path).isDir() || isSupportedVideoFile(path) || isSupportedImageFile(path))
 			{
 				event->acceptProposedAction();
 				return;
@@ -339,19 +339,20 @@ void MainWindow::dragEnterEvent(QDragEnterEvent* event)
 
 void MainWindow::dropEvent(QDropEvent* event)
 {
-	QStringList files;
+	// Files and folders are forwarded as-is; Quick Import expands any folder into the supported files under it.
+	QStringList paths;
 	for (const QUrl& url : event->mimeData()->urls())
 	{
 		QString path = url.toLocalFile();
-		if (isSupportedVideoFile(path) || isSupportedImageFile(path))
-			files.push_back(std::move(path));
+		if (QFileInfo(path).isDir() || isSupportedVideoFile(path) || isSupportedImageFile(path))
+			paths.push_back(std::move(path));
 	}
 
-	// There is no "current collection" in the label model, so hand the dropped files to Quick Import, where the
+	// There is no "current collection" in the label model, so hand the dropped paths to Quick Import, where the
 	// user picks the destination label(s). Deferred so the drop source application is released promptly
 	// instead of being held in the drag state until processing finishes.
-	QMetaObject::invokeMethod(this, [this, files = std::move(files)] {
-		quickImportToCollections(files);
+	QMetaObject::invokeMethod(this, [this, paths = std::move(paths)] {
+		quickImportToCollections(paths);
 	}, Qt::QueuedConnection);
 }
 
