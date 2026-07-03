@@ -81,7 +81,11 @@ restyle needs an app-wide styled `QCheckBox`.
   the built-in player instead). **"Delete all" is per-type**: a video loses its frame folder + source file;
   an owned photo loses its file ONLY (never the shared label dir); a referenced photo is removed from the
   catalog only, its file untouched — the confirmation message spells out exactly what applies to the
-  selection at hand. Includes a **Labels** submenu: a checklist
+  selection at hand. **"Remove from library (untrack)"** (above "Delete all") drops the selection from the
+  catalog only (`Catalog::removeMediaItem`) — no file is touched, but the items' catalog metadata (labels
+  incl. Best, saved loops) is discarded; since the catalog is never re-derived from a disk walk, an
+  untracked video's frame folder simply stays on disk, surfaced again only by the integrity tool (or a
+  re-import of the source). Includes a **Labels** submenu: a checklist
   of every ordinary label (check state from the right-clicked card via `Catalog::mediaItemHasLabel`); toggling
   one drives the whole effective selection to that state via `Catalog::addLabel`/`removeLabel`, then
   `refreshLibraryView()`.

@@ -61,6 +61,8 @@ private:
 	void showMediaItemContextMenu(const MediaId& id, const QPoint& globalPos);
 	// If id is part of the current multi-selection, returns all selected items' ids; otherwise just id alone.
 	[[nodiscard]] std::vector<MediaId> effectiveSelection(const MediaId& id) const;
+	// Bulleted list of the selection's item names for confirmation dialogs, capped so a huge selection stays readable.
+	[[nodiscard]] static QString bulletedItemNameList(const std::vector<MediaId>& selection);
 	// Source-file URLs for the given grid items, handed to MediaGrid to export them when a card is dragged out
 	// (a multi-selection drags every selected file). Missing files (e.g. a referenced item on an unmounted
 	// drive) are skipped.

@@ -735,6 +735,23 @@ QList<QUrl> MainWindow::dragUrlsForItems(const QList<QListWidgetItem*>& items) c
 	return urls;
 }
 
+QString MainWindow::bulletedItemNameList(const std::vector<MediaId>& selection)
+{
+	const Catalog& catalog = Catalog::instance();
+	QString list;
+	constexpr size_t maxListed = 15;
+	for (size_t i = 0; i < std::min(maxListed, selection.size()); ++i)
+	{
+		const MediaId& sel = selection[i];
+		// A video is named by its frame folder; a photo's folder is shared/empty, so use the id's file name.
+		list += "\n• " + (catalog.mediaType(sel) == Catalog::MediaType::Photo
+			? sel.name() : QFileInfo(catalog.folderForMediaItem(sel)).fileName());
+	}
+	if (selection.size() > maxListed)
+		list += "\n" + tr("... and %1 more").arg(selection.size() - maxListed);
+	return list;
+}
+
 void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globalPos)
 {
 	Catalog& catalog = Catalog::instance();
@@ -875,6 +892,42 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 	}
 	menu.addSeparator();
 
+	menu.addAction(selection.size() > 1 ? tr("Remove %1 items from library (untrack)").arg(selection.size()) : tr("Remove from library (untrack)"), [this, selection] {
+		Catalog& catalog = Catalog::instance();
+
+		// Untrack drops the catalog entry only - nothing on disk is touched. The catalog is never re-derived
+		// from a disk walk, so an untracked video's frame folder stays out of the library until the integrity
+		// tool surfaces it as untracked (or the source video is re-imported).
+		QString message;
+		if (selection.size() == 1)
+		{
+			const MediaId& sel = selection.front();
+			message = tr("This will remove the item from the library:\n");
+			if (catalog.mediaType(sel) == Catalog::MediaType::Video)
+				message += "\n• " + catalog.folderForMediaItem(sel);
+			const QString sourcePath = catalog.sourcePathForMediaItem(sel);
+			if (!sourcePath.isEmpty())
+				message += "\n• " + sourcePath;
+		}
+		else
+		{
+			message = tr("This will remove %1 items from the library:\n").arg(selection.size());
+			message += bulletedItemNameList(selection);
+		}
+		message += "\n\n" + tr("No files will be deleted, but labels and other catalog metadata will be discarded. Continue?");
+
+		if (QMessageBox::question(this, tr("Remove from library"), message,
+			QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+			return;
+
+		Catalog::BatchScope batch;  // one store write for the whole selection instead of one per item
+		for (const MediaId& sel : selection)
+			catalog.removeMediaItem(sel);
+		// The frame viewer is deliberately left open if it's showing one of these folders - the frames stay on disk.
+
+		refreshLibraryView();
+	});
+
 	menu.addAction(selection.size() > 1 ? tr("Delete all (%1 items)").arg(selection.size()) : tr("Delete all"), [this, selection] {
 		Catalog& catalog = Catalog::instance();
 
@@ -927,16 +980,7 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 			else  // nothing but referenced photos selected - no file is deleted at all
 				message = tr("This will remove %1 items from the catalog - their files will not be touched:\n").arg(selection.size());
 
-			constexpr size_t maxListed = 15;
-			for (size_t i = 0; i < std::min(maxListed, selection.size()); ++i)
-			{
-				const MediaId& sel = selection[i];
-				// A video is named by its frame folder; a photo's folder is shared/empty, so use the id's file name.
-				message += "\n• " + (catalog.mediaType(sel) == Catalog::MediaType::Photo
-					? sel.name() : QFileInfo(catalog.folderForMediaItem(sel)).fileName());
-			}
-			if (selection.size() > maxListed)
-				message += "\n" + tr("... and %1 more").arg(selection.size() - maxListed);
+			message += bulletedItemNameList(selection);
 
 			if (anyReferencedPhoto && !deletedKinds.isEmpty())
 				message += "\n\n" + tr("Referenced photos in the selection are only removed from the catalog - their files are not touched.");
