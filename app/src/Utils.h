@@ -66,6 +66,10 @@ void forEachFolder(const QString& root, F&& callback)
 
 void openInExplorer(const QString& path);
 
+// Modal warning that names a file the app expected to find but didn't. Centralizes the one wording so every
+// "the source file is gone" path reports identically and always tells the user which path is missing.
+void reportMissingFile(QWidget* parent, const QString& path);
+
 [[nodiscard]] QString ffmpegPath();
 
 [[nodiscard]] QString rootFolder();

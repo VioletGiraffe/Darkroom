@@ -791,6 +791,11 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 			QMessageBox::warning(this, tr("Error"), tr("No source file is recorded for this item."));
 			return;
 		}
+		if (!QFileInfo::exists(sourcePath))  // openInExplorer silently no-ops on a missing path, so guard+report here
+		{
+			reportMissingFile(this, sourcePath);
+			return;
+		}
 		openInExplorer(sourcePath);
 	});
 	menu.addAction(tr("Copy source path to clipboard"), [id] {
@@ -955,7 +960,7 @@ void MainWindow::playVideo(const MediaId& id)
 	const QString sourcePath = Catalog::instance().sourcePathForMediaItem(id);
 	if (!QFile::exists(sourcePath))
 	{
-		QMessageBox::warning(this, tr("Error"), tr("Source video not found at:\n%1").arg(sourcePath));
+		reportMissingFile(this, sourcePath);
 		return;
 	}
 
@@ -968,7 +973,7 @@ void MainWindow::openSourceInSystemApp(const MediaId& id)
 	const QString sourcePath = Catalog::instance().sourcePathForMediaItem(id);
 	if (!QFile::exists(sourcePath))
 	{
-		QMessageBox::warning(this, tr("Error"), tr("Source file not found at:\n%1").arg(sourcePath));
+		reportMissingFile(this, sourcePath);
 		return;
 	}
 
@@ -1014,6 +1019,14 @@ void MainWindow::ensureFramesSplit(const MediaId& id)
 
 void MainWindow::splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder)
 {
+	// Check the source is actually there before doing anything: otherwise ffmpeg fails on the missing input
+	// and the user gets its raw stderr dump instead of a clear "the file is gone" message.
+	if (!QFileInfo::exists(videoFilePath))
+	{
+		reportMissingFile(this, videoFilePath);
+		return;
+	}
+
 	const QString baseName = QFileInfo(videoFilePath).completeBaseName();
 
 	if (!QDir{}.mkpath(outputFolder))

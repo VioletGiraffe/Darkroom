@@ -7,6 +7,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QMessageBox>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QSettings>
@@ -136,6 +137,11 @@ void openInExplorer(const QString& path)
 		const QStringList param{ "/select,", QDir::toNativeSeparators(fi.canonicalFilePath()) };
 		QProcess::startDetached("explorer.exe", param);
 	}
+}
+
+void reportMissingFile(QWidget* parent, const QString& path)
+{
+	QMessageBox::warning(parent, QObject::tr("File not found"), QObject::tr("This file no longer exists:\n%1").arg(path));
 }
 
 QString ffmpegPath()
