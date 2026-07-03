@@ -75,7 +75,7 @@ private:
 	void backfillMissingPreviews();
 	// Rebuilds <folder>/preview from the video's own real frames (plain copy, no ffmpeg, no source needed).
 	// Returns false and touches nothing when there are no real frames to sample. Shared by backfill (which
-	// ignores the result - a frameless folder is a ghost it leaves for scanIntegrity) and the integrity tool.
+	// ignores the result - a frameless folder is a ghost it leaves for CatalogIntegrity::scan) and the integrity tool.
 	bool regeneratePreviewFromRealFrames(const QString& folderPath, int frameCount);
 	// Integrity resolution for INVISIBLE: restores a video's preview from its real frames if present (which also
 	// marks it fully split), else re-extracts from its source video. Returns whether a preview exists afterwards.

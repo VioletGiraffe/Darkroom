@@ -177,58 +177,10 @@ public:
 	// message), or if a relocation was blocked (e.g. a name collision) so a folder still names the label.
 	bool deleteLabel(const QString& labelId);
 
-	// --- Integrity check (manual, user-triggered; the only other place besides the legacy seed that walks disk) ---
-
-	// A placeholder (source was missing when seeded/imported) whose recorded source path now resolves to an
-	// existing file - the source has reappeared and the item can be relinked to its real identity.
-	struct RelinkCandidate
-	{
-		MediaId placeholderId;
-		QString folder;              // absolute, for display
-		QString recordedSourcePath;  // where the source was last known/expected to be; now exists
-	};
-
-	// A frame folder on disk with no catalog entry: either nothing was ever recorded for it, or it has a
-	// legacy source_info.txt whose recorded video collides with an id already tracked elsewhere (clashId).
-	struct UntrackedFolder
-	{
-		QString folderPath;
-		QString candidateSourcePath;   // from a legacy source_info.txt, if present and that file still exists; else empty
-		MediaId clashId;               // the existing catalog id candidateSourcePath resolves to; invalid = no clash
-		bool    filesIdentical = false;  // meaningful only when clashId.isValid(): byte comparison against the existing entry's source
-	};
-
-	// A tracked video whose on-disk backing is not fully intact, in any combination - the integrity grid's
-	// verdicts are orthogonal (see scanIntegrity's banner), so several can hold on one entry. Carries the raw
-	// disk facts; the predicates name the verdicts the dialog renders and resolves. A healthy video -> no issue.
-	struct MediaIssue
-	{
-		MediaId id;
-		QString folder;
-		QString sourcePath;
-		bool    sourcePresent     = false;  // source file still on disk
-		bool    realFramesPresent = false;  // real frames in <folder> - the deliverable
-		bool    previewPresent    = false;  // preview frames in previewDirFor(<folder>) - the card's only render source
-		bool    splitComplete     = false;  // the entry's splitIntoFrames flag
-
-		[[nodiscard]] bool isGhost() const       { return splitComplete && !realFramesPresent; }  // deliverable gone
-		[[nodiscard]] bool isInvisible() const   { return !previewPresent; }                      // card can't render
-		[[nodiscard]] bool isStale() const       { return !splitComplete && realFramesPresent; }  // flag disagrees with disk
-		[[nodiscard]] bool sourceMissing() const { return !sourcePresent; }
-		[[nodiscard]] bool healthy() const       { return sourcePresent && !isGhost() && !isInvisible() && !isStale(); }
-	};
-
-	struct IntegrityReport
-	{
-		std::vector<RelinkCandidate> relinkable;
-		std::vector<UntrackedFolder> untracked;
-		std::vector<MediaIssue>      issues;
-		[[nodiscard]] bool isEmpty() const { return relinkable.empty() && untracked.empty() && issues.empty(); }
-	};
-
-	// Walks disk once (only ever on explicit user request, never part of the normal refresh path) plus the
-	// in-memory model, looking for the three kinds of catalog/disk drift above. Read-only.
-	[[nodiscard]] IntegrityReport scanIntegrity() const;
+	// --- Integrity resolution --------------------------------------------------------------------------------
+	// The read-only catalog-vs-disk scan and its report types live in CatalogIntegrity (Core/CatalogIntegrity.h).
+	// The methods below are the mutations that scan feeds - they belong here because only Catalog can touch the
+	// model and persist.
 
 	// Resolves a placeholder to its real identity now that confirmedSourcePath exists. Unions the placeholder's
 	// stored labels with any pre-existing (orphaned) record already under the real id - see data-model.md's

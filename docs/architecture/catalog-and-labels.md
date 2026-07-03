@@ -126,7 +126,7 @@ still has a usable (if `!isValid()`) id, so even that case stays clean.
   reported none. Catching the collision here, at registration time, is the replacement.
   `splitIntoFrames` has no default — every call site spells out `true`/`false` explicitly. `false` means only
   permanent preview frames exist yet, a full extraction is still owed; `Catalog::isSplitIntoFrames(id)`
-  queries it, and `scanIntegrity`'s ghost check is guarded by it so a video that's legitimately still
+  queries it, and `CatalogIntegrity::scan`'s ghost verdict is guarded by it so a video that's legitimately still
   preview-only is never misreported as a ghost (see [import.md](import.md) for the full on-demand-split
   design).
 - **`removeMediaItem(id)`** drops an item from the catalog entirely (used by delete-all and dedup-cleanup), so it
@@ -203,7 +203,7 @@ re-save the registry on every sort/filter/zoom. `addLabel`/`removeLabel` patch t
 One known wart from this: the grid skips frame folders with zero images (`MainWindow::refreshMediaGrid`'s
 `addCard`, hiding a ghost from a failed re-export or an externally-deleted folder), but the sidebar's
 `labelMediaItemCounts()` reads the model directly and still counts such a ghost. Left as-is; the integrity tool
-(`Catalog::scanIntegrity`, `IntegrityCheckDialog`) surfaces and lets the user reconcile it.
+(`CatalogIntegrity::scan`, `IntegrityCheckDialog`) surfaces and lets the user reconcile it.
 
 ## UI integration
 
@@ -261,7 +261,7 @@ a 0 count until manually deleted via the UI. Two ways to reach it:
 
 Revisit only if orphaned labels turn out to be a real nuisance in practice — e.g. add an explicit "garbage
 collect empty/orphaned labels" action the user triggers deliberately, rather than an automatic one. The
-integrity tool (`Catalog::scanIntegrity`, `IntegrityCheckDialog`) would be a natural place to add this.
+integrity tool (`CatalogIntegrity::scan`, `IntegrityCheckDialog`) would be a natural place to add this.
 
 ---
 
@@ -311,18 +311,21 @@ explicit user request, never part of the normal refresh path. **Video-only in v1
 outright (every check reasons about frame folders — a referenced photo's empty folder would misread as a
 ghost), and the untracked-folder walk skips the `<root>/Photos` tree (it holds owned photo files, not frame
 folders). Photo integrity (missing owned file / vanished referenced file) is deferred backlog.
-`Catalog::scanIntegrity()` is read-only and returns an `IntegrityReport` of three kinds of drift, each with
-its own resolution:
+`CatalogIntegrity::scan()` (`app/src/Core/CatalogIntegrity.{h,cpp}`) is read-only and returns an `IntegrityReport`
+of three kinds of drift, each with its own resolution. The scan and its report structs live in that dedicated
+module — reasoning purely over `Catalog`'s public API plus the on-disk layout — while `Catalog` keeps only the
+resolution *mutations* the scan feeds (they touch the model and persist, so only it can perform them):
 - **`RelinkCandidate`** — an orphaned placeholder (`MediaId::fromNameAndSize(name, -1)`, from when the source
   was missing at seed/import time) whose recorded source path now resolves to an existing file. Resolved via
   `Catalog::relinkPlaceholder`, which unions the placeholder's stored labels with any pre-existing orphaned
   record already under the real id (see [data-model.md](data-model.md)'s "Legacy seed" note) and refuses if
   the real id already names an item tracked under a *different* folder.
-- **`UntrackedFolder`** — a frame folder on disk with no catalog entry (including duplicate frame-folders the
-  legacy seed skipped), optionally carrying a candidate source path recovered from a legacy
-  `source_info.txt`. Resolved via `Catalog::addMediaItem` (registering it, `splitIntoFrames=true` since real
-  frames are already on disk by definition of being found this way).
-- **`MediaIssue`** — a tracked video whose on-disk backing isn't intact. The banner atop `scanIntegrity` maps
+- **`UntrackedFolder`** — a non-empty frame folder on disk that no catalog entry claims. Resolved by browsing to
+  its source video, which registers it via `Catalog::addMediaItem` (`splitIntoFrames=true`, since real frames are
+  already on disk by definition of being found this way). *(The old recovery of a candidate source from a legacy
+  `source_info.txt` — and the resulting auto-"Register" — was dropped; that file is never written by the current
+  app, so the recovery only ever fired for legacy leftovers.)*
+- **`MediaIssue`** — a tracked video whose on-disk backing isn't intact. The banner atop `CatalogIntegrity::scan` maps
   the full state grid; the verdicts are orthogonal, so one entry can carry several. Each `MediaIssue` holds the
   raw disk facts (source / real-frames / preview presence + the split flag) and exposes the predicates the dialog
   reads: `isGhost` (fully split but real frames gone), `isInvisible` (no preview frames, so the grid card can't

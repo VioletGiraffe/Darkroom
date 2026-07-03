@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Catalog.h"
+#include "Core/CatalogIntegrity.h"
 #include "Core/MediaId.h"
 
 #include <QDialog>
@@ -8,7 +9,7 @@
 #include <functional>
 
 // ============================================================================
-// IntegrityCheckDialog - shows what Catalog::scanIntegrity found (relinkable placeholders, untracked frame
+// IntegrityCheckDialog - shows what CatalogIntegrity::scan found (relinkable placeholders, untracked frame
 // folders, and broken video entries) and lets the user resolve each one: relink / register for the first two;
 // per broken video, re-import / regenerate preview / mark-fully-split / remove; plus browse to point at a
 // source manually. All UI logic lives here behind the static scanAndShowUi() entry point - MainWindow only
@@ -43,7 +44,7 @@ public:
 	static void scanAndShowUi(Callbacks callbacks, QWidget* parent);
 
 private:
-	IntegrityCheckDialog(const Catalog::IntegrityReport& report, Callbacks callbacks, QWidget* parent);
+	IntegrityCheckDialog(const CatalogIntegrity::IntegrityReport& report, Callbacks callbacks, QWidget* parent);
 	~IntegrityCheckDialog() override;
 
 	Callbacks m_callbacks;

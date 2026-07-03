@@ -31,7 +31,7 @@ QString browseForSourceVideo(QWidget* parent, const QString& hint)
 
 void IntegrityCheckDialog::scanAndShowUi(Callbacks callbacks, QWidget* parent)
 {
-	const Catalog::IntegrityReport report = Catalog::instance().scanIntegrity();
+	const CatalogIntegrity::IntegrityReport report = CatalogIntegrity::scan();
 	if (report.isEmpty())
 	{
 		QMessageBox::information(parent, tr("Catalog integrity check"), tr("No issues found - the catalog matches what's on disk."));
@@ -42,7 +42,7 @@ void IntegrityCheckDialog::scanAndShowUi(Callbacks callbacks, QWidget* parent)
 	dialog.exec();
 }
 
-IntegrityCheckDialog::IntegrityCheckDialog(const Catalog::IntegrityReport& report, Callbacks callbacks, QWidget* parent)
+IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityReport& report, Callbacks callbacks, QWidget* parent)
 	: QDialog(parent), m_callbacks(std::move(callbacks))
 {
 	setWindowTitle(tr("Catalog Integrity Check"));
@@ -104,7 +104,7 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog::IntegrityReport& repor
 	if (!report.relinkable.empty())
 	{
 		contentLayout->addWidget(new QLabel(tr("<b>Relink</b> - the source file reappeared"), content));
-		for (const Catalog::RelinkCandidate& candidate : report.relinkable)
+		for (const CatalogIntegrity::RelinkCandidate& candidate : report.relinkable)
 		{
 			const auto [row, statusLabel] = addRow(
 				tr("%1<br>Recorded source: %2").arg(QFileInfo(candidate.folder).fileName(), candidate.recordedSourcePath));
@@ -150,51 +150,22 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog::IntegrityReport& repor
 	if (!report.untracked.empty())
 	{
 		contentLayout->addWidget(new QLabel(tr("<b>Untracked folders</b> - on disk, not in the catalog"), content));
-		for (const Catalog::UntrackedFolder& u : report.untracked)
+		for (const CatalogIntegrity::UntrackedFolder& u : report.untracked)
 		{
-			QString status = QFileInfo(u.folderPath).fileName();
-			const bool hasClash = u.clashId.isValid();
-			if (u.candidateSourcePath.isEmpty())
-				status += tr("<br>No source recorded for this folder.");
-			else if (hasClash)
-			{
-				const QString clashDetail = u.filesIdentical
-					? tr("files are identical - likely already imported")
-					: tr("files differ - a name+size collision, not the same file");
-				status += tr("<br>%1 is already tracked elsewhere (%2).").arg(u.candidateSourcePath, clashDetail);
-			}
-			else
-				status += tr("<br>Source found: %1").arg(u.candidateSourcePath);
-
-			const auto [row, statusLabel] = addRow(status);
+			const auto [row, statusLabel] = addRow(QFileInfo(u.folderPath).fileName());
 			QHBoxLayout* rowLayout = static_cast<QHBoxLayout*>(row->layout());
 
-			QPushButton* registerButton = nullptr;
-			if (!u.candidateSourcePath.isEmpty() && !hasClash)
-			{
-				registerButton = new QPushButton(tr("Register"), row);
-				rowLayout->addWidget(registerButton);
-			}
 			QPushButton* browseButton = new QPushButton(tr("Browse..."), row);
 			QPushButton* skipButton   = new QPushButton(tr("Skip"), row);
 			rowLayout->addWidget(browseButton);
 			rowLayout->addWidget(skipButton);
 
 			const QString folderPath = u.folderPath;
-			const QString candidatePath = u.candidateSourcePath;
-			std::vector<QPushButton*> rowButtons{ browseButton, skipButton };
-			if (registerButton)
-				rowButtons.insert(rowButtons.begin(), registerButton);
+			const std::vector<QPushButton*> rowButtons{ browseButton, skipButton };
 
-			if (registerButton)
-			{
-				wireAction(registerButton, statusLabel, rowButtons, tr("Registered."),
-					tr("Could not register - that source file is already tracked under a different folder."),
-					[this, folderPath, candidatePath] { return m_callbacks.registerRequested(folderPath, candidatePath); });
-			}
-
-			connect(browseButton, &QPushButton::clicked, this, [this, folderPath, candidatePath, rowButtons, statusLabel] {
-				const QString picked = browseForSourceVideo(this, candidatePath);
+			// The only resolution is to point at a source video, which registers the folder against it.
+			connect(browseButton, &QPushButton::clicked, this, [this, folderPath, rowButtons, statusLabel] {
+				const QString picked = browseForSourceVideo(this, folderPath);
 				if (picked.isEmpty())
 					return;
 				if (m_callbacks.registerRequested(folderPath, picked))
@@ -217,7 +188,7 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog::IntegrityReport& repor
 	if (!report.issues.empty())
 	{
 		contentLayout->addWidget(new QLabel(tr("<b>Problems</b> - tracked videos whose files don't match the catalog"), content));
-		for (const Catalog::MediaIssue& issue : report.issues)
+		for (const CatalogIntegrity::MediaIssue& issue : report.issues)
 		{
 			// One line per broken video listing everything wrong with it - the grid's verdicts are orthogonal,
 			// so several can apply at once (e.g. frames gone and source also missing).

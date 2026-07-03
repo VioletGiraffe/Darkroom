@@ -503,7 +503,7 @@ void MainWindow::backfillMissingPreviews()
 		progressBox.setText(tr("Updating preview %1/%2...").arg(i + 1).arg(toBackfill.size()));
 		QApplication::processEvents();
 		// A genuine ghost (folder emptied externally) has no real frames, so regenerate returns false and skips
-		// it - scanIntegrity handles that case, not us.
+		// it - CatalogIntegrity::scan handles that case, not us.
 		regeneratePreviewFromRealFrames(catalog.folderForMediaItem(toBackfill[i]), previewFrameCount);
 	}
 }

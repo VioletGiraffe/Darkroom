@@ -116,7 +116,7 @@ and a progress callback reports completions for the staging dialog's counter.
 
 `preview/` is a permanent, separate store once created: a later real `splitVideoIntoFrames` run never deletes
 or rewrites it (it only ever lists/writes files directly in `outputFolder`, never recursing into `preview/`),
-and `Catalog::scanIntegrity`'s ghost check is guarded by `splitIntoFrames` specifically so a video that's
+and `CatalogIntegrity::scan`'s ghost verdict is guarded by `splitIntoFrames` specifically so a video that's
 legitimately still preview-only (zero real frames yet, by design) is never misreported as a ghost.
 
 `MainWindow::refreshMediaGrid` always builds a card's thumbnail set from `<folder>/preview/`, never from the
