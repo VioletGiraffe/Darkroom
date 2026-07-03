@@ -4,9 +4,10 @@
 #include "Import.h"  // Import::PhotoImportMode / PhotoResult (processPhotoBatch's interface)
 
 #include <QHash>
-#include <QList>
 #include <QMainWindow>
 #include <QStringList>
+
+#include <vector>
 
 class FrameViewerWindow;
 class LabelSidebar;
@@ -57,7 +58,7 @@ private:
 	void zoomCards(int steps);
 	void showMediaItemContextMenu(const MediaId& id, const QPoint& globalPos);
 	// If id is part of the current multi-selection, returns all selected items' ids; otherwise just id alone.
-	[[nodiscard]] QList<MediaId> effectiveSelection(const MediaId& id) const;
+	[[nodiscard]] std::vector<MediaId> effectiveSelection(const MediaId& id) const;
 	void splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder);
 	// Wipes and fully re-extracts an already-tracked video's frames. preserveExistingPreview controls what
 	// happens to its preview/ subfolder across that wipe: true carries the existing one through unchanged
@@ -78,7 +79,7 @@ private:
 	// reports errors, applies a referenced photo's initial label (it has no storage folder to derive it
 	// from), and refreshes the view. Returns one result per path, in order - Quick Import's bookkeeping
 	// branches on them (see QuickImportDialog::Callbacks::importPhotosRequested).
-	QList<Import::PhotoResult> processPhotoBatch(const QString& labelId, const QStringList& photoPaths, Import::PhotoImportMode mode);
+	std::vector<Import::PhotoResult> processPhotoBatch(const QString& labelId, const QStringList& photoPaths, Import::PhotoImportMode mode);
 	bool createCollection(const QString& name, bool refreshList = true);
 	// Sidebar "+ Add label": prompts for a name and creates a folder-backed label (a collection folder).
 	void createLabelInteractive();

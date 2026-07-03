@@ -76,7 +76,7 @@ void Catalog::loadRegistry()
 		const QString id = o.value("id").toString();
 		if (id.isEmpty())
 			continue;
-		_labels.append(Label{ id, o.value("displayName").toString(), o.value("color").toString() });
+		_labels.push_back(Label{ id, o.value("displayName").toString(), o.value("color").toString() });
 	}
 	_seededFromSourceInfo = root.value("seededFromSourceInfo").toBool();
 }
@@ -134,7 +134,7 @@ bool Catalog::ensureBestLabelExists()
 {
 	if (labelById(BestLabelId))
 		return false;
-	_labels.prepend(Label{ BestLabelId, "Best", Theme::StarActive });  // pin Best first (virtual is derived from the id); gold, matching the star
+	_labels.insert(_labels.begin(), Label{ BestLabelId, "Best", Theme::StarActive });  // pin Best first (virtual is derived from the id); gold, matching the star
 	return true;
 }
 
@@ -142,7 +142,7 @@ bool Catalog::ensureFolderLabelExists(const QString& displayName)
 {
 	if (!labelIdForFolderName(displayName).isEmpty())
 		return false;  // a folder-backed label with this name already exists
-	_labels.append(Label{ generateLabelId(), displayName, randomLabelColor() });
+	_labels.push_back(Label{ generateLabelId(), displayName, randomLabelColor() });
 	return true;
 }
 
@@ -890,10 +890,10 @@ bool Catalog::deleteLabel(const QString& labelId)
 	const QString displayName = label->displayName;
 
 	// Relocate every item stored under the label off it. Collect first: relocateFolderOffLabel mutates _mediaItems.
-	QList<MediaId> storedHere;
+	std::vector<MediaId> storedHere;
 	for (const MediaId& id : mediaItemsForLabel(labelId))
 		if (storageLabelIdOf(_mediaItems.value(id)) == labelId)
-			storedHere << id;
+			storedHere.push_back(id);
 	for (const MediaId& id : storedHere)
 		relocateFolderOffLabel(id, labelId);
 
@@ -928,7 +928,7 @@ bool Catalog::deleteLabel(const QString& labelId)
 		QDir photoDir{ photosRootFolder() + "/" + displayName };  // the label's owned-photo dir, same empty-only guard
 		if (photoDir.exists() && photoDir.isEmpty())
 			photoDir.removeRecursively();
-		_labels.removeIf([&labelId](const Label& l) { return l.id == labelId; });
+		std::erase_if(_labels, [&labelId](const Label& l) { return l.id == labelId; });
 	}
 
 	saveRegistry();

@@ -37,7 +37,7 @@ public:
 		setAttribute(Qt::WA_TransparentForMouseEvents);
 	}
 
-	void setColors(const QList<QColor>& colors)
+	void setColors(const std::vector<QColor>& colors)
 	{
 		m_colors = colors;
 		updateGeometry();   // sizeHint changed; let the footer layout re-fit the strip
@@ -55,7 +55,7 @@ public:
 protected:
 	void paintEvent(QPaintEvent*) override
 	{
-		if (m_colors.isEmpty())
+		if (m_colors.empty())
 			return;
 
 		QPainter p{ this };
@@ -76,7 +76,7 @@ private:
 	static constexpr int DOT = 8;  // dot diameter
 	static constexpr int GAP = 4;  // spacing between dots
 
-	QList<QColor> m_colors;
+	std::vector<QColor> m_colors;
 };
 
 // A QLabel that elides its text to the available width, keeping the full string for the tooltip. Used for
@@ -244,11 +244,11 @@ void MediaItemWidget::setLabel(const QString& label)
 	static_cast<ElidedLabel*>(m_name)->setFullText(label);
 }
 
-void MediaItemWidget::setLabelDots(const QList<QColor>& colors, const QString& tooltip)
+void MediaItemWidget::setLabelDots(const std::vector<QColor>& colors, const QString& tooltip)
 {
 	auto* strip = static_cast<LabelDotStrip*>(m_labelDots);
 	strip->setColors(colors);            // updates its sizeHint; the footer layout re-fits it
-	strip->setVisible(!colors.isEmpty());
+	strip->setVisible(!colors.empty());
 	m_thumb->setToolTip(tooltip);        // hovering the card lists its label names
 }
 

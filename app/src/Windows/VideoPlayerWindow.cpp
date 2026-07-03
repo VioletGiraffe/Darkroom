@@ -31,7 +31,7 @@ namespace {
 enum LoopItemDataRole { LoopStartRole = Qt::UserRole, LoopEndRole = Qt::UserRole + 1 };
 }
 
-QList<VideoPlayerWindow*> VideoPlayerWindow::_instances;
+std::vector<VideoPlayerWindow*> VideoPlayerWindow::_instances;
 
 
 VideoPlayerWindow::VideoPlayerWindow(const QString& videoPath, const MediaId& mediaId, QWidget* parent) : QMainWindow(parent) {
@@ -303,7 +303,7 @@ VideoPlayerWindow::VideoPlayerWindow(const QString& videoPath, const MediaId& me
 
 VideoPlayerWindow::~VideoPlayerWindow()
 {
-	_instances.removeAll(this);
+	std::erase(_instances, this);
 }
 
 void VideoPlayerWindow::restartAll()

@@ -2,8 +2,9 @@
 
 #include "Core/MediaId.h"
 
-#include <QList>
 #include <QMainWindow>
+
+#include <vector>
 
 class QMediaPlayer;
 class QVideoWidget;
@@ -27,7 +28,7 @@ private:
 	bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
-	static QList<VideoPlayerWindow*> _instances;
+	static std::vector<VideoPlayerWindow*> _instances;
 
 	MediaId _mediaId; // identity of the played source video; keys its saved loops in MetadataStore
 

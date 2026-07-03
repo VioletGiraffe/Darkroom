@@ -238,7 +238,7 @@ void LabelSidebar::rebuildRows()
 	m_list->clear();
 	Catalog& catalog = Catalog::instance();
 	const QHash<QString, int> counts = catalog.labelMediaItemCounts();
-	const QList<Catalog::Label> labels = catalog.allLabels();
+	const std::vector<Catalog::Label>& labels = catalog.allLabels();
 
 	const auto addLabelRow = [&](const Catalog::Label& l, bool star) {
 		auto* item = new QListWidgetItem(l.displayName, m_list);

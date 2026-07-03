@@ -3,12 +3,12 @@
 #include "Core/MediaId.h"
 
 #include <QColor>
-#include <QList>
 #include <QSize>
 #include <QStringList>
 #include <QWidget>
 
 #include <functional>
+#include <vector>
 
 class QDragEnterEvent;
 class QDragMoveEvent;
@@ -41,7 +41,7 @@ public:
 	// Sets the colored dots overlaid on the thumbnail (one per label the item carries, including Best);
 	// tooltip lists their names. An empty list hides the overlay. Colors are computed by the caller
 	// (MainWindow) from the Catalog.
-	void setLabelDots(const QList<QColor>& colors, const QString& tooltip);
+	void setLabelDots(const std::vector<QColor>& colors, const QString& tooltip);
 
 	// Shows/hides a small top-right badge marking a video that hasn't had its full frame set extracted yet
 	// (only its permanent preview frames exist so far) - see Catalog::isSplitIntoFrames.

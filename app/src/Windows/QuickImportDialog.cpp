@@ -649,10 +649,10 @@ void QuickImportDialog::stageMediaItems(const QStringList& paths)
 
 	// One temp scratch dir per video, assembled up front so the batch can extract several videos at once and
 	// the card-building pass below can locate each video's frames.
-	QList<Ffmpeg::PreviewJob> jobs;
+	std::vector<Ffmpeg::PreviewJob> jobs;
 	jobs.reserve(videoPaths.size());
 	for (const QString& path : videoPaths)
-		jobs.append({ path, uniqueTempPreviewDir() });
+		jobs.push_back({ path, uniqueTempPreviewDir() });
 
 	QMessageBox progressBox(this);
 	progressBox.setWindowTitle(tr("Staging"));
@@ -704,13 +704,13 @@ void QuickImportDialog::updateCardLabelDots(const MediaId& id)
 	if (it == m_staged.constEnd())
 		return;
 
-	QList<QColor> colors;
+	std::vector<QColor> colors;
 	QStringList names;
 	for (const QString& labelId : it->pendingLabelIds)
 	{
 		if (const LabelOption* option = findLabelOption(labelId))
 		{
-			colors << QColor(option->color);
+			colors.push_back(QColor(option->color));
 			names << option->displayName;
 		}
 	}
@@ -719,16 +719,16 @@ void QuickImportDialog::updateCardLabelDots(const MediaId& id)
 	card->setLabelDots(colors, names.join(", "));
 }
 
-QList<MediaId> QuickImportDialog::stagedSelection(const MediaId& id) const
+std::vector<MediaId> QuickImportDialog::stagedSelection(const MediaId& id) const
 {
 	const QList<QListWidgetItem*> selected = m_stagedGrid->selectedItems();
 	if (selected.size() <= 1 || !selected.contains(m_staged.value(id).item))
 		return { id };
 
-	QList<MediaId> targets;
+	std::vector<MediaId> targets;
 	for (auto it = m_staged.constBegin(); it != m_staged.constEnd(); ++it)
 		if (selected.contains(it->item))
-			targets << it.key();
+			targets.push_back(it.key());
 	return targets;
 }
 
@@ -736,7 +736,7 @@ void QuickImportDialog::showStagedCardContextMenu(const MediaId& id, const QPoin
 {
 	if (!m_staged.contains(id))
 		return;
-	const QList<MediaId> selection = stagedSelection(id);
+	const std::vector<MediaId> selection = stagedSelection(id);
 
 	QMenu menu(this);
 
@@ -744,7 +744,7 @@ void QuickImportDialog::showStagedCardContextMenu(const MediaId& id, const QPoin
 	// instead of the Catalog (nothing is written there until "Import" runs). Each row's color-tinted checkbox
 	// reflects the whole staged selection; toggling makes it uniform (strip when all carry it, else add to all).
 	QMenu* labelsMenu = menu.addMenu(tr("Labels"));
-	if (m_labelOptions.isEmpty())
+	if (m_labelOptions.empty())
 	{
 		labelsMenu->addAction(tr("(no labels yet)"))->setEnabled(false);
 	}
@@ -796,10 +796,10 @@ void QuickImportDialog::runImport()
 	// by MediaId throughout (the stable m_staged key, captured while the source file still existed): a Move
 	// relocation deletes the source from its staged path before the post-import bookkeeping below runs, so
 	// re-deriving a MediaId from the path then would fail.
-	QHash<QString, QList<MediaId>> idsByLabelId;
+	QHash<QString, std::vector<MediaId>> idsByLabelId;
 	for (auto it = m_staged.constBegin(); it != m_staged.constEnd(); ++it)
 		if (!it->pendingLabelIds.isEmpty())
-			idsByLabelId[it->pendingLabelIds.constFirst()] << it.key();
+			idsByLabelId[it->pendingLabelIds.constFirst()].push_back(it.key());
 
 	if (idsByLabelId.isEmpty())
 	{
@@ -809,10 +809,10 @@ void QuickImportDialog::runImport()
 
 	const RelocateMode relocateMode = static_cast<RelocateMode>(m_relocateModeCombo->currentData().toInt());
 
-	QList<MediaId> bestItems;
-	QList<ExtraLabelAssignment> extraLabelAssignments;
-	QList<MediaId> succeededIds;
-	QList<MediaId> skippedIds;  // collision resolved as "don't import" - cleared from staging like a success, minus the label flush
+	std::vector<MediaId> bestItems;
+	std::vector<ExtraLabelAssignment> extraLabelAssignments;
+	std::vector<MediaId> succeededIds;
+	std::vector<MediaId> skippedIds;  // collision resolved as "don't import" - cleared from staging like a success, minus the label flush
 
 	for (auto it = idsByLabelId.constBegin(); it != idsByLabelId.constEnd(); ++it)
 	{
@@ -823,13 +823,13 @@ void QuickImportDialog::runImport()
 		// Photos and videos take different apply paths: videos relocate (optionally) to the user-chosen folder
 		// and extract into <collection>/<baseName>/, photos land in the label's own photo dir (or are merely
 		// referenced) via importPhotosRequested - so each group is split by type first.
-		QList<MediaId> videoIds;
-		QList<MediaId> photoIds;
+		std::vector<MediaId> videoIds;
+		std::vector<MediaId> photoIds;
 		for (const MediaId& id : it.value())
-			(isSupportedImageFile(m_staged.value(id).path) ? photoIds : videoIds) << id;
+			(isSupportedImageFile(m_staged.value(id).path) ? photoIds : videoIds).push_back(id);
 
 		// --- Photos ---
-		if (!photoIds.isEmpty())
+		if (!photoIds.empty())
 		{
 			// The relocation mode doubles as the photo import mode: Copy/Move land the file in the library's
 			// photo storage, "leave in place" means tracking it right where it is (a referenced photo).
@@ -843,8 +843,8 @@ void QuickImportDialog::runImport()
 			for (const MediaId& id : photoIds)
 				photoPaths << m_staged.value(id).path;
 
-			const QList<Import::PhotoResult> results = m_callbacks.importPhotosRequested(it.key(), photoPaths, photoMode);
-			for (qsizetype i = 0; i < photoIds.size() && i < results.size(); ++i)
+			const std::vector<Import::PhotoResult> results = m_callbacks.importPhotosRequested(it.key(), photoPaths, photoMode);
+			for (size_t i = 0; i < photoIds.size() && i < results.size(); ++i)
 			{
 				const MediaId& id = photoIds[i];
 				Import::PhotoResult result = results[i];
@@ -858,28 +858,28 @@ void QuickImportDialog::runImport()
 						.arg(QDir::toNativeSeparators(m_staged.value(id).path)),
 						QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes)
 				{
-					const QList<Import::PhotoResult> retried =
+					const std::vector<Import::PhotoResult> retried =
 						m_callbacks.importPhotosRequested(it.key(), { m_staged.value(id).path }, Import::PhotoImportMode::Copy);
-					if (!retried.isEmpty())
-						result = retried.first();
+					if (!retried.empty())
+						result = retried.front();
 				}
 
 				if (result.status != Import::PhotoStatus::Success)
 					continue;  // failed or declined - stays staged with its labels intact (errors already reported by the host)
 
 				const StagedEntry entry = m_staged.value(id);
-				succeededIds << id;
+				succeededIds.push_back(id);
 				// Bookkeeping keys on the *registered* id: an owned-import auto-rename gives the imported copy
 				// a new name, hence a new identity - the staged id no longer names anything in the catalog.
 				if (entry.pendingBest)
-					bestItems << result.registeredId;
+					bestItems.push_back(result.registeredId);
 				if (entry.pendingLabelIds.size() > 1)
-					extraLabelAssignments << ExtraLabelAssignment{ result.registeredId, entry.pendingLabelIds.mid(1) };
+					extraLabelAssignments.push_back(ExtraLabelAssignment{ result.registeredId, entry.pendingLabelIds.mid(1) });
 			}
 		}
 
 		// --- Videos ---
-		if (videoIds.isEmpty())
+		if (videoIds.empty())
 			continue;
 
 		QStringList paths;
@@ -904,7 +904,7 @@ void QuickImportDialog::runImport()
 
 			if (relocated.skipped.contains(entry.path))
 			{
-				skippedIds << id;  // resolved as "don't import" (the destination copy stands in for it) - clear from staging
+				skippedIds.push_back(id);  // resolved as "don't import" (the destination copy stands in for it) - clear from staging
 				continue;
 			}
 
@@ -916,25 +916,27 @@ void QuickImportDialog::runImport()
 			if (!m_callbacks.isMediaItemTrackedInCollection(id, option->displayName))
 				continue;  // import declined/failed, or the id collided with an item tracked elsewhere - stays staged with its labels intact
 
-			succeededIds << id;
+			succeededIds.push_back(id);
 
 			if (entry.pendingBest)
-				bestItems << id;
+				bestItems.push_back(id);
 			if (entry.pendingLabelIds.size() > 1)
-				extraLabelAssignments << ExtraLabelAssignment{ id, entry.pendingLabelIds.mid(1) };
+				extraLabelAssignments.push_back(ExtraLabelAssignment{ id, entry.pendingLabelIds.mid(1) });
 		}
 	}
 
-	if (m_callbacks.markBestRequested && !bestItems.isEmpty())
+	if (m_callbacks.markBestRequested && !bestItems.empty())
 		m_callbacks.markBestRequested(bestItems);
-	if (m_callbacks.assignExtraLabelsRequested && !extraLabelAssignments.isEmpty())
+	if (m_callbacks.assignExtraLabelsRequested && !extraLabelAssignments.empty())
 		m_callbacks.assignExtraLabelsRequested(extraLabelAssignments);
 
-	for (const MediaId& id : succeededIds + skippedIds)
+	for (const MediaId& id : succeededIds)
+		unstage(id);
+	for (const MediaId& id : skippedIds)
 		unstage(id);
 
 	// Repaint the host once with the fully-applied state - the dialog stays open, so the mid-Import refresh
 	// that addMediaItemsRequested may have done only shows folder labels, not the Best/extra labels flushed just above.
-	if (!succeededIds.isEmpty() && m_callbacks.viewChanged)
+	if (!succeededIds.empty() && m_callbacks.viewChanged)
 		m_callbacks.viewChanged();
 }

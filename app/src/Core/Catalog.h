@@ -4,10 +4,11 @@
 #include "Core/MetadataStore.h"  // BatchScope holds a MetadataStore::Writer by value
 
 #include <QHash>
-#include <QList>
 #include <QSet>
 #include <QString>
 #include <QStringList>
+
+#include <vector>
 
 // The logical label model for the library. A label is a first-class object with a stable id (so renaming
 // its display name never disturbs associations), a display name, a color, and a "virtual" flag. An item
@@ -54,7 +55,7 @@ public:
 	enum class MediaType { Video, Photo };
 
 	// The label registry in display order. Best is pinned first.
-	[[nodiscard]] const QList<Label>& allLabels() const { return _labels; }
+	[[nodiscard]] const std::vector<Label>& allLabels() const { return _labels; }
 	[[nodiscard]] const Label* labelById(const QString& id) const;
 
 	// Re-syncs the in-memory model from the persisted store (and ensures every collection + Best has a
@@ -68,7 +69,7 @@ public:
 	[[nodiscard]] bool mediaItemHasLabel(const MediaId& id, const QString& labelId) const;
 
 	// Enumeration / counts.
-	[[nodiscard]] QList<MediaId> allMediaItems() const { return _mediaItems.keys(); }
+	[[nodiscard]] std::vector<MediaId> allMediaItems() const { return std::vector<MediaId>(_mediaItems.keyBegin(), _mediaItems.keyEnd()); }
 	[[nodiscard]] bool containsMediaItem(const MediaId& id) const { return _mediaItems.contains(id); }
 	[[nodiscard]] int mediaItemCount() const { return static_cast<int>(_mediaItems.size()); }
 	// labelId -> number of items carrying it, computed in one pass (for the sidebar's per-label counts).
@@ -206,10 +207,10 @@ public:
 
 	struct IntegrityReport
 	{
-		QList<RelinkCandidate> relinkable;
-		QList<UntrackedFolder> untracked;
-		QList<GhostEntry>      ghosts;
-		[[nodiscard]] bool isEmpty() const { return relinkable.isEmpty() && untracked.isEmpty() && ghosts.isEmpty(); }
+		std::vector<RelinkCandidate> relinkable;
+		std::vector<UntrackedFolder> untracked;
+		std::vector<GhostEntry>      ghosts;
+		[[nodiscard]] bool isEmpty() const { return relinkable.empty() && untracked.empty() && ghosts.empty(); }
 	};
 
 	// Walks disk once (only ever on explicit user request, never part of the normal refresh path) plus the
@@ -281,7 +282,7 @@ private:
 	[[nodiscard]] static QStringList readStoredLabelIds(const MediaId& id);
 	static void writeStoredLabelIds(const MediaId& id, const QStringList& labelIds);
 
-	QList<Label>          _labels;                  // registry, display order
+	std::vector<Label>    _labels;                  // registry, display order
 	QHash<MediaId, Entry> _mediaItems;              // the model: MediaId -> per-item facts
 	bool                  _seededFromSourceInfo = false;  // legacy seed guard, persisted in labels.json
 };

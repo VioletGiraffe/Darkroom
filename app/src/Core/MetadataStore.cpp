@@ -119,9 +119,9 @@ void MetadataStore::Writer::rekey(const MediaId& oldId, const MediaId& newId)
 	_store.rekey(oldId, newId);
 }
 
-QList<MediaId> MetadataStore::allMediaIds() const
+std::vector<MediaId> MetadataStore::allMediaIds() const
 {
-	QList<MediaId> ids;
+	std::vector<MediaId> ids;
 	ids.reserve(_records.size());
 	for (auto it = _records.begin(); it != _records.end(); ++it)
 	{
@@ -130,7 +130,7 @@ QList<MediaId> MetadataStore::allMediaIds() const
 		const QString name = it.value().toObject().value(QStringLiteral("name")).toString();
 		const qint64 size = it.key().section(':', 0, 0).toLongLong();
 		if (!name.isEmpty())
-			ids.append(MediaId::fromNameAndSize(name, size));
+			ids.push_back(MediaId::fromNameAndSize(name, size));
 	}
 	return ids;
 }

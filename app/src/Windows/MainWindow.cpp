@@ -427,14 +427,14 @@ QString gridCaption(int displayNumber, const QString& name)
 // shows Best so the card's label display is uniform across all labels.
 void applyLabelDots(Catalog& catalog, const MediaId& id, MediaItemWidget* card)
 {
-	QList<QColor> dotColors;
+	std::vector<QColor> dotColors;
 	QStringList dotNames;
 	for (const QString& labelId : catalog.labelsForMediaItem(id))
 	{
 		const Catalog::Label* label = catalog.labelById(labelId);
 		if (!label)
 			continue;
-		dotColors << (label->color.isEmpty() ? QColor() : QColor(label->color));
+		dotColors.push_back(label->color.isEmpty() ? QColor() : QColor(label->color));
 		dotNames << label->displayName;
 	}
 	card->setLabelDots(dotColors, dotNames.join(", "));
@@ -594,7 +594,7 @@ void MainWindow::refreshMediaGrid()
 		// Deferred: refreshLibraryView rebuilds the grid, deleting this very card mid-dropEvent, so the mutation
 		// runs after the drop event unwinds (same reason MainWindow::dropEvent defers Quick Import).
 		card->setOnLabelDropped([this, id](const QString& labelId) {
-			const QList<MediaId> targets = effectiveSelection(id);
+			const std::vector<MediaId> targets = effectiveSelection(id);
 			QMetaObject::invokeMethod(this, [this, targets, labelId] {
 				Catalog::BatchScope batch;  // one store write for the whole selection instead of one per item
 				for (const MediaId& target : targets)
@@ -619,7 +619,7 @@ void MainWindow::refreshMediaGrid()
 	// Media items to show = the sidebar's active label filter applied to the catalog (final order comes from
 	// sortItems() below, so the enumeration order here doesn't matter).
 	const QStringList activeLabelIds = m_labelSidebar->activeLabelIds();
-	QList<MediaId> mediaItems;
+	std::vector<MediaId> mediaItems;
 	if (activeLabelIds.isEmpty())
 	{
 		mediaItems = catalog.allMediaItems();  // no filter ("All"): the whole catalog
@@ -635,14 +635,14 @@ void MainWindow::refreshMediaGrid()
 			else
 				matched.unite(next);       // OR: items carrying any selected label
 		}
-		mediaItems = QList<MediaId>(matched.cbegin(), matched.cend());
+		mediaItems.assign(matched.cbegin(), matched.cend());
 	}
 
 	// The header's All/Videos/Photos switch, ANDed with the label filter above.
 	if (const int typeFilterIdx = m_mediaTypeFilter->currentIndex(); typeFilterIdx != 0)
 	{
 		const Catalog::MediaType wanted = typeFilterIdx == 2 ? Catalog::MediaType::Photo : Catalog::MediaType::Video;
-		mediaItems.removeIf([&](const MediaId& id) { return catalog.mediaType(id) != wanted; });
+		std::erase_if(mediaItems, [&](const MediaId& id) { return catalog.mediaType(id) != wanted; });
 	}
 
 	pendingAttach.reserve(mediaItems.size());
@@ -705,12 +705,12 @@ void MainWindow::applyNameFilter()
 	renumberGridCaptions(m_mediaGrid);
 }
 
-QList<MediaId> MainWindow::effectiveSelection(const MediaId& id) const
+std::vector<MediaId> MainWindow::effectiveSelection(const MediaId& id) const
 {
-	QList<MediaId> selected;
+	std::vector<MediaId> selected;
 	for (const QListWidgetItem* item : m_mediaGrid->selectedItems())
-		selected.append(static_cast<const GridItem*>(item)->mediaId);
-	if (!selected.contains(id))
+		selected.push_back(static_cast<const GridItem*>(item)->mediaId);
+	if (std::find(selected.cbegin(), selected.cend(), id) == selected.cend())
 		selected = { id };
 	return selected;
 }
@@ -718,7 +718,7 @@ QList<MediaId> MainWindow::effectiveSelection(const MediaId& id) const
 void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globalPos)
 {
 	Catalog& catalog = Catalog::instance();
-	const QList<MediaId> selection = effectiveSelection(id);
+	const std::vector<MediaId> selection = effectiveSelection(id);
 	const QString folderPath = catalog.folderForMediaItem(id);
 	const bool isPhoto = catalog.mediaType(id) == Catalog::MediaType::Photo;
 
@@ -856,7 +856,7 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 		QString message;
 		if (selection.size() == 1)
 		{
-			const MediaId& sel = selection.constFirst();
+			const MediaId& sel = selection.front();
 			const QString sourcePath = catalog.sourcePathForMediaItem(sel);
 			if (catalog.isReferenced(sel))
 			{
@@ -896,8 +896,8 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 			else  // nothing but referenced photos selected - no file is deleted at all
 				message = tr("This will remove %1 items from the catalog - their files will not be touched:\n").arg(selection.size());
 
-			constexpr qsizetype maxListed = 15;
-			for (qsizetype i = 0; i < qMin(maxListed, selection.size()); ++i)
+			constexpr size_t maxListed = 15;
+			for (size_t i = 0; i < std::min(maxListed, selection.size()); ++i)
 			{
 				const MediaId& sel = selection[i];
 				// A video is named by its frame folder; a photo's folder is shared/empty, so use the id's file name.
@@ -1189,7 +1189,7 @@ void MainWindow::processBatch(QStringList videoPaths, const QString& collectionP
 	refreshLibraryView();
 }
 
-QList<Import::PhotoResult> MainWindow::processPhotoBatch(const QString& labelId, const QStringList& photoPaths, Import::PhotoImportMode mode)
+std::vector<Import::PhotoResult> MainWindow::processPhotoBatch(const QString& labelId, const QStringList& photoPaths, Import::PhotoImportMode mode)
 {
 	Catalog& catalog = Catalog::instance();
 	const Catalog::Label* label = catalog.labelById(labelId);
@@ -1198,7 +1198,7 @@ QList<Import::PhotoResult> MainWindow::processPhotoBatch(const QString& labelId,
 
 	Catalog::BatchScope batch;  // one store write for the whole batch instead of one per photo
 
-	QList<Import::PhotoResult> results;
+	std::vector<Import::PhotoResult> results;
 	results.reserve(photoPaths.size());
 	for (const QString& path : photoPaths)
 	{
@@ -1209,7 +1209,7 @@ QList<Import::PhotoResult> MainWindow::processPhotoBatch(const QString& labelId,
 		// (An owned photo's label derives from the Photos/<label> dir its file just landed in.)
 		if (result.status == Import::PhotoStatus::Success && mode == Import::PhotoImportMode::Reference)
 			catalog.addLabel(result.registeredId, labelId);
-		results << result;
+		results.push_back(result);
 	}
 
 	refreshLibraryView();
@@ -1383,10 +1383,10 @@ void MainWindow::quickImportToCollections(const QStringList& initialStaging)
 		// Every ordinary label is a candidate destination folder for the dialog's label list - single
 		// source of truth (the Catalog model), not a disk listing, so the dialog also gets each label's color.
 		.getLabelOptions = [] {
-			QList<QuickImportDialog::LabelOption> options;
+			std::vector<QuickImportDialog::LabelOption> options;
 			for (const Catalog::Label& label : Catalog::instance().allLabels())
 				if (!label.isVirtual())
-					options << QuickImportDialog::LabelOption{ label.id, label.displayName, label.color };
+					options.push_back(QuickImportDialog::LabelOption{ label.id, label.displayName, label.color });
 			return options;
 		},
 		.addMediaItemsRequested = [this](const QString& collectionName, const QStringList& videoPaths,
@@ -1421,7 +1421,7 @@ void MainWindow::quickImportToCollections(const QStringList& initialStaging)
 			const QString expectedFolder = rootFolder() + "/" + collectionName + "/" + QFileInfo(id.name()).completeBaseName();
 			return QString::compare(Catalog::instance().folderForMediaItem(id), expectedFolder, Qt::CaseInsensitive) == 0;
 		},
-		.markBestRequested = [](const QList<MediaId>& bestItems) {
+		.markBestRequested = [](const std::vector<MediaId>& bestItems) {
 			// Items only reach this list after their import was confirmed, so "tracked in the catalog" is the
 			// guard against a stray id - uniform across videos and photos (a photo has no per-item folder whose
 			// existence could stand in for it).
@@ -1430,7 +1430,7 @@ void MainWindow::quickImportToCollections(const QStringList& initialStaging)
 				if (Catalog::instance().containsMediaItem(mediaId))
 					Catalog::instance().addLabel(mediaId, Catalog::BestLabelId);
 		},
-		.assignExtraLabelsRequested = [](const QList<QuickImportDialog::ExtraLabelAssignment>& assignments) {
+		.assignExtraLabelsRequested = [](const std::vector<QuickImportDialog::ExtraLabelAssignment>& assignments) {
 			// Mirrors markBestRequested above, same "tracked" guard.
 			Catalog::BatchScope batch;  // one store write for the whole flush instead of one per assignment
 			for (const QuickImportDialog::ExtraLabelAssignment& assignment : assignments)

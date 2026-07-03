@@ -82,21 +82,21 @@ qint64 parseProbedDurationMs(QProcess& probe)
 
 // Mirrors pickEvenlySpacedFrames' 10%-90% sampling window (Utils.h), in the time domain: frameCount evenly
 // spaced timestamps (ms) across a video of the given duration.
-QList<qint64> pickEvenlySpacedTimestampsMs(qint64 durationMs, int frameCount)
+std::vector<qint64> pickEvenlySpacedTimestampsMs(qint64 durationMs, int frameCount)
 {
 	const qint64 startMs = static_cast<qint64>(durationMs * 0.1);
 	const qint64 endMs   = static_cast<qint64>(durationMs * 0.9);
 
-	QList<qint64> out;
+	std::vector<qint64> out;
 	out.reserve(frameCount);
 	for (int i = 0; i < frameCount; ++i)
-		out << ((frameCount == 1) ? startMs : startMs + i * (endMs - startMs) / (frameCount - 1));
+		out.push_back((frameCount == 1) ? startMs : startMs + i * (endMs - startMs) / (frameCount - 1));
 	return out;
 }
 
 // Builds the argument list for the single multi-seek extraction that writes all of one video's preview
 // frames.
-QStringList buildExtractionArguments(const QString& videoFilePath, const QString& previewFolder, const QList<qint64>& timestampsMs)
+QStringList buildExtractionArguments(const QString& videoFilePath, const QString& previewFolder, const std::vector<qint64>& timestampsMs)
 {
 	QStringList arguments;
 	arguments << "-i" << QDir::toNativeSeparators(videoFilePath)
@@ -105,7 +105,7 @@ QStringList buildExtractionArguments(const QString& videoFilePath, const QString
 
 	// One ffmpeg invocation, multiple "-ss T -frames:v 1 output" output groups: ffmpeg seeks per-output on
 	// the same already-open input rather than spawning N processes or fully decoding the video.
-	for (int i = 0; i < timestampsMs.size(); ++i)
+	for (int i = 0; i < static_cast<int>(timestampsMs.size()); ++i)
 	{
 		const QString outputPath = previewFolder + QString("/%1.jpg").arg(i + 1, 4, 10, QChar('0'));
 		arguments << "-ss" << QString::number(timestampsMs[i] / 1000.0, 'f', 3)
@@ -121,10 +121,10 @@ QStringList buildExtractionArguments(const QString& videoFilePath, const QString
 
 namespace Ffmpeg {
 
-void generatePreviewFrames(const QList<PreviewJob>& jobs, int frameCount, int maxConcurrentProcesses,
+void generatePreviewFrames(const std::vector<PreviewJob>& jobs, int frameCount, int maxConcurrentProcesses,
 	const std::function<void(int, int)>& onProgress)
 {
-	const int total = jobs.size();
+	const int total = static_cast<int>(jobs.size());
 	if (total == 0)
 		return;
 

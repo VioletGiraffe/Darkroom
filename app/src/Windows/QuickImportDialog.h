@@ -6,10 +6,10 @@
 
 #include <QDialog>
 #include <QHash>
-#include <QList>
 #include <QStringList>
 
 #include <functional>
+#include <vector>
 
 class QComboBox;
 class QLineEdit;
@@ -57,7 +57,7 @@ public:
 	{
 		// Every ordinary label, for the label-list panel. A staged item's first-dropped label also
 		// decides which one of these folders it's imported into - see runImport() in the .cpp.
-		std::function<QList<LabelOption>()> getLabelOptions;
+		std::function<std::vector<LabelOption>()> getLabelOptions;
 		// Adds the given video files to the named collection. stagedPreviewDirs maps each staged video's MediaId
 		// to the temp dir whose preview/ holds the frames already extracted for its staging card, so import
 		// can reuse them by copy instead of re-running ffmpeg (see Import::importVideo); a video absent
@@ -70,7 +70,7 @@ public:
 		// IdCollision in Reference mode gets the "import an owned copy instead?" escape hatch). A result's
 		// registeredId is the identity actually registered - an owned-import auto-rename changes it from the
 		// staged id, so all post-import bookkeeping (Best, extra labels) must use it.
-		std::function<QList<Import::PhotoResult>(const QString& labelId, const QStringList& photoPaths,
+		std::function<std::vector<Import::PhotoResult>(const QString& labelId, const QStringList& photoPaths,
 			Import::PhotoImportMode mode)> importPhotosRequested;
 		// The source path of an already-imported photo with byte-identical content (matched by size, any
 		// name - catches renamed duplicates), or empty if none. Checked when staging a photo, so a duplicate
@@ -90,10 +90,10 @@ public:
 		// Called once per successful Import, with the items flagged "Best" (may be empty). The flagged items
 		// have already been added - and are therefore tracked - via their type's apply path above. By MediaId
 		// for the same reason as ExtraLabelAssignment above.
-		std::function<void(const QList<MediaId>& bestItems)> markBestRequested;
+		std::function<void(const std::vector<MediaId>& bestItems)> markBestRequested;
 		// Called once per successful Import, with every imported item's extra-label picks (may be empty).
 		// Mirrors markBestRequested above: the items have already been added via their type's apply path.
-		std::function<void(const QList<ExtraLabelAssignment>& assignments)> assignExtraLabelsRequested;
+		std::function<void(const std::vector<ExtraLabelAssignment>& assignments)> assignExtraLabelsRequested;
 		// Called once at the end of an Import that imported at least one item, after the Best/extra-label flush
 		// above. addMediaItemsRequested may refresh the host view mid-Import (it imports folder-by-folder), but the
 		// post-import label flush has no refresh of its own - so without this, the host shows each item's
@@ -131,7 +131,7 @@ private:
 	void updateCardLabelDots(const MediaId& id);
 	// The staged items a card-targeted action applies to: the whole staged selection when `id` is part of a
 	// multi-selection, otherwise just `id`. Mirrors MainWindow::effectiveSelection for the staged grid.
-	[[nodiscard]] QList<MediaId> stagedSelection(const MediaId& id) const;
+	[[nodiscard]] std::vector<MediaId> stagedSelection(const MediaId& id) const;
 	void showStagedCardContextMenu(const MediaId& id, const QPoint& globalPos);
 	// Every staged entry whose pendingLabelIds isn't empty: grouped by its first label and imported via
 	// addMediaItemsRequested, then markBestRequested/assignExtraLabelsRequested for whatever landed.
@@ -153,7 +153,7 @@ private:
 	};
 
 	Callbacks m_callbacks;
-	QList<LabelOption> m_labelOptions;  // cached result of the last getLabelOptions() call
+	std::vector<LabelOption> m_labelOptions;  // cached result of the last getLabelOptions() call
 	QHash<MediaId, StagedEntry> m_staged;
 
 	QListWidget* m_labelList  = nullptr;

@@ -13,6 +13,7 @@
 #include <QVBoxLayout>
 
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -63,7 +64,7 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog::IntegrityReport& repor
 	// Wires a row's button: on click, runs action; on success, shows successText and disables every button
 	// in the row (the row stays visible as a record of what happened); on failure, warns and leaves the row
 	// active so the user can retry (e.g. Browse a different file).
-	const auto wireAction = [this](QPushButton* button, QLabel* statusLabel, const QList<QPushButton*>& rowButtons,
+	const auto wireAction = [this](QPushButton* button, QLabel* statusLabel, const std::vector<QPushButton*>& rowButtons,
 	                                const QString& successText, const QString& failureText, std::function<bool()> action) {
 		connect(button, &QPushButton::clicked, this, [=] {
 			if (action())
@@ -81,7 +82,7 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog::IntegrityReport& repor
 
 	// A "Skip" button just acknowledges the row without acting - disables the row's other buttons so it
 	// reads as dealt-with for this session; it resurfaces on the next scan since nothing was changed.
-	const auto wireSkip = [](QPushButton* skipButton, QLabel* statusLabel, const QList<QPushButton*>& rowButtons) {
+	const auto wireSkip = [](QPushButton* skipButton, QLabel* statusLabel, const std::vector<QPushButton*>& rowButtons) {
 		connect(skipButton, &QPushButton::clicked, skipButton, [=] {
 			statusLabel->setText(tr("%1  (skipped)").arg(statusLabel->text()));
 			for (QPushButton* b : rowButtons)
@@ -100,7 +101,7 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog::IntegrityReport& repor
 		return { row, statusLabel };
 	};
 
-	if (!report.relinkable.isEmpty())
+	if (!report.relinkable.empty())
 	{
 		contentLayout->addWidget(new QLabel(tr("<b>Relink</b> - the source file reappeared"), content));
 		for (const Catalog::RelinkCandidate& candidate : report.relinkable)
@@ -118,7 +119,7 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog::IntegrityReport& repor
 
 			const MediaId placeholderId = candidate.placeholderId;
 			const QString recordedPath = candidate.recordedSourcePath;
-			const QList<QPushButton*> rowButtons{ relinkButton, browseButton, skipButton };
+			const std::vector<QPushButton*> rowButtons{ relinkButton, browseButton, skipButton };
 
 			wireAction(relinkButton, statusLabel, rowButtons, tr("Relinked."),
 				tr("Could not relink - that source file is already tracked under a different folder."),
@@ -146,7 +147,7 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog::IntegrityReport& repor
 		}
 	}
 
-	if (!report.untracked.isEmpty())
+	if (!report.untracked.empty())
 	{
 		contentLayout->addWidget(new QLabel(tr("<b>Untracked folders</b> - on disk, not in the catalog"), content));
 		for (const Catalog::UntrackedFolder& u : report.untracked)
@@ -181,9 +182,9 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog::IntegrityReport& repor
 
 			const QString folderPath = u.folderPath;
 			const QString candidatePath = u.candidateSourcePath;
-			QList<QPushButton*> rowButtons{ browseButton, skipButton };
+			std::vector<QPushButton*> rowButtons{ browseButton, skipButton };
 			if (registerButton)
-				rowButtons.prepend(registerButton);
+				rowButtons.insert(rowButtons.begin(), registerButton);
 
 			if (registerButton)
 			{
@@ -213,7 +214,7 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog::IntegrityReport& repor
 		}
 	}
 
-	if (!report.ghosts.isEmpty())
+	if (!report.ghosts.empty())
 	{
 		contentLayout->addWidget(new QLabel(tr("<b>Ghosts</b> - catalog entry, frame folder is gone"), content));
 		for (const Catalog::GhostEntry& ghost : report.ghosts)
@@ -242,9 +243,9 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog::IntegrityReport& repor
 			rowLayout->addWidget(skipButton);
 
 			const MediaId ghostId = ghost.id;
-			QList<QPushButton*> rowButtons{ removeButton, skipButton };
+			std::vector<QPushButton*> rowButtons{ removeButton, skipButton };
 			if (reimportButton)
-				rowButtons.prepend(reimportButton);
+				rowButtons.insert(rowButtons.begin(), reimportButton);
 
 			if (reimportButton)
 			{

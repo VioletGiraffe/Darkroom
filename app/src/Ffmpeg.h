@@ -1,9 +1,9 @@
 #pragma once
 
-#include <QList>
 #include <QString>
 
 #include <functional>
+#include <vector>
 
 // Thin wrapper over invoking the ffmpeg binary (see Utils.h's ffmpegPath()) for the one operation shared
 // across import, the legacy-preview backfill, and Quick Import's staging previews: pulling a handful of
@@ -30,7 +30,7 @@ struct PreviewJob
 // skipped), with (completedJobs, totalJobs) where totalJobs == jobs.size(); use it to drive UI. Because the
 // call blocks the calling thread for the whole batch, a UI callback should pump events itself if it wants
 // the display to update mid-batch.
-void generatePreviewFrames(const QList<PreviewJob>& jobs, int frameCount, int maxConcurrentProcesses,
+void generatePreviewFrames(const std::vector<PreviewJob>& jobs, int frameCount, int maxConcurrentProcesses,
 	const std::function<void(int completedJobs, int totalJobs)>& onProgress = {});
 
 // Single-video convenience: the batch form with one job run one process at a time. Used by the import

@@ -105,7 +105,7 @@ void CompareWindow::loadCurrentFrame()
 
 	assert(m_thumbnailWidgets.size() == m_folderFrames.size());
 
-	for (qsizetype i = 0; i < m_thumbnailWidgets.size(); ++i)
+	for (size_t i = 0; i < m_thumbnailWidgets.size(); ++i)
 	{
 		ThumbnailWidget* widget = m_thumbnailWidgets[i];
 		if (frameIndex < m_folderFrames[i].size())

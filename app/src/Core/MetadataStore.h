@@ -3,7 +3,8 @@
 #include "Core/MediaId.h"
 
 #include <QJsonObject>
-#include <QList>
+
+#include <vector>
 
 // App-owned per-video metadata that isn't derivable from disk (e.g. playback loop intervals, and
 // later: labels). Persisted as a single JSON document in the collection root, keyed by MediaId, one
@@ -53,7 +54,7 @@ public:
 	// Every item that has a record, reconstructed from its key (size) and stored "name" (original case).
 	// The catalog enumerates items through here instead of walking the filesystem. Includes source-unavailable
 	// placeholders (negative size), so an item whose source went missing still surfaces.
-	[[nodiscard]] QList<MediaId> allMediaIds() const;
+	[[nodiscard]] std::vector<MediaId> allMediaIds() const;
 
 	[[nodiscard]] Writer beginBatch();
 
