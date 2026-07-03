@@ -482,7 +482,7 @@ void MainWindow::backfillMissingPreviews()
 		if (!catalog.isSplitIntoFrames(id))
 			continue;  // not-yet-split videos already got a real preview/ at import time
 
-		const QString previewFolder = catalog.folderForMediaItem(id) + "/preview";
+		const QString previewFolder = Catalog::previewDirFor(catalog.folderForMediaItem(id));
 		if (QDir(previewFolder).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty())
 			toBackfill.push_back(id);
 	}
@@ -509,7 +509,7 @@ void MainWindow::backfillMissingPreviews()
 		if (realFrames.isEmpty())
 			continue;  // a genuine ghost (folder emptied externally) - scanIntegrity handles this, not us
 
-		const QString previewFolder = folderPath + "/preview";
+		const QString previewFolder = Catalog::previewDirFor(folderPath);
 		QDir{}.mkpath(previewFolder);
 		for (const QString& sourceFrame : pickEvenlySpacedFrames(folderDir, realFrames, previewFrameCount))
 			QFile::copy(sourceFrame, previewFolder + "/" + QFileInfo(sourceFrame).fileName());
@@ -560,7 +560,7 @@ void MainWindow::refreshMediaGrid()
 		{
 			// Video cards always render from the permanent preview/ subfolder, never the real frame folder
 			// directly - this is what lets a not-yet-split video (no real frames yet) still show a real thumbnail.
-			QDir previewDir(folderPath + "/preview");
+			QDir previewDir(Catalog::previewDirFor(folderPath));
 			const QStringList imageFiles = previewDir.entryList(IMAGE_FILE_FILTERS, QDir::Files, QDir::Name);
 			if (imageFiles.isEmpty())
 				return;  // preview/ missing or empty (externally deleted folder, or preview generation failed outright) - don't show a frameless ghost card
@@ -982,7 +982,7 @@ void MainWindow::openSourceInSystemApp(const MediaId& id)
 
 void MainWindow::resplitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder, bool preserveExistingPreview)
 {
-	const QString previewDir = outputFolder + "/preview";
+	const QString previewDir = Catalog::previewDirFor(outputFolder);
 	const QString preservedPreviewDir = outputFolder + "_preview_preserve";
 	const bool hasPreview = preserveExistingPreview && QDir(previewDir).exists();
 	if (hasPreview)
@@ -1001,7 +1001,7 @@ void MainWindow::resplitVideoIntoFrames(const QString& videoFilePath, const QStr
 		// Not preserving an old preview (re-export/reimport want a fresh one) - regenerate it now, but only
 		// if the full split actually produced real frames; a failed split already wiped outputFolder via
 		// splitVideoIntoFrames's own cleanup, and a preview over no real content would be misleading.
-		Ffmpeg::generatePreviewFrames(videoFilePath, outputFolder, m_previewFrameCountCombo->currentData().toInt());
+		Ffmpeg::generatePreviewFrames(videoFilePath, Catalog::previewDirFor(outputFolder), m_previewFrameCountCombo->currentData().toInt());
 	}
 }
 

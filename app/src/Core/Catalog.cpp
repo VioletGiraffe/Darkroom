@@ -333,6 +333,11 @@ QString Catalog::sourcePathForMediaItem(const MediaId& id) const
 	return _mediaItems.value(id).sourcePath;
 }
 
+QString Catalog::previewDirFor(const QString& frameFolder)
+{
+	return frameFolder + "/preview";
+}
+
 bool Catalog::isSplitIntoFrames(const MediaId& id) const
 {
 	return _mediaItems.value(id).splitIntoFrames;

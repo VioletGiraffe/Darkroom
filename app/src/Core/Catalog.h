@@ -78,6 +78,9 @@ public:
 	// Per-item disk facts the catalog tracks. folderForMediaItem is absolute; both are empty for an unknown id.
 	[[nodiscard]] QString folderForMediaItem(const MediaId& id) const;
 	[[nodiscard]] QString sourcePathForMediaItem(const MediaId& id) const;
+	// The preview-frames subdirectory of a video's frame folder - the single definition of the "preview"
+	// subfolder name (a UI-render cache the catalog otherwise never touches). Pure path join; folder may not exist.
+	[[nodiscard]] static QString previewDirFor(const QString& frameFolder);
 	// False once a video was registered with only preview frames (an on-demand split is still owed); true once
 	// the full frame set has been extracted. Unknown id -> true (nothing pending; photos always report true,
 	// there is nothing to split). See addMediaItem.

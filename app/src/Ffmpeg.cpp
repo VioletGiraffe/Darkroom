@@ -134,14 +134,14 @@ void generatePreviewFrames(const std::vector<PreviewJob>& jobs, int frameCount, 
 	const auto reportOneCompleted = [&] { ++completed; if (onProgress) onProgress(completed, total); };
 
 	// Pass 1: probe each job's duration and build its extraction arguments, up to `concurrency` probes at
-	// once. A job whose preview folder can't be created or whose duration can't be probed (a corrupt file
+	// once. A job whose destination folder can't be created or whose duration can't be probed (a corrupt file
 	// typically fails here first) gets no arguments and is counted done now, so it never enters pass 2 and
 	// the extraction windows there stay packed with only good jobs.
 	std::vector<bool> probeStarted(total, false);
 	std::vector<QStringList> extractionArguments(total);
 	runInProcessWindows(total, concurrency,
 		[&](int i, QProcess& probe) {
-			if (!QDir{}.mkpath(jobs[i].outputFolder + "/preview"))
+			if (!QDir{}.mkpath(jobs[i].destinationFolder))
 				return;  // leaves probeStarted[i] false -> treated as a skip in finish
 			startDurationProbe(probe, jobs[i].videoFilePath);
 			probeStarted[i] = true;
@@ -149,14 +149,14 @@ void generatePreviewFrames(const std::vector<PreviewJob>& jobs, int frameCount, 
 		[&](int i, QProcess& probe) {
 			const qint64 durationMs = probeStarted[i] ? parseProbedDurationMs(probe) : -1;
 			if (durationMs <= 0)
-				reportOneCompleted();  // best-effort: leave this job's preview/ empty rather than guessing seek points
+				reportOneCompleted();  // best-effort: leave this job's destination empty rather than guessing seek points
 			else
-				extractionArguments[i] = buildExtractionArguments(jobs[i].videoFilePath, jobs[i].outputFolder + "/preview",
+				extractionArguments[i] = buildExtractionArguments(jobs[i].videoFilePath, jobs[i].destinationFolder,
 					pickEvenlySpacedTimestampsMs(durationMs, frameCount));
 		});
 
 	// Pass 2: run the extractions for the jobs that probed successfully, again up to `concurrency` at once.
-	// Whatever frames each invocation writes stay in its preview/; no failure is surfaced (see header).
+	// Whatever frames each invocation writes stay in its destinationFolder; no failure is surfaced (see header).
 	std::vector<int> jobsToExtract;
 	jobsToExtract.reserve(total);
 	for (int i = 0; i < total; ++i)
@@ -174,9 +174,9 @@ void generatePreviewFrames(const std::vector<PreviewJob>& jobs, int frameCount, 
 		});
 }
 
-void generatePreviewFrames(const QString& videoFilePath, const QString& outputFolder, int frameCount)
+void generatePreviewFrames(const QString& videoFilePath, const QString& destinationFolder, int frameCount)
 {
-	generatePreviewFrames({ PreviewJob{ videoFilePath, outputFolder } }, frameCount, /*maxConcurrentProcesses*/ 1);
+	generatePreviewFrames({ PreviewJob{ videoFilePath, destinationFolder } }, frameCount, /*maxConcurrentProcesses*/ 1);
 }
 
 } // namespace Ffmpeg

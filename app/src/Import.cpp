@@ -56,10 +56,11 @@ Import::Result Import::importVideo(const QString& videoPath, const QString& coll
 	// needs a few permanent preview frames up front, then registers the video right away. Quick Import already
 	// extracted exactly these for its staging card, so reuse them by copy; fall back to a fresh ffmpeg pass only
 	// when there's nothing staged to reuse (not reached via Quick Import, or staging's probe produced no frames).
-	if (stagedPreviewDir.isEmpty() || !copyPreviewFrames(stagedPreviewDir + "/preview", outputFolder + "/preview"))
+	// The staged scratch dir holds those frames directly; the frame folder nests its own under preview/.
+	if (stagedPreviewDir.isEmpty() || !copyPreviewFrames(stagedPreviewDir, Catalog::previewDirFor(outputFolder)))
 	{
 		const int previewFrameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
-		Ffmpeg::generatePreviewFrames(videoPath, outputFolder, previewFrameCount);
+		Ffmpeg::generatePreviewFrames(videoPath, Catalog::previewDirFor(outputFolder), previewFrameCount);
 	}
 
 	if (!Catalog::instance().addMediaItem(MediaId::fromFile(videoPath), videoPath, outputFolder, /*splitIntoFrames=*/false))

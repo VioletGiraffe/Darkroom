@@ -11,19 +11,20 @@
 namespace Ffmpeg {
 
 // One video's preview-extraction request: pull evenly-spaced frames from videoFilePath into
-// outputFolder/preview/.
+// destinationFolder. The "preview" subfolder convention lives with the caller (see Catalog::previewDirFor);
+// this module writes frames into exactly the folder it's handed and knows nothing about where that sits.
 struct PreviewJob
 {
 	QString videoFilePath;
-	QString outputFolder;
+	QString destinationFolder;
 };
 
-// Generates frameCount evenly-spaced preview frames for each job into its outputFolder/preview/ (created if
+// Generates frameCount evenly-spaced preview frames for each job into its destinationFolder (created if
 // needed), running up to maxConcurrentProcesses ffmpeg processes at once. Each ffmpeg is its own OS process,
 // so this parallelizes without any worker threads: it starts a batch of processes and then waits on that
 // batch, all on the calling thread. Work happens in two passes - first all duration probes, then all frame
 // extractions - each batched at maxConcurrentProcesses; a job whose folder can't be created or whose
-// duration can't be probed (the first thing to fail on a corrupt file) is skipped, leaving its preview/
+// duration can't be probed (the first thing to fail on a corrupt file) is skipped, leaving its destinationFolder
 // empty and never entering the extraction pass. Best-effort throughout - callers never gate on this.
 //
 // onProgress, if set, is invoked on the calling thread as each job reaches its terminal state (extracted or
@@ -35,6 +36,6 @@ void generatePreviewFrames(const std::vector<PreviewJob>& jobs, int frameCount, 
 
 // Single-video convenience: the batch form with one job run one process at a time. Used by the import
 // and re-split paths, which handle a single video.
-void generatePreviewFrames(const QString& videoFilePath, const QString& outputFolder, int frameCount);
+void generatePreviewFrames(const QString& videoFilePath, const QString& destinationFolder, int frameCount);
 
 } // namespace Ffmpeg

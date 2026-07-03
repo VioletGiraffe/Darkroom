@@ -104,12 +104,14 @@ duration (probed from ffmpeg's own output, since no `ffprobe` ships here), it pi
 timestamps across the same 10%–90% window used for real-frame sampling and pulls one downscaled thumbnail per
 timestamp in a single multi-seek ffmpeg run — seeking per-output on one open input rather than spawning a
 process per frame or decoding the whole video. Thumbnail height and JPEG quality are fixed constants,
-independent of the user's full-split quality. Best-effort throughout: any failure just leaves `preview/` empty
-or partial, and import never gates on it succeeding.
+independent of the user's full-split quality. Callers pass the exact destination folder — a frame folder's
+`preview/` subdir (via `Catalog::previewDirFor`) or a staging scratch dir — so the engine itself knows nothing
+of the `preview/` convention. Best-effort throughout: any failure just leaves that folder empty or partial,
+and import never gates on it succeeding.
 
 It also has a batch form that extracts several videos' previews at once, used by Quick Import staging. The
 concurrency is deliberately thread-free — each ffmpeg is its own OS process, so a bounded number run together
-and are waited on, all on the calling thread. A video whose probe fails is skipped (its `preview/` left empty),
+and are waited on, all on the calling thread. A video whose probe fails is skipped (its destination left empty),
 and a progress callback reports completions for the staging dialog's counter.
 
 `preview/` is a permanent, separate store once created: a later real `splitVideoIntoFrames` run never deletes

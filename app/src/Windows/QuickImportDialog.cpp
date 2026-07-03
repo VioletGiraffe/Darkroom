@@ -674,12 +674,12 @@ void QuickImportDialog::stageMediaItems(const QStringList& paths)
 	{
 		const QString& path = job.videoFilePath;
 
-		QDir previewDir(job.outputFolder + "/preview");
+		QDir previewDir(job.destinationFolder);
 		QStringList previewPaths;
 		for (const QString& file : previewDir.entryList(IMAGE_FILE_FILTERS, QDir::Files, QDir::Name))
 			previewPaths << previewDir.filePath(file);
 
-		stageCard(path, previewPaths, job.outputFolder, [this, path] {
+		stageCard(path, previewPaths, job.destinationFolder, [this, path] {
 			auto* player = new VideoPlayerWindow(path, MediaId::fromFile(path), this);
 			player->show();
 		});
