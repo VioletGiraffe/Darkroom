@@ -745,16 +745,22 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 	// all-photo selection (2..4; a bigger grid stops being a useful comparison).
 	const bool selectionAllPhotos = std::all_of(selection.cbegin(), selection.cend(),
 		[&catalog](const MediaId& sel) { return catalog.mediaType(sel) == Catalog::MediaType::Photo; });
-	if (selectionAllPhotos && selection.size() >= 2 && selection.size() <= 4)
+	if (selectionAllPhotos && selection.size() >= 2)
 	{
 		menu.addAction(tr("Compare photos"), [this, selection] {
 			QStringList paths;
+			static constexpr size_t MaxImages = 50;
 			for (const MediaId& sel : selection)
 			{
 				const QString path = Catalog::instance().sourcePathForMediaItem(sel);
 				if (!path.isEmpty() && QFileInfo::exists(path))
+				{
 					paths.push_back(path);
+					if (paths.size() >= MaxImages)
+						break;
+				}
 			}
+
 			if (paths.size() < 2)
 			{
 				QMessageBox::warning(this, tr("Error"), tr("The selected photo files could not be found on disk."));

@@ -269,7 +269,7 @@ void PhotoCompareWindow::keyPressEvent(QKeyEvent* event)
 	else if (key == Qt::Key_F)
 		fitView();
 	else if (!m_calibrating && !event->isAutoRepeat() &&
-	         key >= Qt::Key_1 && key < Qt::Key_1 + static_cast<int>(m_panes.size()))
+	         key >= Qt::Key_1 && key <= Qt::Key_9 && key < Qt::Key_1 + static_cast<int>(m_panes.size()))
 	{
 		m_flickerIndex = key - Qt::Key_1;
 		updateAllPanes();
