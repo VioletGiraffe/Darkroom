@@ -66,15 +66,44 @@ count change, and each added photo is default-aligned against the current refere
 
 - **One shared view** (zoom + pan, in widget coordinates — equal pane sizes are what make the same widget
   position show the same subject point in every pane): wheel zooms all panes around the cursor, drag pans all.
-- **A per-photo alignment transform** (uniform scale + offset) mapping each image into the shared "subject"
-  space (defined as photo 0's pixel coordinates). This is the zoom/crop-difference compensation. The default
-  normalizes each photo's height to photo 0's and centers — so pure resolution differences align with no user
-  action. Adjusted manually (Ctrl+wheel / Ctrl+drag on one pane) or via **two-point calibration** (`A`): the
-  user clicks the same two features in every photo; the distance ratio gives each photo's scale, the midpoint
-  difference its offset (similarity transform *without* rotation — a deliberate v1 simplification).
+- **A per-photo alignment transform** (uniform scale + offset — *no rotation*, a deliberate v1
+  simplification) mapping each image into the shared "subject" space, defined as the **reference photo's**
+  pixel coordinates (photo 0 by default; two-point calibration re-elects it). This is the zoom/crop-difference
+  compensation. The default normalizes each photo's height to the reference's and centers — so pure
+  resolution differences align with no user action.
 
-**Flicker** (hold `1`..`N`): every pane temporarily renders that photo under the shared view (accent frame +
-the corner caption flag the override) — with aligned photos, the fastest way to spot differences.
+Three ways to set the alignment:
+
+- **Auto-align (`A`)** — one click estimates every photo's transform against the reference via the
+  `magic-alignment` submodule (a Qt-only static library; pipeline: black-bar detection → coarse joint
+  scale+offset brute force → patch correspondences refined coarse-to-fine over an image pyramid → trimmed
+  least-squares fit → accept-or-fail verdict), feeding the current alignment in as the initial guess. A photo
+  the library cannot align reliably *keeps* its current alignment rather than receiving a plausible-but-wrong
+  one. The per-patch evidence is drawn on the panes as true-footprint squares (accent = used in the fit,
+  orange = matched well but disagrees with the fit — a systematic pattern of these hints at rotation,
+  red = no match) until the next alignment; a per-photo outcome summary lands in the hint bar.
+- **Two-point calibration (`Shift+A`)** — click the same two features in every photo; the photo receiving the
+  session's first point becomes the reference; the distance ratio gives each photo's scale, the midpoint
+  difference its offset.
+- **Manually** — Ctrl+wheel / Ctrl+drag adjusts the hovered photo's transform alone.
+
+Both auto-align and calibration first **fold the reference's transform into the view** (the view pan/zoom
+absorb it, the reference's own transform becomes identity): the reference stays pixel-frozen on screen while
+subject space rebases to its pixel coordinates, and only the other photos move to meet it.
+
+Comparison modes over the aligned set:
+
+- **Flicker** (hold `1`..`N`, capped at 9): every pane temporarily renders that photo under the shared view
+  (accent frame + the corner caption flag the override) — with aligned photos, the fastest way to spot
+  differences.
+- **Difference** (`D` / the Normal—Difference toggle at the toolbar's right): every pane except the
+  reference's renders as the per-channel |photo − reference| (the reference drawn first, the photo composited
+  over it with `QPainter::CompositionMode_Difference`); a region only one of the two covers differences
+  against the matte, i.e. reads as (nearly) unchanged.
+- **Full view** (the bottom slider; `Left`/`Right` step it): a single pane covering the whole grid area shows
+  the photo at the slider's position, so scrubbing the slider is a full-size flicker; held digit keys still
+  override; `Esc` returns to the grid. Viewport switches keep the subject point at the center fixed once the
+  user has navigated (an untouched view just re-fits).
 
 Implementation notes:
 - The pane widget (`PhotoComparePane`) is defined **in the .cpp** — it's a pure viewport; all state (images,

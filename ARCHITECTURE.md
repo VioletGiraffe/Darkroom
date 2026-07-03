@@ -16,8 +16,11 @@ orient, then follow the link for the subsystem you're touching.
 
 ## Build & dependencies
 
-- **Build system**: `app/app.pro` (qmake). Sources and headers come from a recursive glob evaluated each time
-  qmake runs — `SOURCES += $$files(src/*.cpp, true)`, `HEADERS += $$files(src/*.h, true)` + `$$files(src/*.hpp, true)`.
+- **Build system**: qmake, top-level `Darkroom.pro` (`SUBDIRS`): the app itself (`app/app.pro`) plus the
+  static-library submodules it links — `qtutils`/`cpputils`/`cpp-template-utils` and `magic-alignment`
+  (a Qt-only automatic image-alignment library used by `PhotoCompareWindow`, same `$$files` glob convention).
+  Sources and headers come from a recursive glob evaluated each time qmake runs —
+  `SOURCES += $$files(src/*.cpp, true)`, `HEADERS += $$files(src/*.h, true)` + `$$files(src/*.hpp, true)`.
   Because the glob walks the *whole* `src/` subtree, a new file dropped anywhere under it is enumerated
   automatically. **New source files do not need to be registered in any way**.
   (`Q_OBJECT` types are moc'd automatically because the headers are globbed in the same way.)
@@ -28,7 +31,8 @@ orient, then follow the link for the subsystem you're touching.
   (`MainWindow`, `CompareWindow`, `PhotoCompareWindow`, `FrameViewerWindow`, `VideoPlayerWindow`, the `*Dialog`s); the non-UI core
   model in `Core/` (`Catalog`, `MetadataStore`, `MediaId`); and the visual theming in `Theme/` (`Theme`,
   `Style`). `Settings`, `Utils`, `Ffmpeg`, `Import`, and `main.cpp` stay at the `src/` root.
-- **INCLUDEPATH**: `src` plus the submodules `qtutils`, `cpputils`, `cpp-template-utils`. With `src` on the
+- **INCLUDEPATH**: `src` plus the submodules `qtutils`, `cpputils`, `cpp-template-utils`, and
+  `magic-alignment/src` (its headers are included unqualified: `"MagicAlignment.h"`). With `src` on the
   path, app headers are included **layer-qualified** — `"UiComponents/ThumbnailWidget.h"`,
   `"Windows/MainWindow.h"`, `"Core/Catalog.h"`, and the few root headers as `"Utils.h"` — regardless of the
   including file's location; submodule headers likewise drop their prefix (`qtutils/widgets/layouts/cflowlayout.h`
@@ -89,7 +93,8 @@ and the card zoom/preview-count mechanism.
 ### [Frame viewer & video player](docs/architecture/playback.md)
 `FrameViewerWindow` (persistent per-folder thumbnail popup), `VideoPlayerWindow` (built-in player: seek,
 A–B loop, saved loops persisted per-video), `MarkerSlider`, and `PhotoCompareWindow` (N-way photo compare:
-one shared zoom/pan view + a per-photo alignment transform, two-point calibration, flicker).
+one shared zoom/pan view + a per-photo alignment transform, one-click auto-align via the `magic-alignment`
+library, two-point calibration, flicker / difference / full-view comparison modes, drop-to-add photos).
 
 ### [Settings & theme](docs/architecture/settings-and-theme.md)
 The `Settings.h`/`QSettings` key pattern, `SettingsDialog`, the `Theme` dark/light color system (incl. the
