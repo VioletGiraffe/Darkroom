@@ -53,3 +53,38 @@ A `QSlider` subclass (paint-only) that draws up to two vertical markers, positio
 metrics so they align with the handle. Chosen over an overlay widget or a `QGraphicsVideoItem` route because
 it keeps all of `QSlider`'s free behavior (mouse/keyboard seeking, styling, seek signals) and adds only marker
 painting.
+
+---
+
+## `PhotoCompareWindow` (`src/Windows/PhotoCompareWindow.h/.cpp`)
+
+N-way (2..4, gated in `MainWindow`'s context menu for all-photo selections) photo comparison in a square grid
+of equally sized panes, maximized by default. Its core mechanism is **two separate transform layers**:
+
+- **One shared view** (zoom + pan, in widget coordinates — equal pane sizes are what make the same widget
+  position show the same subject point in every pane): wheel zooms all panes around the cursor, drag pans all.
+- **A per-photo alignment transform** (uniform scale + offset) mapping each image into the shared "subject"
+  space (defined as photo 0's pixel coordinates). This is the zoom/crop-difference compensation. The default
+  normalizes each photo's height to photo 0's and centers — so pure resolution differences align with no user
+  action. Adjusted manually (Ctrl+wheel / Ctrl+drag on one pane) or via **two-point calibration** (`A`): the
+  user clicks the same two features in every photo; the distance ratio gives each photo's scale, the midpoint
+  difference its offset (similarity transform *without* rotation — a deliberate v1 simplification).
+
+**Flicker** (hold `1`..`N`): every pane temporarily renders that photo under the shared view (accent frame +
+the corner caption flag the override) — with aligned photos, the fastest way to spot differences.
+
+Implementation notes:
+- The pane widget (`PhotoComparePane`) is defined **in the .cpp** — it's a pure viewport; all state (images,
+  mip chains, alignment, view, calibration points) lives in the window, reached via friendship. No `Q_OBJECT`
+  on either class (direct calls, no signals).
+- **Minification quality**: panes paint through a lazily built halving mip chain
+  (`QImage::scaled(..., SmoothTransformation)` per level), picking the level that keeps the painter's live
+  bilinear pass at ≤2× reduction — the same minification-aliasing lesson as `ThumbnailWidget`'s pre-resample
+  fix, adapted for continuous zoom.
+- **Click-vs-drag** on a pane: a press starts drag tracking, a sub-threshold release is a click — that's how
+  calibration points are placed, keeping pan/zoom fully available *while* calibrating (points are stored in
+  image coordinates, so navigating doesn't disturb them).
+- The view re-fits on every pane resize (first show, maximize, later window resizes) **until the user first
+  navigates**; after that resizes leave the view alone.
+- Photos that fail to load are dropped at construction with a `qWarning` (so all downstream code can assume
+  every pane has a valid image); alignment is transient — nothing here persists except window geometry.

@@ -1,6 +1,7 @@
 #include "Windows/MainWindow.h"
 #include "Core/Catalog.h"
 #include "Windows/CompareWindow.h"
+#include "Windows/PhotoCompareWindow.h"
 #include "Ffmpeg.h"
 #include "Import.h"
 #include "Windows/FrameViewerWindow.h"
@@ -723,8 +724,8 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 
 	QMenu menu(this);
 
-	// CompareWindow browses frame folders, so it's videos-only (a photo comparison tool is a separate future
-	// feature, not an adaptation of it) - offered only when nothing in the selection is a photo.
+	// CompareWindow browses frame folders, so it's videos-only (photos get their own PhotoCompareWindow
+	// below) - offered only when nothing in the selection is a photo.
 	const bool selectionAllVideos = std::all_of(selection.cbegin(), selection.cend(),
 		[&catalog](const MediaId& sel) { return catalog.mediaType(sel) == Catalog::MediaType::Video; });
 	if (selectionAllVideos)
@@ -734,6 +735,32 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 			for (const MediaId& sel : selection)
 				folders << Catalog::instance().folderForMediaItem(sel);
 			auto* w = new CompareWindow(folders, this);
+			w->setAttribute(Qt::WA_DeleteOnClose);
+			w->show();
+		});
+		menu.addSeparator();
+	}
+
+	// PhotoCompareWindow: synchronized zoom/pan over the photo files themselves - offered for a small
+	// all-photo selection (2..4; a bigger grid stops being a useful comparison).
+	const bool selectionAllPhotos = std::all_of(selection.cbegin(), selection.cend(),
+		[&catalog](const MediaId& sel) { return catalog.mediaType(sel) == Catalog::MediaType::Photo; });
+	if (selectionAllPhotos && selection.size() >= 2 && selection.size() <= 4)
+	{
+		menu.addAction(tr("Compare photos"), [this, selection] {
+			QStringList paths;
+			for (const MediaId& sel : selection)
+			{
+				const QString path = Catalog::instance().sourcePathForMediaItem(sel);
+				if (!path.empty() && QFileInfo::exists(path))
+					paths.push_back(path);
+			}
+			if (paths.size() < 2)
+			{
+				QMessageBox::warning(this, tr("Error"), tr("The selected photo files could not be found on disk."));
+				return;
+			}
+			auto* w = new PhotoCompareWindow(paths, this);
 			w->setAttribute(Qt::WA_DeleteOnClose);
 			w->show();
 		});

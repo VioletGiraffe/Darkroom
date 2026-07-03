@@ -22,7 +22,7 @@ orient, then follow the link for the subsystem you're touching.
 - **Source layout** (under `app/src/`): reusable UI widgets in `UiComponents/` (`ThumbnailWidget`,
   `MediaItemWidget`, `MarkerSlider`, `SortControl`, `SegmentedToggle`, `LabelSidebar`) plus their close UI
   helpers (`LabelVisuals`, `DragGestureHelper`, `LabelMimeType`); top-level windows + dialogs in `Windows/`
-  (`MainWindow`, `CompareWindow`, `FrameViewerWindow`, `VideoPlayerWindow`, the `*Dialog`s); the non-UI core
+  (`MainWindow`, `CompareWindow`, `PhotoCompareWindow`, `FrameViewerWindow`, `VideoPlayerWindow`, the `*Dialog`s); the non-UI core
   model in `Core/` (`Catalog`, `MetadataStore`, `MediaId`); and the visual theming in `Theme/` (`Theme`,
   `Style`). `Settings`, `Utils`, `Ffmpeg`, `Import`, and `main.cpp` stay at the `src/` root.
 - **INCLUDEPATH**: `src` plus the submodules `qtutils`, `cpputils`, `cpp-template-utils`. With `src` on the
@@ -85,7 +85,8 @@ and the card zoom/preview-count mechanism.
 
 ### [Frame viewer & video player](docs/architecture/playback.md)
 `FrameViewerWindow` (persistent per-folder thumbnail popup), `VideoPlayerWindow` (built-in player: seek,
-A–B loop, saved loops persisted per-video), and `MarkerSlider`.
+A–B loop, saved loops persisted per-video), `MarkerSlider`, and `PhotoCompareWindow` (N-way photo compare:
+one shared zoom/pan view + a per-photo alignment transform, two-point calibration, flicker).
 
 ### [Settings & theme](docs/architecture/settings-and-theme.md)
 The `Settings.h`/`QSettings` key pattern, `SettingsDialog`, the `Theme` dark/light color system (incl. the
