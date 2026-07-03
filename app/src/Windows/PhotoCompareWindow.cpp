@@ -435,6 +435,10 @@ void PhotoCompareWindow::applyCalibration()
 	// the reference's two: scale = the distance ratio, offset = the midpoint difference.
 	Pane& ref = m_panes[0];
 	const QLineF refLine(ref.calibPoints[0], ref.calibPoints[1]);
+	// Fold the reference's old alignment into the view transform so the reference image stays exactly where
+	// it was on screen (same zoom, same position) and only the other photos move to meet it.
+	m_viewPan += m_viewZoom * ref.alignOffset;
+	m_viewZoom *= ref.alignScale;
 	ref.alignScale = 1.0;
 	ref.alignOffset = QPointF();
 	for (size_t i = 1; i < m_panes.size(); ++i)
@@ -444,8 +448,7 @@ void PhotoCompareWindow::applyCalibration()
 		pane.alignScale = refLine.length() / line.length();
 		pane.alignOffset = refLine.center() - pane.alignScale * line.center();
 	}
-	setCalibrating(false);
-	fitView();
+	setCalibrating(false);  // also repaints all panes
 }
 
 void PhotoCompareWindow::onPaneResized()
