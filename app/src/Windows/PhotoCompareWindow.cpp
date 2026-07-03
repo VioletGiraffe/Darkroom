@@ -1,10 +1,12 @@
 #include "Windows/PhotoCompareWindow.h"
 #include "Theme/Theme.h"
+#include "UiComponents/SegmentedToggle.h"
 #include "Utils.h"
 
 #include <QDebug>
 #include <QFileInfo>
 #include <QGridLayout>
+#include <QHBoxLayout>
 #include <QImageReader>
 #include <QKeyEvent>
 #include <QLabel>
@@ -64,17 +66,33 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 
 	const int renderIndex = m_owner.m_flickerIndex >= 0 ? m_owner.m_flickerIndex : photoIndex();
 	PhotoCompareWindow::Photo& photo = m_owner.m_photos[renderIndex];
-
 	const double effectiveScale = m_owner.m_viewZoom * photo.alignScale;
-	double residualScale = 1.0;
-	const QImage& source = m_owner.imageForScale(photo, effectiveScale, residualScale);
 
-	painter.save();
-	painter.setRenderHint(QPainter::SmoothPixmapTransform);
-	painter.translate(m_owner.m_viewZoom * photo.alignOffset + m_owner.m_viewPan);
-	painter.scale(residualScale, residualScale);
-	painter.drawImage(0, 0, source);
-	painter.restore();
+	const auto drawPhoto = [&](PhotoCompareWindow::Photo& drawn) {
+		const double drawnScale = m_owner.m_viewZoom * drawn.alignScale;
+		double residualScale = 1.0;
+		const QImage& source = m_owner.imageForScale(drawn, drawnScale, residualScale);
+		painter.save();
+		painter.setRenderHint(QPainter::SmoothPixmapTransform);
+		painter.translate(m_owner.m_viewZoom * drawn.alignOffset + m_owner.m_viewPan);
+		painter.scale(residualScale, residualScale);
+		painter.drawImage(0, 0, source);
+		painter.restore();
+	};
+
+	// Difference mode renders every photo except the reference as its per-channel |photo - reference|:
+	// the reference is drawn first, the photo on top of it in Difference composition mode. Where only one
+	// of the two covers, that image differences against the matte, i.e. shows (nearly) unchanged.
+	if (m_owner.m_differenceMode && renderIndex != m_owner.m_refIndex)
+	{
+		drawPhoto(m_owner.m_photos[m_owner.m_refIndex]);
+		painter.save();
+		painter.setCompositionMode(QPainter::CompositionMode_Difference);
+		drawPhoto(photo);
+		painter.restore();
+	}
+	else
+		drawPhoto(photo);
 
 	painter.setRenderHint(QPainter::Antialiasing);
 
@@ -250,6 +268,9 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 		m_viewStack->addWidget(m_fullPane);
 		mainLayout->addLayout(m_viewStack, 1);
 
+		// Bottom toolbar: the full-view picker slider stretching across, render-mode toggle at the far right.
+		QHBoxLayout* toolbar = new QHBoxLayout();
+
 		// Full-view picker: one detent per photo; pressing the handle or changing the value enters the full
 		// view, dragging back and forth scrubs between the aligned photos (a flicker gesture at full size).
 		m_slider = new QSlider(Qt::Horizontal, this);
@@ -260,7 +281,14 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 		m_slider->setFocusPolicy(Qt::NoFocus);  // all keyboard input stays on the window
 		connect(m_slider, &QSlider::sliderPressed, this, [this] { setFullViewIndex(m_slider->value()); });
 		connect(m_slider, &QSlider::valueChanged, this, [this](int value) { setFullViewIndex(value); });
-		mainLayout->addWidget(m_slider, 0);
+		toolbar->addWidget(m_slider, 1);
+
+		m_diffToggle = new SegmentedToggle({ tr("Normal"), tr("Difference") }, this);
+		m_diffToggle->setToolTip(tr("Difference: render each photo as its per-pixel difference against the reference photo (D)"));
+		connect(m_diffToggle, &SegmentedToggle::currentChanged, this, [this](int index) { setDifferenceMode(index == 1); });
+		toolbar->addWidget(m_diffToggle, 0);
+
+		mainLayout->addLayout(toolbar, 0);
 	}
 
 	m_hintLabel = new QLabel(this);
@@ -299,6 +327,8 @@ void PhotoCompareWindow::keyPressEvent(QKeyEvent* event)
 	}
 	else if (key == Qt::Key_F)
 		fitView();
+	else if (key == Qt::Key_D && !event->isAutoRepeat() && !m_photos.empty())
+		setDifferenceMode(!m_differenceMode);
 	else if (m_fullViewIndex >= 0 && (key == Qt::Key_Left || key == Qt::Key_Right))
 		m_slider->setValue(m_slider->value() + (key == Qt::Key_Right ? 1 : -1));  // setValue clamps to the range
 	else if (!m_calibrating && !event->isAutoRepeat() &&
@@ -529,6 +559,13 @@ void PhotoCompareWindow::exitFullView()
 	updateAllPanes();
 }
 
+void PhotoCompareWindow::setDifferenceMode(bool difference)
+{
+	m_differenceMode = difference;
+	m_diffToggle->setCurrentIndex(difference ? 1 : 0);  // silent; a no-op when the toggle itself is the source
+	updateAllPanes();
+}
+
 void PhotoCompareWindow::onPaneResized()
 {
 	// Until the user navigates, every layout change (first show, maximize, a later window resize) re-fits
@@ -563,9 +600,9 @@ void PhotoCompareWindow::updateHintText()
 			.arg(progress.join("   ")));
 	}
 	else if (m_fullViewIndex >= 0)
-		m_hintLabel->setText(tr("Full view %1/%2 · slider / Left,Right: switch photo · hold 1..%2: flicker · wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust this photo · F: fit · Esc: back to grid")
+		m_hintLabel->setText(tr("Full view %1/%2 · slider / Left,Right: switch photo · hold 1..%2: flicker · D: difference · wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust this photo · F: fit · Esc: back to grid")
 			.arg(m_fullViewIndex + 1).arg(m_photos.size()));
 	else
-		m_hintLabel->setText(tr("Wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust one photo · A: align by 2 points · hold 1..%1: flicker · slider: full view · F / double-click: fit · Esc: close")
+		m_hintLabel->setText(tr("Wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust one photo · A: align by 2 points · hold 1..%1: flicker · D: difference · slider: full view · F / double-click: fit · Esc: close")
 			.arg(m_photos.size()));
 }
