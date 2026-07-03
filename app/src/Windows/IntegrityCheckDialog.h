@@ -8,11 +8,11 @@
 #include <functional>
 
 // ============================================================================
-// IntegrityCheckDialog - scans the catalog against disk for the three kinds of drift Catalog::scanIntegrity
-// can find (relinkable placeholders, untracked frame folders, ghost entries) and lets the user resolve each
-// one individually: relink/register/re-import/remove, or browse to manually point at a source video where
-// the catalog couldn't resolve one on its own. All scan/UI logic lives here, behind the static
-// scanAndShowUi() entry point - MainWindow only supplies the callbacks that actually touch the Catalog/disk.
+// IntegrityCheckDialog - shows what Catalog::scanIntegrity found (relinkable placeholders, untracked frame
+// folders, and broken video entries) and lets the user resolve each one: relink / register for the first two;
+// per broken video, re-import / regenerate preview / mark-fully-split / remove; plus browse to point at a
+// source manually. All UI logic lives here behind the static scanAndShowUi() entry point - MainWindow only
+// supplies the callbacks that actually touch the Catalog/disk.
 // ============================================================================
 
 class IntegrityCheckDialog final : public QDialog
@@ -26,11 +26,16 @@ public:
 		// Attempts to register an untracked folder at the given source path; returns whether it succeeded
 		// (Catalog::addMediaItem refuses on an id clash with a different folder).
 		std::function<bool(const QString& folderPath, const QString& sourcePath)> registerRequested;
-		// Re-extracts frames for a ghost whose source is still present, landing back in its existing folder;
-		// returns whether frames actually exist there afterwards.
-		std::function<bool(const MediaId& ghostId)> reimportRequested;
-		// Drops a ghost entry from the catalog outright (its folder is already gone); always succeeds.
-		std::function<bool(const MediaId& ghostId)> removeGhostRequested;
+		// Re-extracts a video's frames from its (present) source back into its folder (also regenerating the
+		// preview); returns whether frames actually exist there afterwards. The GHOST recovery.
+		std::function<bool(const MediaId& id)> reimportRequested;
+		// Rebuilds a video's preview so its card renders again - from its real frames if present (which also
+		// marks the entry fully split), else from its source video. True if a preview exists afterwards. INVISIBLE.
+		std::function<bool(const MediaId& id)> regeneratePreviewRequested;
+		// Marks a video as fully split when its real frames exist but the entry was still flagged preview-only. STALE.
+		std::function<bool(const MediaId& id)> markSplitRequested;
+		// Drops an entry from the catalog outright; always succeeds.
+		std::function<bool(const MediaId& id)> removeEntryRequested;
 	};
 
 	// Scans the catalog for drift against disk and, if anything was found, shows this dialog so the user can

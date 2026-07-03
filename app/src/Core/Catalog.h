@@ -198,22 +198,32 @@ public:
 		bool    filesIdentical = false;  // meaningful only when clashId.isValid(): byte comparison against the existing entry's source
 	};
 
-	// A catalog entry whose frame folder has no images left (deleted externally, or a failed re-export).
-	// Never reported for a video that's merely awaiting its on-demand split - see isSplitIntoFrames.
-	struct GhostEntry
+	// A tracked video whose on-disk backing is not fully intact, in any combination - the integrity grid's
+	// verdicts are orthogonal (see scanIntegrity's banner), so several can hold on one entry. Carries the raw
+	// disk facts; the predicates name the verdicts the dialog renders and resolves. A healthy video -> no issue.
+	struct MediaIssue
 	{
 		MediaId id;
-		QString folder;              // the (missing/emptied) recorded folder
+		QString folder;
 		QString sourcePath;
-		bool    sourcePresent = false;  // true if sourcePath still points at an existing file - re-import is possible
+		bool    sourcePresent     = false;  // source file still on disk
+		bool    realFramesPresent = false;  // real frames in <folder> - the deliverable
+		bool    previewPresent    = false;  // preview frames in previewDirFor(<folder>) - the card's only render source
+		bool    splitComplete     = false;  // the entry's splitIntoFrames flag
+
+		[[nodiscard]] bool isGhost() const       { return splitComplete && !realFramesPresent; }  // deliverable gone
+		[[nodiscard]] bool isInvisible() const   { return !previewPresent; }                      // card can't render
+		[[nodiscard]] bool isStale() const       { return !splitComplete && realFramesPresent; }  // flag disagrees with disk
+		[[nodiscard]] bool sourceMissing() const { return !sourcePresent; }
+		[[nodiscard]] bool healthy() const       { return sourcePresent && !isGhost() && !isInvisible() && !isStale(); }
 	};
 
 	struct IntegrityReport
 	{
 		std::vector<RelinkCandidate> relinkable;
 		std::vector<UntrackedFolder> untracked;
-		std::vector<GhostEntry>      ghosts;
-		[[nodiscard]] bool isEmpty() const { return relinkable.empty() && untracked.empty() && ghosts.empty(); }
+		std::vector<MediaIssue>      issues;
+		[[nodiscard]] bool isEmpty() const { return relinkable.empty() && untracked.empty() && issues.empty(); }
 	};
 
 	// Walks disk once (only ever on explicit user request, never part of the normal refresh path) plus the
@@ -225,6 +235,10 @@ public:
 	// "Legacy seed" note on how such an orphaned record can exist. Refuses (false, qWarning) if the real id
 	// already names an item tracked under a *different* folder - a separate, unrelated collision.
 	bool relinkPlaceholder(const MediaId& placeholderId, const QString& confirmedSourcePath);
+
+	// Integrity resolution for the STALE case: marks a video as fully split when its real frames exist on disk
+	// but the entry was still flagged preview-only. No-op on an unknown id or one already marked split. Persists.
+	void markSplitComplete(const MediaId& id);
 
 	Catalog(const Catalog&) = delete;
 	Catalog& operator=(const Catalog&) = delete;

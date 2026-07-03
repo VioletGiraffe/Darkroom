@@ -214,48 +214,67 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog::IntegrityReport& repor
 		}
 	}
 
-	if (!report.ghosts.empty())
+	if (!report.issues.empty())
 	{
-		contentLayout->addWidget(new QLabel(tr("<b>Ghosts</b> - catalog entry, frame folder is gone"), content));
-		for (const Catalog::GhostEntry& ghost : report.ghosts)
+		contentLayout->addWidget(new QLabel(tr("<b>Problems</b> - tracked videos whose files don't match the catalog"), content));
+		for (const Catalog::MediaIssue& issue : report.issues)
 		{
-			QString detail;
-			if (ghost.sourcePresent)
-				detail = tr("Source still present at %1").arg(ghost.sourcePath);
-			else if (ghost.sourcePath.isEmpty())
-				detail = tr("Source is also missing");
-			else
-				detail = tr("Source is also missing (%1)").arg(ghost.sourcePath);
-			const QString status = QFileInfo(ghost.folder).fileName() + "<br>" + detail;
+			// One line per broken video listing everything wrong with it - the grid's verdicts are orthogonal,
+			// so several can apply at once (e.g. frames gone and source also missing).
+			QStringList problems;
+			if (issue.isGhost())
+				problems << tr("frames are gone");
+			if (issue.isInvisible())
+				problems << tr("no preview - the card can't be shown");
+			if (issue.isStale())
+				problems << tr("marked not-yet-split, but frames exist");
+			if (issue.sourceMissing())
+				problems << (issue.sourcePath.isEmpty() ? tr("no source recorded")
+				                                        : tr("source missing: %1").arg(issue.sourcePath));
+			const QString status = QFileInfo(issue.folder).fileName() + "<br>" + problems.join(QStringLiteral("; "));
 
 			const auto [row, statusLabel] = addRow(status);
 			QHBoxLayout* rowLayout = static_cast<QHBoxLayout*>(row->layout());
 
-			QPushButton* reimportButton = nullptr;
-			if (ghost.sourcePresent)
-			{
-				reimportButton = new QPushButton(tr("Re-import"), row);
-				rowLayout->addWidget(reimportButton);
-			}
-			QPushButton* removeButton = new QPushButton(tr("Remove"), row);
-			QPushButton* skipButton   = new QPushButton(tr("Skip"), row);
-			rowLayout->addWidget(removeButton);
-			rowLayout->addWidget(skipButton);
+			const MediaId id = issue.id;
 
-			const MediaId ghostId = ghost.id;
-			std::vector<QPushButton*> rowButtons{ removeButton, skipButton };
-			if (reimportButton)
-				rowButtons.insert(rowButtons.begin(), reimportButton);
+			// Which fixes are offered follows the grid's recovery notes: Re-import re-extracts a gone deliverable
+			// (needs the source); Regenerate rebuilds a missing preview from real frames or the source; Mark-split
+			// fixes only a stale flag. Remove/Skip are always available.
+			const bool canReimport   = issue.isGhost() && issue.sourcePresent;
+			const bool canRegenerate = issue.isInvisible() && !issue.isGhost() && (issue.realFramesPresent || issue.sourcePresent);
+			const bool canMarkSplit  = issue.isStale() && !issue.isInvisible();
+
+			QPushButton* reimportButton   = canReimport   ? new QPushButton(tr("Re-import"), row) : nullptr;
+			QPushButton* regenerateButton = canRegenerate ? new QPushButton(tr("Regenerate preview"), row) : nullptr;
+			QPushButton* markSplitButton  = canMarkSplit  ? new QPushButton(tr("Mark as fully split"), row) : nullptr;
+			QPushButton* removeButton      = new QPushButton(tr("Remove"), row);
+			QPushButton* skipButton        = new QPushButton(tr("Skip"), row);
+
+			std::vector<QPushButton*> rowButtons;
+			for (QPushButton* b : { reimportButton, regenerateButton, markSplitButton, removeButton, skipButton })
+				if (b)
+				{
+					rowLayout->addWidget(b);
+					rowButtons.push_back(b);
+				}
 
 			if (reimportButton)
-			{
 				wireAction(reimportButton, statusLabel, rowButtons, tr("Re-imported."),
 					tr("Re-import failed - see the error dialog for details."),
-					[this, ghostId] { return m_callbacks.reimportRequested(ghostId); });
-			}
+					[this, id] { return m_callbacks.reimportRequested(id); });
+
+			if (regenerateButton)
+				wireAction(regenerateButton, statusLabel, rowButtons, tr("Preview regenerated."),
+					tr("Could not regenerate the preview - the source may be unavailable."),
+					[this, id] { return m_callbacks.regeneratePreviewRequested(id); });
+
+			if (markSplitButton)
+				wireAction(markSplitButton, statusLabel, rowButtons, tr("Marked as fully split."), tr("Could not update the entry."),
+					[this, id] { return m_callbacks.markSplitRequested(id); });
 
 			wireAction(removeButton, statusLabel, rowButtons, tr("Removed from catalog."), tr("Could not remove."),
-				[this, ghostId] { return m_callbacks.removeGhostRequested(ghostId); });
+				[this, id] { return m_callbacks.removeEntryRequested(id); });
 
 			wireSkip(skipButton, statusLabel, rowButtons);
 		}

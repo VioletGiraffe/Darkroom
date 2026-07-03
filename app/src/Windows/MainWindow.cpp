@@ -502,18 +502,47 @@ void MainWindow::backfillMissingPreviews()
 	{
 		progressBox.setText(tr("Updating preview %1/%2...").arg(i + 1).arg(toBackfill.size()));
 		QApplication::processEvents();
-
-		const QString folderPath = catalog.folderForMediaItem(toBackfill[i]);
-		QDir folderDir(folderPath);
-		const QStringList realFrames = folderDir.entryList(IMAGE_FILE_FILTERS, QDir::Files, QDir::Name);
-		if (realFrames.isEmpty())
-			continue;  // a genuine ghost (folder emptied externally) - scanIntegrity handles this, not us
-
-		const QString previewFolder = Catalog::previewDirFor(folderPath);
-		QDir{}.mkpath(previewFolder);
-		for (const QString& sourceFrame : pickEvenlySpacedFrames(folderDir, realFrames, previewFrameCount))
-			QFile::copy(sourceFrame, previewFolder + "/" + QFileInfo(sourceFrame).fileName());
+		// A genuine ghost (folder emptied externally) has no real frames, so regenerate returns false and skips
+		// it - scanIntegrity handles that case, not us.
+		regeneratePreviewFromRealFrames(catalog.folderForMediaItem(toBackfill[i]), previewFrameCount);
 	}
+}
+
+bool MainWindow::regeneratePreviewFromRealFrames(const QString& folderPath, int frameCount)
+{
+	QDir folderDir(folderPath);
+	const QStringList realFrames = folderDir.entryList(IMAGE_FILE_FILTERS, QDir::Files, QDir::Name);
+	if (realFrames.isEmpty())
+		return false;
+
+	const QString previewFolder = Catalog::previewDirFor(folderPath);
+	QDir{}.mkpath(previewFolder);
+	for (const QString& sourceFrame : pickEvenlySpacedFrames(folderDir, realFrames, frameCount))
+		QFile::copy(sourceFrame, previewFolder + "/" + QFileInfo(sourceFrame).fileName());
+	return true;
+}
+
+bool MainWindow::regeneratePreviewFor(const MediaId& id)
+{
+	Catalog& catalog = Catalog::instance();
+	const QString folder = catalog.folderForMediaItem(id);
+	const int frameCount = m_previewFrameCountCombo->currentData().toInt();
+
+	// Prefer the video's own real frames - a plain copy, no source needed. Their presence also means the entry
+	// is genuinely split whatever its flag said, so reconcile that (clears a co-occurring STALE flag).
+	if (regeneratePreviewFromRealFrames(folder, frameCount))
+	{
+		catalog.markSplitComplete(id);
+		return true;
+	}
+
+	// No real frames (a not-yet-split video): re-extract the preview straight from the source, if present.
+	const QString source = catalog.sourcePathForMediaItem(id);
+	if (!QFile::exists(source))
+		return false;
+
+	Ffmpeg::generatePreviewFrames(source, Catalog::previewDirFor(folder), frameCount);
+	return !QDir(Catalog::previewDirFor(folder)).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty();
 }
 
 void MainWindow::refreshMediaGrid()
@@ -1496,18 +1525,28 @@ void MainWindow::checkCatalogIntegrity()
 				refreshLibraryView();
 			return ok;
 		},
-		.reimportRequested = [this](const MediaId& ghostId) {
-			// Same re-extraction path reExportAllVideos uses for any catalog video, just for this one: clear
-			// the (already empty/missing) folder, re-run ffmpeg, and report whether frames actually landed.
+		.reimportRequested = [this](const MediaId& id) {
+			// Same re-extraction path reExportAllVideos uses for any catalog video, just for this one: clear the
+			// folder, re-run ffmpeg (which also regenerates the preview), and report whether frames actually landed.
 			Catalog& catalog = Catalog::instance();
-			const QString folder = catalog.folderForMediaItem(ghostId);
-			const QString sourcePath = catalog.sourcePathForMediaItem(ghostId);
-			resplitVideoIntoFrames(sourcePath, folder, /*preserveExistingPreview=*/false);
+			const QString folder = catalog.folderForMediaItem(id);
+			resplitVideoIntoFrames(catalog.sourcePathForMediaItem(id), folder, /*preserveExistingPreview=*/false);
 			refreshLibraryView();
 			return !QDir(folder).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty();
 		},
-		.removeGhostRequested = [this](const MediaId& ghostId) {
-			Catalog::instance().removeMediaItem(ghostId);
+		.regeneratePreviewRequested = [this](const MediaId& id) {
+			const bool ok = regeneratePreviewFor(id);
+			if (ok)
+				refreshLibraryView();
+			return ok;
+		},
+		.markSplitRequested = [this](const MediaId& id) {
+			Catalog::instance().markSplitComplete(id);
+			refreshLibraryView();
+			return true;
+		},
+		.removeEntryRequested = [this](const MediaId& id) {
+			Catalog::instance().removeMediaItem(id);
 			refreshLibraryView();
 			return true;
 		},

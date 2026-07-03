@@ -556,9 +556,9 @@ bool Catalog::applyRename(const MediaId& oldId, const MediaId& newId, const QStr
 // Overlay (optional, any entry): sourcePath exists but no longer matches the recorded MediaId (size differs)
 //   -> the source was replaced by a different file. Needs a per-entry stat; not done by default.
 //
-// Status (target vs. now): today only GHOST is caught (frames absent while split=true). INVISIBLE, STALE and
-// source-missing are not yet checked, PHOTO entries are skipped entirely, and (B) untracked is video-only -
-// filling these in is the work in progress.
+// Status: all VIDEO verdicts above are implemented (each entry emits at most one MediaIssue carrying the flags
+// that hold). PHOTO entries are still skipped - photo integrity is the next phase - and (B) untracked covers
+// video frame folders only; Photos/<label> files are that same phase.
 // ---------------------------------------------------------------------------------------------------------
 
 Catalog::IntegrityReport Catalog::scanIntegrity() const
@@ -580,17 +580,18 @@ Catalog::IntegrityReport Catalog::scanIntegrity() const
 			continue;
 		}
 
-		// Ghost: a tracked, fully-split video whose frame folder has no images left. A video still awaiting its
-		// on-demand split legitimately has no real frames yet (only preview/ ones) - see isSplitIntoFrames.
-		if (it->splitIntoFrames && QDir(it->folder).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty())
-		{
-			GhostEntry ghost;
-			ghost.id             = it.key();
-			ghost.folder         = it->folder;
-			ghost.sourcePath = it->sourcePath;
-			ghost.sourcePresent  = !it->sourcePath.isEmpty() && QFileInfo::exists(it->sourcePath);
-			report.ghosts.push_back(ghost);
-		}
+		// Valid video entry: probe its on-disk backing and record a MediaIssue for anything non-healthy. The
+		// verdicts (ghost / invisible / stale / source-missing) are orthogonal - see the state grid above.
+		MediaIssue issue;
+		issue.id                = it.key();
+		issue.folder            = it->folder;
+		issue.sourcePath        = it->sourcePath;
+		issue.sourcePresent     = !it->sourcePath.isEmpty() && QFileInfo::exists(it->sourcePath);
+		issue.splitComplete     = it->splitIntoFrames;
+		issue.realFramesPresent = !QDir(it->folder).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty();
+		issue.previewPresent    = !QDir(previewDirFor(it->folder)).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty();
+		if (!issue.healthy())
+			report.issues.push_back(issue);
 	}
 
 	// Untracked: every non-empty frame folder on disk that isn't any entry's folder.
@@ -624,6 +625,17 @@ Catalog::IntegrityReport Catalog::scanIntegrity() const
 	});
 
 	return report;
+}
+
+void Catalog::markSplitComplete(const MediaId& id)
+{
+	const auto it = _mediaItems.find(id);
+	if (it == _mediaItems.end() || it->splitIntoFrames)
+		return;  // unknown id, or already marked split - nothing to persist
+
+	MetadataStore::Writer writer = MetadataStore::instance().beginBatch();
+	writer.set(id, kSplitIntoFramesField, true);
+	it->splitIntoFrames = true;
 }
 
 bool Catalog::relinkPlaceholder(const MediaId& placeholderId, const QString& confirmedSourcePath)

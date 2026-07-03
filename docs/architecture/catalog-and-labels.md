@@ -322,15 +322,20 @@ its own resolution:
   legacy seed skipped), optionally carrying a candidate source path recovered from a legacy
   `source_info.txt`. Resolved via `Catalog::addMediaItem` (registering it, `splitIntoFrames=true` since real
   frames are already on disk by definition of being found this way).
-- **`GhostEntry`** — a catalog entry whose frame folder has no real images left (deleted externally, or a
-  failed re-export); never reported for a video that's merely awaiting its on-demand split (guarded by
-  `splitIntoFrames`, see "Import lifecycle" above). Resolved either by re-importing (re-extracting frames
-  if the source is still present, via `MainWindow::resplitVideoIntoFrames`) or by dropping the entry outright
-  via `Catalog::removeMediaItem`.
+- **`MediaIssue`** — a tracked video whose on-disk backing isn't intact. The banner atop `scanIntegrity` maps
+  the full state grid; the verdicts are orthogonal, so one entry can carry several. Each `MediaIssue` holds the
+  raw disk facts (source / real-frames / preview presence + the split flag) and exposes the predicates the dialog
+  reads: `isGhost` (fully split but real frames gone), `isInvisible` (no preview frames, so the grid card can't
+  render — `preview/` is the *only* render source), `isStale` (real frames exist but the entry is still flagged
+  preview-only), and `sourceMissing`. Resolutions offered per issue: re-import (re-extract from a present source,
+  `MainWindow::resplitVideoIntoFrames`), regenerate preview (`MainWindow::regeneratePreviewFor` — from real frames,
+  which also marks it split, else from the source video), mark-fully-split (`Catalog::markSplitComplete`), or
+  remove (`Catalog::removeMediaItem`). Source-missing over an otherwise-intact product is advisory (remove/skip).
 
 `IntegrityCheckDialog::scanAndShowUi` owns all the scan/UI logic behind one static entry point; `MainWindow`
-only supplies the four resolution callbacks (relink/register/reimport/remove-ghost) that actually touch the
-`Catalog`/disk, plus a manual "browse to source" path for any finding the tool couldn't resolve on its own.
+only supplies the resolution callbacks (relink / register / re-import / regenerate-preview / mark-split / remove)
+that actually touch the `Catalog`/disk, plus a manual "browse to source" path for the placeholder/untracked
+findings the tool couldn't resolve on its own.
 Everything in the "deliberate non-fix"/"known wart" notes above defers to this tool for actual reconciliation.
 
 ---

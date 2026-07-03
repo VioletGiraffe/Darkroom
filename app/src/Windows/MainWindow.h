@@ -73,6 +73,13 @@ private:
 	// predates this feature has real frames but no preview/ subfolder yet - the grid now reads only from
 	// preview/, so back-fill it via a plain file copy (no ffmpeg needed; real frames already exist).
 	void backfillMissingPreviews();
+	// Rebuilds <folder>/preview from the video's own real frames (plain copy, no ffmpeg, no source needed).
+	// Returns false and touches nothing when there are no real frames to sample. Shared by backfill (which
+	// ignores the result - a frameless folder is a ghost it leaves for scanIntegrity) and the integrity tool.
+	bool regeneratePreviewFromRealFrames(const QString& folderPath, int frameCount);
+	// Integrity resolution for INVISIBLE: restores a video's preview from its real frames if present (which also
+	// marks it fully split), else re-extracts from its source video. Returns whether a preview exists afterwards.
+	[[nodiscard]] bool regeneratePreviewFor(const MediaId& id);
 	void reExportAllVideos();
 	void processBatch(QStringList videoPaths, const QString& collectionPath, const QHash<MediaId, QString>& stagedPreviewDirs);
 	// The photo counterpart to processBatch: imports each photo under the label via Import::importPhoto,
@@ -92,7 +99,7 @@ private:
 	// Tools menu: recursively scans a chosen folder for supported videos not yet tracked by any collection.
 	void scanForUntrackedFiles();
 	// Tools menu: scans the catalog against disk for drift (relinkable placeholders, untracked frame
-	// folders, ghost entries) and lets the user resolve each finding via IntegrityCheckDialog.
+	// folders, broken video entries) and lets the user resolve each finding via IntegrityCheckDialog.
 	void checkCatalogIntegrity();
 
 	// Best helpers (Best is a label in the Catalog; these are thin wrappers over it)
