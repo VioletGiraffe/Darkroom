@@ -1,7 +1,3 @@
-###################################################
-#            Basic configuration
-###################################################
-
 TEMPLATE = app
 TARGET   = Darkroom
 VERSION  = 1.0.0
@@ -14,6 +10,7 @@ QMAKE_TARGET_DESCRIPTION = Video frame extractor and organizer
 QT = core gui widgets multimedia multimediawidgets svg
 
 CONFIG += strict_c++ c++latest
+CONFIG -= flat
 
 mac* | linux* | freebsd {
 	CONFIG(release, debug|release):CONFIG *= Release optimize_full
