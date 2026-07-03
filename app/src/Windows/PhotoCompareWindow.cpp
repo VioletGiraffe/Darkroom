@@ -1,8 +1,10 @@
 #include "Windows/PhotoCompareWindow.h"
+#include "MagicAlignment.h"
 #include "Theme/Theme.h"
 #include "UiComponents/SegmentedToggle.h"
 #include "Utils.h"
 
+#include <QApplication>
 #include <QDebug>
 #include <QFileInfo>
 #include <QGridLayout>
@@ -106,6 +108,19 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 			painter.drawLine(c - QPointF(8, 0), c + QPointF(8, 0));
 			painter.drawLine(c - QPointF(0, 8), c + QPointF(0, 8));
 		}
+	}
+
+	// Auto-align diagnostics: where the aligner took its evidence in the RENDERED photo. Accent = used for
+	// the fit; orange = matched well but inconsistent with the fitted transform (outlier - a systematic
+	// pattern of these hints at rotation, which the model does not correct); red = failed to match.
+	painter.setBrush(Qt::NoBrush);
+	for (const PhotoCompareWindow::AlignmentMark& mark : photo.alignMarks)
+	{
+		const QColor color = mark.kind == PhotoCompareWindow::AlignmentMark::Kind::Used ? QColor(Theme::current().AccentBorder)
+		                   : mark.kind == PhotoCompareWindow::AlignmentMark::Kind::Outlier ? QColor(0xe0, 0xa2, 0x30)
+		                                                                                   : QColor(0xd0, 0x40, 0x40);
+		painter.setPen(QPen(color, 2));
+		painter.drawEllipse(m_owner.widgetFromImage(photo, mark.imagePos), 8.0, 8.0);
 	}
 
 	// Corner caption: "2 · name.jpg · 63%" - the leading digit doubles as the pane's flicker key, the
@@ -322,8 +337,13 @@ void PhotoCompareWindow::keyPressEvent(QKeyEvent* event)
 	}
 	else if (key == Qt::Key_A && !event->isAutoRepeat() && !m_photos.empty())
 	{
-		exitFullView();  // calibration points are placed per grid pane
-		setCalibrating(!m_calibrating);
+		if (event->modifiers().testFlag(Qt::ShiftModifier))
+		{
+			exitFullView();  // calibration points are placed per grid pane
+			setCalibrating(!m_calibrating);
+		}
+		else
+			autoAlignPhotos();  // works in the full view too
 	}
 	else if (key == Qt::Key_F)
 		fitView();
@@ -444,6 +464,73 @@ void PhotoCompareWindow::movePhotoOffset(int index, const QPointF& widgetDelta)
 	updateAllPanes();
 }
 
+void PhotoCompareWindow::autoAlignPhotos()
+{
+	if (m_photos.size() < 2)
+		return;
+	if (m_calibrating)
+		setCalibrating(false);
+	QApplication::setOverrideCursor(Qt::BusyCursor);
+	for (Photo& photo : m_photos)
+		photo.alignMarks.clear();
+
+	Photo& ref = m_photos[m_refIndex];
+	// The library works in the reference's PIXEL space; subject space differs from it by the reference's own
+	// transform. Fold that into the view first (keeps the reference pixel-frozen on screen, same as manual
+	// calibration) - from here on subject space IS reference pixel space, and each photo's current mapping
+	// into it serves both as the initial guess and as the kept alignment when the aligner reports failure.
+	const double refScale = ref.alignScale;
+	const QPointF refOffset = ref.alignOffset;
+	m_viewPan += m_viewZoom * refOffset;
+	m_viewZoom *= refScale;
+	ref.alignScale = 1.0;
+	ref.alignOffset = QPointF();
+
+	QStringList summary;
+	for (size_t i = 0; i < m_photos.size(); ++i)
+	{
+		if (static_cast<int>(i) == m_refIndex)
+			continue;
+		Photo& photo = m_photos[i];
+		AlignmentOptions options;
+		options.initialGuess = { photo.alignScale / refScale, (photo.alignOffset - refOffset) / refScale };
+		const AlignmentResult result = alignImages(ref.image, photo.image, options);
+		qDebug() << "Auto-align photo" << (i + 1) << "vs" << (m_refIndex + 1) << ": succeeded" << result.succeeded
+		         << " confidence" << result.confidence << " coarse" << result.bootstrapZncc
+		         << " scale" << result.transform.scale << " offset" << result.transform.offset;
+		static constexpr const char* fateNames[] = { "accepted", "outside overlap", "flat", "weak match", "outlier" };
+		for (const AlignmentPatchInfo& patchInfo : result.patches)
+		{
+			qDebug() << "  patch @" << patchInfo.refPoint << fateNames[static_cast<int>(patchInfo.fate)]
+			         << " zncc" << patchInfo.zncc << " residual" << patchInfo.residual;
+			const auto kind = patchInfo.fate == AlignmentPatchFate::Accepted ? AlignmentMark::Kind::Used
+			                : patchInfo.fate == AlignmentPatchFate::Outlier  ? AlignmentMark::Kind::Outlier
+			                                                                 : AlignmentMark::Kind::Failed;
+			ref.alignMarks.push_back({ patchInfo.refPoint, kind });
+			if (patchInfo.zncc > 0.0)  // targetPoint is meaningless for a patch that never matched
+				photo.alignMarks.push_back({ patchInfo.targetPoint, kind });
+		}
+		if (result.succeeded)
+		{
+			photo.alignScale = result.transform.scale;
+			photo.alignOffset = result.transform.offset;
+			summary << tr("%1: aligned (%2)").arg(i + 1).arg(result.confidence, 0, 'f', 2);
+		}
+		else
+		{
+			photo.alignScale = options.initialGuess.scale;
+			photo.alignOffset = options.initialGuess.offset;
+			summary << tr("%1: FAILED, kept (conf %2, coarse %3)")
+				.arg(i + 1).arg(result.confidence, 0, 'f', 2).arg(result.bootstrapZncc, 0, 'f', 2);
+		}
+	}
+	QApplication::restoreOverrideCursor();
+	// Transient status in the hint bar; any later mode change repaints the normal hint over it.
+	m_hintLabel->setText(tr("Auto-align vs %1 · %2 · circles: accent = used, orange = outlier, red = no match")
+		.arg(m_refIndex + 1).arg(summary.join("   ")));
+	updateAllPanes();
+}
+
 Qt::CursorShape PhotoCompareWindow::idleCursor() const
 {
 	return m_calibrating ? Qt::CrossCursor : Qt::OpenHandCursor;
@@ -457,7 +544,10 @@ void PhotoCompareWindow::setCalibrating(bool calibrating)
 	// other photo) would have the user placing points against the wrong picture - drop it.
 	m_flickerIndex = -1;
 	for (Photo& photo : m_photos)
+	{
 		photo.calibPoints.clear();
+		photo.alignMarks.clear();  // stale auto-align circles would only be clutter under the crosshairs
+	}
 	for (PhotoComparePane* paneWidget : m_paneWidgets)
 		paneWidget->setCursor(idleCursor());
 	updateHintText();
@@ -600,9 +690,9 @@ void PhotoCompareWindow::updateHintText()
 			.arg(progress.join("   ")));
 	}
 	else if (m_fullViewIndex >= 0)
-		m_hintLabel->setText(tr("Full view %1/%2 · slider / Left,Right: switch photo · hold 1..%2: flicker · D: difference · wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust this photo · F: fit · Esc: back to grid")
+		m_hintLabel->setText(tr("Full view %1/%2 · slider / Left,Right: switch photo · hold 1..%2: flicker · A: auto-align · D: difference · wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust this photo · F: fit · Esc: back to grid")
 			.arg(m_fullViewIndex + 1).arg(m_photos.size()));
 	else
-		m_hintLabel->setText(tr("Wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust one photo · A: align by 2 points · hold 1..%1: flicker · D: difference · slider: full view · F / double-click: fit · Esc: close")
+		m_hintLabel->setText(tr("Wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust one photo · A: auto-align · Shift+A: align by 2 clicks · hold 1..%1: flicker · D: difference · slider: full view · F / double-click: fit · Esc: close")
 			.arg(m_photos.size()));
 }

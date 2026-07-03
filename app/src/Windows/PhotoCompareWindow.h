@@ -5,6 +5,7 @@
 #include <QStringList>
 #include <QWidget>
 
+#include <stdint.h>
 #include <vector>
 
 class QLabel;
@@ -23,9 +24,11 @@ class SegmentedToggle;
 // Controls (also summarized in the in-window hint bar):
 //   wheel = synchronized zoom around the cursor; left-drag = synchronized pan; F / double-click = fit;
 //   Ctrl+wheel / Ctrl+drag = adjust the hovered photo's alignment (scale / offset) alone;
-//   A = two-point calibration: click the same two features in every photo - the photo that receives the
-//       first point becomes the reference; the distance ratio gives each other photo's relative scale, the
-//       midpoints its offset (right-click undoes a point, Esc cancels);
+//   A = auto-align: estimates every photo's scale+offset against the reference (magic-alignment library);
+//       the patch evidence is drawn as circles (accent = used, red = rejected) until the next alignment;
+//   Shift+A = two-point calibration: click the same two features in every photo - the photo that receives
+//       the first point becomes the reference; the distance ratio gives each other photo's relative scale,
+//       the midpoints its offset (right-click undoes a point, Esc cancels);
 //   hold 1..N = flicker: every pane temporarily renders photo N under the shared view, release to revert;
 //   D / the Normal-Difference toggle = difference view: every photo except the reference renders as its
 //       per-channel absolute difference against the reference, the reference stays normal;
@@ -48,6 +51,18 @@ private:
 	// The pane widgets are defined in the .cpp (no other consumer) and reach into the shared state below.
 	friend class PhotoComparePane;
 
+	struct AlignmentMark  // auto-align diagnostics: one patch's location in this photo
+	{
+		enum class Kind : uint8_t
+		{
+			Used,     // contributed to the fitted transform
+			Outlier,  // matched well but disagrees with the fit (systematic pattern of these = rotation suspicion)
+			Failed,   // no usable match (flat, weak, or outside the overlap)
+		};
+		QPointF imagePos;
+		Kind kind = Kind::Failed;
+	};
+
 	struct Photo
 	{
 		QImage image;                 // full-res, EXIF-oriented
@@ -56,6 +71,7 @@ private:
 		QPointF alignOffset;          // image -> subject space
 		QString caption;              // file name, drawn in the pane's corner
 		std::vector<QPointF> calibPoints;  // image-space, at most 2; only populated while calibrating
+		std::vector<AlignmentMark> alignMarks;  // drawn as circles; cleared when the next alignment starts
 	};
 
 	// Coordinate mapping. widget = m_viewZoom * (alignScale * image + alignOffset) + m_viewPan; the pan is
@@ -77,6 +93,9 @@ private:
 	// Per-photo alignment mutations (Ctrl+wheel / Ctrl+drag).
 	void adjustPhotoScale(int index, double factor, const QPointF& widgetAnchor);
 	void movePhotoOffset(int index, const QPointF& widgetDelta);
+
+	// One-click automatic alignment of every photo against the reference (the A key).
+	void autoAlignPhotos();
 
 	// Two-point calibration.
 	[[nodiscard]] Qt::CursorShape idleCursor() const;  // cross while calibrating, open hand otherwise
