@@ -1,0 +1,17 @@
+name: Bulk Delete Old Runs
+on:
+  workflow_dispatch: # Allows you to trigger this manually from the UI
+
+jobs:
+  delete-runs:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Delete workflow runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          retain_days: 0          # Deletes everything down to 0 days old
+          keep_minimum_runs: 3    # Keeps this many most recent runs

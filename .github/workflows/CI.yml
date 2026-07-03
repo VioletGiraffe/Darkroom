@@ -1,0 +1,99 @@
+name: CI
+
+on: [push, pull_request]
+
+env:
+  # Path to the solution file relative to the root of the project.
+  SOLUTION_FILE_PATH: .
+
+  # Configuration type to build.
+  # You can convert this to a build matrix if you need coverage of multiple configuration types.
+  # https://docs.github.com/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
+  BUILD_CONFIGURATION: Release
+
+jobs:
+  build:
+    name: Build & test on ${{ matrix.os }} with ${{ matrix.compiler }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest]
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: 6.10.*
+        target: desktop
+        arch: 'win64_msvc2022_64'
+        archives: 'qtbase icu qtsvg'
+        modules: 'qt5compat qtimageformats qtmultimedia'
+        cache: 'false'
+
+    - name: Windows - setup MSBuild
+      if: startsWith(matrix.os, 'windows')
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Setup MSVC Developer Command Prompt
+      if: startsWith(matrix.os, 'windows')
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Windows
+      if: startsWith(matrix.os, 'windows')
+      shell: cmd
+      run: |
+        %QT_ROOT_DIR%\bin\qmake.exe -v
+        %QT_ROOT_DIR%\bin\qmake.exe -tp vc -r
+        msbuild /t:Build /p:Configuration=Release;PlatformToolset=v143
+
+        @echo on
+        set STAGING_DIR=dist
+        RMDIR /S /Q %STAGING_DIR%
+        mkdir %STAGING_DIR%
+        copy /y bin\release\*.exe "%STAGING_DIR%\" >nul
+        FOR %%p IN (%STAGING_DIR%\*.exe) DO %QT_ROOT_DIR%\bin\windeployqt.exe --dir %STAGING_DIR% --force --release --no-translations --no-system-d3d-compiler --no-system-dxc-compiler --no-opengl-sw --skip-plugin-types networkinformation --skip-plugin-types tls %%p
+
+        del  %STAGING_DIR%\dxil.dll >nul
+        del  %STAGING_DIR%\dxcompiler.dll >nul
+
+        "%programfiles(x86)%\Inno Setup 6\iscc" installer.iss
+
+    - name: .exe file size
+      if: startsWith(matrix.os, 'windows')
+      shell: powershell
+      run: |
+        $sizeKB = (Get-Item "bin\release\Darkroom.exe").Length / 1KB
+        "{0:N2} KB" -f $sizeKB
+
+    - name: Mac
+      if: startsWith(matrix.os, 'macos')
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: |
+        clang --version
+        $QT_ROOT_DIR/bin/qmake -r
+        make -j
+
+    - name: Linux
+      if: startsWith(matrix.os, 'ubuntu')
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: |
+        sudo apt update -y; sudo apt install -qq gcc-14 g++-14
+        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 50
+        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 50
+        g++ --version
+
+        $QT_ROOT_DIR/bin/qmake -r
+        make -j
+
+    - name: Archive Installer
+      if: success() && startsWith(matrix.os, 'windows')
+      uses: actions/upload-artifact@v4
+      with:
+        name: Darkroom.exe
+        path: Darkroom.exe
