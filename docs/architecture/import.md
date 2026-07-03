@@ -31,8 +31,8 @@ just shows whatever "no image" state an empty frame list already produces.
 the folder and re-extract" pattern used by `ensureFramesSplit`, `reExportAllVideos`, and the integrity
 tool's ghost-reimport. All three delete `outputFolder` wholesale before re-splitting; since the permanent
 `preview/` subfolder (above) lives inside that same folder, a plain delete would destroy it too, and the
-grid card would render nothing until the next startup's backfill migration ran. `preserveExistingPreview`
-picks between two ways of avoiding that:
+grid card would render nothing (an INVISIBLE finding for the integrity tool) until it was regenerated.
+`preserveExistingPreview` picks between two ways of avoiding that:
 - **`true`** (`ensureFramesSplit` only) — `preview/` is still fresh from import, nothing changed that
   would make it stale, so it's not worth regenerating: the wrapper renames it out to a sibling folder before
   the delete and back after the re-split completes (success or failure), surviving untouched.
@@ -124,14 +124,6 @@ real frame folder directly — this is what lets a not-yet-split video still sho
 the grid never has to branch on split status for *where* to read images from. A video is hidden from the
 grid only if `preview/` itself is empty.
 
-`MainWindow::backfillMissingPreviews()` runs once at startup, before the first grid build: every already-split
-legacy video (predating this feature) has real frames but no `preview/` yet, so it back-fills one via a plain
-file copy — no ffmpeg needed, since real frames already exist — selecting evenly-spaced real frames and copying
-them into `preview/`. Idempotent: once `preview/` exists, later startups skip it. Photo entries are skipped
-by type — a photo card decodes the photo file itself, and without that gate the scan would plant a `preview/`
-subfolder full of copies inside the shared `Photos/<label>` dir (photos report `isSplitIntoFrames() == true`,
-so that check alone doesn't exclude them).
-
 ## Other utilities
 
 `Utils.h` (mostly inline free functions): `rootFolder()`, `ffmpegPath()`, `openInExplorer()`,
@@ -139,7 +131,7 @@ so that check alone doesn't exclude them).
 `parseTrailingTimestamp` — so it survives moves; falls back to the source file's birth time, then the
 folder's own timestamp as a last resort), `isSupportedVideoFile()`, `filesAreIdentical()` (size-gated
 byte-for-byte file comparison), `IMAGE_FILE_FILTERS`, `forEachFolder(root, cb)` (visits every
-`(collection, folderPath)` pair — used by the legacy seed, not by per-card lookups anymore),
+`(collection, folderPath)` pair — used by the integrity scan and untracked-file discovery, not by per-card lookups),
 `pickEvenlySpacedFrames()`, window-geometry save/restore. The source-path lookups this used to do itself
 (`getSourceVideoPath`, `existingSourceVideoDir`) are gone — callers now ask `Catalog`
 (`sourcePathForMediaItem`, `anySourceDir`; see [catalog-and-labels.md](catalog-and-labels.md)).

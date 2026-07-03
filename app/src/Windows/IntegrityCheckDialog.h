@@ -9,10 +9,10 @@
 #include <functional>
 
 // ============================================================================
-// IntegrityCheckDialog - shows what CatalogIntegrity::scan found (relinkable placeholders, untracked frame
-// folders, and broken video entries) and lets the user resolve each one: relink / register for the first two;
-// per broken video, re-import / regenerate preview / mark-fully-split / remove; plus browse to point at a
-// source manually. All UI logic lives here behind the static scanAndShowUi() entry point - MainWindow only
+// IntegrityCheckDialog - shows what CatalogIntegrity::scan found (untracked frame folders and broken video
+// entries) and lets the user resolve each one: register an untracked folder against its source; per broken
+// video, re-import / regenerate preview / mark-fully-split / remove; plus browse to point at a source
+// manually. All UI logic lives here behind the static scanAndShowUi() entry point - MainWindow only
 // supplies the callbacks that actually touch the Catalog/disk.
 // ============================================================================
 
@@ -21,9 +21,6 @@ class IntegrityCheckDialog final : public QDialog
 public:
 	struct Callbacks
 	{
-		// Attempts to relink a placeholder to the (now-confirmed-to-exist) source path; returns whether it
-		// succeeded (Catalog::relinkPlaceholder refuses if that identity is already tracked elsewhere).
-		std::function<bool(const MediaId& placeholderId, const QString& confirmedSourcePath)> relinkRequested;
 		// Attempts to register an untracked folder at the given source path; returns whether it succeeded
 		// (Catalog::addMediaItem refuses on an id clash with a different folder).
 		std::function<bool(const QString& folderPath, const QString& sourcePath)> registerRequested;

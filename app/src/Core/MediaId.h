@@ -15,10 +15,7 @@ public:
 
 	// Reconstructs an identity from values already known (a persisted catalog record), without touching the
 	// file. The catalog stores each record under key() (which carries the size) plus the original-case name,
-	// so a record round-trips back to its MediaId through here. A negative size marks a "source unavailable"
-	// placeholder: a video whose frames exist but whose source file's size couldn't be read (missing/unmounted
-	// when the catalog was seeded). Such an id is intentionally !isValid() - it still has a usable key() and
-	// name() for storage and display, but the rest of the app treats it as having no live source.
+	// so a record round-trips back to its MediaId through here.
 	static MediaId fromNameAndSize(const QString& name, qint64 size);
 
 	bool isValid() const { return _size >= 0; }

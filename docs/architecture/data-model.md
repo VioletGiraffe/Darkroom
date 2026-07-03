@@ -7,9 +7,10 @@
 `Catalog` (see [catalog-and-labels.md](catalog-and-labels.md)) holds the media-item set in memory, keyed by
 `MediaId`: for every item, its frame folder, its source path, and its full label-id set. It is kept
 current by its own mutation API (`addMediaItem`/`removeMediaItem`/`applyRename`/`addLabel`/`removeLabel`/...), not by
-re-deriving from disk on every refresh — the filesystem is walked in full only once, at the one-time legacy
-seed described below. `MetadataStore` (below) is how the model is *persisted*, not a second source of truth;
-nothing treats `MetadataStore`'s records as the catalog — callers ask `Catalog`.
+re-deriving from disk on every refresh — during normal operation the filesystem is never walked (only the
+on-demand integrity tool walks it; see [catalog-and-labels.md](catalog-and-labels.md)). `MetadataStore`
+(below) is how the model is *persisted*, not a second source of truth; nothing treats `MetadataStore`'s
+records as the catalog — callers ask `Catalog`.
 
 - `rootFolder()` (configured, default `H:/VideoFrames`) contains one **subfolder per collection**, plus the
   reserved **`Photos/`** tree for owned photos (below).
@@ -23,37 +24,12 @@ nothing treats `MetadataStore`'s records as the catalog — callers ask `Catalog
   reserved label/collection name for this reason (see
   [catalog-and-labels.md](catalog-and-labels.md)).
 - The link from a frame folder back to its source video is recorded in the catalog (`Catalog::addMediaItem`
-  persists it via `MetadataStore`), not read from disk per-card. `source_info.txt` files from before this
-  model existed are left on disk untouched but are never read again post-seed (see "Legacy seed" below).
+  persists it via `MetadataStore`), not read from disk per-card.
 - `★ Best` is a **virtual label**, not a folder: membership lives in `MetadataStore` under the `"labels"`
   field (keyed by `MediaId`) and is indexed by `Catalog`. Toggling Best adds/removes that label; no folder is
-  moved. Migrated on first run from the legacy path-keyed `best.txt`, renamed to
-  `best.txt.pre-labels-backup` (entries whose source video is missing can't be re-keyed and are skipped).
+  moved.
 - Source video files themselves live wherever the user keeps them (often a single dir located via
   `Catalog::anySourceDir`), not necessarily under `rootFolder()`.
-
-### Legacy seed: `source_info.txt` → catalog (one-time)
-
-Before `source_info.txt` existed only as a historical artifact, it was the *only* record of a frame folder's
-source video, read fresh off disk on every refresh. `Catalog::seedCatalogFromSourceInfo()` migrates that
-disk state into the catalog exactly once, guarded by a `"seededFromSourceInfo"` flag persisted in
-`labels.json` (so it travels with the catalog onto another drive, e.g. an external disk):
-
-- Present source file → a real (name+size) `MediaId`. Missing/unmounted source → a `MediaId::fromNameAndSize(name, -1)`
-  placeholder (`isValid() == false`) so the frames still surface under their folder label, exactly as
-  before — the source can be reconciled later via the integrity tool described in
-  [catalog-and-labels.md](catalog-and-labels.md).
-- Two folders resolving to the same id (a genuine duplicate source, or two same-named missing sources
-  collapsing to one placeholder) — the second is skipped with a `qWarning`, never silently overwriting the
-  first.
-- **A video whose source was missing at seed time but that had labels/Best from before** (stored under its
-  real `size:name` id, from when the source was still present) ends up split: the seed writes a `-1:name`
-  placeholder record carrying only folder+path, while the real-id record keeps the labels but has no
-  `folder`, so `rebuildIndex` skips it. Net effect: the video shows its folder label only — identical to
-  pre-catalog behavior for a missing-source video, so not a regression — but the extra labels are orphaned
-  under the real id until the source reappears and the integrity tool relinks them (see
-  [catalog-and-labels.md](catalog-and-labels.md)).
-- `source_info.txt` files are deliberately **left on disk**, never read again after the seed runs once.
 
 ---
 

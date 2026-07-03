@@ -47,10 +47,8 @@ Catalog& Catalog::instance()
 
 Catalog::Catalog()
 {
-	loadRegistry();                // labels.json (+ the seed flag)
-	migrateBestTxt();              // legacy: best.txt -> stored Best labels; renames best.txt afterwards
-	seedCatalogFromSourceInfo();   // legacy: source_info.txt -> catalog records; one-time, guarded by the seed flag
-	rebuildIndex();                // build the in-memory model from the store (and seed Best + folder labels)
+	loadRegistry();  // labels.json
+	rebuildIndex();  // build the in-memory model from the store (and seed Best + folder labels)
 }
 
 // --- Registry (labels.json) ----------------------------------------------------------------------------
@@ -63,7 +61,6 @@ QString Catalog::registryPath()
 void Catalog::loadRegistry()
 {
 	_labels.clear();
-	_seededFromSourceInfo = false;
 
 	QFile file{ registryPath() };
 	if (!file.open(QIODevice::ReadOnly))
@@ -78,7 +75,6 @@ void Catalog::loadRegistry()
 			continue;
 		_labels.push_back(Label{ id, o.value("displayName").toString(), o.value("color").toString() });
 	}
-	_seededFromSourceInfo = root.value("seededFromSourceInfo").toBool();
 }
 
 void Catalog::saveRegistry() const
@@ -95,7 +91,6 @@ void Catalog::saveRegistry() const
 
 	QJsonObject root;
 	root.insert(kLabelsField.toString(), arr);
-	root.insert("seededFromSourceInfo", _seededFromSourceInfo);
 
 	QDir{}.mkpath(rootFolder());
 	QSaveFile file{ registryPath() };
@@ -540,66 +535,6 @@ void Catalog::markSplitComplete(const MediaId& id)
 	it->splitIntoFrames = true;
 }
 
-bool Catalog::relinkPlaceholder(const MediaId& placeholderId, const QString& confirmedSourcePath)
-{
-	if (placeholderId.isValid())
-	{
-		qWarning() << "Catalog: relinkPlaceholder called with a non-placeholder id";
-		return false;
-	}
-	const MediaId realId = MediaId::fromFile(confirmedSourcePath);
-	if (!realId.isValid())
-	{
-		qWarning() << "Catalog: cannot relink - no file at" << confirmedSourcePath;
-		return false;
-	}
-
-	const auto placeholderEntry = _mediaItems.constFind(placeholderId);
-	if (placeholderEntry == _mediaItems.cend())
-	{
-		qWarning() << "Catalog: relinkPlaceholder - unknown placeholder id" << placeholderId.key();
-		return false;
-	}
-	const QString folderAbs = placeholderEntry->folder;
-
-	// A name+size collision with an item already tracked under a *different* folder is a separate, unrelated
-	// problem (not the placeholder being relinked) - refuse rather than clobbering that entry, mirroring addMediaItem.
-	const auto existingReal = _mediaItems.constFind(realId);
-	if (existingReal != _mediaItems.cend() && existingReal->folder != folderAbs)
-	{
-		qWarning() << "Catalog: refusing to relink" << folderAbs << "- id" << realId.key()
-		           << "is already tracked at" << existingReal->folder;
-		return false;
-	}
-
-	// Union the placeholder's stored labels with any pre-existing (orphaned) record already under the real id:
-	// a video whose source was missing at seed time but had labels/Best from before the source went missing is
-	// stored under its real id with no folder (skipped by rebuildIndex) - see data-model.md's "Legacy seed" note.
-	QStringList labels = readStoredLabelIds(realId);
-	for (const QString& placeholderLabel : readStoredLabelIds(placeholderId))
-		if (!labels.contains(placeholderLabel))
-			labels << placeholderLabel;
-
-	const bool splitIntoFrames = placeholderEntry->splitIntoFrames;
-
-	// One atomic disk write for the remove + record rebuild (writeStoredLabelIds' own Writer nests into this one).
-	MetadataStore::Writer writer = MetadataStore::instance().beginBatch();
-	writer.remove(placeholderId);
-	writer.set(realId, kSourcePathField, confirmedSourcePath);
-	writer.set(realId, kFolderField, relativeFolder(folderAbs));
-	writer.set(realId, kSplitIntoFramesField, splitIntoFrames);
-	writeStoredLabelIds(realId, labels);
-
-	_mediaItems.remove(placeholderId);
-	Entry e;
-	e.folder          = folderAbs;
-	e.sourcePath      = confirmedSourcePath;
-	e.splitIntoFrames = splitIntoFrames;
-	e.labelIds        = computeLabelIds(realId, e);
-	_mediaItems.insert(realId, e);
-	return true;
-}
-
 bool Catalog::hasOtherOrdinaryLabel(const MediaId& id, const QString& excludedLabelId) const
 {
 	for (const QString& labelId : labelsForMediaItem(id))
@@ -885,108 +820,4 @@ bool Catalog::deleteLabel(const QString& labelId)
 	saveRegistry();
 	rebuildIndex();
 	return !stillNamed;
-}
-
-// --- Legacy migration ----------------------------------------------------------------------------------
-
-QString Catalog::readLegacySourceInfo(const QString& folderPath)
-{
-	QFile infoFile{ folderPath + "/source_info.txt" };
-	if (infoFile.open(QIODevice::ReadOnly))
-		return QString::fromUtf8(infoFile.readAll()).trimmed();
-	return {};
-}
-
-void Catalog::seedCatalogFromSourceInfo()
-{
-	if (_seededFromSourceInfo)
-		return;  // already done once; the disk walk happens only at the initial seed
-
-	MetadataStore& store = MetadataStore::instance();
-	int seeded = 0, placeholders = 0, clashes = 0;
-
-	// Up to 2 writes per folder below; one Writer for the whole walk, or each would rewrite the whole
-	// store, making this an O(n^2)-bytes-written pass for a large pre-existing library.
-	MetadataStore::Writer writer = store.beginBatch();
-
-	forEachFolder(rootFolder(), [&](const QString&, const QString& folderPath) {
-		const QString sourcePath = readLegacySourceInfo(folderPath);
-		if (sourcePath.isEmpty())
-			return;  // no legacy record in this folder; nothing to seed
-
-		// Present source -> a real (name+size) id. Missing/unmounted -> a size-unknown placeholder (!isValid),
-		// so the frames still surface under their folder label, exactly as before; the source can be reconciled
-		// later by the planned integrity tool.
-		const QFileInfo sourceInfo{ sourcePath };
-		const MediaId id = sourceInfo.isFile() ? MediaId::fromFile(sourcePath)
-		                                       : MediaId::fromNameAndSize(sourceInfo.fileName(), -1);
-
-		const QString folderRel = relativeFolder(folderPath);
-		const QString existing  = store.get(id, kFolderField).toString();
-		if (!existing.isEmpty() && existing != folderRel)
-		{
-			// Two folders resolving to the same id (genuine duplicate sources, or two same-named missing
-			// sources collapsing to one placeholder). Keep the first; don't silently clobber it.
-			qWarning() << "Catalog: seed - id clash, skipping" << folderPath << "(collides with" << absoluteFolder(existing) << ")";
-			++clashes;
-			return;
-		}
-
-		writer.set(id, kSourcePathField, sourcePath);
-		writer.set(id, kFolderField, folderRel);
-		if (id.isValid())
-			++seeded;
-		else
-			++placeholders;
-	});
-
-	_seededFromSourceInfo = true;
-	saveRegistry();
-	qInfo() << "Catalog: seeded" << seeded << "videos from source_info.txt," << placeholders
-	        << "source-unavailable placeholders," << clashes << "clashes skipped";
-}
-
-void Catalog::migrateBestTxt()
-{
-	const QString bestTxt = rootFolder() + "/best.txt";
-	QFile file{ bestTxt };
-	if (!file.exists() || !file.open(QIODevice::ReadOnly))
-		return;
-
-	int migrated = 0, unresolved = 0;
-
-	// One writeStoredLabelIds per line below; without batching, each rewrites the whole store, making a
-	// large best.txt migration O(n^2) bytes written (same reasoning as seedCatalogFromSourceInfo's batch).
-	BatchScope batch;
-
-	for (const QByteArray& line : file.readAll().split('\n'))
-	{
-		const QString folderPath = QString::fromUtf8(line).trimmed();
-		if (folderPath.isEmpty())
-			continue;
-
-		// A stale entry (folder gone) or a video whose source file is missing can't be re-keyed by MediaId.
-		const QString sourcePath = QDir(folderPath).exists() ? readLegacySourceInfo(folderPath) : QString{};
-		const MediaId id = sourcePath.isEmpty() ? MediaId{} : MediaId::fromFile(sourcePath);
-		if (!id.isValid())
-		{
-			++unresolved;
-			continue;
-		}
-
-		QStringList ids = readStoredLabelIds(id);
-		if (!ids.contains(BestLabelId))
-		{
-			ids << BestLabelId;
-			writeStoredLabelIds(id, ids);
-		}
-		++migrated;
-	}
-	file.close();
-
-	// Back up rather than delete: keeps the original recoverable and ensures the migration runs only once.
-	if (!QFile::rename(bestTxt, bestTxt + ".pre-labels-backup"))
-		qWarning() << "Catalog: best.txt migrated but could not be renamed to a backup;" << bestTxt << "remains";
-
-	qInfo() << "Catalog: best.txt migration - migrated" << migrated << "entries to the Best label," << unresolved << "unresolved (missing folder or source video)";
 }

@@ -26,9 +26,9 @@
 // catalog loads itself from it once at construction and writes through on each mutation. Nothing treats
 // MetadataStore's records as the catalog - callers ask Catalog.
 //
-// Identity is minted from a file (a stat for name+size) at exactly two points: import (addMediaItem, source
-// path in hand) and the one-time legacy seed (from each folder's source_info.txt). Everywhere else an item
-// is addressed by the MediaId it already carries; the disk is never walked except by that seed.
+// Identity is minted from a file (a stat for name+size) at exactly one point: import (addMediaItem, source
+// path in hand). Everywhere else an item is addressed by the MediaId it already carries; the disk is never
+// walked during normal operation (only the on-demand integrity tool walks it).
 //
 // Single shared instance, GUI-thread only.
 class Catalog
@@ -95,8 +95,8 @@ public:
 	// source lives inside the library itself). Empty if none is found.
 	[[nodiscard]] QString anySourceDir() const;
 
-	// Per-item membership. A missing source file has an invalid (placeholder) id and can't be labeled, so
-	// these no-op on one. addLabel only ever writes the stored id list. removeLabel is metadata-only too,
+	// Per-item membership. An invalid id (a missing/unreadable source file) can't be labeled, so these no-op
+	// on one. addLabel only ever writes the stored id list. removeLabel is metadata-only too,
 	// EXCEPT when labelId is the label that happens to name the item's storage location: then it relocates
 	// the item on disk (a video's frame folder / an owned photo's file) to the item's alphabetically-first
 	// remaining ordinary label. An item must always keep at least one ordinary label, so removing its last
@@ -179,14 +179,8 @@ public:
 
 	// --- Integrity resolution --------------------------------------------------------------------------------
 	// The read-only catalog-vs-disk scan and its report types live in CatalogIntegrity (Core/CatalogIntegrity.h).
-	// The methods below are the mutations that scan feeds - they belong here because only Catalog can touch the
+	// The method below is the mutation that scan feeds - it belongs here because only Catalog can touch the
 	// model and persist.
-
-	// Resolves a placeholder to its real identity now that confirmedSourcePath exists. Unions the placeholder's
-	// stored labels with any pre-existing (orphaned) record already under the real id - see data-model.md's
-	// "Legacy seed" note on how such an orphaned record can exist. Refuses (false, qWarning) if the real id
-	// already names an item tracked under a *different* folder - a separate, unrelated collision.
-	bool relinkPlaceholder(const MediaId& placeholderId, const QString& confirmedSourcePath);
 
 	// Integrity resolution for the STALE case: marks a video as fully split when its real frames exist on disk
 	// but the entry was still flagged preview-only. No-op on an unknown id or one already marked split. Persists.
@@ -198,16 +192,7 @@ public:
 private:
 	Catalog();
 
-	// One-time legacy migrations, run once before the model loads. migrateBestTxt folds the path-keyed best.txt
-	// into the Best label (renames it to a backup afterwards). seedCatalogFromSourceInfo walks the folder tree
-	// once and records each frame folder's source-video path + folder into the store; guarded by a flag in
-	// labels.json (so it travels with the catalog onto another drive) and leaves the source_info.txt files in
-	// place. Both resolve a folder's source video through readLegacySourceInfo (the legacy source_info.txt reader).
-	void migrateBestTxt();
-	void seedCatalogFromSourceInfo();
-	[[nodiscard]] static QString readLegacySourceInfo(const QString& folderPath);
-
-	// Registry (labels.json): load/save (incl. the seed flag), and ensuring the labels the current model implies exist.
+	// Registry (labels.json): load/save, and ensuring the labels the current model implies exist.
 	void loadRegistry();
 	void saveRegistry() const;
 	void ensureBestAndFolderLabels();                          // add any missing: Best + one folder-backed label per collection an item lives in
@@ -253,5 +238,4 @@ private:
 
 	std::vector<Label>    _labels;                  // registry, display order
 	QHash<MediaId, Entry> _mediaItems;              // the model: MediaId -> per-item facts
-	bool                  _seededFromSourceInfo = false;  // legacy seed guard, persisted in labels.json
 };

@@ -45,9 +45,8 @@ void MetadataStore::save() const
 	file.commit();
 }
 
-// Guarded on a non-empty name rather than isValid(): a source-unavailable placeholder (negative size, so
-// !isValid()) still has a stable key() and must be able to persist its folder/source-path fields. Only a
-// truly empty identity (no name) is rejected.
+// Reject only a nameless (default-constructed) identity - it has no usable key(). Everything with a name
+// persists; the store is a dumb key->fields map and doesn't interpret records.
 QJsonValue MetadataStore::get(const MediaId& id, QStringView field) const
 {
 	if (id.name().isEmpty())
@@ -129,8 +128,10 @@ std::vector<MediaId> MetadataStore::allMediaIds() const
 		// record's "name" carries the original case (the key's name part is lowercased), so prefer it.
 		const QString name = it.value().toObject().value(QStringLiteral("name")).toString();
 		const qint64 size = it.key().section(':', 0, 0).toLongLong();
-		if (!name.isEmpty())
-			ids.push_back(MediaId::fromNameAndSize(name, size));
+		if (name.isEmpty() || size < 0)
+			continue;  // skip a nameless record or a legacy negative-size (source-unavailable) key - neither
+			           // resolves to a real catalog identity
+		ids.push_back(MediaId::fromNameAndSize(name, size));
 	}
 	return ids;
 }

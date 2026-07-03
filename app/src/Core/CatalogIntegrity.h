@@ -8,18 +8,9 @@
 
 // The read-only catalog-vs-disk scan and its report vocabulary. The scan (see the state grid above scan() in
 // the .cpp) reasons purely over Catalog's public API plus the on-disk layout; the *resolutions* it feeds
-// (relink / re-import / regenerate-preview / mark-split / remove) are mutations that live on Catalog and
+// (re-import / regenerate-preview / mark-split / remove) are mutations that live on Catalog and
 // MainWindow, because only they can touch the model, persist, and drive ffmpeg.
 namespace CatalogIntegrity {
-
-// A placeholder (source was missing when seeded) whose recorded source path now resolves to an existing file -
-// the source has reappeared and the item can be relinked to its real identity.
-struct RelinkCandidate
-{
-	MediaId placeholderId;
-	QString folder;              // absolute, for display
-	QString recordedSourcePath;  // where the source was last known; now exists
-};
 
 // A non-empty frame folder on disk that no catalog entry claims. The user resolves it by browsing to its
 // source video (which registers it), or skips it.
@@ -50,10 +41,9 @@ struct MediaIssue
 
 struct IntegrityReport
 {
-	std::vector<RelinkCandidate> relinkable;
 	std::vector<UntrackedFolder> untracked;
 	std::vector<MediaIssue>      issues;
-	[[nodiscard]] bool isEmpty() const { return relinkable.empty() && untracked.empty() && issues.empty(); }
+	[[nodiscard]] bool isEmpty() const { return untracked.empty() && issues.empty(); }
 };
 
 // Walks the catalog model + disk once (only ever on explicit user request, never part of the normal refresh

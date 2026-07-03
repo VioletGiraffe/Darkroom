@@ -52,8 +52,7 @@ public:
 	QJsonValue get(const MediaId& id, QStringView field) const;
 
 	// Every item that has a record, reconstructed from its key (size) and stored "name" (original case).
-	// The catalog enumerates items through here instead of walking the filesystem. Includes source-unavailable
-	// placeholders (negative size), so an item whose source went missing still surfaces.
+	// The catalog enumerates items through here instead of walking the filesystem.
 	[[nodiscard]] std::vector<MediaId> allMediaIds() const;
 
 	[[nodiscard]] Writer beginBatch();

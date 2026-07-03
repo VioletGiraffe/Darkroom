@@ -69,13 +69,9 @@ private:
 	// If id hasn't had its full frame set extracted yet, does so now (synchronously, same as a normal split).
 	// Called right before opening the frame viewer on a card - the one and only on-demand split trigger.
 	void ensureFramesSplit(const MediaId& id);
-	// One-time migration, run at startup before the first refreshMediaGrid: every already-split video that
-	// predates this feature has real frames but no preview/ subfolder yet - the grid now reads only from
-	// preview/, so back-fill it via a plain file copy (no ffmpeg needed; real frames already exist).
-	void backfillMissingPreviews();
 	// Rebuilds <folder>/preview from the video's own real frames (plain copy, no ffmpeg, no source needed).
-	// Returns false and touches nothing when there are no real frames to sample. Shared by backfill (which
-	// ignores the result - a frameless folder is a ghost it leaves for CatalogIntegrity::scan) and the integrity tool.
+	// Returns false and touches nothing when there are no real frames to sample. Used by the integrity tool's
+	// INVISIBLE recovery (regeneratePreviewFor).
 	bool regeneratePreviewFromRealFrames(const QString& folderPath, int frameCount);
 	// Integrity resolution for INVISIBLE: restores a video's preview from its real frames if present (which also
 	// marks it fully split), else re-extracts from its source video. Returns whether a preview exists afterwards.
@@ -98,8 +94,8 @@ private:
 	void quickImportToCollections(const QStringList& initialStaging = {});
 	// Tools menu: recursively scans a chosen folder for supported videos not yet tracked by any collection.
 	void scanForUntrackedFiles();
-	// Tools menu: scans the catalog against disk for drift (relinkable placeholders, untracked frame
-	// folders, broken video entries) and lets the user resolve each finding via IntegrityCheckDialog.
+	// Tools menu: scans the catalog against disk for drift (untracked frame folders and broken video
+	// entries) and lets the user resolve each finding via IntegrityCheckDialog.
 	void checkCatalogIntegrity();
 
 	// Best helpers (Best is a label in the Catalog; these are thin wrappers over it)

@@ -17,9 +17,8 @@ label a stored extra, and no label operation or deletion ever touches its file. 
 This replaced the original one-folder-per-collection model: collections are now dynamic in-app **filters by
 label** (an item can have many; `★ Best` is just another label) rather than a 1:1 item→folder mapping. A
 later pass (see "Import lifecycle" below) replaced the *disk-walk-per-refresh* implementation of that
-model with the current in-memory one — identity is minted from a file (a stat for name+size) at exactly two
-points, import (`addMediaItem`) and the one-time legacy seed (see [data-model.md](data-model.md)); everywhere
-else an item is addressed by the `MediaId` it already carries.
+model with the current in-memory one — identity is minted from a file (a stat for name+size) at exactly one
+point, import (`addMediaItem`); everywhere else an item is addressed by the `MediaId` it already carries.
 
 ## The model
 
@@ -51,8 +50,7 @@ the label itself changing identity).
 
 ## Persistence
 
-- **Registry (`labels.json`)** in `rootFolder()`: an ordered `[{id, displayName, color}]`, plus the
-  `"seededFromSourceInfo"` legacy-seed guard flag (see [data-model.md](data-model.md)). Seeded on
+- **Registry (`labels.json`)** in `rootFolder()`: an ordered `[{id, displayName, color}]`. Seeded on
   `rebuildIndex()` — `Best` (pinned first) plus one label per collection an item **in the catalog model**
   actually lives in (`ensureBestAndFolderLabels`/`ensureFolderLabelExists`). This is derived from the model,
   not a disk walk, which is why an **empty collection needs an explicit `createLabel(displayName)` call** —
@@ -91,7 +89,8 @@ points, not bolted on elsewhere.
 
 **Both queries and mutations are `MediaId`-anchored** — a card carries its item's id directly (`GridItem`
 stores it as a member), so nothing needs to bridge folder→id at call sites anymore. A missing-source item
-still has a usable (if `!isValid()`) id, so even that case stays clean.
+still carries its id (identity is the stored name+size, not whether the file is currently present), so even
+that case stays clean.
 
 - **Queries**: `labelsForMediaItem`, `mediaItemsForLabel`, `mediaItemHasLabel`; enumeration via `allMediaItems`,
   `containsMediaItem`, `mediaItemCount`, `labelMediaItemCounts` (per-label counts in one pass, for the
@@ -144,14 +143,14 @@ still has a usable (if `!isValid()`) id, so even that case stays clean.
 
 Every Catalog mutation writes the store through its own `MetadataStore::Writer` (see
 [data-model.md](data-model.md)) — so a multi-field mutation (`addMediaItem`, `addPhoto`, `applyRename`,
-`relinkPlaceholder`, the relocate path) hits disk as **one atomic write of the finished record state**, never
-a partially-updated one, and each single mutation is one write. But a loop over many items (the legacy seed,
-a drag-drop batch, re-export-all, the Best/extra-label flush after a Quick Import session) would still
+the relocate path) hits disk as **one atomic write of the finished record state**, never
+a partially-updated one, and each single mutation is one write. But a loop over many items
+(a drag-drop batch, re-export-all, the Best/extra-label flush after a Quick Import session) would still
 re-serialize the *entire* store once per call, making an n-item loop write O(n²) bytes overall.
 `Catalog::BatchScope` is an RAII guard — construct one at the top of such a loop — that defers the physical
 write until the **outermost** scope is destroyed (nests freely), collapsing the whole loop into one write.
 It simply owns a Writer it never writes through; the mutations' own nested Writers coalesce into it. Used by
-the multi-item loops: the legacy seed, Quick Import's batch import, re-export-all, and the post-Import
+the multi-item loops: Quick Import's batch import, re-export-all, and the post-Import
 Best/extra-label flush.
 
 ## Registry mutations (the label objects themselves)
@@ -190,9 +189,8 @@ library; the guards only prevent creating the conflict from here on.
 splitIntoFrames, type, referenced}` — this **is** the catalog; see "Catalog is the authoritative in-memory
 model" in [data-model.md](data-model.md). `rebuildIndex()` re-seeds the registry from the model
 (`ensureBestAndFolderLabels`) and reloads every entry fresh from `MetadataStore::allMediaIds()` + per-id
-field reads. A folder-less record is skipped as a non-item (a legacy orphan carrying only labels — see
-[data-model.md](data-model.md)'s "Legacy seed" note) **unless** its `type` says photo: a folder-less photo
-is a referenced photo, a real item tracked in place. It runs at construction and inside
+field reads. A folder-less record is skipped as a non-item (a legacy orphan carrying only labels) **unless**
+its `type` says photo: a folder-less photo is a referenced photo, a real item tracked in place. It runs at construction and inside
 `renameLabel`/`deleteLabel` (many folder paths can change at once there, so a full reload is simpler than
 incremental surgery) — **not** on every grid refresh. `MainWindow::refreshMediaGrid` deliberately does **not**
 call it: the model is kept current by its own mutation API (`addMediaItem`/`removeMediaItem`/`applyRename`/
@@ -294,20 +292,16 @@ above doesn't carry the reasoning behind forks that were considered and rejected
 - **Folders are reconciled at exactly 3 points and nowhere else** — a deliberate constraint, not an
   emergent accident. Every time a new label feature was added during implementation, the design was
   re-checked against "does this need a 4th reconciliation point?" — so far, no.
-- **Retiring `source_info.txt` in favor of the in-memory `MediaId`-keyed model** (this doc's current state)
-  was flagged as a future direction during the original labels design and **has since been implemented** —
-  kept as a historical note so the "why move off `source_info.txt`" reasoning (a missing source file
-  couldn't keep a stable identity under the old per-refresh-disk-walk model) isn't lost. On-demand frame
-  extraction at import was flagged at the same time and **has since also been implemented** — see
-  [import.md](import.md).
+- **On-demand frame extraction at import** was flagged as a future direction during the original labels
+  design and **has since been implemented** — see [import.md](import.md).
 
 ---
 
 ## Integrity tool
 
 Tools menu → "Check catalog integrity..." (`MainWindow::checkCatalogIntegrity`) reconciles the catalog
-against disk on demand — the only other place besides the legacy seed that walks disk, and only ever on
-explicit user request, never part of the normal refresh path. **Video-only in v1**: photo entries are skipped
+against disk on demand — the catalog model is otherwise never re-derived from disk, so this runs only on
+explicit user request, never as part of the normal refresh path. **Video-only in v1**: photo entries are skipped
 (every check reasons about frame folders, which photos don't have) and the untracked walk skips the
 `<root>/Photos` tree. Photo integrity (missing owned file / vanished referenced file) is deferred backlog.
 
@@ -319,20 +313,16 @@ the split flag) and the verdicts it yields — is documented authoritatively in 
 `CatalogIntegrity::scan`, kept next to the code so the two can't drift.** This section stays conceptual and
 does not restate it.
 
-The scan reports three kinds of drift, each with its own resolution:
-- **Relinkable placeholder** — an item seeded with a then-missing source (an `isValid() == false` id; see
-  [data-model.md](data-model.md)'s "Legacy seed" note) whose recorded source path now exists again → relink
-  it to the real file.
+The scan reports two kinds of drift, each with its own resolution:
 - **Untracked folder** — a non-empty frame folder on disk that no catalog entry claims → the user browses to
-  its source video to register it. *(A legacy path that instead recovered the source automatically from a
-  `source_info.txt` was dropped together with reading that file at all — the current app never writes one.)*
+  its source video to register it.
 - **Broken video entry** — a tracked video whose on-disk product (preview frames and/or real frames) no
   longer matches what the catalog records → resolved by re-import, preview regeneration, marking it fully
   split, or removal, depending on which verdicts hold (the banner maps verdict → available resolution).
 
 `IntegrityCheckDialog::scanAndShowUi` owns all the scan/UI logic behind one static entry point; `MainWindow`
 only supplies the resolution callbacks that actually touch the `Catalog`/disk, plus a manual "browse to
-source" path for the placeholder/untracked findings the tool can't resolve on its own. Everything in the
+source" path for an untracked folder the tool can't resolve on its own. Everything in the
 "deliberate non-fix"/"known wart" notes above defers to this tool for actual reconciliation.
 
 ---

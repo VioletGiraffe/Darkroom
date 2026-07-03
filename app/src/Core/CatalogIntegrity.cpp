@@ -47,7 +47,7 @@ IntegrityReport scan()
 	Catalog& catalog = Catalog::instance();
 	IntegrityReport report;
 
-	// Phase 1: per-video-entry checks (issues + relinkable placeholders).
+	// Phase 1: per-video-entry issue checks.
 	for (const MediaId& id : catalog.allMediaItems())
 	{
 		if (catalog.mediaType(id) != Catalog::MediaType::Video)
@@ -55,14 +55,6 @@ IntegrityReport scan()
 
 		const QString folder = catalog.folderForMediaItem(id);
 		const QString source = catalog.sourcePathForMediaItem(id);
-
-		// Relinkable: a placeholder (missing source at seed time) whose recorded path now exists.
-		if (!id.isValid())
-		{
-			if (!source.isEmpty() && QFileInfo::exists(source))
-				report.relinkable.push_back({ id, folder, source });
-			continue;
-		}
 
 		// Probe the entry's on-disk backing; record a MediaIssue for anything non-healthy. The verdicts
 		// (ghost / invisible / stale / source-missing) are orthogonal - see the state grid above.

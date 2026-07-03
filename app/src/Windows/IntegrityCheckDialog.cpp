@@ -101,52 +101,6 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 		return { row, statusLabel };
 	};
 
-	if (!report.relinkable.empty())
-	{
-		contentLayout->addWidget(new QLabel(tr("<b>Relink</b> - the source file reappeared"), content));
-		for (const CatalogIntegrity::RelinkCandidate& candidate : report.relinkable)
-		{
-			const auto [row, statusLabel] = addRow(
-				tr("%1<br>Recorded source: %2").arg(QFileInfo(candidate.folder).fileName(), candidate.recordedSourcePath));
-			QHBoxLayout* rowLayout = static_cast<QHBoxLayout*>(row->layout());
-
-			QPushButton* relinkButton = new QPushButton(tr("Relink"), row);
-			QPushButton* browseButton = new QPushButton(tr("Browse..."), row);
-			QPushButton* skipButton   = new QPushButton(tr("Skip"), row);
-			rowLayout->addWidget(relinkButton);
-			rowLayout->addWidget(browseButton);
-			rowLayout->addWidget(skipButton);
-
-			const MediaId placeholderId = candidate.placeholderId;
-			const QString recordedPath = candidate.recordedSourcePath;
-			const std::vector<QPushButton*> rowButtons{ relinkButton, browseButton, skipButton };
-
-			wireAction(relinkButton, statusLabel, rowButtons, tr("Relinked."),
-				tr("Could not relink - that source file is already tracked under a different folder."),
-				[this, placeholderId, recordedPath] { return m_callbacks.relinkRequested(placeholderId, recordedPath); });
-
-			connect(browseButton, &QPushButton::clicked, this, [this, placeholderId, recordedPath, relinkButton, browseButton, skipButton, statusLabel] {
-				const QString picked = browseForSourceVideo(this, recordedPath);
-				if (picked.isEmpty())
-					return;
-				if (m_callbacks.relinkRequested(placeholderId, picked))
-				{
-					statusLabel->setText(tr("Relinked to %1").arg(picked));
-					relinkButton->setEnabled(false);
-					browseButton->setEnabled(false);
-					skipButton->setEnabled(false);
-				}
-				else
-				{
-					QMessageBox::warning(this, tr("Catalog integrity check"),
-						tr("Could not relink - that file's identity is already tracked under a different folder."));
-				}
-			});
-
-			wireSkip(skipButton, statusLabel, rowButtons);
-		}
-	}
-
 	if (!report.untracked.empty())
 	{
 		contentLayout->addWidget(new QLabel(tr("<b>Untracked folders</b> - on disk, not in the catalog"), content));

@@ -95,7 +95,6 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
 	m_frameViewer = new FrameViewerWindow();
 
 	setupUI();
-	backfillMissingPreviews();
 
 	// The one initial grid build is deliberately deferred to restoreSettings() below (queued): it applies the
 	// persisted label filter and calls refreshMediaGrid() once. Building here too would construct every card
@@ -469,44 +468,6 @@ bool nameMatchesFilter(const QString& name, const QString& query)
 }
 
 } // namespace
-
-void MainWindow::backfillMissingPreviews()
-{
-	Catalog& catalog = Catalog::instance();
-	std::vector<MediaId> toBackfill;
-	for (const MediaId& id : catalog.allMediaItems())
-	{
-		if (catalog.mediaType(id) != Catalog::MediaType::Video)
-			continue;  // photo cards decode the photo file itself - no preview/ cache exists or is wanted
-
-		if (!catalog.isSplitIntoFrames(id))
-			continue;  // not-yet-split videos already got a real preview/ at import time
-
-		const QString previewFolder = Catalog::previewDirFor(catalog.folderForMediaItem(id));
-		if (QDir(previewFolder).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty())
-			toBackfill.push_back(id);
-	}
-
-	if (toBackfill.empty())
-		return;
-
-	const int previewFrameCount = m_previewFrameCountCombo->currentData().toInt();
-
-	QMessageBox progressBox(this);
-	progressBox.setWindowTitle(tr("Updating previews"));
-	progressBox.setStandardButtons(QMessageBox::NoButton);
-	progressBox.setModal(true);
-	progressBox.show();
-
-	for (size_t i = 0; i < toBackfill.size(); ++i)
-	{
-		progressBox.setText(tr("Updating preview %1/%2...").arg(i + 1).arg(toBackfill.size()));
-		QApplication::processEvents();
-		// A genuine ghost (folder emptied externally) has no real frames, so regenerate returns false and skips
-		// it - CatalogIntegrity::scan handles that case, not us.
-		regeneratePreviewFromRealFrames(catalog.folderForMediaItem(toBackfill[i]), previewFrameCount);
-	}
-}
 
 bool MainWindow::regeneratePreviewFromRealFrames(const QString& folderPath, int frameCount)
 {
@@ -1513,12 +1474,6 @@ void MainWindow::scanForUntrackedFiles()
 void MainWindow::checkCatalogIntegrity()
 {
 	IntegrityCheckDialog::Callbacks callbacks{
-		.relinkRequested = [this](const MediaId& placeholderId, const QString& sourcePath) {
-			const bool ok = Catalog::instance().relinkPlaceholder(placeholderId, sourcePath);
-			if (ok)
-				refreshLibraryView();
-			return ok;
-		},
 		.registerRequested = [this](const QString& folderPath, const QString& sourcePath) {
 			const bool ok = Catalog::instance().addMediaItem(MediaId::fromFile(sourcePath), sourcePath, folderPath, /*splitIntoFrames=*/true);
 			if (ok)
@@ -1710,7 +1665,7 @@ void MainWindow::renameMediaItem(const MediaId& oldId, const QString& newFolderP
 	}
 
 	// --- Step 3: update the catalog: carry the metadata record (loop intervals, labels incl. Best) to the new
-	// identity and record the new source path + frame folder. Replaces the old re-key + source_info.txt rewrite.
+	// identity and record the new source path + frame folder.
 	// Refused when the new name+size collides with another tracked item - undo the disk renames then, so disk
 	// and catalog stay in sync (a collision requires a changed id, so the source file was renamed here too).
 	if (!catalog.applyRename(oldId, newId, newSourcePath, newFolderPath))
