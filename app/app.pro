@@ -37,7 +37,8 @@ INCLUDEPATH += \
 	src \
 	../qtutils \
 	../cpputils \
-	../cpp-template-utils
+	../cpp-template-utils \
+	../magic-alignment/src
 
 ###################################################
 #                 SOURCES
@@ -56,7 +57,7 @@ RESOURCES += res/UI/resources.qrc
 #                 LIBS
 ###################################################
 
-LIBS += -L$${DESTDIR} -lqtutils -lcpputils
+LIBS += -L$${DESTDIR} -lqtutils -lcpputils -lmagic-alignment
 
 ###################################################
 #    Platform-specific compiler options and libs

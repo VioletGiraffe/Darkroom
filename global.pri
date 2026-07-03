@@ -1,0 +1,6 @@
+CONFIG += c++2b
+
+windows*{
+	Release:QMAKE_CXXFLAGS += /GL
+	Release:QMAKE_LFLAGS += /DEBUG:FULL /OPT:REF /OPT:ICF /TIME /LTCG:INCREMENTAL
+}

@@ -7,3 +7,6 @@
 [submodule "cpputils"]
 	path = cpputils
 	url = https://github.com/VioletGiraffe/cpputils
+[submodule "magic-alignment"]
+	path = magic-alignment
+	url = https://github.com/VioletGiraffe/magic-alignment
