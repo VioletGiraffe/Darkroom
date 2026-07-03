@@ -752,7 +752,7 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 			for (const MediaId& sel : selection)
 			{
 				const QString path = Catalog::instance().sourcePathForMediaItem(sel);
-				if (!path.empty() && QFileInfo::exists(path))
+				if (!path.isEmpty() && QFileInfo::exists(path))
 					paths.push_back(path);
 			}
 			if (paths.size() < 2)
