@@ -3,6 +3,8 @@
 #include <QStringList>
 #include <QWidget>
 
+#include <vector>
+
 class QLabel;
 class QSlider;
 class QTimer;
@@ -23,9 +25,9 @@ private:
 
 private:
 	// Per-folder sorted image file lists.
-	QList<QStringList> m_folderFrames;
+	std::vector<QStringList> m_folderFrames;
 
-	QList<ThumbnailWidget*> m_thumbnailWidgets;
+	std::vector<ThumbnailWidget*> m_thumbnailWidgets;
 	QSlider*         m_slider    = nullptr;
 	QLabel*          m_frameLabel = nullptr;
 	QTimer*          m_debounceTimer = nullptr;

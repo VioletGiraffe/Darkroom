@@ -29,7 +29,7 @@ CompareWindow::CompareWindow(const QStringList& folderPaths, QWidget* parent) : 
 		// Prepend the full path so ThumbnailWidget can load them directly.
 		for (QString& f : files)
 			f = dir.filePath(f);
-		m_folderFrames.append(std::move(files));
+		m_folderFrames.push_back(std::move(files));
 	}
 
 	// The slider spans 0 .. maxFrameCount-1 (the longest folder); a folder with no frame at the current
