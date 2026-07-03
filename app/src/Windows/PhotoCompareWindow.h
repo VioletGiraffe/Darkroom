@@ -25,7 +25,8 @@ class SegmentedToggle;
 //   wheel = synchronized zoom around the cursor; left-drag = synchronized pan; F / double-click = fit;
 //   Ctrl+wheel / Ctrl+drag = adjust the hovered photo's alignment (scale / offset) alone;
 //   A = auto-align: estimates every photo's scale+offset against the reference (magic-alignment library);
-//       the patch evidence is drawn as circles (accent = used, red = rejected) until the next alignment;
+//       the patch evidence is drawn as true-footprint squares (accent = used, orange = outlier, red = no
+//       match) until the next alignment;
 //   Shift+A = two-point calibration: click the same two features in every photo - the photo that receives
 //       the first point becomes the reference; the distance ratio gives each other photo's relative scale,
 //       the midpoints its offset (right-click undoes a point, Esc cancels);
@@ -71,7 +72,7 @@ private:
 		QPointF alignOffset;          // image -> subject space
 		QString caption;              // file name, drawn in the pane's corner
 		std::vector<QPointF> calibPoints;  // image-space, at most 2; only populated while calibrating
-		std::vector<AlignmentMark> alignMarks;  // drawn as circles; cleared when the next alignment starts
+		std::vector<AlignmentMark> alignMarks;  // drawn as footprint squares; cleared when the next alignment starts
 	};
 
 	// Coordinate mapping. widget = m_viewZoom * (alignScale * image + alignOffset) + m_viewPan; the pan is
@@ -127,6 +128,9 @@ private:
 	QPointF m_viewPan;
 	int m_flickerIndex = -1;   // >= 0: every pane renders this photo (a digit key is held)
 	int m_fullViewIndex = -1;  // >= 0: the full-view page is active, showing this photo (flicker keys still override)
+	// Edge of an alignment patch in subject units. The footprint is the same in subject space for both sides
+	// of a pair (ref px directly; target px scaled by its alignment), so one number serves every mark.
+	double m_alignMarkSize = 0.0;
 	int m_refIndex = 0;        // the pane others calibrate against; re-chosen by each calibration session's first point
 	bool m_calibrating = false;
 	bool m_differenceMode = false;

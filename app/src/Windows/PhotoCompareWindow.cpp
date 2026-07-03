@@ -110,17 +110,20 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 		}
 	}
 
-	// Auto-align diagnostics: where the aligner took its evidence in the RENDERED photo. Accent = used for
-	// the fit; orange = matched well but inconsistent with the fitted transform (outlier - a systematic
-	// pattern of these hints at rotation, which the model does not correct); red = failed to match.
+	// Auto-align diagnostics: where the aligner took its evidence in the RENDERED photo, drawn at the
+	// patch's true on-screen footprint. Accent = used for the fit; orange = matched well but inconsistent
+	// with the fitted transform (outlier - a systematic pattern of these hints at rotation, which the model
+	// does not correct); red = failed to match.
 	painter.setBrush(Qt::NoBrush);
+	const double markHalf = 0.5 * m_owner.m_alignMarkSize * m_owner.m_viewZoom;
 	for (const PhotoCompareWindow::AlignmentMark& mark : photo.alignMarks)
 	{
 		const QColor color = mark.kind == PhotoCompareWindow::AlignmentMark::Kind::Used ? QColor(Theme::current().AccentBorder)
 		                   : mark.kind == PhotoCompareWindow::AlignmentMark::Kind::Outlier ? QColor(0xe0, 0xa2, 0x30)
 		                                                                                   : QColor(0xd0, 0x40, 0x40);
 		painter.setPen(QPen(color, 2));
-		painter.drawEllipse(m_owner.widgetFromImage(photo, mark.imagePos), 8.0, 8.0);
+		const QPointF center = m_owner.widgetFromImage(photo, mark.imagePos);
+		painter.drawRect(QRectF(center.x() - markHalf, center.y() - markHalf, 2.0 * markHalf, 2.0 * markHalf));
 	}
 
 	// Corner caption: "2 · name.jpg · 63%" - the leading digit doubles as the pane's flicker key, the
@@ -495,6 +498,7 @@ void PhotoCompareWindow::autoAlignPhotos()
 		AlignmentOptions options;
 		options.initialGuess = { photo.alignScale / refScale, (photo.alignOffset - refOffset) / refScale };
 		const AlignmentResult result = alignImages(ref.image, photo.image, options);
+		m_alignMarkSize = result.patchSize;  // in reference px == subject units (the subject space was just rebased)
 		qDebug() << "Auto-align photo" << (i + 1) << "vs" << (m_refIndex + 1) << ": succeeded" << result.succeeded
 		         << " confidence" << result.confidence << " coarse" << result.bootstrapZncc
 		         << " scale" << result.transform.scale << " offset" << result.transform.offset;
@@ -526,7 +530,7 @@ void PhotoCompareWindow::autoAlignPhotos()
 	}
 	QApplication::restoreOverrideCursor();
 	// Transient status in the hint bar; any later mode change repaints the normal hint over it.
-	m_hintLabel->setText(tr("Auto-align vs %1 · %2 · circles: accent = used, orange = outlier, red = no match")
+	m_hintLabel->setText(tr("Auto-align vs %1 · %2 · squares: accent = used, orange = outlier, red = no match")
 		.arg(m_refIndex + 1).arg(summary.join("   ")));
 	updateAllPanes();
 }
