@@ -41,8 +41,8 @@ disk state into the catalog exactly once, guarded by a `"seededFromSourceInfo"` 
 
 - Present source file → a real (name+size) `MediaId`. Missing/unmounted source → a `MediaId::fromNameAndSize(name, -1)`
   placeholder (`isValid() == false`) so the frames still surface under their folder label, exactly as
-  before — the source can be reconciled later if the integrity tool described in
-  [catalog-and-labels.md](catalog-and-labels.md) is built.
+  before — the source can be reconciled later via the integrity tool described in
+  [catalog-and-labels.md](catalog-and-labels.md).
 - Two folders resolving to the same id (a genuine duplicate source, or two same-named missing sources
   collapsing to one placeholder) — the second is skipped with a `qWarning`, never silently overwriting the
   first.
@@ -51,7 +51,7 @@ disk state into the catalog exactly once, guarded by a `"seededFromSourceInfo"` 
   placeholder record carrying only folder+path, while the real-id record keeps the labels but has no
   `folder`, so `rebuildIndex` skips it. Net effect: the video shows its folder label only — identical to
   pre-catalog behavior for a missing-source video, so not a regression — but the extra labels are orphaned
-  under the real id until the source reappears and an integrity tool relinks them (see
+  under the real id until the source reappears and the integrity tool relinks them (see
   [catalog-and-labels.md](catalog-and-labels.md)).
 - `source_info.txt` files are deliberately **left on disk**, never read again after the seed runs once.
 

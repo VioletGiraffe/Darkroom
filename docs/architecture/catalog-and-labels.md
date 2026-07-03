@@ -308,38 +308,32 @@ above doesn't carry the reasoning behind forks that were considered and rejected
 Tools menu → "Check catalog integrity..." (`MainWindow::checkCatalogIntegrity`) reconciles the catalog
 against disk on demand — the only other place besides the legacy seed that walks disk, and only ever on
 explicit user request, never part of the normal refresh path. **Video-only in v1**: photo entries are skipped
-outright (every check reasons about frame folders — a referenced photo's empty folder would misread as a
-ghost), and the untracked-folder walk skips the `<root>/Photos` tree (it holds owned photo files, not frame
-folders). Photo integrity (missing owned file / vanished referenced file) is deferred backlog.
-`CatalogIntegrity::scan()` (`app/src/Core/CatalogIntegrity.{h,cpp}`) is read-only and returns an `IntegrityReport`
-of three kinds of drift, each with its own resolution. The scan and its report structs live in that dedicated
-module — reasoning purely over `Catalog`'s public API plus the on-disk layout — while `Catalog` keeps only the
-resolution *mutations* the scan feeds (they touch the model and persist, so only it can perform them):
-- **`RelinkCandidate`** — an orphaned placeholder (`MediaId::fromNameAndSize(name, -1)`, from when the source
-  was missing at seed/import time) whose recorded source path now resolves to an existing file. Resolved via
-  `Catalog::relinkPlaceholder`, which unions the placeholder's stored labels with any pre-existing orphaned
-  record already under the real id (see [data-model.md](data-model.md)'s "Legacy seed" note) and refuses if
-  the real id already names an item tracked under a *different* folder.
-- **`UntrackedFolder`** — a non-empty frame folder on disk that no catalog entry claims. Resolved by browsing to
-  its source video, which registers it via `Catalog::addMediaItem` (`splitIntoFrames=true`, since real frames are
-  already on disk by definition of being found this way). *(The old recovery of a candidate source from a legacy
-  `source_info.txt` — and the resulting auto-"Register" — was dropped; that file is never written by the current
-  app, so the recovery only ever fired for legacy leftovers.)*
-- **`MediaIssue`** — a tracked video whose on-disk backing isn't intact. The banner atop `CatalogIntegrity::scan` maps
-  the full state grid; the verdicts are orthogonal, so one entry can carry several. Each `MediaIssue` holds the
-  raw disk facts (source / real-frames / preview presence + the split flag) and exposes the predicates the dialog
-  reads: `isGhost` (fully split but real frames gone), `isInvisible` (no preview frames, so the grid card can't
-  render — `preview/` is the *only* render source), `isStale` (real frames exist but the entry is still flagged
-  preview-only), and `sourceMissing`. Resolutions offered per issue: re-import (re-extract from a present source,
-  `MainWindow::resplitVideoIntoFrames`), regenerate preview (`MainWindow::regeneratePreviewFor` — from real frames,
-  which also marks it split, else from the source video), mark-fully-split (`Catalog::markSplitComplete`), or
-  remove (`Catalog::removeMediaItem`). Source-missing over an otherwise-intact product is advisory (remove/skip).
+(every check reasons about frame folders, which photos don't have) and the untracked walk skips the
+`<root>/Photos` tree. Photo integrity (missing owned file / vanished referenced file) is deferred backlog.
+
+The read-only scan and its report types live in a dedicated module, `CatalogIntegrity`
+(`app/src/Core/CatalogIntegrity.{h,cpp}`), reasoning purely over `Catalog`'s public API plus the on-disk
+layout; `Catalog` keeps only the resolution *mutations* the scan feeds, since those touch the model and
+persist. **What the check actually looks for — the full video state space (what a frame folder can hold ×
+the split flag) and the verdicts it yields — is documented authoritatively in the banner comment atop
+`CatalogIntegrity::scan`, kept next to the code so the two can't drift.** This section stays conceptual and
+does not restate it.
+
+The scan reports three kinds of drift, each with its own resolution:
+- **Relinkable placeholder** — an item seeded with a then-missing source (an `isValid() == false` id; see
+  [data-model.md](data-model.md)'s "Legacy seed" note) whose recorded source path now exists again → relink
+  it to the real file.
+- **Untracked folder** — a non-empty frame folder on disk that no catalog entry claims → the user browses to
+  its source video to register it. *(A legacy path that instead recovered the source automatically from a
+  `source_info.txt` was dropped together with reading that file at all — the current app never writes one.)*
+- **Broken video entry** — a tracked video whose on-disk product (preview frames and/or real frames) no
+  longer matches what the catalog records → resolved by re-import, preview regeneration, marking it fully
+  split, or removal, depending on which verdicts hold (the banner maps verdict → available resolution).
 
 `IntegrityCheckDialog::scanAndShowUi` owns all the scan/UI logic behind one static entry point; `MainWindow`
-only supplies the resolution callbacks (relink / register / re-import / regenerate-preview / mark-split / remove)
-that actually touch the `Catalog`/disk, plus a manual "browse to source" path for the placeholder/untracked
-findings the tool couldn't resolve on its own.
-Everything in the "deliberate non-fix"/"known wart" notes above defers to this tool for actual reconciliation.
+only supplies the resolution callbacks that actually touch the `Catalog`/disk, plus a manual "browse to
+source" path for the placeholder/untracked findings the tool can't resolve on its own. Everything in the
+"deliberate non-fix"/"known wart" notes above defers to this tool for actual reconciliation.
 
 ---
 
