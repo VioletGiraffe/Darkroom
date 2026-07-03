@@ -528,6 +528,38 @@ bool Catalog::applyRename(const MediaId& oldId, const MediaId& newId, const QStr
 }
 
 // --- Integrity check -------------------------------------------------------------------------------------
+//
+// Compares the catalog model against what's on disk. Two directions: (A) per entry - is this entry's backing
+// intact? (grids below); (B) per folder - on-disk content under no entry? (the "untracked" walk lower down).
+//
+// (A) VIDEO  <folder> = frame folder. Cell = verdict; columns are what the folder holds, rows the split flag.
+//            preview/ is the card's ONLY render source (both rows); real frames are the deliverable, due once split.
+//
+//     | split       | frames+preview  | preview only    | frames only     | empty / gone
+//     |-------------|-----------------|-----------------|-----------------|-----------------
+//     | split=true  | ok              | GHOST           | INVISIBLE       | GHOST+INVISIBLE
+//     | split=false | STALE flag      | ok              | STALE+INVISIBLE | INVISIBLE
+//
+//       GHOST     = real frames gone (source present -> re-import, else remove)
+//       INVISIBLE = preview/ gone -> card silently absent from the grid
+//       STALE     = real frames exist but entry still marked preview-only
+//     + source missing (overlays ANY cell): source unavailable - frames may be intact, but re-extract/re-import
+//       is blocked, and a not-yet-split entry can never complete its split.
+//
+// (A) PHOTO  the file IS the item (no preview, no frames; the card decodes it). Only the source file matters:
+//
+//     |            | present | missing
+//     |------------|---------|-------------------------------------------------
+//     | owned      | ok      | LOST - the library's own file (was <root>/Photos/<label>)
+//     | referenced | ok      | GONE - external file moved or unmounted
+//
+// Overlay (optional, any entry): sourcePath exists but no longer matches the recorded MediaId (size differs)
+//   -> the source was replaced by a different file. Needs a per-entry stat; not done by default.
+//
+// Status (target vs. now): today only GHOST is caught (frames absent while split=true). INVISIBLE, STALE and
+// source-missing are not yet checked, PHOTO entries are skipped entirely, and (B) untracked is video-only -
+// filling these in is the work in progress.
+// ---------------------------------------------------------------------------------------------------------
 
 Catalog::IntegrityReport Catalog::scanIntegrity() const
 {
