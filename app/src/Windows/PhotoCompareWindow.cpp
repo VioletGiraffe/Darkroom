@@ -353,7 +353,7 @@ void PhotoCompareWindow::fitView()
 	const QSizeF paneSize = m_paneWidgets[0]->size();
 	if (paneSize.isEmpty())
 		return;
-	const Pane& ref = m_panes[0];
+	const Pane& ref = m_panes[m_refIndex];
 	const QRectF subjectRect(ref.alignOffset, QSizeF(ref.image.size()) * ref.alignScale);
 	m_viewZoom = std::min(paneSize.width() / subjectRect.width(), paneSize.height() / subjectRect.height());
 	m_viewPan = QPointF((paneSize.width() - m_viewZoom * subjectRect.width()) / 2.0,
@@ -408,6 +408,9 @@ void PhotoCompareWindow::addCalibrationPoint(int index, const QPointF& imagePos)
 	// A near-duplicate would make the two-point distance ratio meaningless (or divide by ~zero) - ignore it.
 	if (points.size() == 1 && QLineF(points[0], imagePos).length() < 4.0)
 		return;
+	// The pane receiving the session's very first point becomes the reference the others are mapped onto.
+	if (std::all_of(m_panes.cbegin(), m_panes.cend(), [](const Pane& pane) { return pane.calibPoints.empty(); }))
+		m_refIndex = index;
 	points.push_back(imagePos);
 	updateHintText();
 	m_paneWidgets[index]->update();
@@ -430,10 +433,11 @@ void PhotoCompareWindow::undoCalibrationPoint(int index)
 
 void PhotoCompareWindow::applyCalibration()
 {
-	// Photo 0 is the reference: subject space becomes its pixel coords. Every other photo maps onto it by
-	// the transform (uniform scale + offset - no rotation in v1) that carries its two clicked points onto
-	// the reference's two: scale = the distance ratio, offset = the midpoint difference.
-	Pane& ref = m_panes[0];
+	// The reference is the pane that received the session's first point: subject space becomes its pixel
+	// coords. Every other photo maps onto it by the transform (uniform scale + offset - no rotation in v1)
+	// that carries its two clicked points onto the reference's two: scale = the distance ratio, offset =
+	// the midpoint difference.
+	Pane& ref = m_panes[m_refIndex];
 	const QLineF refLine(ref.calibPoints[0], ref.calibPoints[1]);
 	// Fold the reference's old alignment into the view transform so the reference image stays exactly where
 	// it was on screen (same zoom, same position) and only the other photos move to meet it.
@@ -441,8 +445,10 @@ void PhotoCompareWindow::applyCalibration()
 	m_viewZoom *= ref.alignScale;
 	ref.alignScale = 1.0;
 	ref.alignOffset = QPointF();
-	for (size_t i = 1; i < m_panes.size(); ++i)
+	for (size_t i = 0; i < m_panes.size(); ++i)
 	{
+		if (static_cast<int>(i) == m_refIndex)
+			continue;
 		Pane& pane = m_panes[i];
 		const QLineF line(pane.calibPoints[0], pane.calibPoints[1]);
 		pane.alignScale = refLine.length() / line.length();
@@ -473,7 +479,12 @@ void PhotoCompareWindow::updateHintText()
 	{
 		QStringList progress;
 		for (size_t i = 0; i < m_panes.size(); ++i)
-			progress.push_back(QString("%1: %2/2").arg(i + 1).arg(m_panes[i].calibPoints.size()));
+		{
+			QString entry = QString("%1: %2/2").arg(i + 1).arg(m_panes[i].calibPoints.size());
+			if (static_cast<int>(i) == m_refIndex && !m_panes[i].calibPoints.empty())
+				entry += tr(" (ref)");
+			progress.push_back(entry);
+		}
 		m_hintLabel->setText(tr("Alignment: click the same two features in every photo · right-click: undo a point · Esc: cancel · %1")
 			.arg(progress.join("   ")));
 	}

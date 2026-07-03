@@ -20,8 +20,9 @@ class PhotoComparePane;
 // Controls (also summarized in the in-window hint bar):
 //   wheel = synchronized zoom around the cursor; left-drag = synchronized pan; F / double-click = fit;
 //   Ctrl+wheel / Ctrl+drag = adjust the hovered photo's alignment (scale / offset) alone;
-//   A = two-point calibration: click the same two features in every photo - the distance ratio gives each
-//       photo's relative scale, the midpoints its offset (right-click undoes a point, Esc cancels);
+//   A = two-point calibration: click the same two features in every photo - the photo that receives the
+//       first point becomes the reference; the distance ratio gives each other photo's relative scale, the
+//       midpoints its offset (right-click undoes a point, Esc cancels);
 //   hold 1..N = flicker: every pane temporarily renders photo N under the shared view, release to revert;
 //   Esc = close.
 class PhotoCompareWindow final : public QWidget
@@ -44,7 +45,7 @@ private:
 	{
 		QImage image;                 // full-res, EXIF-oriented
 		std::vector<QImage> mipmaps;  // lazily built halving chain: [k] is image scaled by 2^-(k+1)
-		double alignScale = 1.0;      // image -> subject space (subject space = photo 0's pixel coords)
+		double alignScale = 1.0;      // image -> subject space (subject space = the reference photo's pixel coords)
 		QPointF alignOffset;          // image -> subject space
 		QString caption;              // file name, drawn in the pane's corner
 		std::vector<QPointF> calibPoints;  // image-space, at most 2; only populated while calibrating
@@ -64,7 +65,7 @@ private:
 	// Shared-view mutations (all panes follow).
 	void zoomView(double factor, const QPointF& widgetAnchor);  // zoom keeping widgetAnchor fixed
 	void panView(const QPointF& widgetDelta);
-	void fitView();  // fit photo 0's subject-space rect into a pane
+	void fitView();  // fit the reference photo's subject-space rect into a pane
 
 	// Per-photo alignment mutations (Ctrl+wheel / Ctrl+drag).
 	void adjustPaneScale(int index, double factor, const QPointF& widgetAnchor);
@@ -86,9 +87,10 @@ private:
 	std::vector<PhotoComparePane*> m_paneWidgets;
 	QLabel* m_hintLabel = nullptr;
 
-	double m_viewZoom = 1.0;  // subject -> widget; 1.0 means photo 0 at 100% (1 image px = 1 widget px)
+	double m_viewZoom = 1.0;  // subject -> widget; 1.0 means the reference photo at 100% (1 image px = 1 widget px)
 	QPointF m_viewPan;
 	int m_flickerIndex = -1;   // >= 0: every pane renders this photo (a digit key is held)
+	int m_refIndex = 0;        // the pane others calibrate against; re-chosen by each calibration session's first point
 	bool m_calibrating = false;
 	bool m_viewTouched = false;  // until the user navigates, pane resizes keep re-fitting the view
 };
