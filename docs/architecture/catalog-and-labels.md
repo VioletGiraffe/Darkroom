@@ -301,28 +301,32 @@ above doesn't carry the reasoning behind forks that were considered and rejected
 
 Tools menu → "Check catalog integrity..." (`MainWindow::checkCatalogIntegrity`) reconciles the catalog
 against disk on demand — the catalog model is otherwise never re-derived from disk, so this runs only on
-explicit user request, never as part of the normal refresh path. **Video-only in v1**: photo entries are skipped
-(every check reasons about frame folders, which photos don't have) and the untracked walk skips the
-`<root>/Photos` tree. Photo integrity (missing owned file / vanished referenced file) is deferred backlog.
+explicit user request, never as part of the normal refresh path. It covers **videos and photos**. The one
+piece still deferred is discovering an *untracked* file under `<root>/Photos/<label>` (the untracked walk
+skips the `Photos` tree), so a stray photo file that no catalog entry claims isn't surfaced yet.
 
 The read-only scan and its report types live in a dedicated module, `CatalogIntegrity`
 (`app/src/Core/CatalogIntegrity.{h,cpp}`), reasoning purely over `Catalog`'s public API plus the on-disk
 layout; `Catalog` keeps only the resolution *mutations* the scan feeds, since those touch the model and
-persist. **What the check actually looks for — the full video state space (what a frame folder can hold ×
-the split flag) and the verdicts it yields — is documented authoritatively in the banner comment atop
-`CatalogIntegrity::scan`, kept next to the code so the two can't drift.** This section stays conceptual and
-does not restate it.
+persist. **What the check actually looks for — the full state space (a video's frame folder × split flag; a
+photo's owned/referenced × source presence) and the verdicts it yields — is documented authoritatively in the
+banner comment atop `CatalogIntegrity::scan`, kept next to the code so the two can't drift.** This section
+stays conceptual and does not restate it.
 
-The scan reports two kinds of drift, each with its own resolution:
+The scan reports three kinds of drift, each with its own resolution:
 - **Untracked folder** — a non-empty frame folder on disk that no catalog entry claims → the user browses to
   its source video to register it.
 - **Broken video entry** — a tracked video whose on-disk product (preview frames and/or real frames) no
   longer matches what the catalog records → resolved by re-import, preview regeneration, marking it fully
   split, or removal, depending on which verdicts hold (the banner maps verdict → available resolution).
+- **Missing photo** — a tracked photo whose source file is gone; a photo is source-only, so that's its whole
+  failure mode (owned → LOST, referenced → GONE). A referenced photo offers **Locate** (browse to the moved
+  file, repointing the entry through `applyRename`) plus Remove/Skip; an owned photo, which lives in the
+  library tree, offers only Remove/Skip.
 
 `IntegrityCheckDialog::scanAndShowUi` owns all the scan/UI logic behind one static entry point; `MainWindow`
-only supplies the resolution callbacks that actually touch the `Catalog`/disk, plus a manual "browse to
-source" path for an untracked folder the tool can't resolve on its own. Everything in the
+only supplies the resolution callbacks that actually touch the `Catalog`/disk, including the manual "browse"
+paths (an untracked folder's source video, a moved referenced photo). Everything in the
 "deliberate non-fix"/"known wart" notes above defers to this tool for actual reconciliation.
 
 ---

@@ -9,11 +9,11 @@
 #include <functional>
 
 // ============================================================================
-// IntegrityCheckDialog - shows what CatalogIntegrity::scan found (untracked frame folders and broken video
-// entries) and lets the user resolve each one: register an untracked folder against its source; per broken
-// video, re-import / regenerate preview / mark-fully-split / remove; plus browse to point at a source
-// manually. All UI logic lives here behind the static scanAndShowUi() entry point - MainWindow only
-// supplies the callbacks that actually touch the Catalog/disk.
+// IntegrityCheckDialog - shows what CatalogIntegrity::scan found (untracked frame folders, broken video
+// entries, and photos whose source file is missing) and lets the user resolve each one: register an untracked
+// folder against its source; per broken video, re-import / regenerate preview / mark-fully-split / remove; per
+// missing photo, locate the moved file (referenced only) or remove. All UI logic lives here behind the static
+// scanAndShowUi() entry point - MainWindow only supplies the callbacks that actually touch the Catalog/disk.
 // ============================================================================
 
 class IntegrityCheckDialog final : public QDialog
@@ -34,6 +34,9 @@ public:
 		std::function<bool(const MediaId& id)> markSplitRequested;
 		// Drops an entry from the catalog outright; always succeeds.
 		std::function<bool(const MediaId& id)> removeEntryRequested;
+		// Repoints a referenced photo (whose source file moved) at a newly-located file; returns whether it
+		// succeeded - refused on an id clash with a different tracked item (via Catalog::applyRename).
+		std::function<bool(const MediaId& id, const QString& newSourcePath)> locatePhotoRequested;
 	};
 
 	// Scans the catalog for drift against disk and, if anything was found, shows this dialog so the user can

@@ -1505,6 +1505,15 @@ void MainWindow::checkCatalogIntegrity()
 			refreshLibraryView();
 			return true;
 		},
+		.locatePhotoRequested = [this](const MediaId& id, const QString& newSourcePath) {
+			// Repoint a referenced photo at the file the user located. applyRename carries the record (labels,
+			// referenced flag) to the new identity and refuses an id clash; a referenced photo has no storage
+			// folder, so it stays folder-less (empty newFolderAbs).
+			const bool ok = Catalog::instance().applyRename(id, MediaId::fromFile(newSourcePath), newSourcePath, /*newFolderAbs=*/QString{});
+			if (ok)
+				refreshLibraryView();
+			return ok;
+		},
 	};
 	IntegrityCheckDialog::scanAndShowUi(std::move(callbacks), this);
 }

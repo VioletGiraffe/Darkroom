@@ -27,6 +27,15 @@ QString browseForSourceVideo(QWidget* parent, const QString& hint)
 	return QFileDialog::getOpenFileName(parent, QObject::tr("Select source video"), startDir, QObject::tr(VIDEO_FILE_FILTER));
 }
 
+// The photo counterpart (the referenced-photo Locate resolution): point at an image file, starting in hint's
+// directory if given. The filter is built from the app-wide image extensions (IMAGE_FILE_FILTERS).
+QString browseForSourcePhoto(QWidget* parent, const QString& hint)
+{
+	const QString startDir = hint.isEmpty() ? QString{} : QFileInfo(hint).absolutePath();
+	const QString filter = QObject::tr("Image files (%1);;All files (*)").arg(IMAGE_FILE_FILTERS.join(QStringLiteral(" ")));
+	return QFileDialog::getOpenFileName(parent, QObject::tr("Locate photo"), startDir, filter);
+}
+
 } // namespace
 
 void IntegrityCheckDialog::scanAndShowUi(Callbacks callbacks, QWidget* parent)
@@ -90,6 +99,27 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 		});
 	};
 
+	// Wires a "browse then act" button (the untracked Register and the photo Locate share this shape): opens a
+	// file picker; if the user picked something, runs action(picked) and, on success, sets the row status from
+	// successFmt (a "...%1..." string filled with the picked path) and disables the row; on failure, warns.
+	const auto wireBrowse = [this](QPushButton* button, QLabel* statusLabel, const std::vector<QPushButton*>& rowButtons,
+	                               std::function<QString()> browse, std::function<bool(const QString&)> action,
+	                               const QString& successFmt, const QString& failureText) {
+		connect(button, &QPushButton::clicked, this, [=] {
+			const QString picked = browse();
+			if (picked.isEmpty())
+				return;
+			if (action(picked))
+			{
+				statusLabel->setText(successFmt.arg(picked));
+				for (QPushButton* b : rowButtons)
+					b->setEnabled(false);
+			}
+			else
+				QMessageBox::warning(this, tr("Catalog integrity check"), failureText);
+		});
+	};
+
 	const auto addRow = [&](const QString& statusText) -> std::pair<QFrame*, QLabel*> {
 		QFrame* row = new QFrame(content);
 		row->setFrameShape(QFrame::StyledPanel);
@@ -118,22 +148,11 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 			const std::vector<QPushButton*> rowButtons{ browseButton, skipButton };
 
 			// The only resolution is to point at a source video, which registers the folder against it.
-			connect(browseButton, &QPushButton::clicked, this, [this, folderPath, rowButtons, statusLabel] {
-				const QString picked = browseForSourceVideo(this, folderPath);
-				if (picked.isEmpty())
-					return;
-				if (m_callbacks.registerRequested(folderPath, picked))
-				{
-					statusLabel->setText(tr("Registered with %1").arg(picked));
-					for (QPushButton* b : rowButtons)
-						b->setEnabled(false);
-				}
-				else
-				{
-					QMessageBox::warning(this, tr("Catalog integrity check"),
-						tr("Could not register - that file's identity is already tracked under a different folder."));
-				}
-			});
+			wireBrowse(browseButton, statusLabel, rowButtons,
+				[this, folderPath] { return browseForSourceVideo(this, folderPath); },
+				[this, folderPath](const QString& picked) { return m_callbacks.registerRequested(folderPath, picked); },
+				tr("Registered with %1"),
+				tr("Could not register - that file's identity is already tracked under a different folder."));
 
 			wireSkip(skipButton, statusLabel, rowButtons);
 		}
@@ -197,6 +216,48 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 			if (markSplitButton)
 				wireAction(markSplitButton, statusLabel, rowButtons, tr("Marked as fully split."), tr("Could not update the entry."),
 					[this, id] { return m_callbacks.markSplitRequested(id); });
+
+			wireAction(removeButton, statusLabel, rowButtons, tr("Removed from catalog."), tr("Could not remove."),
+				[this, id] { return m_callbacks.removeEntryRequested(id); });
+
+			wireSkip(skipButton, statusLabel, rowButtons);
+		}
+	}
+
+	if (!report.photoIssues.empty())
+	{
+		contentLayout->addWidget(new QLabel(tr("<b>Photos</b> - tracked photos whose source file is missing"), content));
+		for (const CatalogIntegrity::PhotoIssue& photo : report.photoIssues)
+		{
+			const QString name   = photo.sourcePath.isEmpty() ? tr("(no source recorded)") : QFileInfo(photo.sourcePath).fileName();
+			const QString what   = photo.referenced ? tr("referenced file moved or unmounted") : tr("the library's own file is gone");
+			const QString detail = photo.sourcePath.isEmpty() ? QString{} : "<br>" + photo.sourcePath;
+			const auto [row, statusLabel] = addRow(name + "<br>" + what + detail);
+			QHBoxLayout* rowLayout = static_cast<QHBoxLayout*>(row->layout());
+
+			const MediaId id = photo.id;
+			const QString recordedPath = photo.sourcePath;
+
+			// Locate is offered only for a referenced photo - its file may have just moved, so pointing at it
+			// repoints the entry. An owned photo lives in the library tree, so a missing owned file is Remove/Skip.
+			QPushButton* locateButton = photo.referenced ? new QPushButton(tr("Locate..."), row) : nullptr;
+			QPushButton* removeButton = new QPushButton(tr("Remove"), row);
+			QPushButton* skipButton   = new QPushButton(tr("Skip"), row);
+
+			std::vector<QPushButton*> rowButtons;
+			for (QPushButton* b : { locateButton, removeButton, skipButton })
+				if (b)
+				{
+					rowLayout->addWidget(b);
+					rowButtons.push_back(b);
+				}
+
+			if (locateButton)
+				wireBrowse(locateButton, statusLabel, rowButtons,
+					[this, recordedPath] { return browseForSourcePhoto(this, recordedPath); },
+					[this, id](const QString& picked) { return m_callbacks.locatePhotoRequested(id, picked); },
+					tr("Relocated to %1"),
+					tr("Could not relocate - that file's identity is already tracked as a different item."));
 
 			wireAction(removeButton, statusLabel, rowButtons, tr("Removed from catalog."), tr("Could not remove."),
 				[this, id] { return m_callbacks.removeEntryRequested(id); });

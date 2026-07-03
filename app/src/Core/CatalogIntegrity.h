@@ -8,7 +8,7 @@
 
 // The read-only catalog-vs-disk scan and its report vocabulary. The scan (see the state grid above scan() in
 // the .cpp) reasons purely over Catalog's public API plus the on-disk layout; the *resolutions* it feeds
-// (re-import / regenerate-preview / mark-split / remove) are mutations that live on Catalog and
+// (re-import / regenerate-preview / mark-split / relocate / remove) are mutations that live on Catalog and
 // MainWindow, because only they can touch the model, persist, and drive ffmpeg.
 namespace CatalogIntegrity {
 
@@ -39,11 +39,23 @@ struct MediaIssue
 	[[nodiscard]] bool healthy() const       { return sourcePresent && !isGhost() && !isInvisible() && !isStale(); }
 };
 
+// A tracked photo whose source file is missing. A photo is source-only (no frames, no preview - the card
+// decodes the file itself), so a missing file is its whole failure mode: owned -> LOST (the library's own
+// <root>/Photos/<label> file is gone), referenced -> GONE (the external file moved or was unmounted). A
+// present file -> no issue. referenced selects the verdict wording and which resolutions the dialog offers.
+struct PhotoIssue
+{
+	MediaId id;
+	QString sourcePath;
+	bool    referenced = false;
+};
+
 struct IntegrityReport
 {
 	std::vector<UntrackedFolder> untracked;
 	std::vector<MediaIssue>      issues;
-	[[nodiscard]] bool isEmpty() const { return untracked.empty() && issues.empty(); }
+	std::vector<PhotoIssue>      photoIssues;
+	[[nodiscard]] bool isEmpty() const { return untracked.empty() && issues.empty() && photoIssues.empty(); }
 };
 
 // Walks the catalog model + disk once (only ever on explicit user request, never part of the normal refresh

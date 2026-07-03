@@ -35,9 +35,10 @@
 // Overlay (optional, any entry): sourcePath exists but no longer matches the recorded MediaId (size differs)
 //   -> the source was replaced by a different file. Needs a per-entry stat; not done by default.
 //
-// Status: all VIDEO verdicts above are implemented (each entry emits at most one MediaIssue carrying the flags
-// that hold). PHOTO entries are still skipped - photo integrity is the next phase - and (B) untracked covers
-// video frame folders only; Photos/<label> files are that same phase.
+// Status: all VIDEO verdicts above are implemented (each non-healthy video emits one MediaIssue carrying the
+// flags that hold). PHOTO entries emit a PhotoIssue when the source file is missing (owned -> LOST, referenced
+// -> GONE). Still deferred: (B) untracked covers video frame folders only - an unclaimed file under
+// Photos/<label> isn't surfaced yet.
 // ---------------------------------------------------------------------------------------------------------
 
 namespace CatalogIntegrity {
@@ -50,11 +51,18 @@ IntegrityReport scan()
 	// Phase 1: per-video-entry issue checks.
 	for (const MediaId& id : catalog.allMediaItems())
 	{
-		if (catalog.mediaType(id) != Catalog::MediaType::Video)
-			continue;  // photo integrity is deferred - a referenced photo's empty folder would misread as a ghost
+		const QString source = catalog.sourcePathForMediaItem(id);
+
+		if (catalog.mediaType(id) == Catalog::MediaType::Photo)
+		{
+			// A photo is source-only (the card decodes the file itself) - no frames or preview to probe. Its
+			// sole failure is the file going missing: owned -> LOST, referenced -> GONE.
+			if (source.isEmpty() || !QFileInfo::exists(source))
+				report.photoIssues.push_back({ id, source, catalog.isReferenced(id) });
+			continue;
+		}
 
 		const QString folder = catalog.folderForMediaItem(id);
-		const QString source = catalog.sourcePathForMediaItem(id);
 
 		// Probe the entry's on-disk backing; record a MediaIssue for anything non-healthy. The verdicts
 		// (ghost / invisible / stale / source-missing) are orthogonal - see the state grid above.
