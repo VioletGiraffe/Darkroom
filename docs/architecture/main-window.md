@@ -151,7 +151,8 @@ up front and to show relocate/untag counts in a confirm dialog, then `deleteLabe
 
 Middle-click → `FrameViewerWindow::showForFolder()` (videos only — not wired on photo cards); double-click →
 built-in player for a video, system image viewer for a photo; right-click → context menu;
-Ctrl/Shift-click and rubber-band → multi-select. (Single+double click on the same button proved unreliable;
+Ctrl/Shift-click and rubber-band → multi-select; left-drag → export the source file(s) out to Explorer/another
+app (see **Media grid & multi-select** below). (Single+double click on the same button proved unreliable;
 middle-click is the deliberate choice for "show frames".)
 
 ---
@@ -173,18 +174,27 @@ several sessions before being caught). The current IconMode `QListWidget` restor
 flow grid.
 
 **Why multi-select works despite embedded card widgets**: `ThumbnailWidget`'s mouse handlers fall through
-to `QWidget::` base (leaving the event *ignored*) whenever no drag starts; Qt then propagates the ignored
-event up to the view, which does click-to-select/rubber-band. Drag code only consumes the event once
-`tryStartDrag` actually starts a `QDrag`.
+to `QWidget::` base (leaving the event *ignored*) whenever it has nothing to do with them; Qt then propagates
+the ignored event up to the view, which does click-to-select/rubber-band — or, once the pointer passes the
+drag threshold, starts the card's file-export drag itself (see **Dragging cards out**, below).
 
-**Press-collapses-selection fix**: a plain (no-modifier) press on an already-multi-selected item used to
-collapse the selection to that one item before a drag could start (so a group could never be dragged). The
-"don't change selection until release" nuance lives in `QAbstractItemView::mousePressEvent`, which only
-runs for presses landing on the viewport — ours land on the embedded widget first. Fix:
-`ThumbnailWidget::setSelectionGuard` — on a plain left press, if the guard returns true the press is swallowed
-(never propagates), preserving the selection. `MediaItemWidget` forwards it; `MainWindow` wires it per-card to
-"is this card part of a multi-selection". Deliberately not implemented: Explorer's release-without-drag
-collapse-to-single nuance.
+**Keeping a multi-selection through a press**: a plain (no-modifier) press on an already-multi-selected item
+would otherwise collapse the selection to that one item before a drag could start (so a group could never be
+dragged). `setDragEnabled(true)` on the grid is what prevents it: with a drag possible, `QAbstractItemView`
+**defers** the "collapse to the clicked item" to *release* rather than doing it on press, so the
+multi-selection survives the press+move and the whole group drags together. Deliberately not implemented:
+Explorer's release-without-drag collapse-to-single nuance.
+
+**Dragging cards out (file export)**: the grid is a **`MediaGrid`** (`src/UiComponents/MediaGrid.h/.cpp`), a
+`QListWidget` subclass whose `startDrag` exports the current selection's **source files** as `file://` URLs
+(`CopyAction` — never a move/delete of the original) to Explorer or another app. It maps items → URLs through
+a provider `MainWindow` sets (`dragUrlsForItems`, which skips missing files), so catalog access stays out of
+the view — the same "MainWindow computes, card draws" split the cards use. The drag image is the grabbed card
+(a count badge when >1 file goes along). The view has already resolved *which* cards via the normal selection
+(press-on-unselected selects just it; press-within-a-group keeps the group), so `startDrag` just reads
+`selectedItems()`. Since those URLs are "supported files", `MainWindow::dragEnterEvent` guards against the
+export dropping back onto the window's own import handler (`event->source() == m_mediaGrid` → ignored) — the
+import drop zone is for files from outside the app, not a card re-import of an already-tracked item.
 
 **Selection highlight**: the `QListWidget::item:selected` background rule (`Theme::ListSelectedBg`) shows
 through because `MediaItemWidget` now paints a **transparent** normal background (it owns only a rounded

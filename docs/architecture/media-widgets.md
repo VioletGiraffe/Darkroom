@@ -71,12 +71,15 @@ yet at construction (before the grid lays it out).
 Card image size = per-frame height × frame count wide, by that height tall — both the per-frame height and the
 frame count are user-adjustable at runtime (see "Card preview sizing & zoom" below).
 
-### Not a drag source
+### Dragging a card out (file export)
 
-The card is **not** a drag source — its only drag involvement is the label drop target above. An earlier "move
-video between collections" feature made the card draggable (drop it onto a destination collection); that was
-retired once moving between collections became "drag a label onto a card" instead, so the card no longer
-originates any drag.
+The card *widget* originates no drag itself — `MediaItemWidget`/`ThumbnailWidget` leave a left-drag to fall
+through to the view. Dragging a card is owned by the **grid view** (`MediaGrid`, see
+[main-window.md](main-window.md)): it exports the selected cards' **source files** as `file://` URLs
+(`CopyAction`) to Explorer or another app, drawing the grabbed card as the drag image (plus a count badge for
+a multi-file drag). The **label drop target** above is the card's only *incoming* drag. (An earlier
+card-owned "move video between collections" drag was retired when that became "drag a label onto a card"
+instead.)
 
 ---
 

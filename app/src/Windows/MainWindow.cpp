@@ -14,6 +14,7 @@
 #include "Windows/SettingsDialog.h"
 #include "UiComponents/SortControl.h"
 #include "Core/MediaId.h"
+#include "UiComponents/MediaGrid.h"
 #include "UiComponents/MediaItemWidget.h"
 #include "Windows/VideoPlayerWindow.h"
 #include "Theme/Theme.h"
@@ -47,6 +48,7 @@
 #include <QShortcut>
 #include <QSplitter>
 #include <QTimer>
+#include <QUrl>
 #include <QVBoxLayout>
 
 #include <QScopeGuard>
@@ -209,7 +211,8 @@ void MainWindow::setupUI()
 	mainLayout->addWidget(headerWidget);
 
 	// Media item card grid
-	m_mediaGrid = new QListWidget();
+	auto* grid = new MediaGrid();
+	m_mediaGrid = grid;
 	m_mediaGrid->setViewMode(QListView::IconMode);
 	m_mediaGrid->setFlow(QListView::LeftToRight);
 	m_mediaGrid->setWrapping(true);
@@ -221,12 +224,12 @@ void MainWindow::setupUI()
 	m_mediaGrid->setUniformItemSizes(true);
 	m_mediaGrid->setMovement(QListView::Static);
 	m_mediaGrid->setSelectionMode(QAbstractItemView::ExtendedSelection);
-	// Without this, the view reads "button-held + mouse moving" as a rubber-band reselection, which collapses an
-	// existing multi-selection to the single item under the cursor before our custom card drag can even start.
-	// With drag enabled, the view defers the collapse (it's expecting a drag), so a multi-selection survives the
-	// press+move long enough for ThumbnailWidget's QDrag to take over. The view itself never starts a drag — our
-	// ThumbnailWidget consumes the threshold-crossing move first.
+	// Dragging a card exports its source file(s): MediaGrid::startDrag turns the view's drag into a file:// URL
+	// copy out to Explorer / another app. Enabling drags also makes the view keep an existing multi-selection
+	// through a plain press+move instead of collapsing it to the single card under the cursor (it defers the
+	// collapse while a drag is possible), so a whole group can be dragged out together.
 	m_mediaGrid->setDragEnabled(true);
+	grid->setDragUrlsProvider([this](const QList<QListWidgetItem*>& items) { return dragUrlsForItems(items); });
 	m_mediaGrid->setSpacing(10);
 	m_mediaGrid->setStyleSheet(QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().AccentBg));
 
@@ -308,6 +311,12 @@ void MainWindow::openSettings()
 
 void MainWindow::dragEnterEvent(QDragEnterEvent* event)
 {
+	// A card dragged out of the grid carries its source file:// URL(s) for export to other apps. Those URLs are
+	// "supported files", so without this the drop would land back on our own import handler and re-import an
+	// already-tracked item. The import drop zone is for files coming from outside the app.
+	if (event->source() == m_mediaGrid)
+		return;
+
 	if (event->mimeData()->hasUrls())
 	{
 		for (const QUrl& url : event->mimeData()->urls())
@@ -703,6 +712,20 @@ std::vector<MediaId> MainWindow::effectiveSelection(const MediaId& id) const
 	if (std::find(selected.cbegin(), selected.cend(), id) == selected.cend())
 		selected = { id };
 	return selected;
+}
+
+QList<QUrl> MainWindow::dragUrlsForItems(const QList<QListWidgetItem*>& items) const
+{
+	Catalog& catalog = Catalog::instance();
+	QList<QUrl> urls;
+	urls.reserve(items.size());
+	for (const QListWidgetItem* item : items)
+	{
+		const QString path = catalog.sourcePathForMediaItem(static_cast<const GridItem*>(item)->mediaId);
+		if (!path.isEmpty() && QFile::exists(path))
+			urls << QUrl::fromLocalFile(path);
+	}
+	return urls;
 }
 
 void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globalPos)

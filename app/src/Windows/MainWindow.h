@@ -14,7 +14,9 @@ class LabelSidebar;
 class QComboBox;
 class QLineEdit;
 class QListWidget;
+class QListWidgetItem;
 class QTimer;
+class QUrl;
 class QWidget;
 class SegmentedToggle;
 class SortControl;
@@ -59,6 +61,10 @@ private:
 	void showMediaItemContextMenu(const MediaId& id, const QPoint& globalPos);
 	// If id is part of the current multi-selection, returns all selected items' ids; otherwise just id alone.
 	[[nodiscard]] std::vector<MediaId> effectiveSelection(const MediaId& id) const;
+	// Source-file URLs for the given grid items, handed to MediaGrid to export them when a card is dragged out
+	// (a multi-selection drags every selected file). Missing files (e.g. a referenced item on an unmounted
+	// drive) are skipped.
+	[[nodiscard]] QList<QUrl> dragUrlsForItems(const QList<QListWidgetItem*>& items) const;
 	void splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder);
 	// Wipes and fully re-extracts an already-tracked video's frames. preserveExistingPreview controls what
 	// happens to its preview/ subfolder across that wipe: true carries the existing one through unchanged
