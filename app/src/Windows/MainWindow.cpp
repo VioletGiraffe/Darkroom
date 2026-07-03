@@ -268,6 +268,12 @@ void MainWindow::setupMainMenu()
 	toolsMenu->addAction(tr("Scan for untracked files..."), this, &MainWindow::scanForUntrackedFiles);
 	toolsMenu->addAction(tr("Check catalog integrity..."), this, &MainWindow::checkCatalogIntegrity);
 	toolsMenu->addSeparator();
+	toolsMenu->addAction(tr("Compare photos..."), this, [this] {
+		auto* w = new PhotoCompareWindow({}, this);  // opens empty; photos are dropped in
+		w->setAttribute(Qt::WA_DeleteOnClose);
+		w->show();
+	}, QKeySequence("Shift+C"));
+	toolsMenu->addSeparator();
 	toolsMenu->addAction(tr("Restart all videos"), QKeySequence("Shift+R"), this, &VideoPlayerWindow::restartAll);
 	toolsMenu->addAction(tr("Close all videos"),   QKeySequence("Shift+W"), this, &VideoPlayerWindow::closeAll);
 	toolsMenu->addSeparator();

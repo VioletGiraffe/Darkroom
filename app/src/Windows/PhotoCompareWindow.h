@@ -35,18 +35,21 @@ class SegmentedToggle;
 //       per-channel absolute difference against the reference, the reference stays normal;
 //   bottom slider = full view: one pane covering the whole grid area, showing the photo at the slider's
 //       position (drag to scrub between photos; Left/Right step it; held digit keys still override);
+//   drop image files anywhere on the window = add them to the comparison;
 //   Esc = leave full view / cancel calibration / close.
 class PhotoCompareWindow final : public QWidget
 {
 public:
-	// photoPaths: the photo files to compare (2..4 make sense; any count works). Paths that fail to load
-	// are dropped with a warning.
+	// photoPaths: the photo files to compare (2..4 make sense; any count works; empty opens the window in
+	// its drop-target state - the Tools menu route). Paths that fail to load are dropped with a warning.
 	explicit PhotoCompareWindow(const QStringList& photoPaths, QWidget* parent = nullptr);
 	~PhotoCompareWindow() override;
 
 protected:
 	void keyPressEvent(QKeyEvent* event) override;
 	void keyReleaseEvent(QKeyEvent* event) override;
+	void dragEnterEvent(QDragEnterEvent* event) override;
+	void dropEvent(QDropEvent* event) override;
 
 private:
 	// The pane widgets are defined in the .cpp (no other consumer) and reach into the shared state below.
@@ -86,6 +89,11 @@ private:
 	// levels on demand, and the residual scale the painter must still apply to that level.
 	[[nodiscard]] const QImage& imageForScale(Photo& photo, double effectiveScale, double& residualScale);
 
+	// Loads and appends photos (the constructor's initial batch, or files dropped onto the window), then
+	// refreshes everything that depends on the photo count. Unreadable files are skipped with a warning.
+	void addPhotosFromFiles(const QStringList& photoPaths);
+	void rebuildPaneGrid();  // re-places every pane after a photo count change; shows the drop hint when empty
+
 	// Shared-view mutations (all panes follow).
 	void zoomView(double factor, const QPointF& widgetAnchor);  // zoom keeping widgetAnchor fixed
 	void panView(const QPointF& widgetDelta);
@@ -118,6 +126,8 @@ private:
 private:
 	std::vector<Photo> m_photos;
 	std::vector<PhotoComparePane*> m_paneWidgets;  // the grid cells; the full-view pane is separate (m_fullPane)
+	QWidget* m_gridPage = nullptr;             // page 0 of m_viewStack: the pane grid (or the drop hint when empty)
+	QLabel* m_dropHintLabel = nullptr;         // centered "drop files" prompt, shown only while there are no photos
 	PhotoComparePane* m_fullPane = nullptr;    // full-view page: one pane covering the whole grid area (index -1)
 	QStackedLayout* m_viewStack = nullptr;     // page 0: the pane grid, page 1: m_fullPane
 	QSlider* m_slider = nullptr;               // full-view photo picker; interacting with it enters the full view

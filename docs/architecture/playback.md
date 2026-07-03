@@ -58,8 +58,11 @@ painting.
 
 ## `PhotoCompareWindow` (`src/Windows/PhotoCompareWindow.h/.cpp`)
 
-N-way (2..4, gated in `MainWindow`'s context menu for all-photo selections) photo comparison in a square grid
-of equally sized panes, maximized by default. Its core mechanism is **two separate transform layers**:
+N-way (2..4, gated in `MainWindow`'s context menu for all-photo selections; also openable empty from
+Tools → "Compare photos...") photo comparison in a square grid of equally sized panes, maximized by default.
+Photos can be added at any time by dropping image files onto the window — the pane grid is rebuilt on every
+count change, and each added photo is default-aligned against the current reference. Its core mechanism is
+**two separate transform layers**:
 
 - **One shared view** (zoom + pan, in widget coordinates — equal pane sizes are what make the same widget
   position show the same subject point in every pane): wheel zooms all panes around the cursor, drag pans all.
@@ -86,5 +89,6 @@ Implementation notes:
   image coordinates, so navigating doesn't disturb them).
 - The view re-fits on every pane resize (first show, maximize, later window resizes) **until the user first
   navigates**; after that resizes leave the view alone.
-- Photos that fail to load are dropped at construction with a `qWarning` (so all downstream code can assume
-  every pane has a valid image); alignment is transient — nothing here persists except window geometry.
+- Photos that fail to load are skipped at load time (constructor batch and dropped files alike) with a
+  `qWarning` (so all downstream code can assume every pane has a valid image); alignment is transient —
+  nothing here persists except window geometry.

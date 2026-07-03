@@ -6,6 +6,8 @@
 
 #include <QApplication>
 #include <QDebug>
+#include <QDragEnterEvent>
+#include <QDropEvent>
 #include <QFileInfo>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -13,10 +15,12 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineF>
+#include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QSlider>
 #include <QStackedLayout>
+#include <QUrl>
 #include <QVBoxLayout>
 #include <QWheelEvent>
 
@@ -220,7 +224,63 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 {
 	setWindowTitle(tr("Compare Photos"));
 	setFocusPolicy(Qt::StrongFocus);  // the panes never take focus, so key events land here
+	setAcceptDrops(true);  // no child accepts drops, so a drop anywhere in the window lands here
 
+	QVBoxLayout* mainLayout = new QVBoxLayout(this);
+	mainLayout->setContentsMargins(4, 4, 4, 4);
+
+	m_gridPage = new QWidget(this);
+	m_dropHintLabel = new QLabel(tr("Drop image files here to compare them"), m_gridPage);
+	m_dropHintLabel->setAlignment(Qt::AlignCenter);
+
+	m_fullPane = new PhotoComparePane(*this, -1);
+	m_viewStack = new QStackedLayout();
+	m_viewStack->addWidget(m_gridPage);
+	m_viewStack->addWidget(m_fullPane);
+	mainLayout->addLayout(m_viewStack, 1);
+
+	// Bottom toolbar: the full-view picker slider stretching across, render-mode toggle at the far right.
+	QHBoxLayout* toolbar = new QHBoxLayout();
+
+	// Full-view picker: one detent per photo; pressing the handle or changing the value enters the full
+	// view, dragging back and forth scrubs between the aligned photos (a flicker gesture at full size).
+	m_slider = new QSlider(Qt::Horizontal, this);
+	m_slider->setPageStep(1);
+	m_slider->setTickPosition(QSlider::TicksBelow);
+	m_slider->setTickInterval(1);
+	m_slider->setFocusPolicy(Qt::NoFocus);  // all keyboard input stays on the window
+	connect(m_slider, &QSlider::sliderPressed, this, [this] { setFullViewIndex(m_slider->value()); });
+	connect(m_slider, &QSlider::valueChanged, this, [this](int value) { setFullViewIndex(value); });
+	toolbar->addWidget(m_slider, 1);
+
+	m_diffToggle = new SegmentedToggle({ tr("Normal"), tr("Difference") }, this);
+	m_diffToggle->setToolTip(tr("Difference: render each photo as its per-pixel difference against the reference photo (D)"));
+	connect(m_diffToggle, &SegmentedToggle::currentChanged, this, [this](int index) { setDifferenceMode(index == 1); });
+	toolbar->addWidget(m_diffToggle, 0);
+
+	mainLayout->addLayout(toolbar, 0);
+
+	m_hintLabel = new QLabel(this);
+	m_hintLabel->setAlignment(Qt::AlignCenter);
+	mainLayout->addWidget(m_hintLabel, 0);
+
+	addPhotosFromFiles(photoPaths);  // also puts the empty drop-target state in place when the list is empty
+
+	if (!restoreWindowGeometry(this, "photoCompareWindow"))
+	{
+		resize(1200, 800);  // the size the window falls back to when un-maximized
+		setWindowState(Qt::WindowMaximized);  // "use the whole screen" by default; the saved geometry rules thereafter
+	}
+}
+
+PhotoCompareWindow::~PhotoCompareWindow()
+{
+	saveWindowGeometry(this, "photoCompareWindow");
+}
+
+void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
+{
+	const size_t oldCount = m_photos.size();
 	for (const QString& path : photoPaths)
 	{
 		QImageReader reader(path);
@@ -234,96 +294,81 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 		Photo photo;
 		photo.image = std::move(image);
 		photo.caption = QFileInfo(path).fileName();
+		// Default alignment: normalize the photo's height to the reference's subject-space height and center
+		// the two on each other - so identical shots that only differ in export resolution line up with no
+		// user action at all. The very first photo keeps the identity default: it defines subject space.
+		if (!m_photos.empty())
+		{
+			const Photo& ref = m_photos[m_refIndex];
+			const QRectF refRect(ref.alignOffset, QSizeF(ref.image.size()) * ref.alignScale);
+			photo.alignScale = refRect.height() / photo.image.height();
+			photo.alignOffset = refRect.center() - photo.alignScale * QPointF(photo.image.width(), photo.image.height()) / 2.0;
+		}
 		m_photos.push_back(std::move(photo));
 	}
 
-	QVBoxLayout* mainLayout = new QVBoxLayout(this);
-	mainLayout->setContentsMargins(4, 4, 4, 4);
-
-	if (m_photos.empty())
-	{
-		QLabel* errorLabel = new QLabel(tr("None of the selected photos could be loaded."), this);
-		errorLabel->setAlignment(Qt::AlignCenter);
-		mainLayout->addWidget(errorLabel, 1);
-	}
-	else
-	{
-		// Default alignment: normalize each photo's height to photo 0's and center them on each other - so
-		// identical shots that only differ in export resolution line up with no user action at all. Photo 0
-		// itself gets the identity transform (the formula yields exactly that).
-		const QSizeF refSize = m_photos[0].image.size();
-		for (Photo& photo : m_photos)
-		{
-			photo.alignScale = refSize.height() / photo.image.height();
-			photo.alignOffset = QPointF(refSize.width() - photo.alignScale * photo.image.width(),
-			                            refSize.height() - photo.alignScale * photo.image.height()) / 2.0;
-		}
-
-		const int photoCount = static_cast<int>(m_photos.size());
-		const int columns = static_cast<int>(std::ceil(std::sqrt(photoCount)));
-		const int rows = (photoCount + columns - 1) / columns;
-		QWidget* gridPage = new QWidget(this);
-		QGridLayout* grid = new QGridLayout(gridPage);
-		grid->setContentsMargins(0, 0, 0, 0);
-		grid->setSpacing(4);
-		for (int i = 0; i < photoCount; ++i)
-		{
-			auto* paneWidget = new PhotoComparePane(*this, i);
-			m_paneWidgets.push_back(paneWidget);
-			grid->addWidget(paneWidget, i / columns, i % columns);
-		}
-		// Equal stretch keeps every cell the same size (including a 3-way compare's empty 4th cell): the
-		// shared pan is in widget coordinates, so equally sized panes is what makes the same widget position
-		// show the same subject point in each.
-		for (int c = 0; c < columns; ++c)
-			grid->setColumnStretch(c, 1);
-		for (int r = 0; r < rows; ++r)
-			grid->setRowStretch(r, 1);
-
-		m_fullPane = new PhotoComparePane(*this, -1);
-		m_viewStack = new QStackedLayout();
-		m_viewStack->addWidget(gridPage);
-		m_viewStack->addWidget(m_fullPane);
-		mainLayout->addLayout(m_viewStack, 1);
-
-		// Bottom toolbar: the full-view picker slider stretching across, render-mode toggle at the far right.
-		QHBoxLayout* toolbar = new QHBoxLayout();
-
-		// Full-view picker: one detent per photo; pressing the handle or changing the value enters the full
-		// view, dragging back and forth scrubs between the aligned photos (a flicker gesture at full size).
-		m_slider = new QSlider(Qt::Horizontal, this);
-		m_slider->setRange(0, photoCount - 1);
-		m_slider->setPageStep(1);
-		m_slider->setTickPosition(QSlider::TicksBelow);
-		m_slider->setTickInterval(1);
-		m_slider->setFocusPolicy(Qt::NoFocus);  // all keyboard input stays on the window
-		connect(m_slider, &QSlider::sliderPressed, this, [this] { setFullViewIndex(m_slider->value()); });
-		connect(m_slider, &QSlider::valueChanged, this, [this](int value) { setFullViewIndex(value); });
-		toolbar->addWidget(m_slider, 1);
-
-		m_diffToggle = new SegmentedToggle({ tr("Normal"), tr("Difference") }, this);
-		m_diffToggle->setToolTip(tr("Difference: render each photo as its per-pixel difference against the reference photo (D)"));
-		connect(m_diffToggle, &SegmentedToggle::currentChanged, this, [this](int index) { setDifferenceMode(index == 1); });
-		toolbar->addWidget(m_diffToggle, 0);
-
-		mainLayout->addLayout(toolbar, 0);
-	}
-
-	m_hintLabel = new QLabel(this);
-	m_hintLabel->setAlignment(Qt::AlignCenter);
-	mainLayout->addWidget(m_hintLabel, 0);
+	rebuildPaneGrid();
+	m_slider->setRange(0, std::max(0, static_cast<int>(m_photos.size()) - 1));
+	m_slider->setEnabled(!m_photos.empty() && !m_calibrating);
+	if (!m_viewTouched)
+		fitView();
 	updateHintText();
-
-	if (!restoreWindowGeometry(this, "photoCompareWindow"))
-	{
-		resize(1200, 800);  // the size the window falls back to when un-maximized
-		setWindowState(Qt::WindowMaximized);  // "use the whole screen" by default; the saved geometry rules thereafter
-	}
+	updateAllPanes();
+	if (m_photos.size() == oldCount && !photoPaths.isEmpty())  // transient status, like the auto-align summary
+		m_hintLabel->setText(tr("None of the files could be loaded as images."));
 }
 
-PhotoCompareWindow::~PhotoCompareWindow()
+void PhotoCompareWindow::rebuildPaneGrid()
 {
-	saveWindowGeometry(this, "photoCompareWindow");
+	// Rebuilt from scratch on every photo count change: recreate the layout (panes stay children of the page)
+	// and re-place every pane - a fresh layout also drops the previous geometry's row/column stretches.
+	delete m_gridPage->layout();
+	QGridLayout* grid = new QGridLayout(m_gridPage);
+	grid->setContentsMargins(0, 0, 0, 0);
+	grid->setSpacing(4);
+
+	const int photoCount = static_cast<int>(m_photos.size());
+	m_dropHintLabel->setVisible(photoCount == 0);
+	if (photoCount == 0)
+	{
+		grid->addWidget(m_dropHintLabel, 0, 0);
+		return;
+	}
+
+	while (static_cast<int>(m_paneWidgets.size()) < photoCount)
+		m_paneWidgets.push_back(new PhotoComparePane(*this, static_cast<int>(m_paneWidgets.size())));
+
+	const int columns = static_cast<int>(std::ceil(std::sqrt(photoCount)));
+	const int rows = (photoCount + columns - 1) / columns;
+	for (int i = 0; i < photoCount; ++i)
+		grid->addWidget(m_paneWidgets[i], i / columns, i % columns);
+	// Equal stretch keeps every cell the same size (including a 3-way compare's empty 4th cell): the
+	// shared pan is in widget coordinates, so equally sized panes is what makes the same widget position
+	// show the same subject point in each.
+	for (int c = 0; c < columns; ++c)
+		grid->setColumnStretch(c, 1);
+	for (int r = 0; r < rows; ++r)
+		grid->setRowStretch(r, 1);
+}
+
+void PhotoCompareWindow::dragEnterEvent(QDragEnterEvent* event)
+{
+	// Accept any local files; whether they are images is decided by the load attempt on drop.
+	const QList<QUrl> urls = event->mimeData()->urls();
+	if (std::any_of(urls.cbegin(), urls.cend(), [](const QUrl& url) { return url.isLocalFile(); }))
+		event->acceptProposedAction();
+}
+
+void PhotoCompareWindow::dropEvent(QDropEvent* event)
+{
+	QStringList paths;
+	for (const QUrl& url : event->mimeData()->urls())
+	{
+		if (url.isLocalFile())
+			paths.push_back(url.toLocalFile());
+	}
+	addPhotosFromFiles(paths);
+	event->acceptProposedAction();
 }
 
 void PhotoCompareWindow::keyPressEvent(QKeyEvent* event)
@@ -679,7 +724,7 @@ void PhotoCompareWindow::updateAllPanes()
 void PhotoCompareWindow::updateHintText()
 {
 	if (m_photos.empty())
-		m_hintLabel->setText(tr("Esc: close"));
+		m_hintLabel->setText(tr("Drop image files onto the window to load them · Esc: close"));
 	else if (m_calibrating)
 	{
 		QStringList progress;
