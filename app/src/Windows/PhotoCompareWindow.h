@@ -61,9 +61,10 @@ private:
 	{
 		enum class Kind : uint8_t
 		{
-			Used,     // contributed to the fitted transform
-			Outlier,  // matched well but disagrees with the fit (locally moved content, parallax, ...)
-			Failed,   // no usable match (flat, weak, or outside the overlap)
+			Used,        // contributed to the fitted transform
+			UsedCoarse,  // contributed, but only via a coarser pyramid level (unreliable at full res, e.g. defocused) - drawn dashed
+			Outlier,     // matched well but disagrees with the fit (locally moved content, parallax, ...)
+			Failed,      // no usable match (flat, weak, or outside the overlap)
 		};
 		QPointF imagePos;
 		Kind kind = Kind::Failed;
@@ -82,6 +83,7 @@ private:
 		bool alignScored = false;         // auto-align has evaluated this photo -> the two scores below are valid & shown
 		double alignConfidence = 0.0;     // fitness of the last auto-align: mean patch ZNCC (AlignmentResult::confidence)
 		double alignBootstrapZncc = 0.0;  // coarse whole-frame score of the last auto-align (AlignmentResult::bootstrapZncc)
+		double alignTimeMs = 0.0;         // runtime of the last alignImages call for this photo
 	};
 
 	// Coordinate mapping. widget = m_viewZoom * (alignScale * R(alignRotation) * image + alignOffset) +

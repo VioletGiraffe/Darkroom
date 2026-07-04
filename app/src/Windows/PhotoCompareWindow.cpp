@@ -8,6 +8,7 @@
 #include <QDebug>
 #include <QDragEnterEvent>
 #include <QDropEvent>
+#include <QElapsedTimer>
 #include <QFileInfo>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -129,16 +130,21 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 	}
 
 	// Auto-align diagnostics: where the aligner took its evidence in the RENDERED photo, drawn at the
-	// patch's true on-screen footprint. Accent = used for the fit; orange = matched well but inconsistent
-	// with the fitted transform (outlier - locally moved content, parallax, ...); red = failed to match.
+	// patch's true on-screen footprint. Accent = used for the fit (dashed = used via a coarser-level match
+	// only, e.g. defocused at full res); orange = matched well but inconsistent with the fitted transform
+	// (outlier - locally moved content, parallax, ...); red = failed to match.
 	painter.setBrush(Qt::NoBrush);
 	const double markHalf = 0.5 * m_owner.m_alignMarkSize * m_owner.m_viewZoom;
 	for (const PhotoCompareWindow::AlignmentMark& mark : photo.alignMarks)
 	{
-		const QColor color = mark.kind == PhotoCompareWindow::AlignmentMark::Kind::Used ? QColor(Theme::current().AccentBorder)
-		                   : mark.kind == PhotoCompareWindow::AlignmentMark::Kind::Outlier ? QColor(0xe0, 0xa2, 0x30)
-		                                                                                   : QColor(0xd0, 0x40, 0x40);
-		painter.setPen(QPen(color, 2));
+		using Kind = PhotoCompareWindow::AlignmentMark::Kind;
+		const QColor color = mark.kind == Kind::Used || mark.kind == Kind::UsedCoarse ? QColor(Theme::current().AccentBorder)
+		                   : mark.kind == Kind::Outlier ? QColor(0xe0, 0xa2, 0x30)
+		                                                : QColor(0xd0, 0x40, 0x40);
+		QPen pen(color, 2);
+		if (mark.kind == Kind::UsedCoarse)
+			pen.setStyle(Qt::DashLine);
+		painter.setPen(pen);
 		const QPointF center = m_owner.widgetFromImage(photo, mark.imagePos);
 		painter.drawRect(QRectF(center.x() - markHalf, center.y() - markHalf, 2.0 * markHalf, 2.0 * markHalf));
 	}
@@ -147,8 +153,8 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 	// flicker key, the percentage is this photo's on-screen scale (100% = 1 image px per widget px), making
 	// any compensation difference between panes visible at a glance. The alignment line spells out this
 	// photo's raw similarity into subject space (scale, rotation in degrees, offset in subject px). The score
-	// line appears only once auto-align has evaluated this photo, echoing the run's two quality measures
-	// (conf = mean patch ZNCC fitness, coarse = coarse whole-frame score) - the same pair as the hint bar.
+	// line appears only once auto-align has evaluated this photo: the run's two quality measures
+	// (conf = weighted patch ZNCC fitness, coarse = coarse whole-frame score) and the align call's runtime.
 	QStringList captionLines;
 	captionLines << QString("%1 · %2 · %3%").arg(renderIndex + 1).arg(photo.caption).arg(qRound(effectiveScale * 100.0));
 	captionLines << QString("scale %1 · rot %2° · offset (%3, %4)")
@@ -156,7 +162,8 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 		.arg(photo.alignRotation * (180.0 / Pi), 0, 'f', 2)
 		.arg(qRound(photo.alignOffset.x())).arg(qRound(photo.alignOffset.y()));
 	if (photo.alignScored)
-		captionLines << QString("conf %1 · coarse %2").arg(photo.alignConfidence, 0, 'f', 2).arg(photo.alignBootstrapZncc, 0, 'f', 2);
+		captionLines << QString("conf %1 · coarse %2 · %3 ms")
+			.arg(photo.alignConfidence, 0, 'f', 2).arg(photo.alignBootstrapZncc, 0, 'f', 2).arg(photo.alignTimeMs, 0, 'f', 0);
 	const QFontMetrics fm = painter.fontMetrics();
 	int textWidth = 0;
 	for (const QString& line : captionLines)
@@ -566,7 +573,6 @@ void PhotoCompareWindow::autoAlignPhotos()
 	ref.alignRotation = 0.0;
 	ref.alignOffset = QPointF();
 
-	QStringList summary;
 	for (size_t i = 0; i < m_photos.size(); ++i)
 	{
 		if (static_cast<int>(i) == m_refIndex)
@@ -576,23 +582,28 @@ void PhotoCompareWindow::autoAlignPhotos()
 		// refTransform^-1 * photoTransform: the photo's mapping into the rebased subject space.
 		options.initialGuess = { photo.alignScale / refScale, photo.alignRotation - refRotation,
 		                         rotated(photo.alignOffset - refOffset, -refRotation) / refScale };
+		QElapsedTimer alignTimer;
+		alignTimer.start();
 		const AlignmentResult result = alignImages(ref.image, photo.image, options);
+		photo.alignTimeMs = alignTimer.nsecsElapsed() / 1e6;
 		m_alignMarkSize = result.patchSize;  // in reference px == subject units (the subject space was just rebased)
-		photo.alignConfidence = result.confidence;        // both surfaced in this photo's corner caption, success or not
+		photo.alignConfidence = result.confidence;        // all surfaced in this photo's corner caption, success or not
 		photo.alignBootstrapZncc = result.bootstrapZncc;
 		photo.alignScored = true;
 		qDebug() << "Auto-align photo" << (i + 1) << "vs" << (m_refIndex + 1) << ": succeeded" << result.succeeded
 		         << " confidence" << result.confidence << " coarse" << result.bootstrapZncc
 		         << " scale" << result.transform.scale << " offset" << result.transform.offset
-		         << " rotation" << result.transform.rotation * (180.0 / Pi) << "deg";
-		static constexpr const char* fateNames[] = { "accepted", "outside overlap", "flat", "weak match", "outlier" };
+		         << " rotation" << result.transform.rotation * (180.0 / Pi) << "deg"
+		         << " time" << photo.alignTimeMs << "ms";
+		static constexpr const char* fateNames[] = { "accepted", "accepted (coarse)", "outside overlap", "flat", "weak match", "outlier" };
 		for (const AlignmentPatchInfo& patchInfo : result.patches)
 		{
 			qDebug() << "  patch @" << patchInfo.refPoint << fateNames[static_cast<int>(patchInfo.fate)]
 			         << " zncc" << patchInfo.zncc << " residual" << patchInfo.residual;
 			const auto kind = patchInfo.fate == AlignmentPatchFate::Accepted ? AlignmentMark::Kind::Used
-			                : patchInfo.fate == AlignmentPatchFate::Outlier  ? AlignmentMark::Kind::Outlier
-			                                                                 : AlignmentMark::Kind::Failed;
+			                : patchInfo.fate == AlignmentPatchFate::AcceptedCoarse ? AlignmentMark::Kind::UsedCoarse
+			                : patchInfo.fate == AlignmentPatchFate::Outlier ? AlignmentMark::Kind::Outlier
+			                                                                : AlignmentMark::Kind::Failed;
 			ref.alignMarks.push_back({ patchInfo.refPoint, kind });
 			if (patchInfo.zncc > 0.0)  // targetPoint is meaningless for a patch that never matched
 				photo.alignMarks.push_back({ patchInfo.targetPoint, kind });
@@ -602,21 +613,12 @@ void PhotoCompareWindow::autoAlignPhotos()
 			photo.alignScale = result.transform.scale;
 			photo.alignRotation = result.transform.rotation;
 			photo.alignOffset = result.transform.offset;
-			QString entry = tr("%1: aligned (%2)").arg(i + 1).arg(result.confidence, 0, 'f', 2);
-			// Rotation is corrected like the rest of the transform, but it is the one component with no
-			// manual-adjustment gesture - surface notable angles.
-			const double rotationDegrees = result.transform.rotation * (180.0 / Pi);
-			if (std::abs(rotationDegrees) >= 0.05)
-				entry += tr(" rot %1°").arg(rotationDegrees, 0, 'f', 2);
-			summary << entry;
 		}
-		else
+		else  // keep the (rebased) current alignment; the caption's conf/coarse scores tell the story
 		{
 			photo.alignScale = options.initialGuess.scale;
 			photo.alignRotation = options.initialGuess.rotation;
 			photo.alignOffset = options.initialGuess.offset;
-			summary << tr("%1: FAILED, kept (conf %2, coarse %3)")
-				.arg(i + 1).arg(result.confidence, 0, 'f', 2).arg(result.bootstrapZncc, 0, 'f', 2);
 		}
 	}
 	QApplication::restoreOverrideCursor();

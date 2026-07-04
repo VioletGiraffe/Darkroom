@@ -77,15 +77,17 @@ Three ways to set the alignment:
 
 - **Auto-align (`A`)** — one click estimates every photo's transform against the reference via the
   `magic-alignment` submodule (a Qt-only static library; pipeline: black-bar detection → coarse joint
-  scale+offset brute force → patch correspondences refined coarse-to-fine over an image pyramid → trimmed
-  least-squares similarity fit → accept-or-fail verdict), feeding the current alignment in as the initial
-  guess. A photo the library cannot align reliably *keeps* its current alignment rather than receiving a
+  scale+offset brute force → patch correspondences refined coarse-to-fine over an image pyramid → robust
+  least-squares similarity fit, iteratively reweighted by residual, with patches that stop matching at fine
+  levels — e.g. defocused regions — still contributing their last good coarser match at a discounted weight →
+  accept-or-fail verdict), feeding the current alignment in as the initial guess. A photo the library cannot align reliably *keeps* its current alignment rather than receiving a
   plausible-but-wrong one. Rotation is corrected along with scale and offset, but its capture range is
   small-angle only (a few degrees — horizon-correction grade; a larger real rotation fails honestly); a
   notable corrected angle is surfaced in the hint bar, being the one component with no manual-adjustment
   gesture. The per-patch evidence is drawn on the panes as true-footprint squares (accent = used in the fit,
-  orange = matched well but disagrees with the fit: locally moved content, parallax, red = no match) until
-  the next alignment; a per-photo outcome summary lands in the hint bar.
+  dashed accent = used via a coarser-level match only, orange = matched well but disagrees with the fit:
+  locally moved content, parallax, red = no match) until the next alignment; per-photo stats (alignment
+  parameters, confidence/coarse scores, align-call runtime) live in each pane's corner caption.
 - **Two-point calibration (`Shift+A`)** — click the same two features in every photo; the photo receiving the
   session's first point becomes the reference; the two point pairs determine the full similarity exactly
   (scale from the distance ratio, rotation from the segment angles, offset from the midpoints) — so manual
