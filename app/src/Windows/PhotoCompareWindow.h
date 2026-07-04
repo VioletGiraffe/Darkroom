@@ -15,21 +15,23 @@ class PhotoComparePane;
 class SegmentedToggle;
 
 // N-way (2..4) photo comparison in a square grid of panes. All panes share ONE zoom+pan view, while each
-// photo additionally carries its own alignment transform (uniform scale + offset) mapping it into the
-// shared "subject" space - so photos of the same subject at different zoom/crop/resolution can be brought
-// to the same apparent scale first, then compared under synchronized navigation. The default alignment
-// normalizes by image height, which already compensates pure resolution differences (same shot exported
-// at different sizes) with no user action.
+// photo additionally carries its own alignment transform (a similarity: uniform scale + rotation + offset)
+// mapping it into the shared "subject" space - so photos of the same subject at different zoom/crop/rotation/
+// resolution can be brought to the same apparent scale first, then compared under synchronized navigation.
+// The default alignment normalizes by image height, which already compensates pure resolution differences
+// (same shot exported at different sizes) with no user action.
 //
 // Controls (also summarized in the in-window hint bar):
 //   wheel = synchronized zoom around the cursor; left-drag = synchronized pan; F / double-click = fit;
 //   Ctrl+wheel / Ctrl+drag = adjust the hovered photo's alignment (scale / offset) alone;
-//   A = auto-align: estimates every photo's scale+offset against the reference (magic-alignment library);
-//       the patch evidence is drawn as true-footprint squares (accent = used, orange = outlier, red = no
-//       match) until the next alignment;
+//   A = auto-align: estimates every photo's scale+rotation+offset against the reference (magic-alignment
+//       library; rotation capture is small-angle - a few degrees); the patch evidence is drawn as
+//       true-footprint squares (accent = used, orange = outlier, red = no match) until the next alignment;
 //   Shift+A = two-point calibration: click the same two features in every photo - the photo that receives
-//       the first point becomes the reference; the distance ratio gives each other photo's relative scale,
-//       the midpoints its offset (right-click undoes a point, Esc cancels);
+//       the first point becomes the reference; the two point pairs define each other photo's similarity
+//       exactly (scale from the distance ratio, rotation from the segment angles, offset from the
+//       midpoints - so arbitrary angles work, beyond auto-align's range; right-click undoes a point,
+//       Esc cancels);
 //   hold 1..N = flicker: every pane temporarily renders photo N under the shared view, release to revert;
 //   D / the Normal-Difference toggle = difference view: every photo except the reference renders as its
 //       per-channel absolute difference against the reference, the reference stays normal;
@@ -72,15 +74,16 @@ private:
 		QImage image;                 // full-res, EXIF-oriented
 		std::vector<QImage> mipmaps;  // lazily built halving chain: [k] is image scaled by 2^-(k+1)
 		double alignScale = 1.0;      // image -> subject space (subject space = the reference photo's pixel coords)
+		double alignRotation = 0.0;   // radians; the R factor applied between the scale and the offset
 		QPointF alignOffset;          // image -> subject space
 		QString caption;              // file name, drawn in the pane's corner
 		std::vector<QPointF> calibPoints;  // image-space, at most 2; only populated while calibrating
 		std::vector<AlignmentMark> alignMarks;  // drawn as footprint squares; cleared when the next alignment starts
 	};
 
-	// Coordinate mapping. widget = m_viewZoom * (alignScale * image + alignOffset) + m_viewPan; the pan is
-	// in widget coordinates, shared across panes (they are equally sized grid cells, so the same transform
-	// shows the same subject region in each).
+	// Coordinate mapping. widget = m_viewZoom * (alignScale * R(alignRotation) * image + alignOffset) +
+	// m_viewPan; the pan is in widget coordinates, shared across panes (they are equally sized grid cells,
+	// so the same transform shows the same subject region in each). The view itself has no rotation.
 	[[nodiscard]] QPointF subjectFromWidget(const QPointF& widgetPos) const;
 	[[nodiscard]] QPointF widgetFromImage(const Photo& photo, const QPointF& imagePos) const;
 	[[nodiscard]] QPointF imageFromWidget(const Photo& photo, const QPointF& widgetPos) const;

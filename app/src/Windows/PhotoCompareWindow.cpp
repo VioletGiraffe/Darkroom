@@ -27,6 +27,19 @@
 #include <algorithm>
 #include <cmath>
 
+namespace {
+
+constexpr double Pi = 3.14159265358979323846;
+
+// p rotated by angle (radians) about the origin - the R factor of a photo's image -> subject similarity.
+QPointF rotated(const QPointF& p, double angle)
+{
+	const double c = std::cos(angle), s = std::sin(angle);
+	return QPointF(c * p.x() - s * p.y(), s * p.x() + c * p.y());
+}
+
+} // namespace
+
 // One grid cell: a viewport onto the shared view. All state (images, alignment, the view itself) lives in
 // the owning PhotoCompareWindow; the pane renders and translates mouse input into owner calls.
 // The same class also serves as the full-view pane (index -1), which shows whatever photo the owner's
@@ -81,6 +94,7 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 		painter.save();
 		painter.setRenderHint(QPainter::SmoothPixmapTransform);
 		painter.translate(m_owner.m_viewZoom * drawn.alignOffset + m_owner.m_viewPan);
+		painter.rotate(drawn.alignRotation * (180.0 / Pi));  // rotation and uniform scale commute, so the order is free
 		painter.scale(residualScale, residualScale);
 		painter.drawImage(0, 0, source);
 		painter.restore();
@@ -426,12 +440,12 @@ QPointF PhotoCompareWindow::subjectFromWidget(const QPointF& widgetPos) const
 
 QPointF PhotoCompareWindow::widgetFromImage(const Photo& photo, const QPointF& imagePos) const
 {
-	return m_viewZoom * (photo.alignScale * imagePos + photo.alignOffset) + m_viewPan;
+	return m_viewZoom * (photo.alignScale * rotated(imagePos, photo.alignRotation) + photo.alignOffset) + m_viewPan;
 }
 
 QPointF PhotoCompareWindow::imageFromWidget(const Photo& photo, const QPointF& widgetPos) const
 {
-	return (subjectFromWidget(widgetPos) - photo.alignOffset) / photo.alignScale;
+	return rotated((subjectFromWidget(widgetPos) - photo.alignOffset) / photo.alignScale, -photo.alignRotation);
 }
 
 const QImage& PhotoCompareWindow::imageForScale(Photo& photo, double effectiveScale, double& residualScale)
@@ -497,9 +511,9 @@ void PhotoCompareWindow::adjustPhotoScale(int index, double factor, const QPoint
 	// Rescale one photo's alignment keeping ITS point under the cursor fixed (the other panes don't move).
 	Photo& photo = m_photos[index];
 	const QPointF subjectAnchor = subjectFromWidget(widgetAnchor);
-	const QPointF imageAnchor = (subjectAnchor - photo.alignOffset) / photo.alignScale;
+	const QPointF imageAnchor = imageFromWidget(photo, widgetAnchor);
 	photo.alignScale = std::clamp(photo.alignScale * factor, 0.01, 100.0);
-	photo.alignOffset = subjectAnchor - photo.alignScale * imageAnchor;
+	photo.alignOffset = subjectAnchor - photo.alignScale * rotated(imageAnchor, photo.alignRotation);
 	m_viewTouched = true;
 	updateAllPanes();  // flicker can be rendering this photo in other panes, so update all (it's <= 4 repaints)
 }
@@ -526,11 +540,15 @@ void PhotoCompareWindow::autoAlignPhotos()
 	// transform. Fold that into the view first (keeps the reference pixel-frozen on screen, same as manual
 	// calibration) - from here on subject space IS reference pixel space, and each photo's current mapping
 	// into it serves both as the initial guess and as the kept alignment when the aligner reports failure.
+	// The view has no rotation, so only the scale+offset part can be folded: a (rare) rotation on the
+	// reference itself becomes a small one-time visual jump as it rebases; subject space stays exact.
 	const double refScale = ref.alignScale;
+	const double refRotation = ref.alignRotation;
 	const QPointF refOffset = ref.alignOffset;
 	m_viewPan += m_viewZoom * refOffset;
 	m_viewZoom *= refScale;
 	ref.alignScale = 1.0;
+	ref.alignRotation = 0.0;
 	ref.alignOffset = QPointF();
 
 	QStringList summary;
@@ -540,13 +558,15 @@ void PhotoCompareWindow::autoAlignPhotos()
 			continue;
 		Photo& photo = m_photos[i];
 		AlignmentOptions options;
-		options.initialGuess = { photo.alignScale / refScale, (photo.alignOffset - refOffset) / refScale };
+		// refTransform^-1 * photoTransform: the photo's mapping into the rebased subject space.
+		options.initialGuess = { photo.alignScale / refScale, photo.alignRotation - refRotation,
+		                         rotated(photo.alignOffset - refOffset, -refRotation) / refScale };
 		const AlignmentResult result = alignImages(ref.image, photo.image, options);
 		m_alignMarkSize = result.patchSize;  // in reference px == subject units (the subject space was just rebased)
 		qDebug() << "Auto-align photo" << (i + 1) << "vs" << (m_refIndex + 1) << ": succeeded" << result.succeeded
 		         << " confidence" << result.confidence << " coarse" << result.bootstrapZncc
 		         << " scale" << result.transform.scale << " offset" << result.transform.offset
-		         << " rotation" << result.rotationDegrees << "deg (measured, not corrected)";
+		         << " rotation" << result.transform.rotation * (180.0 / Pi) << "deg";
 		static constexpr const char* fateNames[] = { "accepted", "outside overlap", "flat", "weak match", "outlier" };
 		for (const AlignmentPatchInfo& patchInfo : result.patches)
 		{
@@ -562,17 +582,20 @@ void PhotoCompareWindow::autoAlignPhotos()
 		if (result.succeeded)
 		{
 			photo.alignScale = result.transform.scale;
+			photo.alignRotation = result.transform.rotation;
 			photo.alignOffset = result.transform.offset;
 			QString entry = tr("%1: aligned (%2)").arg(i + 1).arg(result.confidence, 0, 'f', 2);
-			// A measured rotation cannot be corrected (the alignment model has none) - surface it as the
-			// explanation for residual mismatch that grows away from the frame center.
-			if (std::abs(result.rotationDegrees) >= 0.05)
-				entry += tr(" rot %1°").arg(result.rotationDegrees, 0, 'f', 2);
+			// Rotation is corrected like the rest of the transform, but it is the one component with no
+			// manual-adjustment gesture - surface notable angles.
+			const double rotationDegrees = result.transform.rotation * (180.0 / Pi);
+			if (std::abs(rotationDegrees) >= 0.05)
+				entry += tr(" rot %1°").arg(rotationDegrees, 0, 'f', 2);
 			summary << entry;
 		}
 		else
 		{
 			photo.alignScale = options.initialGuess.scale;
+			photo.alignRotation = options.initialGuess.rotation;
 			photo.alignOffset = options.initialGuess.offset;
 			summary << tr("%1: FAILED, kept (conf %2, coarse %3)")
 				.arg(i + 1).arg(result.confidence, 0, 'f', 2).arg(result.bootstrapZncc, 0, 'f', 2);
@@ -642,16 +665,19 @@ void PhotoCompareWindow::undoCalibrationPoint(int index)
 void PhotoCompareWindow::applyCalibration()
 {
 	// The reference is the pane that received the session's first point: subject space becomes its pixel
-	// coords. Every other photo maps onto it by the transform (uniform scale + offset - no rotation in v1)
-	// that carries its two clicked points onto the reference's two: scale = the distance ratio, offset =
-	// the midpoint difference.
+	// coords. Every other photo maps onto it by the similarity that carries its two clicked points exactly
+	// onto the reference's two: scale = the distance ratio, rotation = the angle between the segments,
+	// offset = what maps the midpoints. Two point pairs determine all four parameters, so this handles
+	// arbitrary angles - beyond auto-align's small-angle capture range.
 	Photo& ref = m_photos[m_refIndex];
 	const QLineF refLine(ref.calibPoints[0], ref.calibPoints[1]);
 	// Fold the reference's old alignment into the view transform so the reference image stays exactly where
-	// it was on screen (same zoom, same position) and only the other photos move to meet it.
+	// it was on screen (same zoom, same position) and only the other photos move to meet it. The view has no
+	// rotation, so a (rare) rotation on the reference itself becomes a small one-time visual jump.
 	m_viewPan += m_viewZoom * ref.alignOffset;
 	m_viewZoom *= ref.alignScale;
 	ref.alignScale = 1.0;
+	ref.alignRotation = 0.0;
 	ref.alignOffset = QPointF();
 	for (size_t i = 0; i < m_photos.size(); ++i)
 	{
@@ -660,7 +686,13 @@ void PhotoCompareWindow::applyCalibration()
 		Photo& photo = m_photos[i];
 		const QLineF line(photo.calibPoints[0], photo.calibPoints[1]);
 		photo.alignScale = refLine.length() / line.length();
-		photo.alignOffset = refLine.center() - photo.alignScale * line.center();
+		double rotation = std::atan2(refLine.dy(), refLine.dx()) - std::atan2(line.dy(), line.dx());
+		if (rotation > Pi)  // wrap the atan2 difference back into (-Pi, Pi]
+			rotation -= 2.0 * Pi;
+		else if (rotation <= -Pi)
+			rotation += 2.0 * Pi;
+		photo.alignRotation = rotation;
+		photo.alignOffset = refLine.center() - photo.alignScale * rotated(line.center(), rotation);
 	}
 	setCalibrating(false);  // also repaints all panes
 }

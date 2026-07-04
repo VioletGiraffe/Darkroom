@@ -66,11 +66,12 @@ count change, and each added photo is default-aligned against the current refere
 
 - **One shared view** (zoom + pan, in widget coordinates — equal pane sizes are what make the same widget
   position show the same subject point in every pane): wheel zooms all panes around the cursor, drag pans all.
-- **A per-photo alignment transform** (uniform scale + offset — *no rotation*, a deliberate v1
-  simplification) mapping each image into the shared "subject" space, defined as the **reference photo's**
-  pixel coordinates (photo 0 by default; two-point calibration re-elects it). This is the zoom/crop-difference
-  compensation. The default normalizes each photo's height to the reference's and centers — so pure
-  resolution differences align with no user action.
+- **A per-photo alignment transform** (a similarity: uniform scale + rotation + offset) mapping each image
+  into the shared "subject" space, defined as the **reference photo's** pixel coordinates (photo 0 by
+  default; two-point calibration re-elects it). This is the zoom/crop/rotation-difference compensation. The
+  default normalizes each photo's height to the reference's and centers — so pure resolution differences
+  align with no user action. The view itself stays rotation-free (the reference, by the fold convention
+  below, always has rotation 0).
 
 Three ways to set the alignment:
 
@@ -79,16 +80,18 @@ Three ways to set the alignment:
   scale+offset brute force → patch correspondences refined coarse-to-fine over an image pyramid → trimmed
   least-squares similarity fit → accept-or-fail verdict), feeding the current alignment in as the initial
   guess. A photo the library cannot align reliably *keeps* its current alignment rather than receiving a
-  plausible-but-wrong one. The fit measures rotation internally (it keeps patch tracking and outlier trimming
-  honest on slightly rotated pairs), but the applied model stays scale + translation — a notable measured
-  angle is reported in the hint bar instead, as the explanation for residual mismatch the model cannot
-  correct. The per-patch evidence is drawn on the panes as true-footprint squares (accent = used in the fit,
+  plausible-but-wrong one. Rotation is corrected along with scale and offset, but its capture range is
+  small-angle only (a few degrees — horizon-correction grade; a larger real rotation fails honestly); a
+  notable corrected angle is surfaced in the hint bar, being the one component with no manual-adjustment
+  gesture. The per-patch evidence is drawn on the panes as true-footprint squares (accent = used in the fit,
   orange = matched well but disagrees with the fit: locally moved content, parallax, red = no match) until
   the next alignment; a per-photo outcome summary lands in the hint bar.
 - **Two-point calibration (`Shift+A`)** — click the same two features in every photo; the photo receiving the
-  session's first point becomes the reference; the distance ratio gives each photo's scale, the midpoint
-  difference its offset.
-- **Manually** — Ctrl+wheel / Ctrl+drag adjusts the hovered photo's transform alone.
+  session's first point becomes the reference; the two point pairs determine the full similarity exactly
+  (scale from the distance ratio, rotation from the segment angles, offset from the midpoints) — so manual
+  calibration handles arbitrary angles, beyond auto-align's range.
+- **Manually** — Ctrl+wheel / Ctrl+drag adjusts the hovered photo's scale / offset alone (rotation has no
+  manual gesture).
 
 Both auto-align and calibration first **fold the reference's transform into the view** (the view pan/zoom
 absorb it, the reference's own transform becomes identity): the reference stays pixel-frozen on screen while
