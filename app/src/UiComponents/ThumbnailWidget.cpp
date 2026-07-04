@@ -139,7 +139,7 @@ ThumbnailWidget::ThumbnailWidget(const QString& filePath, const QString& label, 
 	// (e.g. CompareWindow's, sized by their layout) stay empty until the first loadFrame().
 	m_sourcePaths = { m_filePath };
 	m_maxSize = currentImageArea();
-	scheduleRender();
+	// The render is deferred to the first paintEvent, not started here - see paintEvent (lazy thumbnail load).
 
 	// Default drag payload: a file:// URL to the displayed file. Composite/folder-preview widgets have no
 	// filePath() of their own and aren't drag sources at all (m_dragMimeDataFactory stays unset for them).
@@ -161,7 +161,7 @@ ThumbnailWidget::ThumbnailWidget(const QStringList& compositePaths, const QStrin
 
 	m_sourcePaths = compositePaths;
 	m_maxSize = compositePaths.isEmpty() ? QSize{} : canvasSize;
-	scheduleRender();
+	// Deferred to the first paintEvent, not started here - see paintEvent (lazy thumbnail load).
 }
 
 ThumbnailWidget::~ThumbnailWidget()
@@ -203,8 +203,7 @@ QSize ThumbnailWidget::currentImageArea() const
 
 void ThumbnailWidget::scheduleRender()
 {
-	if (m_asyncTask)
-		disarmAsyncTask();
+	disarmAsyncTask();  // no-op if none is scheduled yet (first render); otherwise cancels the in-flight one
 
 	// devicePixelRatioF() is only trustworthy once the widget is realized on its real, final screen. Grid/
 	// search cards are constructed parentless and reparented afterward, so this can capture a stale ratio
@@ -231,8 +230,15 @@ QSize ThumbnailWidget::sizeHint() const
 	const QMargins m = contentsMargins();
 	const int labelHeight = m_caption.isEmpty() ? 0 : THUMBNAIL_LABEL_HEIGHT;
 
-	std::lock_guard lock{ m_asyncTask->m_mutex };
-	const QSize imageArea = m_image.isNull() ? m_maxSize : m_image.deviceIndependentSize().toSize();
+	// Before the first paint the render hasn't been scheduled yet (m_asyncTask is null) and m_image is still
+	// null, so the placeholder m_maxSize is the answer; once scheduled, read m_image under the task's lock.
+	QSize imageArea = m_maxSize;
+	if (m_asyncTask)
+	{
+		std::lock_guard lock{ m_asyncTask->m_mutex };
+		if (!m_image.isNull())
+			imageArea = m_image.deviceIndependentSize().toSize();
+	}
 	return QSize(imageArea.width() + m.left() + m.right(),
 	            imageArea.height() + labelHeight + m.top() + m.bottom());
 }
@@ -285,10 +291,12 @@ void ThumbnailWidget::wheelEvent(QWheelEvent* event)
 
 void ThumbnailWidget::paintEvent(QPaintEvent*)
 {
-	// paintEvent only ever runs once the widget is on a real, shown screen, so this is the one place
-	// devicePixelRatioF() is guaranteed accurate. Catch a stale capture from scheduleRender() here and
-	// redo the render — self-corrects within a frame or two without the caller needing to do anything.
-	if (!qFuzzyCompare(m_renderDpr, devicePixelRatioF()))
+	// The render is started lazily on the first paint, not at construction: a QListWidget grid builds a card
+	// for every item but only paints the visible ones, so off-screen cards never reach here and never decode
+	// their (potentially full-resolution) image until scrolled into view. paintEvent is also the one place
+	// devicePixelRatioF() is guaranteed accurate - the widget is on its real, shown screen - so this both
+	// kicks off the initial render and re-renders if an earlier scheduleRender() captured a stale DPR.
+	if (!m_asyncTask || !qFuzzyCompare(m_renderDpr, devicePixelRatioF()))
 		scheduleRender();
 
 	QPainter painter(this);
@@ -371,6 +379,9 @@ bool ThumbnailWidget::openFile()
 
 void ThumbnailWidget::disarmAsyncTask()
 {
+	if (!m_asyncTask)  // never painted (e.g. an off-screen grid card cleared before it was ever shown): nothing was scheduled
+		return;
+
 	{
 		std::lock_guard lock{ m_asyncTask->m_mutex };
 		(void)QThreadPool::globalInstance()->tryTake(m_asyncTask.get()); // We don't care about the result
