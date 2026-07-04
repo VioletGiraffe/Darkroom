@@ -143,18 +143,25 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 		painter.drawRect(QRectF(center.x() - markHalf, center.y() - markHalf, 2.0 * markHalf, 2.0 * markHalf));
 	}
 
-	// Corner caption: "2 · name.jpg · 63%" - the leading digit doubles as the pane's flicker key, the
-	// percentage is this photo's on-screen scale (100% = 1 image px per widget px), making any compensation
-	// difference between panes visible at a glance.
-	const QString caption = QString("%1 · %2 · %3%")
+	// Corner caption, two lines. Headline "2 · name.jpg · 63%": the leading digit doubles as the pane's
+	// flicker key, the percentage is this photo's on-screen scale (100% = 1 image px per widget px), making
+	// any compensation difference between panes visible at a glance. Second line spells out this photo's raw
+	// alignment similarity (image -> subject scale, rotation in degrees, offset in subject px) so every
+	// parameter driving the overlay is inspectable per pane.
+	const QString headline = QString("%1 · %2 · %3%")
 		.arg(renderIndex + 1).arg(photo.caption).arg(qRound(effectiveScale * 100.0));
+	const QString alignLine = QString("scale %1 · rot %2° · offset (%3, %4)")
+		.arg(photo.alignScale, 0, 'f', 3)
+		.arg(photo.alignRotation * (180.0 / Pi), 0, 'f', 2)
+		.arg(qRound(photo.alignOffset.x())).arg(qRound(photo.alignOffset.y()));
 	const QFontMetrics fm = painter.fontMetrics();
-	const QRectF textRect(8, 8, fm.horizontalAdvance(caption) + 12, fm.height() + 6);
+	const int textWidth = std::max(fm.horizontalAdvance(headline), fm.horizontalAdvance(alignLine));
+	const QRectF textRect(8, 8, textWidth + 12, 2 * fm.height() + 6);
 	painter.setPen(Qt::NoPen);
 	painter.setBrush(QColor(0, 0, 0, 150));
 	painter.drawRoundedRect(textRect, 4, 4);
 	painter.setPen(QColor(0xe8, 0xe8, 0xe8));
-	painter.drawText(textRect, Qt::AlignCenter, caption);
+	painter.drawText(textRect, Qt::AlignCenter, headline + "\n" + alignLine);
 
 	// A flickered pane shows a photo other than its own - flag it with an accent frame.
 	if (renderIndex != photoIndex())
