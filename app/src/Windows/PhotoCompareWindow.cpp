@@ -41,6 +41,23 @@ QPointF rotated(const QPointF& p, double angle)
 	return QPointF(c * p.x() - s * p.y(), s * p.x() + c * p.y());
 }
 
+// Maps an axis-aligned subject-space rect through the INVERSE of an image -> subject similarity (scale,
+// rotation, offset) into image coordinates - the bounding rect when rotation makes the image non-axis-aligned.
+QRectF subjectRectToImage(const QRectF& rect, double scale, double rotation, const QPointF& offset)
+{
+	const QPointF corners[] = { rect.topLeft(), rect.topRight(), rect.bottomLeft(), rect.bottomRight() };
+	QRectF result(rotated(corners[0] - offset, -rotation) / scale, QSizeF());
+	for (int i = 1; i < 4; ++i)
+	{
+		const QPointF p = rotated(corners[i] - offset, -rotation) / scale;
+		result.setLeft(std::min(result.left(), p.x()));
+		result.setTop(std::min(result.top(), p.y()));
+		result.setRight(std::max(result.right(), p.x()));
+		result.setBottom(std::max(result.bottom(), p.y()));
+	}
+	return result;
+}
+
 } // namespace
 
 // One grid cell: a viewport onto the shared view. All state (images, alignment, the view itself) lives in
@@ -80,6 +97,11 @@ private:
 	bool m_leftButtonDown = false;
 	bool m_dragConfirmed = false;
 	bool m_ctrlDrag = false;
+
+	// Shift+drag rubber-bands the owner's auto-align region; the anchor is held in subject space so the
+	// rect stays glued to the content even if the view is somehow moved mid-drag.
+	bool m_aoiDrag = false;
+	QPointF m_aoiAnchor;
 };
 
 void PhotoComparePane::paintEvent(QPaintEvent*)
@@ -152,6 +174,16 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 		painter.drawRect(QRectF(center.x() - markHalf, center.y() - markHalf, 2.0 * markHalf, 2.0 * markHalf));
 	}
 
+	// The auto-align region (Shift+drag): one subject-space rect, so it frames the same content in every
+	// pane. Dashed light gray, to stay distinct from the accent patch marks.
+	if (!m_owner.m_alignAoi.isEmpty())
+	{
+		painter.setPen(QPen(QColor(0xe8, 0xe8, 0xe8), 1, Qt::DashLine));
+		painter.setBrush(Qt::NoBrush);
+		painter.drawRect(QRectF(m_owner.m_viewZoom * m_owner.m_alignAoi.topLeft() + m_owner.m_viewPan,
+		                        m_owner.m_alignAoi.size() * m_owner.m_viewZoom));
+	}
+
 	// Corner caption, stacked lines. Headline "2 · name.jpg · 6000x4000 (24 MP) · 63%": the leading digit
 	// doubles as the pane's flicker key, then the photo's pixel resolution, then its on-screen scale (100% =
 	// 1 image px per widget px), making any compensation difference between panes visible at a glance. The
@@ -171,9 +203,14 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 		.arg(photo.alignRotation * (180.0 / Pi), 0, 'f', 2)
 		.arg(qRound(photo.alignOffset.x())).arg(qRound(photo.alignOffset.y()));
 	if (photo.alignScored)
-		captionLines << QString("conf %1 · coarse %2 · rot ±%3° · %4 ms")
+	{
+		QString scoreLine = QString("conf %1 · coarse %2 · rot ±%3° · %4 ms")
 			.arg(photo.alignConfidence, 0, 'f', 2).arg(photo.alignBootstrapZncc, 0, 'f', 2)
 			.arg(photo.alignRotationSigma * (180.0 / Pi), 0, 'f', 2).arg(photo.alignTimeMs, 0, 'f', 0);
+		if (!photo.alignSucceeded)  // the alignment on screen is the kept previous one - make that impossible to miss
+			scoreLine.prepend(tr("FAILED · "));
+		captionLines << scoreLine;
+	}
 	const QFontMetrics fm = painter.fontMetrics();
 	int textWidth = 0;
 	for (const QString& line : captionLines)
@@ -218,7 +255,16 @@ void PhotoComparePane::wheelEvent(QWheelEvent* event)
 
 void PhotoComparePane::mousePressEvent(QMouseEvent* event)
 {
-	if (event->button() == Qt::LeftButton)
+	if (event->button() == Qt::LeftButton && event->modifiers().testFlag(Qt::ShiftModifier))
+	{
+		// Shift+drag marks the auto-align region; clearing on press makes a plain Shift+click the eraser.
+		m_aoiDrag = true;
+		m_aoiAnchor = m_owner.subjectFromWidget(event->position());
+		m_owner.m_alignAoi = QRectF();
+		m_owner.updateAllPanes();
+		setCursor(Qt::CrossCursor);
+	}
+	else if (event->button() == Qt::LeftButton)
 	{
 		m_leftButtonDown = true;
 		m_dragConfirmed = false;
@@ -231,6 +277,12 @@ void PhotoComparePane::mousePressEvent(QMouseEvent* event)
 
 void PhotoComparePane::mouseMoveEvent(QMouseEvent* event)
 {
+	if (m_aoiDrag)
+	{
+		m_owner.m_alignAoi = QRectF(m_aoiAnchor, m_owner.subjectFromWidget(event->position())).normalized();
+		m_owner.updateAllPanes();
+		return;
+	}
 	if (!m_leftButtonDown)
 		return;
 	const QPointF pos = event->position();
@@ -251,6 +303,16 @@ void PhotoComparePane::mouseMoveEvent(QMouseEvent* event)
 
 void PhotoComparePane::mouseReleaseEvent(QMouseEvent* event)
 {
+	if (event->button() == Qt::LeftButton && m_aoiDrag)
+	{
+		m_aoiDrag = false;
+		setCursor(m_owner.idleCursor());
+		// A degenerate rect (a stray wiggle of a clearing Shift+click) is not a usable region - drop it.
+		if (std::min(m_owner.m_alignAoi.width(), m_owner.m_alignAoi.height()) * m_owner.m_viewZoom < 8.0)
+			m_owner.m_alignAoi = QRectF();
+		m_owner.updateAllPanes();
+		return;
+	}
 	if (event->button() != Qt::LeftButton || !m_leftButtonDown)
 		return;
 	m_leftButtonDown = false;
@@ -609,6 +671,10 @@ void PhotoCompareWindow::autoAlignPhotos()
 	ref.alignScale = 1.0;
 	ref.alignRotation = 0.0;
 	ref.alignOffset = QPointF();
+	// The user's align region lives in subject space, which the fold just rebased to the reference's pixel
+	// coords - rebase the rect along (which also makes it directly usable as the library's areaOfInterest).
+	if (!m_alignAoi.isEmpty())
+		m_alignAoi = subjectRectToImage(m_alignAoi, refScale, refRotation, refOffset);
 
 	for (size_t i = 0; i < m_photos.size(); ++i)
 	{
@@ -616,6 +682,7 @@ void PhotoCompareWindow::autoAlignPhotos()
 			continue;
 		Photo& photo = m_photos[i];
 		AlignmentOptions options;
+		options.areaOfInterest = m_alignAoi;  // empty = whole frame
 		// refTransform^-1 * photoTransform: the photo's mapping into the rebased subject space.
 		options.initialGuess = { photo.alignScale / refScale, photo.alignRotation - refRotation,
 		                         rotated(photo.alignOffset - refOffset, -refRotation) / refScale };
@@ -627,6 +694,7 @@ void PhotoCompareWindow::autoAlignPhotos()
 		photo.alignConfidence = result.confidence;        // all surfaced in this photo's corner caption, success or not
 		photo.alignBootstrapZncc = result.bootstrapZncc;
 		photo.alignRotationSigma = result.rotationSigma;
+		photo.alignSucceeded = result.succeeded;
 		photo.alignScored = true;
 		qDebug() << "Auto-align photo" << (i + 1) << "vs" << (m_refIndex + 1) << ": succeeded" << result.succeeded
 		         << " confidence" << result.confidence << " coarse" << result.bootstrapZncc
@@ -732,6 +800,8 @@ void PhotoCompareWindow::applyCalibration()
 	// rotation, so a (rare) rotation on the reference itself becomes a small one-time visual jump.
 	m_viewPan += m_viewZoom * ref.alignOffset;
 	m_viewZoom *= ref.alignScale;
+	if (!m_alignAoi.isEmpty())  // subject space is being rebased - keep the align region glued to its content
+		m_alignAoi = subjectRectToImage(m_alignAoi, ref.alignScale, ref.alignRotation, ref.alignOffset);
 	ref.alignScale = 1.0;
 	ref.alignRotation = 0.0;
 	ref.alignOffset = QPointF();
@@ -832,9 +902,9 @@ void PhotoCompareWindow::updateHintText()
 			.arg(progress.join("   ")));
 	}
 	else if (m_fullViewIndex >= 0)
-		m_hintLabel->setText(tr("Full view %1/%2 · slider / Left,Right: switch photo · hold 1..%2: flicker · A: auto-align · D: difference · wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust this photo · F: fit · Esc: back to grid")
+		m_hintLabel->setText(tr("Full view %1/%2 · slider / Left,Right: switch photo · hold 1..%2: flicker · A: auto-align · Shift+drag: align region · D: difference · wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust this photo · F: fit · Esc: back to grid")
 			.arg(m_fullViewIndex + 1).arg(m_photos.size()));
 	else
-		m_hintLabel->setText(tr("Wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust one photo · A: auto-align · Shift+A: align by 2 clicks · hold 1..%1: flicker · D: difference · slider: full view · F / double-click: fit · Esc: close")
+		m_hintLabel->setText(tr("Wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust one photo · A: auto-align · Shift+A: align by 2 clicks · Shift+drag: align region · hold 1..%1: flicker · D: difference · slider: full view · F / double-click: fit · Esc: close")
 			.arg(m_photos.size()));
 }

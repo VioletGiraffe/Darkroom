@@ -2,6 +2,7 @@
 
 #include <QImage>
 #include <QPointF>
+#include <QRectF>
 #include <QStringList>
 #include <QWidget>
 
@@ -32,6 +33,9 @@ class SegmentedToggle;
 //       exactly (scale from the distance ratio, rotation from the segment angles, offset from the
 //       midpoints - so arbitrary angles work, beyond auto-align's range; right-click undoes a point,
 //       Esc cancels);
+//   Shift+drag = mark the auto-align region (dashed rect, one subject-space region shown in every pane):
+//       auto-align then draws its evidence from that region only - for scenes where no global alignment
+//       exists (depth parallax, locally moved subjects), align what matters; Shift+click clears it;
 //   hold 1..N = flicker: every pane temporarily renders photo N under the shared view, release to revert;
 //   D / the Normal-Difference toggle = difference view: every photo except the reference renders as its
 //       per-channel absolute difference against the reference, the reference stays normal;
@@ -84,6 +88,7 @@ private:
 		std::vector<QPointF> calibPoints;  // image-space, at most 2; only populated while calibrating
 		std::vector<AlignmentMark> alignMarks;  // drawn as footprint squares; cleared when the next alignment starts
 		bool alignScored = false;         // auto-align has evaluated this photo -> the two scores below are valid & shown
+		bool alignSucceeded = false;      // the last auto-align's verdict; false = the shown alignment is the kept previous one
 		double alignConfidence = 0.0;     // fitness of the last auto-align: mean patch ZNCC (AlignmentResult::confidence)
 		double alignBootstrapZncc = 0.0;  // coarse whole-frame score of the last auto-align (AlignmentResult::bootstrapZncc)
 		double alignRotationSigma = 0.0;  // radians: 1-sigma error bar of the fitted rotation (AlignmentResult::rotationSigma)
@@ -148,6 +153,7 @@ private:
 
 	double m_viewZoom = 1.0;  // subject -> widget; 1.0 means the reference photo at 100% (1 image px = 1 widget px)
 	QPointF m_viewPan;
+	QRectF m_alignAoi;         // auto-align region (Shift+drag), subject space; empty = align on the whole frame
 	int m_flickerIndex = -1;   // >= 0: every pane renders this photo (a digit key is held)
 	int m_fullViewIndex = -1;  // >= 0: the full-view page is active, showing this photo (flicker keys still override)
 	// Edge of an alignment patch in subject units. The footprint is the same in subject space for both sides

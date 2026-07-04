@@ -90,6 +90,10 @@ Three ways to set the alignment:
   dashed accent = used via a coarser-level match only, orange = matched well but disagrees with the fit:
   locally moved content, parallax, red = no match) until the next alignment; per-photo stats (resolution,
   alignment parameters, confidence/coarse scores, align-call runtime) live in each pane's corner caption.
+  An optional **align region** (Shift+drag; one subject-space rect drawn dashed in every pane; Shift+click
+  clears; persists across aligns and reference folds) restricts the alignment evidence to that region — the
+  tool for scenes where no global alignment exists (depth parallax between focus-stack slices, locally moved
+  subjects): align what matters and let the rest fall where it falls.
 - **Two-point calibration (`Shift+A`)** — click the same two features in every photo; the photo receiving the
   session's first point becomes the reference; the two point pairs determine the full similarity exactly
   (scale from the distance ratio, rotation from the segment angles, offset from the midpoints) — so manual
