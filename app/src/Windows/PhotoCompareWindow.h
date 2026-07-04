@@ -86,6 +86,7 @@ private:
 		bool alignScored = false;         // auto-align has evaluated this photo -> the two scores below are valid & shown
 		double alignConfidence = 0.0;     // fitness of the last auto-align: mean patch ZNCC (AlignmentResult::confidence)
 		double alignBootstrapZncc = 0.0;  // coarse whole-frame score of the last auto-align (AlignmentResult::bootstrapZncc)
+		double alignRotationSigma = 0.0;  // radians: 1-sigma error bar of the fitted rotation (AlignmentResult::rotationSigma)
 		double alignTimeMs = 0.0;         // runtime of the last alignImages call for this photo
 	};
 

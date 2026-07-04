@@ -158,7 +158,8 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 	// alignment line spells out this photo's raw similarity into subject space (scale, rotation in degrees,
 	// offset in subject px). The score
 	// line appears only once auto-align has evaluated this photo: the run's two quality measures
-	// (conf = weighted patch ZNCC fitness, coarse = coarse whole-frame score) and the align call's runtime.
+	// (conf = weighted patch ZNCC fitness, coarse = coarse whole-frame score), the fitted rotation's 1-sigma
+	// error bar, and the align call's runtime.
 	QStringList captionLines;
 	captionLines << QString("%1 · %2 · %3x%4 (%5 MP) · %6%")
 		.arg(renderIndex + 1).arg(photo.caption)
@@ -170,8 +171,9 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 		.arg(photo.alignRotation * (180.0 / Pi), 0, 'f', 2)
 		.arg(qRound(photo.alignOffset.x())).arg(qRound(photo.alignOffset.y()));
 	if (photo.alignScored)
-		captionLines << QString("conf %1 · coarse %2 · %3 ms")
-			.arg(photo.alignConfidence, 0, 'f', 2).arg(photo.alignBootstrapZncc, 0, 'f', 2).arg(photo.alignTimeMs, 0, 'f', 0);
+		captionLines << QString("conf %1 · coarse %2 · rot ±%3° · %4 ms")
+			.arg(photo.alignConfidence, 0, 'f', 2).arg(photo.alignBootstrapZncc, 0, 'f', 2)
+			.arg(photo.alignRotationSigma * (180.0 / Pi), 0, 'f', 2).arg(photo.alignTimeMs, 0, 'f', 0);
 	const QFontMetrics fm = painter.fontMetrics();
 	int textWidth = 0;
 	for (const QString& line : captionLines)
@@ -624,12 +626,13 @@ void PhotoCompareWindow::autoAlignPhotos()
 		m_alignMarkSize = result.patchSize;  // in reference px == subject units (the subject space was just rebased)
 		photo.alignConfidence = result.confidence;        // all surfaced in this photo's corner caption, success or not
 		photo.alignBootstrapZncc = result.bootstrapZncc;
+		photo.alignRotationSigma = result.rotationSigma;
 		photo.alignScored = true;
 		qDebug() << "Auto-align photo" << (i + 1) << "vs" << (m_refIndex + 1) << ": succeeded" << result.succeeded
 		         << " confidence" << result.confidence << " coarse" << result.bootstrapZncc
 		         << " scale" << result.transform.scale << " offset" << result.transform.offset
-		         << " rotation" << result.transform.rotation * (180.0 / Pi) << "deg"
-		         << " time" << photo.alignTimeMs << "ms";
+		         << " rotation" << result.transform.rotation * (180.0 / Pi) << "+-" << result.rotationSigma * (180.0 / Pi) << "deg"
+		         << " radial k" << result.radialK << " time" << photo.alignTimeMs << "ms";
 		static constexpr const char* fateNames[] = { "accepted", "accepted (coarse)", "outside overlap", "flat", "weak match", "outlier" };
 		for (const AlignmentPatchInfo& patchInfo : result.patches)
 		{
