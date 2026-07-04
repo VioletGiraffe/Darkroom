@@ -143,25 +143,30 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 		painter.drawRect(QRectF(center.x() - markHalf, center.y() - markHalf, 2.0 * markHalf, 2.0 * markHalf));
 	}
 
-	// Corner caption, two lines. Headline "2 · name.jpg · 63%": the leading digit doubles as the pane's
+	// Corner caption, stacked lines. Headline "2 · name.jpg · 63%": the leading digit doubles as the pane's
 	// flicker key, the percentage is this photo's on-screen scale (100% = 1 image px per widget px), making
-	// any compensation difference between panes visible at a glance. Second line spells out this photo's raw
-	// alignment similarity (image -> subject scale, rotation in degrees, offset in subject px) so every
-	// parameter driving the overlay is inspectable per pane.
-	const QString headline = QString("%1 · %2 · %3%")
-		.arg(renderIndex + 1).arg(photo.caption).arg(qRound(effectiveScale * 100.0));
-	const QString alignLine = QString("scale %1 · rot %2° · offset (%3, %4)")
+	// any compensation difference between panes visible at a glance. The alignment line spells out this
+	// photo's raw similarity into subject space (scale, rotation in degrees, offset in subject px). The score
+	// line appears only once auto-align has evaluated this photo, echoing the run's two quality measures
+	// (conf = mean patch ZNCC fitness, coarse = coarse whole-frame score) - the same pair as the hint bar.
+	QStringList captionLines;
+	captionLines << QString("%1 · %2 · %3%").arg(renderIndex + 1).arg(photo.caption).arg(qRound(effectiveScale * 100.0));
+	captionLines << QString("scale %1 · rot %2° · offset (%3, %4)")
 		.arg(photo.alignScale, 0, 'f', 3)
 		.arg(photo.alignRotation * (180.0 / Pi), 0, 'f', 2)
 		.arg(qRound(photo.alignOffset.x())).arg(qRound(photo.alignOffset.y()));
+	if (photo.alignScored)
+		captionLines << QString("conf %1 · coarse %2").arg(photo.alignConfidence, 0, 'f', 2).arg(photo.alignBootstrapZncc, 0, 'f', 2);
 	const QFontMetrics fm = painter.fontMetrics();
-	const int textWidth = std::max(fm.horizontalAdvance(headline), fm.horizontalAdvance(alignLine));
-	const QRectF textRect(8, 8, textWidth + 12, 2 * fm.height() + 6);
+	int textWidth = 0;
+	for (const QString& line : captionLines)
+		textWidth = std::max(textWidth, fm.horizontalAdvance(line));
+	const QRectF textRect(8, 8, textWidth + 12, captionLines.size() * fm.height() + 6.0);
 	painter.setPen(Qt::NoPen);
 	painter.setBrush(QColor(0, 0, 0, 150));
 	painter.drawRoundedRect(textRect, 4, 4);
 	painter.setPen(QColor(0xe8, 0xe8, 0xe8));
-	painter.drawText(textRect, Qt::AlignCenter, headline + "\n" + alignLine);
+	painter.drawText(textRect, Qt::AlignCenter, captionLines.join('\n'));
 
 	// A flickered pane shows a photo other than its own - flag it with an accent frame.
 	if (renderIndex != photoIndex())
@@ -540,7 +545,10 @@ void PhotoCompareWindow::autoAlignPhotos()
 		setCalibrating(false);
 	QApplication::setOverrideCursor(Qt::BusyCursor);
 	for (Photo& photo : m_photos)
+	{
 		photo.alignMarks.clear();
+		photo.alignScored = false;  // re-derived below for each non-reference photo; the reference stays unscored
+	}
 
 	Photo& ref = m_photos[m_refIndex];
 	// The library works in the reference's PIXEL space; subject space differs from it by the reference's own
@@ -570,6 +578,9 @@ void PhotoCompareWindow::autoAlignPhotos()
 		                         rotated(photo.alignOffset - refOffset, -refRotation) / refScale };
 		const AlignmentResult result = alignImages(ref.image, photo.image, options);
 		m_alignMarkSize = result.patchSize;  // in reference px == subject units (the subject space was just rebased)
+		photo.alignConfidence = result.confidence;        // both surfaced in this photo's corner caption, success or not
+		photo.alignBootstrapZncc = result.bootstrapZncc;
+		photo.alignScored = true;
 		qDebug() << "Auto-align photo" << (i + 1) << "vs" << (m_refIndex + 1) << ": succeeded" << result.succeeded
 		         << " confidence" << result.confidence << " coarse" << result.bootstrapZncc
 		         << " scale" << result.transform.scale << " offset" << result.transform.offset
@@ -609,9 +620,6 @@ void PhotoCompareWindow::autoAlignPhotos()
 		}
 	}
 	QApplication::restoreOverrideCursor();
-	// Transient status in the hint bar; any later mode change repaints the normal hint over it.
-	m_hintLabel->setText(tr("Auto-align vs %1 · %2 · squares: accent = used, orange = outlier, red = no match")
-		.arg(m_refIndex + 1).arg(summary.join("   ")));
 	updateAllPanes();
 }
 
@@ -631,6 +639,7 @@ void PhotoCompareWindow::setCalibrating(bool calibrating)
 	{
 		photo.calibPoints.clear();
 		photo.alignMarks.clear();  // stale auto-align circles would only be clutter under the crosshairs
+		photo.alignScored = false;  // and the auto-align scores they went with
 	}
 	for (PhotoComparePane* paneWidget : m_paneWidgets)
 		paneWidget->setCursor(idleCursor());

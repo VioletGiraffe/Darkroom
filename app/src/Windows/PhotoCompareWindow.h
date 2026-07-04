@@ -79,6 +79,9 @@ private:
 		QString caption;              // file name, drawn in the pane's corner
 		std::vector<QPointF> calibPoints;  // image-space, at most 2; only populated while calibrating
 		std::vector<AlignmentMark> alignMarks;  // drawn as footprint squares; cleared when the next alignment starts
+		bool alignScored = false;         // auto-align has evaluated this photo -> the two scores below are valid & shown
+		double alignConfidence = 0.0;     // fitness of the last auto-align: mean patch ZNCC (AlignmentResult::confidence)
+		double alignBootstrapZncc = 0.0;  // coarse whole-frame score of the last auto-align (AlignmentResult::bootstrapZncc)
 	};
 
 	// Coordinate mapping. widget = m_viewZoom * (alignScale * R(alignRotation) * image + alignOffset) +
