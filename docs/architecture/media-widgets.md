@@ -111,6 +111,14 @@ grid card — drops the border, hover and padding, leaving just the recessed mat
 The grid also constructs it caption-less (the name lives in the footer), so its caption strip collapses to
 zero. Framed, captioned thumbnails (single-frame viewers, Compare) are unchanged.
 
+### Lazy load & serialized I/O
+
+The render is **not** started at construction. The first `paintEvent` arms a short dwell timer and starts the
+load only if the card is still visible when it fires — so a grid (which paints only its visible cards) never
+decodes off-screen ones, and a fast scroll loads nothing it doesn't come to rest on. All thumbnail loads post
+to one process-wide worker thread (`Core/IoThreadPool`, a hidden single-thread `QThreadPool`), serializing disk
+reads so a spinning disk isn't seek-thrashed when a whole screenful loads at once.
+
 ### Drag
 
 Drag is intrinsic to `ThumbnailWidget` (overrides `mousePressEvent`/`mouseMoveEvent`, holds a
@@ -122,10 +130,11 @@ way to acquire one — composite thumbnails are never drag sources. So `MediaIte
 
 ### Two rendering bug fixes worth not regressing
 
-- **DPR-at-construction**: cards are built with no parent and reparented later, so the constructor's render
-  can capture a stale device-pixel-ratio on scaled displays → low-res, blurry canvas. Fixed by re-checking the
-  render DPR against the current one in `paintEvent` and re-rendering on mismatch (the first point DPR is
-  guaranteed correct; self-corrects within a frame).
+- **Stale DPR**: cards are built with no parent and reparented later, so an early render can capture a stale
+  device-pixel-ratio on scaled displays → low-res, blurry canvas. Fixed by re-checking the render DPR against
+  the current one in `paintEvent` and re-rendering on mismatch (the first point DPR is guaranteed correct;
+  self-corrects within a frame). Deferring the first render to paint-time (above) already makes this correct on
+  the first try; the re-check remains as the guard.
 - **Minification aliasing**: drawing full-res frames straight into small slots aliases badly at large
   reductions (bilinear is a poor minification filter). Fixed by pre-resampling each frame to its target size
   (area-correct) before a 1:1 blit. Living in the shared loader, this fixes grid, FrameViewer, and Compare
