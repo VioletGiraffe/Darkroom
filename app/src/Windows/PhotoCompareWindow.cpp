@@ -233,13 +233,12 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 	painter.setPen(QColor(0xe8, 0xe8, 0xe8));
 	painter.drawText(textRect, Qt::AlignCenter, captionLines.join('\n'));
 
-	// The reference pane - the photo difference mode and both alignment paths work against - is outlined
-	// in yellow (pointless with a single photo: it is trivially the reference).
+	// The reference pane - the photo difference mode and both alignment paths work against - is outlined in yellow
 	if (photoIndex() == m_owner.m_refIndex && m_owner.m_photos.size() > 1)
 	{
-		painter.setPen(QPen(QColor(0xf0, 0xe0, 0x40), 2));
+		painter.setPen(QPen(QColor(240, 224, 64), 2.0));
 		painter.setBrush(Qt::NoBrush);
-		painter.drawRect(rect().adjusted(1, 1, -2, -2));
+		painter.drawRect(rect().adjusted(1, 1, -1, -1));
 	}
 
 	// A flickered pane shows a photo other than its own - flag it with an accent frame.
