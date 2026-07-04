@@ -136,5 +136,14 @@ Implementation notes:
 - The view re-fits on every pane resize (first show, maximize, later window resizes) **until the user first
   navigates**; after that resizes leave the view alone.
 - Photos that fail to load are skipped at load time (constructor batch and dropped files alike) with a
-  `qWarning` (so all downstream code can assume every pane has a valid image); alignment is transient —
-  nothing here persists except window geometry.
+  `qWarning` (so all downstream code can assume every pane has a valid image); the alignment itself is
+  transient, but three things persist across sessions: window geometry, the "Ignore rotation" option, and the
+  align region. The latter two use window-local `QSettings` keys defined in the `.cpp` (not app-wide, so kept
+  out of `Settings.h`); the region is stored as fractions of the reference frame, so it restores regardless of
+  the images' resolution and is re-anchored to the current reference on open.
+- **`R` — reset to first-open layout**: every photo drops back to its default alignment (the current
+  reference is kept — its role and subject-space anchoring survive), the align region clears, the view
+  re-fits, and difference/flicker/full-view/calibration modes are dropped — everything except the persisted
+  "Ignore rotation" option. The default-alignment math lives in one place (`setDefaultAlignment`, reused by
+  the initial load) over `referenceSubjectRect()`, the single rotation-0 mapping of the reference image into
+  subject space (also used by the view fit and the region persistence).

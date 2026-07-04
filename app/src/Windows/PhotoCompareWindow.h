@@ -38,6 +38,8 @@ class SegmentedToggle;
 //   Shift+drag = mark the auto-align region (dashed rect, one subject-space region shown in every pane):
 //       auto-align then draws its evidence from that region only - for scenes where no global alignment
 //       exists (depth parallax, locally moved subjects), align what matters; Shift+click clears it;
+//   R = reset: drop every photo back to its default alignment (the current reference is kept), clear the align
+//       region and re-fit the view - the first-open layout, except the "Ignore rotation" option is left as set;
 //   hold 1..N = flicker: every pane temporarily renders photo N under the shared view, release to revert;
 //   D / the Normal-Difference toggle = difference view: every photo except the reference renders as its
 //       per-channel absolute difference against the reference, the reference stays normal;
@@ -112,6 +114,14 @@ private:
 	// refreshes everything that depends on the photo count. Unreadable files are skipped with a warning.
 	void addPhotosFromFiles(const QStringList& photoPaths);
 	void rebuildPaneGrid();  // re-places every pane after a photo count change; shows the drop hint when empty
+
+	// The reference photo's image rect mapped into subject space (rotation assumed 0 - see the definition).
+	[[nodiscard]] QRectF referenceSubjectRect() const;
+	// Height-normalizes the photo to the reference's subject rect and centers it (the default alignment).
+	void setDefaultAlignment(Photo& photo);
+	// R: return to the first-open layout - default alignment for every photo (the current reference kept), no
+	// align region, re-fitted view - but leave the persisted "Ignore rotation" option untouched.
+	void resetToInitialState();
 
 	// Shared-view mutations (all panes follow).
 	void zoomView(double factor, const QPointF& widgetAnchor);  // zoom keeping widgetAnchor fixed

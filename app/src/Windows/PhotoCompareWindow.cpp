@@ -22,6 +22,7 @@
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QSettings>
 #include <QSlider>
 #include <QStackedLayout>
 #include <QUrl>
@@ -30,6 +31,15 @@
 
 #include <algorithm>
 #include <cmath>
+
+// This window's persisted UI state. These keys live here, not in Settings.h, because they are local to the
+// compare tool rather than app-wide configuration - but stay under the Settings namespace for the uniform
+// QSettings{}.value(Settings::Foo) call style. The align region is stored as a QRectF of fractions of the
+// reference frame (resolution-independent); an empty/absent value means no region.
+namespace Settings {
+	constexpr const char* PhotoCompareIgnoreRotation = "photoCompare/ignoreRotation";
+	constexpr const char* PhotoCompareAoi = "photoCompare/aoiNormalized";
+}
 
 namespace {
 
@@ -389,6 +399,9 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 	m_ignoreRotationCheck->setToolTip(tr("Auto-align fits scale and offset only, treating any apparent rotation as spurious\n"
 	                                     "(e.g. depth parallax between focus-stack slices can read as a slight tilt)"));
 	m_ignoreRotationCheck->setFocusPolicy(Qt::NoFocus);  // all keyboard input stays on the window
+	m_ignoreRotationCheck->setChecked(QSettings{}.value(Settings::PhotoCompareIgnoreRotation, false).toBool());
+	connect(m_ignoreRotationCheck, &QCheckBox::toggled, this,
+	        [](bool checked) { QSettings{}.setValue(Settings::PhotoCompareIgnoreRotation, checked); });
 	toolbar->addWidget(m_ignoreRotationCheck, 0);
 
 	m_diffToggle = new SegmentedToggle({ tr("Normal"), tr("Difference") }, this);
@@ -402,7 +415,8 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 	m_hintLabel->setAlignment(Qt::AlignCenter);
 	mainLayout->addWidget(m_hintLabel, 0);
 
-	addPhotosFromFiles(photoPaths);  // also puts the empty drop-target state in place when the list is empty
+	addPhotosFromFiles(photoPaths);  // also puts the empty drop-target state in place when the list is empty (the
+	                                 // saved align region is restored inside, once the first photos actually exist)
 
 	if (!restoreWindowGeometry(this, "photoCompareWindow"))
 	{
@@ -414,6 +428,64 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 PhotoCompareWindow::~PhotoCompareWindow()
 {
 	saveWindowGeometry(this, "photoCompareWindow");
+	// Persist the align region as fractions of the reference frame (resolution-independent). Empty (no region,
+	// or no photos to anchor it) stores an empty rect, which reads back as "no region".
+	QRectF normalizedAoi;
+	if (!m_alignAoi.isEmpty() && !m_photos.empty())
+	{
+		const QRectF r = referenceSubjectRect();
+		normalizedAoi = QRectF((m_alignAoi.x() - r.x()) / r.width(), (m_alignAoi.y() - r.y()) / r.height(),
+		                       m_alignAoi.width() / r.width(), m_alignAoi.height() / r.height());
+	}
+	QSettings{}.setValue(Settings::PhotoCompareAoi, normalizedAoi);
+}
+
+QRectF PhotoCompareWindow::referenceSubjectRect() const
+{
+	// The reference's image rect placed into subject space. Assumes the reference carries no rotation - which
+	// holds for the default alignment and, after an auto-align/calibration fold, by construction; the same
+	// assumption is baked into the default alignment and the view fit that also build this rect.
+	const Photo& ref = m_photos[m_refIndex];
+	return QRectF(ref.alignOffset, QSizeF(ref.image.size()) * ref.alignScale);
+}
+
+void PhotoCompareWindow::setDefaultAlignment(Photo& photo)
+{
+	const QRectF refRect = referenceSubjectRect();
+	photo.alignScale = refRect.height() / photo.image.height();
+	photo.alignRotation = 0.0;
+	photo.alignOffset = refRect.center() - photo.alignScale * QPointF(photo.image.width(), photo.image.height()) / 2.0;
+}
+
+void PhotoCompareWindow::resetToInitialState()
+{
+	if (m_photos.empty())
+		return;
+	if (m_calibrating)
+		setCalibrating(false);
+	exitFullView();
+	setDifferenceMode(false);
+	m_flickerIndex = -1;
+	// The current reference keeps its role and defines subject space again (identity); every other photo
+	// returns to the default height-normalized alignment against it - the same layout a fresh open produces,
+	// only anchored on whichever photo is the reference now rather than forcing it back to photo 1.
+	Photo& ref = m_photos[m_refIndex];
+	ref.alignScale = 1.0;
+	ref.alignRotation = 0.0;
+	ref.alignOffset = QPointF();
+	for (size_t i = 0; i < m_photos.size(); ++i)
+	{
+		Photo& photo = m_photos[i];
+		photo.alignMarks.clear();
+		photo.alignScored = false;
+		if (static_cast<int>(i) != m_refIndex)
+			setDefaultAlignment(photo);  // reads the now-identity reference
+	}
+	m_alignAoi = QRectF();
+	m_viewTouched = false;  // like a fresh open: pane resizes re-fit again until the user navigates
+	fitView();
+	updateHintText();
+	updateAllPanes();
 }
 
 void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
@@ -437,12 +509,7 @@ void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
 		// the two on each other - so identical shots that only differ in export resolution line up with no
 		// user action at all. The very first photo keeps the identity default: it defines subject space.
 		if (!m_photos.empty())
-		{
-			const Photo& ref = m_photos[m_refIndex];
-			const QRectF refRect(ref.alignOffset, QSizeF(ref.image.size()) * ref.alignScale);
-			photo.alignScale = refRect.height() / photo.image.height();
-			photo.alignOffset = refRect.center() - photo.alignScale * QPointF(photo.image.width(), photo.image.height()) / 2.0;
-		}
+			setDefaultAlignment(photo);
 		m_photos.push_back(std::move(photo));
 	}
 
@@ -451,6 +518,19 @@ void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
 	m_slider->setEnabled(!m_photos.empty() && !m_calibrating);
 	if (!m_viewTouched)
 		fitView();
+	// The first photos to arrive (the constructor batch, or the first drop into a window opened empty) get the
+	// saved align region restored - only now does a reference exist to un-normalize the stored frame-fractions
+	// against. Apply-once, and never over a region the user has already drawn.
+	if (oldCount == 0 && !m_photos.empty() && m_alignAoi.isEmpty())
+	{
+		const QRectF normalizedAoi = QSettings{}.value(Settings::PhotoCompareAoi).toRectF();
+		if (!normalizedAoi.isEmpty())
+		{
+			const QRectF r = referenceSubjectRect();
+			m_alignAoi = QRectF(r.x() + normalizedAoi.x() * r.width(), r.y() + normalizedAoi.y() * r.height(),
+			                    normalizedAoi.width() * r.width(), normalizedAoi.height() * r.height());
+		}
+	}
 	updateHintText();
 	updateAllPanes();
 	if (m_photos.size() == oldCount && !photoPaths.isEmpty())  // transient status, like the auto-align summary
@@ -536,6 +616,8 @@ void PhotoCompareWindow::keyPressEvent(QKeyEvent* event)
 		fitView();
 	else if (key == Qt::Key_D && !event->isAutoRepeat() && !m_photos.empty())
 		setDifferenceMode(!m_differenceMode);
+	else if (key == Qt::Key_R && !event->isAutoRepeat() && !m_photos.empty())
+		resetToInitialState();
 	else if (m_fullViewIndex >= 0 && (key == Qt::Key_Left || key == Qt::Key_Right))
 		m_slider->setValue(m_slider->value() + (key == Qt::Key_Right ? 1 : -1));  // setValue clamps to the range
 	else if (!m_calibrating && !event->isAutoRepeat() &&
@@ -623,8 +705,7 @@ void PhotoCompareWindow::fitView()
 	const QSizeF paneSize = (m_fullViewIndex >= 0 ? m_fullPane : m_paneWidgets[0])->size();
 	if (paneSize.isEmpty())
 		return;
-	const Photo& ref = m_photos[m_refIndex];
-	const QRectF subjectRect(ref.alignOffset, QSizeF(ref.image.size()) * ref.alignScale);
+	const QRectF subjectRect = referenceSubjectRect();
 	m_viewZoom = std::min(paneSize.width() / subjectRect.width(), paneSize.height() / subjectRect.height());
 	m_viewPan = QPointF((paneSize.width() - m_viewZoom * subjectRect.width()) / 2.0,
 	                    (paneSize.height() - m_viewZoom * subjectRect.height()) / 2.0)
@@ -911,9 +992,9 @@ void PhotoCompareWindow::updateHintText()
 			.arg(progress.join("   ")));
 	}
 	else if (m_fullViewIndex >= 0)
-		m_hintLabel->setText(tr("Full view %1/%2 · slider / Left,Right: switch photo · hold 1..%2: flicker · A: auto-align · Shift+drag: align region · D: difference · wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust this photo · F: fit · Esc: back to grid")
+		m_hintLabel->setText(tr("Full view %1/%2 · slider / Left,Right: switch photo · hold 1..%2: flicker · A: auto-align · Shift+drag: align region · D: difference · wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust this photo · F: fit · R: reset · Esc: back to grid")
 			.arg(m_fullViewIndex + 1).arg(m_photos.size()));
 	else
-		m_hintLabel->setText(tr("Wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust one photo · A: auto-align · Shift+A: align by 2 clicks · Shift+drag: align region · hold 1..%1: flicker · D: difference · slider: full view · F / double-click: fit · Esc: close")
+		m_hintLabel->setText(tr("Wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust one photo · A: auto-align · Shift+A: align by 2 clicks · Shift+drag: align region · hold 1..%1: flicker · D: difference · slider: full view · F / double-click: fit · R: reset · Esc: close")
 			.arg(m_photos.size()));
 }
