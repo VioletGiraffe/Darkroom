@@ -218,6 +218,9 @@ void ThumbnailWidget::loadFrame(const QString& path, const QString& caption)
 	m_filePath = path;
 	m_caption = caption;
 	m_sourcePaths = { path };
+	// Disarm any in-flight load before clearing m_image: the decode stage writes m_image under the job lock, so a
+	// bare assignment here would race a running decode (scheduleRender() below disarms again - a no-op by then).
+	disarmAsyncTask();
 	if (contentChanged)
 		m_image = QImage{};
 	m_maxSize = currentImageArea();
