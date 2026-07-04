@@ -786,16 +786,16 @@ void PhotoCompareWindow::autoAlignPhotos()
 		photo.alignRotationSigma = result.rotationSigma;
 		photo.alignSucceeded = result.succeeded;
 		photo.alignScored = true;
-		qDebug() << "Auto-align photo" << (i + 1) << "vs" << (m_refIndex + 1) << ": succeeded" << result.succeeded
-		         << " confidence" << result.confidence << " coarse" << result.bootstrapZncc
-		         << " scale" << result.transform.scale << " offset" << result.transform.offset
-		         << " rotation" << result.transform.rotation * (180.0 / Pi) << "+-" << result.rotationSigma * (180.0 / Pi) << "deg"
-		         << " radial k" << result.radialK << " time" << photo.alignTimeMs << "ms";
+		//qDebug() << "Auto-align photo" << (i + 1) << "vs" << (m_refIndex + 1) << ": succeeded" << result.succeeded
+		//         << " confidence" << result.confidence << " coarse" << result.bootstrapZncc
+		//         << " scale" << result.transform.scale << " offset" << result.transform.offset
+		//         << " rotation" << result.transform.rotation * (180.0 / Pi) << "+-" << result.rotationSigma * (180.0 / Pi) << "deg"
+		//         << " radial k" << result.radialK << " time" << photo.alignTimeMs << "ms";
 		static constexpr const char* fateNames[] = { "accepted", "accepted (coarse)", "outside overlap", "flat", "weak match", "outlier" };
 		for (const AlignmentPatchInfo& patchInfo : result.patches)
 		{
-			qDebug() << "  patch @" << patchInfo.refPoint << fateNames[static_cast<int>(patchInfo.fate)]
-			         << " zncc" << patchInfo.zncc << " residual" << patchInfo.residual;
+			//qDebug() << "  patch @" << patchInfo.refPoint << fateNames[static_cast<int>(patchInfo.fate)]
+			//         << " zncc" << patchInfo.zncc << " residual" << patchInfo.residual;
 			const auto kind = patchInfo.fate == AlignmentPatchFate::Accepted ? AlignmentMark::Kind::Used
 			                : patchInfo.fate == AlignmentPatchFate::AcceptedCoarse ? AlignmentMark::Kind::UsedCoarse
 			                : patchInfo.fate == AlignmentPatchFate::Outlier ? AlignmentMark::Kind::Outlier
