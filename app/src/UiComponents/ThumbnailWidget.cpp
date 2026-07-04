@@ -3,9 +3,12 @@
 #include "Theme/Theme.h"
 
 #include <QApplication>
+#include <QBuffer>
 #include <QByteArray>
 #include <QDesktopServices>
 #include <QFile>
+#include <QImageIOHandler>
+#include <QImageReader>
 #include <QMessageBox>
 #include <QMimeData>
 #include <QMouseEvent>
@@ -66,23 +69,37 @@ namespace {
 			if (slotWidth <= 0 || slotHeight <= 0)
 				return;
 
-			// Best-fit each frame into its slot, then resample its pixel data to that exact physical size right here
-			// via QImage::scaled() — Qt's dedicated area-correct minification filter. Drawing the full-resolution
-			// source straight into the slot via QPainter would use the paint engine's transform-time bilinear
-			// sampling, which aliases badly at the reductions involved (source ~1080p, slots a couple hundred px).
-			// logicalSize drives all the layout math below; only the pixel data itself is at physical resolution.
+			// Decode each frame straight to its fitted physical size via QImageReader::setScaledSize rather than
+			// full-decode-then-QImage::scaled: for JPEG this is a reduced-scale libjpeg decode (the bulk of the
+			// reduction done by a good filter), which is far cheaper and also sidesteps the minification aliasing a
+			// single large downscale used to cause. setAutoTransform applies EXIF orientation. Both size() and
+			// setScaledSize are in the file's *stored* orientation, and the transform is applied to the result, so
+			// for a 90/270 rotation the displayed image is transposed: fit against the displayed size, but hand the
+			// reader the stored-orientation target. logicalSize drives the layout math below; the pixel data is
+			// produced at physical resolution.
 			struct Fitted { QImage img; QSize logicalSize; };
 			std::vector<Fitted> fitted;
 			fitted.reserve(n);
-			for (const QByteArray& bytes : std::as_const(m_bytes))
+			for (QByteArray& bytes : m_bytes)   // non-const: QBuffer wraps a QByteArray*, so it can't be a const ref
 			{
-				const QImage src = QImage::fromData(bytes);   // decode from memory; the disk read already happened on the I/O thread
+				QBuffer buffer(&bytes);
+				buffer.open(QIODevice::ReadOnly);
+				QImageReader reader(&buffer);
+				reader.setAutoTransform(true);
+
+				const QSize rawSize = reader.size();   // header only, no full decode
+				if (rawSize.isEmpty())
+					continue;
+
+				const bool swapsWH = reader.transformation().testFlag(QImageIOHandler::TransformationRotate90);
+				const QSize displayedSize = swapsWH ? rawSize.transposed() : rawSize;
+				const QSize logicalSize   = displayedSize.scaled(QSize(slotWidth, slotHeight), Qt::KeepAspectRatio);
+				const QSize physicalSize  = (QSizeF(logicalSize) * job.m_dpr).toSize();
+				reader.setScaledSize(swapsWH ? physicalSize.transposed() : physicalSize);
+
+				const QImage src = reader.read();   // reduced-scale decode + EXIF transform -> physicalSize, displayed orientation
 				if (!src.isNull())
-				{
-					const QSize logicalSize = src.size().scaled(QSize(slotWidth, slotHeight), Qt::KeepAspectRatio);
-					const QSize physicalSize = (QSizeF(logicalSize) * job.m_dpr).toSize();
-					fitted.push_back({ src.scaled(physicalSize, Qt::KeepAspectRatio, Qt::SmoothTransformation), logicalSize });
-				}
+					fitted.push_back({ src, logicalSize });
 			}
 
 			// Nothing decoded (e.g. a cleared frame): leave m_image as-is but still repaint below so the previously
