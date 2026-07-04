@@ -69,6 +69,7 @@ private:
 	qreal m_renderDpr = 0.0; // devicePixelRatioF() at the time of the most recently scheduled render; re-checked in paintEvent (see scheduleRender)
 
 	std::unique_ptr<BaseLoaderTask> m_asyncTask;
+	bool m_loadArmed = false;  // a dwell timer is pending to start the first render (see paintEvent); guards against stacking timers across repaints
 
 	DragGestureHelper m_dragHelper;
 	std::function<QMimeData*()> m_dragMimeDataFactory;

@@ -1,4 +1,5 @@
 #include "UiComponents/ThumbnailWidget.h"
+#include "Core/IoThreadPool.h"
 #include "Theme/Theme.h"
 
 #include <QApplication>
@@ -8,7 +9,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QRunnable>
-#include <QThreadPool>
+#include <QTimer>
 #include <QUrl>
 #include <QWheelEvent>
 
@@ -18,6 +19,10 @@
 // Folder preview: gap between cells in the composite strip
 static constexpr int FOLDER_PREVIEW_GAP = 2;
 static constexpr int THUMBNAIL_LABEL_HEIGHT = 20;
+
+// Grace period after a card first becomes visible before its image load starts, so flicking past a card doesn't
+// trigger a decode (and disk read) for something the user isn't looking at. See paintEvent.
+static constexpr int LOAD_DWELL_MS = 100;
 
 struct ThumbnailWidget::BaseLoaderTask : public QRunnable {
 	BaseLoaderTask() {
@@ -210,7 +215,7 @@ void ThumbnailWidget::scheduleRender()
 	// (e.g. 1.0 on a 150%-scaled display) the first time round; paintEvent re-checks and re-renders if so.
 	m_renderDpr = devicePixelRatioF();
 	m_asyncTask = std::make_unique<ImageLoaderTask>(this, m_sourcePaths, &m_image, m_maxSize, m_renderDpr);
-	QThreadPool::globalInstance()->start(m_asyncTask.get());
+	IoThreadPool::start(m_asyncTask.get());
 }
 
 void ThumbnailWidget::setOnMouseWheelCallback(std::function<void(int)> handler)
@@ -291,12 +296,26 @@ void ThumbnailWidget::wheelEvent(QWheelEvent* event)
 
 void ThumbnailWidget::paintEvent(QPaintEvent*)
 {
-	// The render is started lazily on the first paint, not at construction: a QListWidget grid builds a card
-	// for every item but only paints the visible ones, so off-screen cards never reach here and never decode
-	// their (potentially full-resolution) image until scrolled into view. paintEvent is also the one place
-	// devicePixelRatioF() is guaranteed accurate - the widget is on its real, shown screen - so this both
-	// kicks off the initial render and re-renders if an earlier scheduleRender() captured a stale DPR.
-	if (!m_asyncTask || !qFuzzyCompare(m_renderDpr, devicePixelRatioF()))
+	// The initial render is deferred to the first paint (a grid builds a card per item but only paints the
+	// visible ones) and then gated behind a short dwell: a fast flick paints each card once and scrolls it away
+	// before the timer fires, so cards the user didn't stop on never touch the disk. The render starts only if
+	// the card is still visible when the timer fires; m_loadArmed stops repaints from stacking timers.
+	if (!m_asyncTask)
+	{
+		if (!m_loadArmed)
+		{
+			m_loadArmed = true;
+			QTimer::singleShot(LOAD_DWELL_MS, this, [this] {
+				m_loadArmed = false;
+				if (!m_asyncTask && !visibleRegion().isEmpty())  // still not loaded, and still on-screen after the dwell
+					scheduleRender();
+			});
+		}
+	}
+	// An already-rendered card that captured a stale DPR earlier (see scheduleRender) re-renders immediately -
+	// no dwell: it's correcting something already on-screen, not a fresh decode. paintEvent is the one place
+	// devicePixelRatioF() is guaranteed accurate - the widget is on its real, shown screen.
+	else if (!qFuzzyCompare(m_renderDpr, devicePixelRatioF()))
 		scheduleRender();
 
 	QPainter painter(this);
@@ -305,8 +324,12 @@ void ThumbnailWidget::paintEvent(QPaintEvent*)
 	const int labelHeight = m_caption.isEmpty() ? 0 : THUMBNAIL_LABEL_HEIGHT;
 	const QRect imageArea(content.left(), content.top(), content.width(), content.height() - labelHeight);
 
-	// Lock the image while drawing to prevent it from being modified by the loader thread
-	std::lock_guard lock{ m_asyncTask->m_mutex };
+	// Lock the image while drawing so the loader thread can't swap it mid-paint. During the dwell before the
+	// first render there is no task yet (and m_image is null, touched only by this thread), so there is nothing
+	// to lock against - fall through unlocked and draw the "Loading..." placeholder.
+	std::unique_lock<std::mutex> lock;
+	if (m_asyncTask)
+		lock = std::unique_lock{ m_asyncTask->m_mutex };
 
 	if (!m_image.isNull())
 	{
@@ -384,7 +407,7 @@ void ThumbnailWidget::disarmAsyncTask()
 
 	{
 		std::lock_guard lock{ m_asyncTask->m_mutex };
-		(void)QThreadPool::globalInstance()->tryTake(m_asyncTask.get()); // We don't care about the result
+		(void)IoThreadPool::tryTake(m_asyncTask.get()); // We don't care about the result
 
 		m_asyncTask->disarm();
 	} // Remember to unlock m_asyncTask->m_mutex before deleting m_asyncTask
