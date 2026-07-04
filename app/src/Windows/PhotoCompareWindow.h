@@ -60,7 +60,7 @@ private:
 		enum class Kind : uint8_t
 		{
 			Used,     // contributed to the fitted transform
-			Outlier,  // matched well but disagrees with the fit (systematic pattern of these = rotation suspicion)
+			Outlier,  // matched well but disagrees with the fit (locally moved content, parallax, ...)
 			Failed,   // no usable match (flat, weak, or outside the overlap)
 		};
 		QPointF imagePos;

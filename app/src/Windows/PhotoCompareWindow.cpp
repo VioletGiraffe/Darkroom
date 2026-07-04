@@ -116,8 +116,7 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 
 	// Auto-align diagnostics: where the aligner took its evidence in the RENDERED photo, drawn at the
 	// patch's true on-screen footprint. Accent = used for the fit; orange = matched well but inconsistent
-	// with the fitted transform (outlier - a systematic pattern of these hints at rotation, which the model
-	// does not correct); red = failed to match.
+	// with the fitted transform (outlier - locally moved content, parallax, ...); red = failed to match.
 	painter.setBrush(Qt::NoBrush);
 	const double markHalf = 0.5 * m_owner.m_alignMarkSize * m_owner.m_viewZoom;
 	for (const PhotoCompareWindow::AlignmentMark& mark : photo.alignMarks)
@@ -546,7 +545,8 @@ void PhotoCompareWindow::autoAlignPhotos()
 		m_alignMarkSize = result.patchSize;  // in reference px == subject units (the subject space was just rebased)
 		qDebug() << "Auto-align photo" << (i + 1) << "vs" << (m_refIndex + 1) << ": succeeded" << result.succeeded
 		         << " confidence" << result.confidence << " coarse" << result.bootstrapZncc
-		         << " scale" << result.transform.scale << " offset" << result.transform.offset;
+		         << " scale" << result.transform.scale << " offset" << result.transform.offset
+		         << " rotation" << result.rotationDegrees << "deg (measured, not corrected)";
 		static constexpr const char* fateNames[] = { "accepted", "outside overlap", "flat", "weak match", "outlier" };
 		for (const AlignmentPatchInfo& patchInfo : result.patches)
 		{
@@ -563,7 +563,12 @@ void PhotoCompareWindow::autoAlignPhotos()
 		{
 			photo.alignScale = result.transform.scale;
 			photo.alignOffset = result.transform.offset;
-			summary << tr("%1: aligned (%2)").arg(i + 1).arg(result.confidence, 0, 'f', 2);
+			QString entry = tr("%1: aligned (%2)").arg(i + 1).arg(result.confidence, 0, 'f', 2);
+			// A measured rotation cannot be corrected (the alignment model has none) - surface it as the
+			// explanation for residual mismatch that grows away from the frame center.
+			if (std::abs(result.rotationDegrees) >= 0.05)
+				entry += tr(" rot %1°").arg(result.rotationDegrees, 0, 'f', 2);
+			summary << entry;
 		}
 		else
 		{

@@ -77,11 +77,14 @@ Three ways to set the alignment:
 - **Auto-align (`A`)** — one click estimates every photo's transform against the reference via the
   `magic-alignment` submodule (a Qt-only static library; pipeline: black-bar detection → coarse joint
   scale+offset brute force → patch correspondences refined coarse-to-fine over an image pyramid → trimmed
-  least-squares fit → accept-or-fail verdict), feeding the current alignment in as the initial guess. A photo
-  the library cannot align reliably *keeps* its current alignment rather than receiving a plausible-but-wrong
-  one. The per-patch evidence is drawn on the panes as true-footprint squares (accent = used in the fit,
-  orange = matched well but disagrees with the fit — a systematic pattern of these hints at rotation,
-  red = no match) until the next alignment; a per-photo outcome summary lands in the hint bar.
+  least-squares similarity fit → accept-or-fail verdict), feeding the current alignment in as the initial
+  guess. A photo the library cannot align reliably *keeps* its current alignment rather than receiving a
+  plausible-but-wrong one. The fit measures rotation internally (it keeps patch tracking and outlier trimming
+  honest on slightly rotated pairs), but the applied model stays scale + translation — a notable measured
+  angle is reported in the hint bar instead, as the explanation for residual mismatch the model cannot
+  correct. The per-patch evidence is drawn on the panes as true-footprint squares (accent = used in the fit,
+  orange = matched well but disagrees with the fit: locally moved content, parallax, red = no match) until
+  the next alignment; a per-photo outcome summary lands in the hint bar.
 - **Two-point calibration (`Shift+A`)** — click the same two features in every photo; the photo receiving the
   session's first point becomes the reference; the distance ratio gives each photo's scale, the midpoint
   difference its offset.
