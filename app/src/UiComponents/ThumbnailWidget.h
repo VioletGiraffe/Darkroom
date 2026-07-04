@@ -13,7 +13,7 @@ class QMimeData;
 
 class ThumbnailWidget final : public QWidget {
 public:
-	struct BaseLoaderTask;
+	struct LoadJob;
 
 	ThumbnailWidget(const QString& filePath, const QString& caption, int thumbnailSize, QWidget* parent);
 	// canvasSize is the card's image area: the frames are tiled across it (one slot each) and best-fit
@@ -68,7 +68,7 @@ private:
 	QSize m_maxSize; // the image-area size the canvas is rendered to fill (deterministic, drives sizeHint)
 	qreal m_renderDpr = 0.0; // devicePixelRatioF() at the time of the most recently scheduled render; re-checked in paintEvent (see scheduleRender)
 
-	std::unique_ptr<BaseLoaderTask> m_asyncTask;
+	std::shared_ptr<LoadJob> m_job;  // shared control block for the in-flight two-stage load (read -> decode); see ThumbnailWidget.cpp
 	bool m_loadArmed = false;  // a dwell timer is pending to start the first render (see paintEvent); guards against stacking timers across repaints
 
 	DragGestureHelper m_dragHelper;

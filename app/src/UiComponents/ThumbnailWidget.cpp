@@ -3,16 +3,20 @@
 #include "Theme/Theme.h"
 
 #include <QApplication>
+#include <QByteArray>
 #include <QDesktopServices>
+#include <QFile>
 #include <QMessageBox>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QRunnable>
+#include <QThreadPool>
 #include <QTimer>
 #include <QUrl>
 #include <QWheelEvent>
 
+#include <memory>
 #include <mutex>
 #include <vector>
 
@@ -24,109 +28,141 @@ static constexpr int THUMBNAIL_LABEL_HEIGHT = 20;
 // trigger a decode (and disk read) for something the user isn't looking at. See paintEvent.
 static constexpr int LOAD_DWELL_MS = 100;
 
-struct ThumbnailWidget::BaseLoaderTask : public QRunnable {
-	BaseLoaderTask() {
-		setAutoDelete(false);
-	}
-	virtual void disarm() = 0;
-
+// Shared control block for one thumbnail load, split across two stages (read on the single I/O thread, decode on
+// the CPU pool). It's held by a shared_ptr so it outlives the widget when a stage is still running: the widget's
+// destructor disarms it (below) rather than deleting it, and each stage re-checks m_disarmed before touching the
+// widget. m_parent/m_target/m_disarmed are guarded by m_mutex (disarm() flips them from the GUI thread while a
+// stage may run); m_paths/m_canvasLogical/m_dpr are set once before posting and only read after, so lock-free.
+struct ThumbnailWidget::LoadJob {
 	std::mutex m_mutex;
+	ThumbnailWidget* m_parent = nullptr;
+	QImage* m_target = nullptr;         // = &widget->m_image
+	bool m_disarmed = false;
+
+	QStringList m_paths;                // source frame path(s), read by the read stage
+	QSize m_canvasLogical;
+	qreal m_dpr = 1.0;
 };
 
 namespace {
-	// Best-fits each frame into its slot within the given canvas (the max bound), then composes them into
-	// a canvas sized to the actual content — so the widget's sizeHint() can tighten to the real bounding box.
-	// Rendered at device resolution; gaps are left transparent so the styled background shows through.
-	struct ImageLoaderTask final : public ThumbnailWidget::BaseLoaderTask {
-		ImageLoaderTask(ThumbnailWidget* parent, QStringList paths, QImage* target, QSize canvasLogical, qreal dpr)
-			: m_paths{ std::move(paths) }, m_target{ target }, m_parent{ parent }, m_canvasLogical{ canvasLogical }, m_dpr{ dpr }
+	// Stage 2 (CPU pool, multi-threaded): decode the bytes the read stage produced, best-fit each frame into its
+	// slot and compose a canvas sized to the actual content (so sizeHint() can tighten to the real bounding box),
+	// then install it into the widget's m_image and repaint. The heavy decode/compose runs outside the lock; the
+	// lock is taken only for the brief install, so paintEvent (which reads m_image under the same lock) barely waits.
+	struct DecodeStage final : public QRunnable {
+		DecodeStage(std::shared_ptr<ThumbnailWidget::LoadJob> job, std::vector<QByteArray> bytes)
+			: m_job{ std::move(job) }, m_bytes{ std::move(bytes) }
 		{
 		}
+
 		void run() override {
-			std::lock_guard lock{ m_mutex };
-			if (!m_parent || m_paths.isEmpty() || m_canvasLogical.isEmpty() || m_dpr <= 0.0)
+			ThumbnailWidget::LoadJob& job = *m_job;
+			if (m_bytes.empty() || job.m_canvasLogical.isEmpty() || job.m_dpr <= 0.0)
 				return;
 
-			const int n = static_cast<int>(m_paths.size());
-			const int slotWidth = (m_canvasLogical.width() - (n - 1) * FOLDER_PREVIEW_GAP) / n;
-			const int slotHeight = m_canvasLogical.height();
+			const int n = static_cast<int>(m_bytes.size());
+			const int slotWidth = (job.m_canvasLogical.width() - (n - 1) * FOLDER_PREVIEW_GAP) / n;
+			const int slotHeight = job.m_canvasLogical.height();
 			if (slotWidth <= 0 || slotHeight <= 0)
 				return;
 
-			// Best-fit each frame into its slot, then resample its pixel data to that exact physical size
-			// right here via QImage::scaled() — Qt's dedicated area-correct minification filter. Drawing
-			// the full-resolution source straight into the slot via QPainter instead would use the paint
-			// engine's transform-time bilinear sampling, which aliases badly at the size reductions involved
-			// here (source frames are typically ~1080p, slots a couple hundred px) — that's what made an
-			// earlier version of this code look pixelated despite being "the right size". logicalSize still
-			// drives all the layout math below; only the pixel data itself is produced at physical resolution.
+			// Best-fit each frame into its slot, then resample its pixel data to that exact physical size right here
+			// via QImage::scaled() — Qt's dedicated area-correct minification filter. Drawing the full-resolution
+			// source straight into the slot via QPainter would use the paint engine's transform-time bilinear
+			// sampling, which aliases badly at the reductions involved (source ~1080p, slots a couple hundred px).
+			// logicalSize drives all the layout math below; only the pixel data itself is at physical resolution.
 			struct Fitted { QImage img; QSize logicalSize; };
 			std::vector<Fitted> fitted;
 			fitted.reserve(n);
-			for (const QString& path : std::as_const(m_paths))
+			for (const QByteArray& bytes : std::as_const(m_bytes))
 			{
-				QImage src(path);
+				const QImage src = QImage::fromData(bytes);   // decode from memory; the disk read already happened on the I/O thread
 				if (!src.isNull())
 				{
 					const QSize logicalSize = src.size().scaled(QSize(slotWidth, slotHeight), Qt::KeepAspectRatio);
-					const QSize physicalSize = (QSizeF(logicalSize) * m_dpr).toSize();
+					const QSize physicalSize = (QSizeF(logicalSize) * job.m_dpr).toSize();
 					fitted.push_back({ src.scaled(physicalSize, Qt::KeepAspectRatio, Qt::SmoothTransformation), logicalSize });
 				}
 			}
 
-			if (fitted.empty())
+			// Nothing decoded (e.g. a cleared frame): leave m_image as-is but still repaint below so the previously
+			// shown frame is removed rather than left stale. Otherwise compose the tight canvas.
+			QImage canvas;
+			if (!fitted.empty())
 			{
-				// Nothing to show (e.g. a cleared frame). Leave m_image null but still repaint so the
-				// previously shown frame is removed rather than left stale on screen.
-				QMetaObject::invokeMethod(m_parent, [parent = m_parent] {
-					parent->updateGeometry();
-					parent->update();
-				}, Qt::QueuedConnection);
+				// Tight composite: width = sum of fitted (logical) widths + gaps, height = tallest fitted frame.
+				int totalWidth = (static_cast<int>(fitted.size()) - 1) * FOLDER_PREVIEW_GAP;
+				int totalHeight = 0;
+				for (const Fitted& f : std::as_const(fitted))
+				{
+					totalWidth += f.logicalSize.width();
+					totalHeight = qMax(totalHeight, f.logicalSize.height());
+				}
+
+				canvas = QImage((QSizeF(totalWidth, totalHeight) * job.m_dpr).toSize(), QImage::Format_ARGB32_Premultiplied);
+				canvas.fill(Qt::transparent);
+				canvas.setDevicePixelRatio(job.m_dpr); // lets us paint below in logical coordinates
+
+				QPainter painter(&canvas);
+				painter.setRenderHint(QPainter::SmoothPixmapTransform, true); // defensive only: f.img is already ~exactly logicalSize*dpr, so this draw is normally a 1:1 copy, not a real resample
+				int x = 0;
+				for (const Fitted& f : std::as_const(fitted))
+				{
+					painter.drawImage(QRect(QPoint(x, (totalHeight - f.logicalSize.height()) / 2), f.logicalSize), f.img);
+					x += f.logicalSize.width() + FOLDER_PREVIEW_GAP;
+				}
+			}
+
+			// Install + repaint under the lock. disarm() takes this same mutex, so within it m_parent is guaranteed
+			// alive for the invokeMethod; a disarmed job (widget torn down, or superseded by a newer render) drops
+			// the result. Heavy work is already done above, so this critical section is just a move + an event post.
+			std::lock_guard lock{ job.m_mutex };
+			if (job.m_disarmed || !job.m_target)
 				return;
-			}
-
-			// Tight composite: width = sum of fitted (logical) widths + gaps, height = tallest fitted frame.
-			int totalWidth = (static_cast<int>(fitted.size()) - 1) * FOLDER_PREVIEW_GAP;
-			int totalHeight = 0;
-			for (const Fitted& f : std::as_const(fitted))
-			{
-				totalWidth += f.logicalSize.width();
-				totalHeight = qMax(totalHeight, f.logicalSize.height());
-			}
-
-			QImage canvas((QSizeF(totalWidth, totalHeight) * m_dpr).toSize(), QImage::Format_ARGB32_Premultiplied);
-			canvas.fill(Qt::transparent);
-			canvas.setDevicePixelRatio(m_dpr); // lets us paint below in logical coordinates
-
-			QPainter painter(&canvas);
-			painter.setRenderHint(QPainter::SmoothPixmapTransform, true); // defensive only: f.img is already ~exactly logicalSize*dpr, so this draw is normally a 1:1 copy, not a real resample
-			int x = 0;
-			for (const Fitted& f : std::as_const(fitted))
-			{
-				painter.drawImage(QRect(QPoint(x, (totalHeight - f.logicalSize.height()) / 2), f.logicalSize), f.img);
-				x += f.logicalSize.width() + FOLDER_PREVIEW_GAP;
-			}
-			painter.end();
-			*m_target = std::move(canvas);
-
-			// sizeHint() now reflects the loaded image, so the layout must re-query it, not just repaint.
-			QMetaObject::invokeMethod(m_parent, [parent = m_parent] {
+			if (!fitted.empty())
+				*job.m_target = std::move(canvas);
+			// The image (and thus sizeHint()) changed, so the layout must re-query it, not just repaint.
+			QMetaObject::invokeMethod(job.m_parent, [parent = job.m_parent] {
 				parent->updateGeometry();
 				parent->update();
 			}, Qt::QueuedConnection);
 		}
 
-		void disarm() override {
-			m_parent = nullptr;
-			m_target = nullptr;
-			m_paths.clear();
+		std::shared_ptr<ThumbnailWidget::LoadJob> m_job;
+		std::vector<QByteArray> m_bytes;
+	};
+
+	// Stage 1 (single I/O thread): read each source file into memory, then hand the bytes to the decode pool. It
+	// touches only the job (never the widget), so it is safe whatever the widget's lifetime. Serialized on the one
+	// I/O thread, it keeps a spinning disk from being seek-thrashed and lets OS read-ahead work one file at a time.
+	struct ReadStage final : public QRunnable {
+		explicit ReadStage(std::shared_ptr<ThumbnailWidget::LoadJob> job) : m_job{ std::move(job) } {}
+
+		void run() override {
+			ThumbnailWidget::LoadJob& job = *m_job;
+			{
+				std::lock_guard lock{ job.m_mutex };
+				if (job.m_disarmed)   // superseded, or the widget went away, before the I/O thread reached us: skip the read entirely
+					return;
+			}
+
+			std::vector<QByteArray> bytes;
+			bytes.reserve(job.m_paths.size());
+			for (const QString& path : std::as_const(job.m_paths))
+			{
+				QFile file(path);
+				bytes.push_back(file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray{});
+			}
+
+			{
+				std::lock_guard lock{ job.m_mutex };
+				if (job.m_disarmed)   // disarmed while we were reading: don't bother decoding
+					return;
+			}
+			QThreadPool::globalInstance()->start(new DecodeStage{ m_job, std::move(bytes) });  // decode on the shared CPU pool
 		}
 
-		QStringList m_paths;
-		QImage* m_target = nullptr;
-		ThumbnailWidget* m_parent = nullptr;
-		QSize m_canvasLogical;
-		qreal m_dpr = 1.0;
+		std::shared_ptr<ThumbnailWidget::LoadJob> m_job;
 	};
 
 } // anonymous namespace
@@ -208,14 +244,20 @@ QSize ThumbnailWidget::currentImageArea() const
 
 void ThumbnailWidget::scheduleRender()
 {
-	disarmAsyncTask();  // no-op if none is scheduled yet (first render); otherwise cancels the in-flight one
+	disarmAsyncTask();  // no-op if none is scheduled yet (first render); otherwise disarms the in-flight one
 
 	// devicePixelRatioF() is only trustworthy once the widget is realized on its real, final screen. Grid/
 	// search cards are constructed parentless and reparented afterward, so this can capture a stale ratio
 	// (e.g. 1.0 on a 150%-scaled display) the first time round; paintEvent re-checks and re-renders if so.
 	m_renderDpr = devicePixelRatioF();
-	m_asyncTask = std::make_unique<ImageLoaderTask>(this, m_sourcePaths, &m_image, m_maxSize, m_renderDpr);
-	IoThreadPool::start(m_asyncTask.get());
+
+	m_job = std::make_shared<LoadJob>();
+	m_job->m_parent = this;
+	m_job->m_target = &m_image;
+	m_job->m_paths = m_sourcePaths;
+	m_job->m_canvasLogical = m_maxSize;
+	m_job->m_dpr = m_renderDpr;
+	IoThreadPool::start(new ReadStage{ m_job });   // stage 1 (read) on the single I/O thread; it posts stage 2 (decode) to the CPU pool
 }
 
 void ThumbnailWidget::setOnMouseWheelCallback(std::function<void(int)> handler)
@@ -235,12 +277,13 @@ QSize ThumbnailWidget::sizeHint() const
 	const QMargins m = contentsMargins();
 	const int labelHeight = m_caption.isEmpty() ? 0 : THUMBNAIL_LABEL_HEIGHT;
 
-	// Before the first paint the render hasn't been scheduled yet (m_asyncTask is null) and m_image is still
-	// null, so the placeholder m_maxSize is the answer; once scheduled, read m_image under the task's lock.
+	// Before the first paint the render hasn't been scheduled yet (m_job is null) and m_image is still null, so
+	// the placeholder m_maxSize is the answer; once scheduled, read m_image under the job's lock (the decode
+	// stage writes it under the same mutex).
 	QSize imageArea = m_maxSize;
-	if (m_asyncTask)
+	if (m_job)
 	{
-		std::lock_guard lock{ m_asyncTask->m_mutex };
+		std::lock_guard lock{ m_job->m_mutex };
 		if (!m_image.isNull())
 			imageArea = m_image.deviceIndependentSize().toSize();
 	}
@@ -300,14 +343,14 @@ void ThumbnailWidget::paintEvent(QPaintEvent*)
 	// visible ones) and then gated behind a short dwell: a fast flick paints each card once and scrolls it away
 	// before the timer fires, so cards the user didn't stop on never touch the disk. The render starts only if
 	// the card is still visible when the timer fires; m_loadArmed stops repaints from stacking timers.
-	if (!m_asyncTask)
+	if (!m_job)
 	{
 		if (!m_loadArmed)
 		{
 			m_loadArmed = true;
 			QTimer::singleShot(LOAD_DWELL_MS, this, [this] {
 				m_loadArmed = false;
-				if (!m_asyncTask && !visibleRegion().isEmpty())  // still not loaded, and still on-screen after the dwell
+				if (!m_job && !visibleRegion().isEmpty())  // still not loaded, and still on-screen after the dwell
 					scheduleRender();
 			});
 		}
@@ -324,12 +367,12 @@ void ThumbnailWidget::paintEvent(QPaintEvent*)
 	const int labelHeight = m_caption.isEmpty() ? 0 : THUMBNAIL_LABEL_HEIGHT;
 	const QRect imageArea(content.left(), content.top(), content.width(), content.height() - labelHeight);
 
-	// Lock the image while drawing so the loader thread can't swap it mid-paint. During the dwell before the
-	// first render there is no task yet (and m_image is null, touched only by this thread), so there is nothing
-	// to lock against - fall through unlocked and draw the "Loading..." placeholder.
+	// Lock the image while drawing so the decode stage can't swap it mid-paint. During the dwell before the first
+	// render there is no job yet (and m_image is null, touched only by this thread), so there is nothing to lock
+	// against - fall through unlocked and draw the "Loading..." placeholder.
 	std::unique_lock<std::mutex> lock;
-	if (m_asyncTask)
-		lock = std::unique_lock{ m_asyncTask->m_mutex };
+	if (m_job)
+		lock = std::unique_lock{ m_job->m_mutex };
 
 	if (!m_image.isNull())
 	{
@@ -402,15 +445,18 @@ bool ThumbnailWidget::openFile()
 
 void ThumbnailWidget::disarmAsyncTask()
 {
-	if (!m_asyncTask)  // never painted (e.g. an off-screen grid card cleared before it was ever shown): nothing was scheduled
+	if (!m_job)  // nothing scheduled yet (e.g. an off-screen grid card cleared before it was ever painted)
 		return;
 
 	{
-		std::lock_guard lock{ m_asyncTask->m_mutex };
-		(void)IoThreadPool::tryTake(m_asyncTask.get()); // We don't care about the result
-
-		m_asyncTask->disarm();
-	} // Remember to unlock m_asyncTask->m_mutex before deleting m_asyncTask
-
-	m_asyncTask.reset();
+		// Flip the flag under the lock: a stage running right now finishes its critical section first (so it
+		// can't write m_image after we return), then sees m_disarmed and drops its result; a not-yet-run stage
+		// skips the disk read / decode. Nulling the pointers makes any late stage a no-op.
+		std::lock_guard lock{ m_job->m_mutex };
+		m_job->m_disarmed = true;
+		m_job->m_parent = nullptr;
+		m_job->m_target = nullptr;
+	}
+	// An in-flight stage keeps the job alive through its own shared_ptr; it's freed when that stage ends.
+	m_job.reset();
 }
