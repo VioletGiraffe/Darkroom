@@ -86,7 +86,10 @@ Three ways to set the alignment:
   plausible-but-wrong one. Rotation is corrected along with scale and offset, but its capture range is
   small-angle only (a few degrees — horizon-correction grade; a larger real rotation fails honestly); a
   notable corrected angle is surfaced in the hint bar, being the one component with no manual-adjustment
-  gesture. The per-patch evidence is drawn on the panes as true-footprint squares (accent = used in the fit,
+  gesture. The bottom bar's **"Ignore rotation"** checkbox removes the rotation degree of freedom from the
+  fit itself (`AlignmentOptions::fitRotation`) — scale and offset are re-derived by the constrained least
+  squares rather than by zeroing a jointly-fitted angle — for pairs whose apparent rotation is spurious
+  (e.g. depth parallax reading as a slight tilt). The per-patch evidence is drawn on the panes as true-footprint squares (accent = used in the fit,
   dashed accent = used via a coarser-level match only, orange = matched well but disagrees with the fit:
   locally moved content, parallax, red = no match) until the next alignment; per-photo stats (resolution,
   alignment parameters, confidence/coarse scores, align-call runtime) live in each pane's corner caption.

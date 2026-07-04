@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <vector>
 
+class QCheckBox;
 class QLabel;
 class QSlider;
 class QStackedLayout;
@@ -26,7 +27,8 @@ class SegmentedToggle;
 //   wheel = synchronized zoom around the cursor; left-drag = synchronized pan; F / double-click = fit;
 //   Ctrl+wheel / Ctrl+drag = adjust the hovered photo's alignment (scale / offset) alone;
 //   A = auto-align: estimates every photo's scale+rotation+offset against the reference (magic-alignment
-//       library; rotation capture is small-angle - a few degrees); the patch evidence is drawn as
+//       library; rotation capture is small-angle - a few degrees; the bottom bar's "Ignore rotation" checkbox
+//       constrains the fit to scale+offset, for pairs whose apparent rotation is spurious); the patch evidence is drawn as
 //       true-footprint squares (accent = used, orange = outlier, red = no match) until the next alignment;
 //   Shift+A = two-point calibration: click the same two features in every photo - the photo that receives
 //       the first point becomes the reference; the two point pairs define each other photo's similarity
@@ -149,6 +151,7 @@ private:
 	QStackedLayout* m_viewStack = nullptr;     // page 0: the pane grid, page 1: m_fullPane
 	QSlider* m_slider = nullptr;               // full-view photo picker; interacting with it enters the full view
 	SegmentedToggle* m_diffToggle = nullptr;   // Normal / Difference, mirrors m_differenceMode
+	QCheckBox* m_ignoreRotationCheck = nullptr;  // auto-align constrains its fit to scale+offset (no rotation model)
 	QLabel* m_hintLabel = nullptr;
 
 	double m_viewZoom = 1.0;  // subject -> widget; 1.0 means the reference photo at 100% (1 image px = 1 widget px)

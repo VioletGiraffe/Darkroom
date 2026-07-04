@@ -5,6 +5,7 @@
 #include "Utils.h"
 
 #include <QApplication>
+#include <QCheckBox>
 #include <QContextMenuEvent>
 #include <QDebug>
 #include <QDragEnterEvent>
@@ -369,7 +370,8 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 	m_viewStack->addWidget(m_fullPane);
 	mainLayout->addLayout(m_viewStack, 1);
 
-	// Bottom toolbar: the full-view picker slider stretching across, render-mode toggle at the far right.
+	// Bottom toolbar: the full-view picker slider stretching across; the align-option checkbox and the
+	// render-mode toggle at the right.
 	QHBoxLayout* toolbar = new QHBoxLayout();
 
 	// Full-view picker: one detent per photo; pressing the handle or changing the value enters the full
@@ -382,6 +384,12 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 	connect(m_slider, &QSlider::sliderPressed, this, [this] { setFullViewIndex(m_slider->value()); });
 	connect(m_slider, &QSlider::valueChanged, this, [this](int value) { setFullViewIndex(value); });
 	toolbar->addWidget(m_slider, 1);
+
+	m_ignoreRotationCheck = new QCheckBox(tr("Ignore rotation"), this);
+	m_ignoreRotationCheck->setToolTip(tr("Auto-align fits scale and offset only, treating any apparent rotation as spurious\n"
+	                                     "(e.g. depth parallax between focus-stack slices can read as a slight tilt)"));
+	m_ignoreRotationCheck->setFocusPolicy(Qt::NoFocus);  // all keyboard input stays on the window
+	toolbar->addWidget(m_ignoreRotationCheck, 0);
 
 	m_diffToggle = new SegmentedToggle({ tr("Normal"), tr("Difference") }, this);
 	m_diffToggle->setToolTip(tr("Difference: render each photo as its per-pixel difference against the reference photo (D)"));
@@ -683,6 +691,7 @@ void PhotoCompareWindow::autoAlignPhotos()
 		Photo& photo = m_photos[i];
 		AlignmentOptions options;
 		options.areaOfInterest = m_alignAoi;  // empty = whole frame
+		options.fitRotation = !m_ignoreRotationCheck->isChecked();
 		// refTransform^-1 * photoTransform: the photo's mapping into the rebased subject space.
 		options.initialGuess = { photo.alignScale / refScale, photo.alignRotation - refRotation,
 		                         rotated(photo.alignOffset - refOffset, -refRotation) / refScale };
