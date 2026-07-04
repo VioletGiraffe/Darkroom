@@ -61,14 +61,15 @@ painting.
 N-way (2..4, gated in `MainWindow`'s context menu for all-photo selections; also openable empty from
 Tools → "Compare photos...") photo comparison in a square grid of equally sized panes, maximized by default.
 Photos can be added at any time by dropping image files onto the window — the pane grid is rebuilt on every
-count change, and each added photo is default-aligned against the current reference. Its core mechanism is
-**two separate transform layers**:
+count change, and each added photo is default-aligned against the current reference. Each pane has a context
+menu: open the photo's containing folder in Explorer, or make the photo the reference (the reference pane is
+outlined in yellow). Its core mechanism is **two separate transform layers**:
 
 - **One shared view** (zoom + pan, in widget coordinates — equal pane sizes are what make the same widget
   position show the same subject point in every pane): wheel zooms all panes around the cursor, drag pans all.
 - **A per-photo alignment transform** (a similarity: uniform scale + rotation + offset) mapping each image
   into the shared "subject" space, defined as the **reference photo's** pixel coordinates (photo 0 by
-  default; two-point calibration re-elects it). This is the zoom/crop/rotation-difference compensation. The
+  default; re-elected by two-point calibration or the pane context menu). This is the zoom/crop/rotation-difference compensation. The
   default normalizes each photo's height to the reference's and centers — so pure resolution differences
   align with no user action. The view itself stays rotation-free (the reference, by the fold convention
   below, always has rotation 0).
@@ -86,8 +87,8 @@ Three ways to set the alignment:
   notable corrected angle is surfaced in the hint bar, being the one component with no manual-adjustment
   gesture. The per-patch evidence is drawn on the panes as true-footprint squares (accent = used in the fit,
   dashed accent = used via a coarser-level match only, orange = matched well but disagrees with the fit:
-  locally moved content, parallax, red = no match) until the next alignment; per-photo stats (alignment
-  parameters, confidence/coarse scores, align-call runtime) live in each pane's corner caption.
+  locally moved content, parallax, red = no match) until the next alignment; per-photo stats (resolution,
+  alignment parameters, confidence/coarse scores, align-call runtime) live in each pane's corner caption.
 - **Two-point calibration (`Shift+A`)** — click the same two features in every photo; the photo receiving the
   session's first point becomes the reference; the two point pairs determine the full similarity exactly
   (scale from the distance ratio, rotation from the segment angles, offset from the midpoints) — so manual

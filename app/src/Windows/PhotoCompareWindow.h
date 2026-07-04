@@ -38,6 +38,8 @@ class SegmentedToggle;
 //   bottom slider = full view: one pane covering the whole grid area, showing the photo at the slider's
 //       position (drag to scrub between photos; Left/Right step it; held digit keys still override);
 //   drop image files anywhere on the window = add them to the comparison;
+//   right-click a pane = context menu: open the photo's containing folder, or make it the reference
+//       (the reference pane is outlined in yellow);
 //   Esc = leave full view / cancel calibration / close.
 class PhotoCompareWindow final : public QWidget
 {
@@ -73,6 +75,7 @@ private:
 	struct Photo
 	{
 		QImage image;                 // full-res, EXIF-oriented
+		QString filePath;             // full source path (the caption only shows the file name)
 		std::vector<QImage> mipmaps;  // lazily built halving chain: [k] is image scaled by 2^-(k+1)
 		double alignScale = 1.0;      // image -> subject space (subject space = the reference photo's pixel coords)
 		double alignRotation = 0.0;   // radians; the R factor applied between the scale and the offset
@@ -149,7 +152,7 @@ private:
 	// Edge of an alignment patch in subject units. The footprint is the same in subject space for both sides
 	// of a pair (ref px directly; target px scaled by its alignment), so one number serves every mark.
 	double m_alignMarkSize = 0.0;
-	int m_refIndex = 0;        // the pane others calibrate against; re-chosen by each calibration session's first point
+	int m_refIndex = 0;        // the pane others align against; re-chosen by each calibration session's first point or the pane context menu
 	bool m_calibrating = false;
 	bool m_differenceMode = false;
 	bool m_viewTouched = false;  // until the user navigates, pane resizes keep re-fitting the view

@@ -5,6 +5,7 @@
 #include "Utils.h"
 
 #include <QApplication>
+#include <QContextMenuEvent>
 #include <QDebug>
 #include <QDragEnterEvent>
 #include <QDropEvent>
@@ -16,6 +17,7 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineF>
+#include <QMenu>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
@@ -61,6 +63,7 @@ protected:
 	void mouseMoveEvent(QMouseEvent* event) override;
 	void mouseReleaseEvent(QMouseEvent* event) override;
 	void mouseDoubleClickEvent(QMouseEvent* event) override;
+	void contextMenuEvent(QContextMenuEvent* event) override;
 	void resizeEvent(QResizeEvent* event) override { QWidget::resizeEvent(event); m_owner.onPaneResized(); }
 
 private:
@@ -149,14 +152,19 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 		painter.drawRect(QRectF(center.x() - markHalf, center.y() - markHalf, 2.0 * markHalf, 2.0 * markHalf));
 	}
 
-	// Corner caption, stacked lines. Headline "2 · name.jpg · 63%": the leading digit doubles as the pane's
-	// flicker key, the percentage is this photo's on-screen scale (100% = 1 image px per widget px), making
-	// any compensation difference between panes visible at a glance. The alignment line spells out this
-	// photo's raw similarity into subject space (scale, rotation in degrees, offset in subject px). The score
+	// Corner caption, stacked lines. Headline "2 · name.jpg · 6000x4000 (24 MP) · 63%": the leading digit
+	// doubles as the pane's flicker key, then the photo's pixel resolution, then its on-screen scale (100% =
+	// 1 image px per widget px), making any compensation difference between panes visible at a glance. The
+	// alignment line spells out this photo's raw similarity into subject space (scale, rotation in degrees,
+	// offset in subject px). The score
 	// line appears only once auto-align has evaluated this photo: the run's two quality measures
 	// (conf = weighted patch ZNCC fitness, coarse = coarse whole-frame score) and the align call's runtime.
 	QStringList captionLines;
-	captionLines << QString("%1 · %2 · %3%").arg(renderIndex + 1).arg(photo.caption).arg(qRound(effectiveScale * 100.0));
+	captionLines << QString("%1 · %2 · %3x%4 (%5 MP) · %6%")
+		.arg(renderIndex + 1).arg(photo.caption)
+		.arg(photo.image.width()).arg(photo.image.height())
+		.arg(qRound(photo.image.width() * photo.image.height() / 1e6))
+		.arg(qRound(effectiveScale * 100.0));
 	captionLines << QString("scale %1 · rot %2° · offset (%3, %4)")
 		.arg(photo.alignScale, 0, 'f', 3)
 		.arg(photo.alignRotation * (180.0 / Pi), 0, 'f', 2)
@@ -174,6 +182,15 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 	painter.drawRoundedRect(textRect, 4, 4);
 	painter.setPen(QColor(0xe8, 0xe8, 0xe8));
 	painter.drawText(textRect, Qt::AlignCenter, captionLines.join('\n'));
+
+	// The reference pane - the photo difference mode and both alignment paths work against - is outlined
+	// in yellow (pointless with a single photo: it is trivially the reference).
+	if (photoIndex() == m_owner.m_refIndex && m_owner.m_photos.size() > 1)
+	{
+		painter.setPen(QPen(QColor(0xf0, 0xe0, 0x40), 2));
+		painter.setBrush(Qt::NoBrush);
+		painter.drawRect(rect().adjusted(1, 1, -2, -2));
+	}
 
 	// A flickered pane shows a photo other than its own - flag it with an accent frame.
 	if (renderIndex != photoIndex())
@@ -248,6 +265,23 @@ void PhotoComparePane::mouseDoubleClickEvent(QMouseEvent* event)
 		mousePressEvent(event);
 	else if (event->button() == Qt::LeftButton)
 		m_owner.fitView();
+}
+
+void PhotoComparePane::contextMenuEvent(QContextMenuEvent* event)
+{
+	if (m_owner.m_calibrating)  // right-click means "undo a point" while calibrating
+		return;
+	const int index = photoIndex();
+	QMenu menu;
+	menu.addAction(tr("Open containing folder"), [this, index] {
+		openInExplorer(m_owner.m_photos[index].filePath);
+	});
+	QAction* makeReference = menu.addAction(tr("Make this the reference image"), [this, index] {
+		m_owner.m_refIndex = index;
+		m_owner.updateAllPanes();  // difference mode and the next align/calibration now work against this photo
+	});
+	makeReference->setEnabled(index != m_owner.m_refIndex);
+	menu.exec(event->globalPos());
 }
 
 // ---------------------------------------------------------------------------------------------------------
@@ -325,6 +359,7 @@ void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
 		}
 		Photo photo;
 		photo.image = std::move(image);
+		photo.filePath = path;
 		photo.caption = QFileInfo(path).fileName();
 		// Default alignment: normalize the photo's height to the reference's subject-space height and center
 		// the two on each other - so identical shots that only differ in export resolution line up with no
