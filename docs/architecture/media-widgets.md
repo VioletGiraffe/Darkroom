@@ -90,9 +90,9 @@ The shared image-rendering widget under cards/frames. Owns drag-start directly.
 ### Sizing model
 
 Both constructors take a target image-area size (single-frame: `int` → square; composite: `QSize`) as a
-**max bound, not exact**. `ImageLoaderTask` (one unified loader) best-fits each source frame
-(`KeepAspectRatio`) and composes a canvas sized to the *actual tight content* (Σ fitted widths + gaps ×
-tallest fitted height) — so the image can be smaller than the bound. Gaps left transparent.
+**max bound, not exact**. The loader (see *Loading* below) best-fits each source frame (`KeepAspectRatio`) and
+composes a canvas sized to the *actual tight content* (Σ fitted widths + gaps × tallest fitted height) — so the
+image can be smaller than the bound. Gaps left transparent.
 
 `paintEvent` blits the loaded image **1:1 centered** when it fits the content area, falling back to a fast
 rescale only transiently (mid-resize). Deliberate: a calc bug shows as clipping, not a silent rescale.
@@ -111,13 +111,21 @@ grid card — drops the border, hover and padding, leaving just the recessed mat
 The grid also constructs it caption-less (the name lives in the footer), so its caption strip collapses to
 zero. Framed, captioned thumbnails (single-frame viewers, Compare) are unchanged.
 
-### Lazy load & serialized I/O
+### Loading
 
-The render is **not** started at construction. The first `paintEvent` arms a short dwell timer and starts the
-load only if the card is still visible when it fires — so a grid (which paints only its visible cards) never
-decodes off-screen ones, and a fast scroll loads nothing it doesn't come to rest on. All thumbnail loads post
-to one process-wide worker thread (`Core/IoThreadPool`, a hidden single-thread `QThreadPool`), serializing disk
-reads so a spinning disk isn't seek-thrashed when a whole screenful loads at once.
+The render is **not** started at construction. The first `paintEvent` arms a short dwell timer and renders only
+if the card is still visible when it fires — so a grid (which paints only its visible cards) never loads
+off-screen ones, and a fast scroll loads nothing it doesn't come to rest on.
+
+A load runs in two stages: the **file read** on one process-wide I/O thread (`Core/IoThreadPool`, a hidden
+single-thread pool) so a spinning disk isn't seek-thrashed by parallel reads, then the **decode** on the shared
+CPU pool so it fans across cores without blocking the next read. The decode reads straight to the target size
+(`QImageReader::setScaledSize` — a reduced-scale libjpeg decode for JPEG), far cheaper than a full decode plus
+downscale and free of the aliasing that a single large downscale caused; it also applies EXIF orientation.
+
+Cards are built parentless and reparented later, so the device-pixel-ratio isn't reliable until the widget is on
+its real screen — another reason the render lives in `paintEvent`, which captures the correct DPR and re-renders
+if an earlier one was stale.
 
 ### Drag
 
@@ -127,18 +135,6 @@ Drag is intrinsic to `ThumbnailWidget` (overrides `mousePressEvent`/`mouseMoveEv
 **composite constructor** (used by `MediaItemWidget`'s grid cards) sets no drag payload at all and has no
 way to acquire one — composite thumbnails are never drag sources. So `MediaItemWidget` and
 `FrameViewerWindow` contain zero drag-mechanics code of their own either way; it all lives here.
-
-### Two rendering bug fixes worth not regressing
-
-- **Stale DPR**: cards are built with no parent and reparented later, so an early render can capture a stale
-  device-pixel-ratio on scaled displays → low-res, blurry canvas. Fixed by re-checking the render DPR against
-  the current one in `paintEvent` and re-rendering on mismatch (the first point DPR is guaranteed correct;
-  self-corrects within a frame). Deferring the first render to paint-time (above) already makes this correct on
-  the first try; the re-check remains as the guard.
-- **Minification aliasing**: drawing full-res frames straight into small slots aliases badly at large
-  reductions (bilinear is a poor minification filter). Fixed by pre-resampling each frame to its target size
-  (area-correct) before a 1:1 blit. Living in the shared loader, this fixes grid, FrameViewer, and Compare
-  thumbnails alike.
 
 ## `DragGestureHelper` (`src/UiComponents/DragGestureHelper.h/.cpp`)
 
