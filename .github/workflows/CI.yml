@@ -27,6 +27,18 @@ jobs:
         submodules: recursive
         token: ${{ secrets.magic_pat }}
 
+    - name: LOC count - app
+      if: "startsWith(matrix.os, 'windows')"
+      run: |
+        choco install cloc -y
+        cloc --include-lang="C,C++" --strip-str-comments --exclude-dir=tests,bin,build,.git,3rdparty ./app/
+
+    - name: LOC count - libs
+      if: "startsWith(matrix.os, 'windows')"
+      run: |
+        choco install cloc -y
+        cloc --include-lang="C,C++" --strip-str-comments --exclude-dir=tests,bin,build,.git,3rdparty,app .
+
     - name: Install Qt
       uses: jurplel/install-qt-action@v4
       with:
