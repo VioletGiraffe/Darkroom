@@ -138,6 +138,7 @@ jobs:
         name: Darkroom metrics
         tool: customSmallerIsBetter
         output-file-path: metrics.json
+        benchmark-data-dir-path: dev/metrics  # where data.js + index.html live on gh-pages (default: dev/bench)
         github-token: ${{ secrets.GITHUB_TOKEN }}
         auto-push: true
         # Don't treat a change as a regression
