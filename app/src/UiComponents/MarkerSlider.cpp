@@ -1,4 +1,5 @@
 #include "UiComponents/MarkerSlider.h"
+#include "Theme/Theme.h"
 
 #include <QPainter>
 #include <QStyleOptionSlider>
@@ -39,7 +40,7 @@ void MarkerSlider::paintEvent(QPaintEvent* event)
 	const int available = groove.width() - handle.width();
 
 	QPainter painter{ this };
-	painter.setPen(QPen{ QColor{ 0xE8, 0x5D, 0x04 }, 2 }); // orange: legible against both light and dark grooves
+	painter.setPen(QPen{ QColor{ QString::fromLatin1(Theme::StarActive) }, 2 }); // gold: legible on both themes, and a strong hue contrast with the accent-filled groove
 
 	for (const int value : { _markerA, _markerB })
 	{
