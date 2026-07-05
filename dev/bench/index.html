@@ -13,7 +13,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Darkroom тАФ build metrics</title>
+  <title>Darkroom — build metrics</title>
 
   <script>
     // Resolve the theme before first paint to avoid a flash of the wrong background.
@@ -80,7 +80,7 @@
   <main id="charts"></main>
 
   <footer>
-    Rendered from <a href="data.js">data.js</a> ┬╖
+    Rendered from <a href="data.js">data.js</a> ·
     collected by <a href="https://github.com/benchmark-action/github-action-benchmark">github-action-benchmark</a>.
   </footer>
 
@@ -198,11 +198,11 @@
                     const i = items[0].dataIndex, c = commits[i];
                     if (!c) return '';
                     const d = new Date(suite[i].date).toLocaleString();
-                    return c.id.slice(0, 7) + (c.author ? ' ┬╖ ' + c.author.name : '') + ' ┬╖ ' + d;
+                    return c.id.slice(0, 7) + (c.author ? ' · ' + c.author.name : '') + ' · ' + d;
                   },
                   label: item => {
                     const v = item.parsed.y;
-                    return item.dataset.label + ': ' + (v == null ? 'тАФ' : v.toLocaleString()) + ' ' + spec.unit;
+                    return item.dataset.label + ': ' + (v == null ? '—' : v.toLocaleString()) + ' ' + spec.unit;
                   },
                   afterBody: () => 'Click a point to open the commit',
                 },
@@ -225,12 +225,12 @@
     const repo = data.repoUrl || '';
     const updated = data.lastUpdate ? new Date(data.lastUpdate).toLocaleString() : 'unknown';
     document.getElementById('subtitle').innerHTML =
-      suiteName + ' ┬╖ last updated ' + updated +
-      (repo ? ' ┬╖ <a href="' + repo + '">' + repo.replace('https://github.com/', '') + '</a>' : '');
+      suiteName + ' · last updated ' + updated +
+      (repo ? ' · <a href="' + repo + '">' + repo.replace('https://github.com/', '') + '</a>' : '');
 
     // Theme toggle (persists to localStorage).
     const btn = document.getElementById('themeToggle');
-    const syncBtn = () => { btn.textContent = document.documentElement.dataset.theme === 'dark' ? 'тША Light' : 'тШ╛ Dark'; };
+    const syncBtn = () => { btn.textContent = document.documentElement.dataset.theme === 'dark' ? '☀ Light' : '☾ Dark'; };
     btn.addEventListener('click', () => {
       const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
       document.documentElement.dataset.theme = next;
