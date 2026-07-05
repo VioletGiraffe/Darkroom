@@ -108,7 +108,7 @@
     // One benchmark suite in this repo; use the first key generically.
     const suiteName = Object.keys(data.entries)[0];
     const suite = data.entries[suiteName];               // array of commit datapoints, oldest -> newest
-    const labels = suite.map(e => e.commit.id.slice(0, 7));
+    const labels = suite.map(e => new Date(e.date).toLocaleDateString());
     const commits = suite.map(e => e.commit);
 
     // Series names in first-seen order, plus their unit.
