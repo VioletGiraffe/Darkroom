@@ -219,11 +219,11 @@ void MainWindow::setupUI()
 	m_mediaGrid->setFlow(QListView::LeftToRight);
 	m_mediaGrid->setWrapping(true);
 	m_mediaGrid->setResizeMode(QListView::Adjust);
-	// Every card in a refresh is built to the same size (shared card-image height x preview-frame count, plus a
-	// fixed footer), so the view can skip per-item size accounting during layout - a large win when populating
-	// hundreds of items, since otherwise each addItem re-measures the wrapping grid. Precondition: keep cards
-	// uniformly sized; revisit if variable-size cards are ever introduced.
-	m_mediaGrid->setUniformItemSizes(true);
+	// Cards come in two fixed sizes (a video's frame strip vs. a square photo), so setUniformItemSizes(true) -
+	// which forces one size on every item - can't be used. Instead each GridItem carries an explicit sizeHint
+	// (computed once per media type in refreshMediaGrid), so laying out an item stays a cached-value lookup
+	// rather than a widget layout activation; populating hundreds of items is essentially as cheap as before.
+	m_mediaGrid->setUniformItemSizes(false);
 	m_mediaGrid->setMovement(QListView::Static);
 	m_mediaGrid->setSelectionMode(QAbstractItemView::ExtendedSelection);
 	// Dragging a card exports its source file(s): MediaGrid::startDrag turns the view's drag into a file:// URL
@@ -537,6 +537,12 @@ void MainWindow::refreshMediaGrid()
 	const int previewFrameCount = m_previewFrameCountCombo->currentData().toInt();
 	const int imageHeight = cardImageHeight();
 
+	// Card thumbnail canvases: a photo is square; a video is a horizontal strip sized to tile with
+	// previewFrameCount photo cards (so a video's width + gap spans that many photo widths + gaps), letting a
+	// mixed grid line up on one column grid. Both are fixed per refresh, so each is computed once here.
+	const QSize photoCanvas{ imageHeight, imageHeight };
+	const QSize videoCanvas{ MediaItemWidget::videoCanvasWidthForTiling(imageHeight, previewFrameCount, m_mediaGrid->spacing()), imageHeight };
+
 	// The catalog is the authoritative in-memory model, kept current by its mutations, so the grid reads it
 	// directly - no per-refresh re-derivation. Look up the Best set once: the per-card star state and the
 	// favorites-first sort below share it.
@@ -553,10 +559,11 @@ void MainWindow::refreshMediaGrid()
 	// far -> O(N^2). This list carries each item and its not-yet-attached card between the two passes.
 	std::vector<std::pair<GridItem*, MediaItemWidget*>> pendingAttach;
 
-	// Every card in a refresh is the same size (fixed size-hint mode; shared image height x frame count, plus a
-	// constant footer), so the hint is computed once from the first built card and reused - the same uniformity
-	// setUniformItemSizes(true) relies on. Querying all 850 would needlessly activate each card's layout.
-	QSize uniformCardHint;
+	// Cards come in two fixed sizes, one per media type (a video's frame strip, a photo's square), so the size
+	// hint for each type is computed once from that type's first built card and reused - a card's size depends
+	// only on its type. Querying every card would needlessly activate each one's layout. The two widths are
+	// chosen to tile on one column grid (see photoCanvas/videoCanvas above), so a mixed grid still lines up.
+	QSize videoCardHint, photoCardHint;
 
 	// Cards are added in catalog order with their sort info attached, then sortItems() (using
 	// GridItem::operator<) puts them in their final order; captions are numbered after that.
@@ -583,7 +590,7 @@ void MainWindow::refreshMediaGrid()
 		}
 
 		auto* card = new MediaItemWidget(
-			QSize{ imageHeight * previewFrameCount, imageHeight },
+			isPhoto ? photoCanvas : videoCanvas,
 			previewPaths, QString(),
 			id,
 			bestSet.contains(id),
@@ -622,9 +629,10 @@ void MainWindow::refreshMediaGrid()
 		auto* item = new GridItem();
 		item->mediaId = id;
 		item->info = itemInfoFor(catalog, id, bestSet.contains(id), sortByDate);
-		if (!uniformCardHint.isValid())
-			uniformCardHint = card->sizeHint();
-		item->setSizeHint(uniformCardHint);
+		QSize& typeHint = isPhoto ? photoCardHint : videoCardHint;   // one cached hint per media type (see above)
+		if (!typeHint.isValid())
+			typeHint = card->sizeHint();
+		item->setSizeHint(typeHint);
 		m_mediaGrid->addItem(item);
 
 		pendingAttach.emplace_back(item, card);   // widget attached in the second pass, after sortItems()

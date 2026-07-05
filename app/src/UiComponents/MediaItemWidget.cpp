@@ -168,11 +168,10 @@ MediaItemWidget::MediaItemWidget(
 	// the central sheet (Style.cpp), not per-instance (which polished slowly at grid scale). The thumbnail inside
 	// is borderless (just the matte well); the footer below carries the star, label dots and name. The normal
 	// background stays transparent so the grid's item-selection highlight shows through behind it.
-	static constexpr int CARD_BORDER = 1;
-	static constexpr int CARD_PADDING = 6;
 	setAttribute(Qt::WA_StyledBackground);
 	setAttribute(Qt::WA_Hover);   // card keeps its hover state even while the cursor is over a child widget
-	setContentsMargins(CARD_BORDER + CARD_PADDING, CARD_BORDER + CARD_PADDING, CARD_BORDER + CARD_PADDING, CARD_BORDER + CARD_PADDING);
+	// Reserve the frame's border + padding on each side; the #mediaItemCard border (Style.cpp) paints within it.
+	setContentsMargins(CardChromePerSide, CardChromePerSide, CardChromePerSide, CardChromePerSide);
 
 	auto* layout = new QVBoxLayout(this);
 	layout->setContentsMargins(0, 0, 0, 0);

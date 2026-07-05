@@ -31,6 +31,23 @@ public:
 
 	[[nodiscard]] QSize sizeHint() const override;
 
+	// Card chrome (frame border + inner padding) reserved around the thumbnail canvas on every side. Public so
+	// the grid can size cards to tile together (see videoCanvasWidthForTiling).
+	static constexpr int CardBorder = 1;
+	static constexpr int CardPadding = 6;
+	static constexpr int CardChromePerSide = CardBorder + CardPadding;
+
+	// A video card shows `frameCount` preview frames in a horizontal strip; a photo card shows one square image
+	// (side = photoSide). Returns the video card's thumbnail-canvas width chosen so the video card spans exactly
+	// `frameCount` photo-card columns plus the gaps between them - i.e. (video width + gap) == frameCount x
+	// (photo width + gap). This makes mixed video/photo cards align on a single column grid in the media grid's
+	// flow layout. `gridGap` is the grid's item spacing (QListView::spacing()).
+	[[nodiscard]] inline static constexpr int videoCanvasWidthForTiling(int photoSide, int frameCount, int gridGap)
+	{
+		// A card's width is its canvas + 2*CardChromePerSide; solving the tiling equation above for the canvas.
+		return frameCount * photoSide + (frameCount - 1) * (gridGap + 2 * CardChromePerSide);
+	}
+
 	// The card's stable identity (source video name + size). Carried so label ops and the label-drop target
 	// (see setOnLabelDropped) address the video directly. Invalid if the source video is missing.
 	[[nodiscard]] const MediaId& mediaId() const { return m_mediaId; }
