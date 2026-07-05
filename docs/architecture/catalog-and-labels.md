@@ -155,9 +155,13 @@ Best/extra-label flush.
 
 ## Registry mutations (the label objects themselves)
 
-- **`createLabel(displayName)`** — creates a folder-backed label with this name if none exists yet. Exists
+- **`createLabel(displayName, color = {})`** — creates a folder-backed label with this name if none exists yet
+  (with the given color, or a random one), and returns the created-or-existing label's id. Exists
   because empty collections have no item to derive a folder-label from (see "Persistence" above);
-  `createCollection` calls it explicitly after creating the on-disk folder. No-op if the name is taken.
+  `createCollection` calls it explicitly after creating the on-disk folder and passes the id through to its
+  own caller (Quick Import's provisional-label materialization keys on it — see
+  [import.md](import.md#runimport-the-import-button)). Registry-idempotent if the name is taken: the existing
+  label keeps its color, and its id is returned all the same.
 - **`renameLabel(labelId, newName)`** — uniqueness-checked (case-insensitive); renames the backing folders
   if they exist (see reconciliation point 2 above), then updates `displayName` keeping the id. Refuses: Best,
   empty name, duplicate name, the reserved name `"Photos"` (see below), or a colliding/failed folder rename.
@@ -228,7 +232,7 @@ existed, looking for real gaps rather than just describing the design optimistic
 `ensureBestLabelExists`). **Reachable through completely ordinary UI usage, not external disk tampering**:
 typing "Best" into the name prompt wasn't blocked. It would create a real folder named `Best`, and the next
 `rebuildIndex` → `ensureFolderLabelExists("Best")` would mint a **second, distinct label** that *also*
-displays as "Best" — `labelIdForFolderName`'s lookup excludes the virtual Best from its search (only
+displays as "Best" — `ordinaryLabelIdByName`'s lookup excludes the virtual Best from its search (only
 ordinary labels can name a folder), so it never recognizes the new folder as "already covered" by the real
 Best. Result: two rows both reading "Best" in the sidebar (one gold/virtual, one grey/ordinary). **Fixed**
 by correcting the constant's value to `"Best"`.

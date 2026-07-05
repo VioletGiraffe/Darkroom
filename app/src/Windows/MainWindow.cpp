@@ -1382,29 +1382,29 @@ void MainWindow::reExportAllVideos()
 	refreshMediaGrid();
 }
 
-bool MainWindow::createCollection(const QString& name, bool refreshList)
+QString MainWindow::createCollection(const QString& name, const QString& color, bool refreshList)
 {
 	// "Photos" is reserved for the owned-photo storage dir (<root>/Photos/<label>) - a collection folder by
 	// that name would intermingle with it. Catalog::renameLabel refuses the same name.
 	if (name.compare(BEST_COLLECTION_NAME, Qt::CaseInsensitive) == 0 || name.compare(PHOTOS_DIR_NAME, Qt::CaseInsensitive) == 0)
 	{
 		QMessageBox::warning(this, tr("Error"), tr("\"%1\" is a reserved name.").arg(name));
-		return false;
+		return {};
 	}
 
 	if (!QDir{}.mkpath(rootFolder() + "/" + name))
 	{
 		QMessageBox::warning(this, tr("Error"), tr("Failed to create collection:\n%1").arg(rootFolder() + "/" + name));
-		return false;
+		return {};
 	}
 
 	// Register the folder label now: an empty collection has no item to derive it from, so the catalog
 	// won't surface it otherwise.
-	Catalog::instance().createLabel(name);
+	const QString labelId = Catalog::instance().createLabel(name, color);
 
 	if (refreshList)
 		refreshLibraryView();
-	return true;
+	return labelId;
 }
 
 void MainWindow::createLabelInteractive()
@@ -1515,9 +1515,10 @@ void MainWindow::quickImportToCollections(const QStringList& initialStaging)
 			}
 			return {};
 		},
-		.createCollectionRequested = [this](const QString& name) -> bool {
-			return createCollection(name, false);
+		.createCollectionRequested = [this](const QString& name, const QString& color) -> QString {
+			return createCollection(name, color, /*refreshList*/ false);
 		},
+		.generateLabelColor = [] { return Catalog::randomLabelColor(); },
 		.isMediaItemTrackedInCollection = [](const MediaId& id, const QString& collectionName) {
 			// Compare against the exact folder this import derives (Import::importVideo's outputFolder): on a
 			// name+size collision the id is tracked under some *other* folder - the staged copy was refused,

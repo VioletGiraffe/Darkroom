@@ -24,17 +24,6 @@ namespace
 	constexpr QStringView kTypeField            = u"type";             // kPhotoTypeValue for photos; absent = video, so pre-photos records need no migration
 	constexpr QStringView kReferencedField      = u"referenced";       // bool; photos only
 	constexpr QStringView kPhotoTypeValue       = u"photo";
-
-	// A pleasant, randomized label color: full hue range but moderate saturation and a bright-but-not-blinding
-	// value, so the swatch reads as a distinct tint rather than a harsh primary or a near-black smudge.
-	QString randomLabelColor()
-	{
-		auto* rng = QRandomGenerator::global();
-		const int hue = rng->bounded(360);
-		const int saturation = 110 + rng->bounded(80);  // 110..189 of 255 - clearly tinted, never fully saturated
-		const int value = 180 + rng->bounded(50);        // 180..229 of 255 - bright enough to never look dark
-		return QColor::fromHsv(hue, saturation, value).name();
-	}
 }
 
 const QString Catalog::BestLabelId = "Best";
@@ -133,11 +122,22 @@ bool Catalog::ensureBestLabelExists()
 	return true;
 }
 
-bool Catalog::ensureFolderLabelExists(const QString& displayName)
+// A pleasant, randomized label color: full hue range but moderate saturation and a bright-but-not-blinding
+// value, so the swatch reads as a distinct tint rather than a harsh primary or a near-black smudge.
+QString Catalog::randomLabelColor()
 {
-	if (!labelIdForFolderName(displayName).isEmpty())
+	auto* rng = QRandomGenerator::global();
+	const int hue = rng->bounded(360);
+	const int saturation = 110 + rng->bounded(80);  // 110..189 of 255 - clearly tinted, never fully saturated
+	const int value = 180 + rng->bounded(50);        // 180..229 of 255 - bright enough to never look dark
+	return QColor::fromHsv(hue, saturation, value).name();
+}
+
+bool Catalog::ensureFolderLabelExists(const QString& displayName, const QString& color)
+{
+	if (!ordinaryLabelIdByName(displayName).isEmpty())
 		return false;  // a folder-backed label with this name already exists
-	_labels.push_back(Label{ generateLabelId(), displayName, randomLabelColor() });
+	_labels.push_back(Label{ generateLabelId(), displayName, color.isEmpty() ? randomLabelColor() : color });
 	return true;
 }
 
@@ -157,14 +157,14 @@ Catalog::Label* Catalog::mutableLabelById(const QString& id)
 	return nullptr;
 }
 
-QString Catalog::labelIdForFolderName(const QString& folderName) const
+QString Catalog::ordinaryLabelIdByName(const QString& displayName) const
 {
-	// Only ordinary (non-virtual) labels can name a storage folder; the virtual Best never does.
-	// Case-insensitive: the (Windows) filesystem is, so a collection folder differing from the label's
-	// display name only in case is the same folder - matching exactly would mint a duplicate, case-variant
-	// label (which renameLabel's own case-insensitive uniqueness check then refuses to ever merge back).
+	// Case-insensitive: an ordinary label names a storage folder, and the (Windows) filesystem is
+	// case-insensitive - so a folder differing from the label's display name only in case is the same folder.
+	// Matching exactly would mint a duplicate, case-variant label (which renameLabel's own case-insensitive
+	// uniqueness check then refuses to ever merge back).
 	for (const Label& l : _labels)
-		if (!l.isVirtual() && l.displayName.compare(folderName, Qt::CaseInsensitive) == 0)
+		if (!l.isVirtual() && l.displayName.compare(displayName, Qt::CaseInsensitive) == 0)
 			return l.id;
 	return {};
 }
@@ -219,7 +219,7 @@ QString Catalog::storageLabelNameOf(const Entry& e)
 QString Catalog::storageLabelIdOf(const Entry& e) const
 {
 	const QString name = storageLabelNameOf(e);
-	return name.isEmpty() ? QString{} : labelIdForFolderName(name);
+	return name.isEmpty() ? QString{} : ordinaryLabelIdByName(name);
 }
 
 QString Catalog::relativeFolder(const QString& folderAbs)
@@ -696,7 +696,7 @@ bool Catalog::renameLabel(const QString& labelId, const QString& newDisplayName)
 
 	// The folders moved, so every item stored under oldName now lives under newName: rewrite the stored fields
 	// before re-deriving the model (otherwise rebuildIndex would re-seed a stale oldName folder label).
-	// Case-insensitive, like labelIdForFolderName: a stored folder whose case drifted from the label's display
+	// Case-insensitive, like ordinaryLabelIdByName: a stored folder whose case drifted from the label's display
 	// name still just moved on disk, and skipping it here would leave its stored path pointing at the old name.
 	MetadataStore::Writer writer = MetadataStore::instance().beginBatch();  // one store write for the whole rewrite loop instead of one per item
 	for (auto it = _mediaItems.cbegin(); it != _mediaItems.cend(); ++it)
@@ -730,10 +730,11 @@ void Catalog::setColor(const QString& labelId, const QString& color)
 	saveRegistry();
 }
 
-void Catalog::createLabel(const QString& displayName)
+QString Catalog::createLabel(const QString& displayName, const QString& color)
 {
-	if (ensureFolderLabelExists(displayName))
+	if (ensureFolderLabelExists(displayName, color))
 		saveRegistry();
+	return ordinaryLabelIdByName(displayName);  // created or pre-existing, same answer
 }
 
 Catalog::DeleteImpact Catalog::deleteLabelImpact(const QString& labelId) const

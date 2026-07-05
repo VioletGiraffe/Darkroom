@@ -25,7 +25,13 @@ class QWidget;
 // Mirrors the main window's own label model: a small label-list panel (like LabelSidebar, minus
 // filtering) sits next to a big grid of staged item cards (MediaItemWidget, same as the main grid).
 // Dragging a label from the list onto a staged card tags it, exactly like dragging a label onto an item
-// card in the main window; the star button toggles Best the same way too. Nothing is written to the
+// card in the main window; the star button toggles Best the same way too.
+//
+// The label list holds the Catalog's real labels plus this session's *provisional* labels: dropping a folder
+// auto-creates one per folder (named for the folder's relative path, e.g. "Root-cars-2026") and pre-assigns
+// its files, and "+ Add label" makes one too. Provisional labels live only in this dialog - right-click to
+// rename/recolor/delete them - and are created in the Catalog for real only when "Import" materializes the ones
+// actually used (see runImport); a real label can't be edited from here. Nothing is written to the
 // Catalog until "Import" runs: every staged item that's been labeled gets imported and removed from
 // staging on success, or stays staged (with its labels intact) on failure or a deferred (Cancel) relocation
 // collision; a collision resolved as Skip / "Skip and Delete" also clears the entry - the destination copy
@@ -42,6 +48,7 @@ public:
 		QString id;
 		QString displayName;
 		QString color;  // hex string e.g. "#378ADD"; empty = unset - mirrors Catalog::Label::color
+		bool provisional = false;  // true = minted in this dialog (id "new:<n>"), not yet in the Catalog; created on Import
 	};
 
 	// One staged item's extra-label picks (every pending label beyond the destination-deciding first one).
@@ -76,8 +83,15 @@ public:
 		// name - catches renamed duplicates), or empty if none. Checked when staging a photo, so a duplicate
 		// is flagged before it can be labeled and imported.
 		std::function<QString(const QString& photoPath)> findAlreadyImportedDuplicatePhoto;
-		// Creates a new collection with the given name; returns true on success
-		std::function<bool(const QString& name)> createCollectionRequested;
+		// Materializes one provisional label at Import time (called per used provisional from runImport): ensures a
+		// label with this name exists in the catalog and returns its id - which is what the dialog then rewrites
+		// the staged items' pending picks to, replacing the provisional stand-in id. The color applies only when
+		// the label is genuinely new; an existing same-name label keeps its own. Empty return = creation refused
+		// (reserved/invalid name), and the affected picks are dropped rather than remapped.
+		std::function<QString(const QString& name, const QString& color)> createCollectionRequested;
+		// A fresh random label color ("#rrggbb"), matching what the Catalog assigns a new label - gives a
+		// provisional (folder-derived or manually added) label a swatch before Import creates it for real.
+		std::function<QString()> generateLabelColor;
 		// True iff the item is now tracked by the Catalog at the frame folder this import derives for it
 		// (<collection>/<source base name>) - checked right after addMediaItemsRequested for each item in its
 		// batch, purely so runImport() knows which staged entries to clear (a successfully-added one) versus
@@ -139,6 +153,24 @@ private:
 	void runImport();
 	[[nodiscard]] const LabelOption* findLabelOption(const QString& id) const;
 
+	// --- Provisional labels (folder-derived or "+ Add label"); all mutate m_provisionalLabels and re-render via
+	// refreshLabelList. See QuickImportDialog.cpp for the model. ---------------------------------------------------
+	[[nodiscard]] static bool isProvisionalId(const QString& id);
+	// The id of the label whose display name matches (case-insensitive), skipping excludeId; empty if none.
+	[[nodiscard]] QString findLabelIdByName(const QString& name, const QString& excludeId) const;
+	QString addProvisionalLabel(const QString& name);        // unconditionally mints one, returns its id
+	QString ensureLabelForFolderName(const QString& name);   // reuse an existing same-name label, else mint provisional
+	void showLabelListContextMenu(const QPoint& pos);
+	void renameProvisionalLabel(const QString& provisionalId);
+	void setProvisionalLabelColor(const QString& provisionalId);
+	void deleteProvisionalLabel(const QString& provisionalId);
+	// Reassign every staged pick from provisionalId to targetId, then drop the merged provisional (purely local).
+	void mergeProvisionalInto(const QString& provisionalId, const QString& targetId);
+	void updateAllCardLabelDots();  // re-derive every staged card's dots after a label name/color change
+	// Import prologue: create in the Catalog each provisional label a staged item actually uses, then rewrite every
+	// staged pick from its provisional stand-in to the real id, so the rest of runImport sees only real labels.
+	void materializeUsedProvisionalLabels();
+
 private:
 	// Per-staged-item state, accumulated by dragging labels from m_labelList onto the card in m_stagedGrid
 	// and toggling its Best star; applied (and removed from here) only once "Import" runs successfully. The
@@ -154,7 +186,9 @@ private:
 	};
 
 	Callbacks m_callbacks;
-	std::vector<LabelOption> m_labelOptions;  // cached result of the last getLabelOptions() call
+	std::vector<LabelOption> m_labelOptions;       // cached list: real labels (getLabelOptions()) + m_provisionalLabels
+	std::vector<LabelOption> m_provisionalLabels;  // labels minted in-dialog, not in the Catalog until Import materializes them
+	int m_provisionalSeq = 0;                      // mints unique provisional ids ("new:<n>")
 	QHash<MediaId, StagedEntry> m_staged;
 
 	QListWidget* m_labelList  = nullptr;

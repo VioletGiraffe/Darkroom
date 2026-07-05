@@ -91,7 +91,8 @@ private:
 	// from), and refreshes the view. Returns one result per path, in order - Quick Import's bookkeeping
 	// branches on them (see QuickImportDialog::Callbacks::importPhotosRequested).
 	std::vector<Import::PhotoResult> processPhotoBatch(const QString& labelId, const QStringList& photoPaths, Import::PhotoImportMode mode);
-	bool createCollection(const QString& name, bool refreshList = true);
+	// Creates the collection folder + its label; returns the created-or-existing label's id, empty if refused.
+	QString createCollection(const QString& name, const QString& color = {}, bool refreshList = true);
 	// Sidebar "+ Add label": prompts for a name and creates a folder-backed label (a collection folder).
 	void createLabelInteractive();
 	// Sidebar label right-click menu: each prompts/confirms, mutates the Catalog, then refreshes the view.

@@ -172,7 +172,12 @@ The dialog is one big staging area (a media-item-card grid) plus a small label-l
 `MainWindow`'s own drop and `FindUntrackedFilesDialog`'s "send to staging"), calls `stageMediaItems()`, which
 first flattens its input — a dropped **folder** is scanned recursively and contributes every supported
 video/photo file under it (`flattenToSupportedMediaFiles`), so a folder drops in exactly as if its files were
-selected individually. It then extracts a temporary preview per new
+selected individually. Each file harvested from a folder also carries a **folder-derived label name**: the path
+from the dropped folder's *parent* down to the file's own folder, components joined by `-` (dropping `Root`
+containing `Root/cars/2026/x.jpg` yields `Root-cars-2026`). `stageMediaItems` resolves each such name to a
+concrete label via `ensureLabelForFolderName` (reuse an existing same-name label, else mint a *provisional* one
+— see below) and pre-assigns it as the file's first (destination) label; a file dropped loose, outside any
+folder, stages unlabeled as before. It then extracts a temporary preview per new
 video path (deduplicated by `MediaId` first — see "Duplicate detection" above) into a per-video temp dir via the
 batch `Ffmpeg::generatePreviewFrames`, so several videos are processed
 at once behind a modal progress box. A staged *photo* skips all of that: its card decodes the file directly
@@ -188,8 +193,17 @@ re-running ffmpeg (the import-side reuse in "Import: preview frames only" above)
 
 ### Label assignment: drag-from-list or per-card checklist, no "destination" UI
 
-The label-list panel is populated from `Callbacks::getLabelOptions()` (`MainWindow` supplies every
-non-virtual `Catalog::allLabels()` entry, with color) and supports the same drag-a-row-out gesture as
+The label-list panel (`refreshLabelList`) is this session's **provisional** labels followed by the Catalog's
+real ones: `Callbacks::getLabelOptions()` supplies every non-virtual `Catalog::allLabels()` entry (with color),
+and `m_provisionalLabels` holds those minted in-dialog — folder-derived (above) or via **+ Add label** — cached
+together as `m_labelOptions`. A provisional label carries a synthetic id (`"new:<n>"`, tested by
+`isProvisionalId`), a swatch from `Callbacks::generateLabelColor()` (the Catalog's own `randomLabelColor`), and
+renders italic with a `(new)` suffix. It exists **only in the dialog** until Import; right-clicking a provisional
+row offers **Rename** / **Set color** / **Delete** (all local mutations that re-render via `refreshLabelList`),
+where a rename onto an existing name (real or provisional) offers to *merge* into it — `mergeProvisionalInto`
+rewrites the staged cards' picks and drops the source, purely locally. Right-clicking a *real* row offers only
+**Rename**, which explains that real labels are edited in the main window, not here. Name matching everywhere is
+case-insensitive, matching the Catalog/filesystem rule. The panel supports the same drag-a-row-out gesture as
 `LabelSidebar` (`DragGestureHelper` + `LabelMimeType`, mirrored line-for-line). Dragging a label onto a
 staged card — or onto a multi-selection containing it, same effective-selection shape as the main grid's
 own card drop — appends the label id to that card's `pendingLabelIds` (no-op if already present) and
@@ -205,6 +219,14 @@ just an ordinary additional tag, applied the same way Best is.
 
 ### `runImport()` (the "Import" button)
 
+0. **`materializeUsedProvisionalLabels()`** runs first — the *only* point provisional labels reach the Catalog.
+   For each provisional id any staged entry actually carries, it calls `createCollectionRequested(name, color)`
+   (→ `MainWindow::createCollection`, which honors the color only for a genuinely new label) to get the real id
+   back, then rewrites every entry's `pendingLabelIds` from provisional stand-in to real id. A creation that
+   fails (reserved/invalid name) maps to empty and is dropped from the pick, leaving that item staged but
+   unlabeled (one summary warning). Successfully-created provisionals are removed from `m_provisionalLabels`
+   (they're real labels from now on), so a partial Import that leaves items staged won't recreate them on a
+   second run. Everything below then sees only real label ids.
 1. Groups every staged entry with a non-empty `pendingLabelIds` by its first id; entries with no label are
    skipped entirely, left staged. Each group is then split by type — photos and videos take different apply
    paths.

@@ -156,9 +156,14 @@ public:
 
 	// Creates a folder-backed label with this display name if none exists yet - for the user adding an empty
 	// collection up front, before any item lives in it (such a label can't be derived from the model, since no
-	// item references its collection). Persists labels.json; no-op if the name is already taken. The caller
-	// creates the backing collection folder on disk.
-	void createLabel(const QString& displayName);
+	// item references its collection). Persists labels.json. The caller creates the backing collection folder
+	// on disk. An explicit color is honored only when the label is actually created; an already-existing label
+	// keeps its color (empty color = pick a random one). Returns the created-or-existing label's id.
+	QString createLabel(const QString& displayName, const QString& color = {});
+
+	// A pleasant, randomized label color ("#rrggbb") - the same generator new labels get on creation, exposed so
+	// callers minting a label elsewhere (e.g. the Quick Import staging dialog) can show a matching swatch up front.
+	static QString randomLabelColor();
 
 	// What deleting a label would do, for a confirmation dialog / pre-flight check (computed, no mutation).
 	struct DeleteImpact
@@ -197,9 +202,9 @@ private:
 	void saveRegistry() const;
 	void ensureBestAndFolderLabels();                          // add any missing: Best + one folder-backed label per collection an item lives in
 	bool ensureBestLabelExists();                              // returns true if it added the entry
-	bool ensureFolderLabelExists(const QString& displayName);  // returns true if it added the entry
+	bool ensureFolderLabelExists(const QString& displayName, const QString& color = {});  // returns true if it added the entry
 	[[nodiscard]] QString generateLabelId() const;
-	[[nodiscard]] QString labelIdForFolderName(const QString& folderName) const;  // non-virtual displayName match; empty if none
+	[[nodiscard]] QString ordinaryLabelIdByName(const QString& displayName) const;  // non-virtual displayName match (case-insensitive); empty if none
 	[[nodiscard]] static QString registryPath();
 
 	struct Entry
