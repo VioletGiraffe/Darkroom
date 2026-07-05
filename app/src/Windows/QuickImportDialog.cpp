@@ -631,14 +631,19 @@ void QuickImportDialog::stageMediaItems(const QStringList& paths)
 
 	const int frameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
 
-	// Builds one staged card + entry; shared by the photo and video paths below, which differ only in the
-	// preview images, the temp dir (photos have none) and the double-click action.
-	const auto stageCard = [this, frameCount](const QString& path, const QStringList& previewPaths,
+	// Card thumbnail canvases mirror the main library grid: a photo is square, a video is a horizontal strip
+	// sized to tile with `frameCount` photo cards, so mixed staged cards line up on one column grid.
+	const QSize photoCanvas{ STAGED_CARD_IMAGE_HEIGHT, STAGED_CARD_IMAGE_HEIGHT };
+	const QSize videoCanvas{ MediaItemWidget::videoCanvasWidthForTiling(STAGED_CARD_IMAGE_HEIGHT, frameCount, m_stagedGrid->spacing()), STAGED_CARD_IMAGE_HEIGHT };
+
+	// Builds one staged card + entry; shared by the photo and video paths below, which differ only in the card
+	// canvas, the preview images, the temp dir (photos have none) and the double-click action.
+	const auto stageCard = [this](QSize canvasSize, const QString& path, const QStringList& previewPaths,
 		const QString& tempPreviewDir, std::function<void()> onDoubleClick) {
 		const MediaId id = MediaId::fromFile(path);
 
 		auto* card = new MediaItemWidget(
-			QSize{ STAGED_CARD_IMAGE_HEIGHT * frameCount, STAGED_CARD_IMAGE_HEIGHT },
+			canvasSize,
 			previewPaths, QFileInfo(path).fileName(),
 			id,
 			/*inBest*/ false,
@@ -673,7 +678,7 @@ void QuickImportDialog::stageMediaItems(const QStringList& paths)
 
 	// Photo cards decode the file itself - no extraction step, so they stage instantly.
 	for (const QString& path : photoPaths)
-		stageCard(path, { path }, /*tempPreviewDir*/ {}, [this, path] {
+		stageCard(photoCanvas, path, { path }, /*tempPreviewDir*/ {}, [this, path] {
 			QDesktopServices::openUrl(QUrl::fromLocalFile(path));  // double-click previews in the system image viewer
 		});
 
@@ -712,7 +717,7 @@ void QuickImportDialog::stageMediaItems(const QStringList& paths)
 		for (const QString& file : previewDir.entryList(IMAGE_FILE_FILTERS, QDir::Files, QDir::Name))
 			previewPaths << previewDir.filePath(file);
 
-		stageCard(path, previewPaths, job.destinationFolder, [this, path] {
+		stageCard(videoCanvas, path, previewPaths, job.destinationFolder, [this, path] {
 			auto* player = new VideoPlayerWindow(path, MediaId::fromFile(path), this);
 			player->show();
 		});
