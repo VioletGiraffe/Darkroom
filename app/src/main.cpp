@@ -10,7 +10,6 @@
 #include <QSettings>
 #include <QStyleHints>
 
-// DARKROOM_VERSION is injected from app.pro (DEFINES += DARKROOM_VERSION=$$VERSION); STRINGIFY_EXPANDED_ARGUMENT turns the raw token into "1.0.0".
 #ifndef DARKROOM_VERSION
 #error "DARKROOM_VERSION is not defined; set it in app.pro"
 #endif
@@ -30,7 +29,7 @@ int main(int argc, char* argv[])
 	const int scheme = QSettings{}.value(Settings::ColorScheme, Defaults::ColorScheme).toInt();
 	app.styleHints()->setColorScheme(static_cast<Qt::ColorScheme>(scheme));
 
-	Style::install();  // app-wide non-stock chrome; re-applies on a light/dark switch
+	Style::install();  // app-wide non-stock style; re-applies on a light/dark switch
 
 	MainWindow window;
 	window.show();
