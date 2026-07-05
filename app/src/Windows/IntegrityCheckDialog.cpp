@@ -67,6 +67,11 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 
 	QScrollArea* scroll = new QScrollArea(this);
 	scroll->setWidgetResizable(true);
+	// The dialog-body scroll region gets the central sheet's QListWidget vocabulary (hairline frame, no fill
+	// of its own) in place of the native sunken panel; QScrollArea isn't styled centrally because its other
+	// use (FrameViewerWindow) wants no frame at all.
+	scroll->setStyleSheet(QStringLiteral("QScrollArea { border: 1px solid %1; border-radius: %2px; background: transparent; }")
+		.arg(Theme::current().BorderControl).arg(Theme::ControlRadius));
 	QWidget* content = new QWidget(scroll);
 	QVBoxLayout* contentLayout = new QVBoxLayout(content);
 
@@ -120,9 +125,14 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 		});
 	};
 
+	// One issue per row, drawn as a hairline card (BorderSubtle - a passive separator, not an interactive
+	// control) rather than the native StyledPanel bevel. One sheet string shared by every row.
+	const QString rowStyle = QStringLiteral("QFrame#integrityRow { border: 1px solid %1; border-radius: %2px; }")
+		.arg(Theme::current().BorderSubtle).arg(Theme::ControlRadius);
 	const auto addRow = [&](const QString& statusText) -> std::pair<QFrame*, QLabel*> {
 		QFrame* row = new QFrame(content);
-		row->setFrameShape(QFrame::StyledPanel);
+		row->setObjectName("integrityRow");
+		row->setStyleSheet(rowStyle);
 		QHBoxLayout* rowLayout = new QHBoxLayout(row);
 		QLabel* statusLabel = new QLabel(statusText, row);
 		statusLabel->setWordWrap(true);

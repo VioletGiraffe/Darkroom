@@ -91,11 +91,18 @@ is used by both the frame-viewer thumbnails (`#framedThumbnail`) and the grid ca
 stuck-state fix is separate from that. When the menu action can delete the spawning widget mid-`exec()` (grid
 cards get rebuilt by their own menu actions), guard the widget with a `QPointer` before the post-`exec()` re-sync.
 
+- **`QSplitter::handle:hover` never matches out of the box** - `QSplitterHandle` doesn't set `WA_Hover` on
+  itself (long-standing QTBUG-13768), so the handle neither repaints on enter/leave nor reports
+  `State_MouseOver`, and the QSS hover rule is dead. The handles are created internally by `QSplitter` with
+  no per-instance hook, so `Style.cpp`'s `SplitterHandleHoverEnabler` (an app-wide event filter, same pattern
+  as `ComboPopupRounder`) sets the attribute on each handle as it gets polished.
+
 ## General QSS gotchas
 
 - **`QString::arg` replaces every occurrence of the lowest-numbered placeholder in one call** (e.g. `%1` used
-  10 times is fully filled by one `.arg(...)`). Relied on throughout `Style.cpp`; it's also how a single
-  `%5` can carry `Theme::ControlRadius` to every control radius in the sheet.
+  10 times is fully filled by one `.arg(...)`). `Style.cpp` has since moved from numbered placeholders to
+  named `%Token%` ones resolved via `QString::replace`, but the per-instance sheets elsewhere still use
+  `.arg()` and rely on this.
 - **`palette(...)` roles track the active theme automatically; hardcoded hex does not.** Anything built from
   a `Theme` hex must be rebuilt on a light/dark switch (we re-apply the whole sheet on
   `colorSchemeChanged`); `palette(base)` etc. update on their own.

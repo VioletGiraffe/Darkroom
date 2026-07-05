@@ -90,6 +90,15 @@ constexpr char kMenus[] = R"(
 	QMenu::separator { height: 1px; background: %BorderControl%; margin: 4px 8px; }
 )";
 
+constexpr char kMenuBar[] = R"(
+	/* The bar itself blends into the window; a hovered (:selected) or open (:pressed) item gets the same
+	   soft pill treatment as QMenu items. */
+	QMenuBar { background: transparent; }
+	QMenuBar::item { background: transparent; border-radius: %MenuItemRadius%px; padding: 4px 10px; }
+	QMenuBar::item:selected { background: %AccentBg%; }
+	QMenuBar::item:pressed { background: %AccentBg%; }
+)";
+
 constexpr char kLists[] = R"(
 	/* Plain lists get the same hairline border as the other stock controls, but no separate fill - they
 	   blend into whatever surface hosts them (sidebar panel, dialog body) rather than standing out as
@@ -149,6 +158,31 @@ constexpr char kCheckBoxes[] = R"(
 	}
 )";
 
+constexpr char kGroupBoxes[] = R"(
+	/* Hairline card with the title straddling the top border; the title's window-colored background patches
+	   the border line out behind the text. */
+	QGroupBox {
+		border: 1px solid %BorderSubtle%;
+		border-radius: %ControlRadius%px;
+		margin-top: 1ex;
+		padding-top: 2px;
+	}
+	QGroupBox::title {
+		subcontrol-origin: margin;
+		subcontrol-position: top left;
+		left: 8px;
+		padding: 0 3px;
+		background-color: palette(window);
+		color: %InstructionText%;
+	}
+)";
+
+constexpr char kSplitters[] = R"(
+	/* Invisible until interacted with - the panels' own edges already delimit the split. */
+	QSplitter::handle { background: transparent; }
+	QSplitter::handle:hover, QSplitter::handle:pressed { background: %AccentBg%; }
+)";
+
 constexpr char kToolTips[] = R"(
 	/* Square corners on purpose: a tooltip is its own top-level window, so rounding it would need the same
 	   hand-painted treatment as the combo popup (ComboPopupRounder) - not worth the machinery here. */
@@ -187,8 +221,8 @@ QString styleSheetString()
 	const Theme::ThemeColors& t = Theme::current();
 
 	QString sheet;
-	for (const char* section : { kButtons, kTextInputs, kComboBoxes, kMenus, kLists, kScrollBars,
-	                             kSliders, kCheckBoxes, kToolTips, kGridCards, kStarButtons })
+	for (const char* section : { kButtons, kTextInputs, kComboBoxes, kMenus, kMenuBar, kLists, kScrollBars,
+	                             kSliders, kCheckBoxes, kGroupBoxes, kSplitters, kToolTips, kGridCards, kStarButtons })
 		sheet += QLatin1String(section);
 
 	const std::pair<QString, QString> tokens[] = {
@@ -197,6 +231,7 @@ QString styleSheetString()
 		{ QStringLiteral("%AccentBorder%"),             QString::fromLatin1(t.AccentBorder) },
 		{ QStringLiteral("%AccentBg%"),                 QString::fromLatin1(t.AccentBg) },
 		{ QStringLiteral("%MutedText%"),                QString::fromLatin1(t.MutedText) },
+		{ QStringLiteral("%InstructionText%"),          QString::fromLatin1(t.InstructionText) },
 		{ QStringLiteral("%BackgroundPrimary%"),        QString::fromLatin1(t.BackgroundPrimary) },
 		{ QStringLiteral("%TextPrimary%"),              QString::fromLatin1(t.TextPrimary) },
 		{ QStringLiteral("%ThumbnailMatte%"),           QString::fromLatin1(t.ThumbnailMatte) },
@@ -302,6 +337,23 @@ public:
 	}
 };
 
+// A QSplitterHandle never sets Qt::WA_Hover on itself, so the sheet's QSplitter::handle:hover rule could
+// never match: without the attribute the handle neither repaints on enter/leave nor reports State_MouseOver
+// (see docs/tips/qt-styling-system-quirks.md). Enable it on each handle as it gets polished - app-wide via
+// an event filter because the handles are created internally by QSplitter, leaving no per-instance hook.
+class SplitterHandleHoverEnabler : public QObject
+{
+public:
+	using QObject::QObject;
+
+	bool eventFilter(QObject* watched, QEvent* event) override
+	{
+		if (event->type() == QEvent::Polish && watched->isWidgetType() && watched->inherits("QSplitterHandle"))
+			static_cast<QWidget*>(watched)->setAttribute(Qt::WA_Hover);
+		return QObject::eventFilter(watched, event);
+	}
+};
+
 } // namespace
 
 namespace Style {
@@ -313,6 +365,8 @@ void install()
 
 	// Round the combo drop-down popups (see ComboPopupRounder); parented to qApp for the app's lifetime.
 	qApp->installEventFilter(new ComboPopupRounder(qApp));
+	// Make the sheet's QSplitter::handle:hover rule reachable (see SplitterHandleHoverEnabler).
+	qApp->installEventFilter(new SplitterHandleHoverEnabler(qApp));
 
 	// Re-apply on a light/dark switch (Settings writes the scheme via QStyleHints::setColorScheme, which
 	// emits this), so the globally-styled chrome re-derives from the new Theme palette without a restart.

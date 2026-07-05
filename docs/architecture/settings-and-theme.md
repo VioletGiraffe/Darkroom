@@ -52,10 +52,15 @@ full-strength colors and disabled controls would not dim at all.
 `Style::install()` (called once in `main.cpp`, after the colour scheme is set, before the window shows)
 builds one `Theme`-driven stylesheet and applies it to `qApp`: the shared non-stock vocabulary (rounded
 corners, hairline borders, roomy padding, soft hover/focus) for stock controls — `QPushButton`, `QLineEdit`,
-`QComboBox`, `QMenu`, `QScrollBar`, `QSlider` (horizontal only; note a QSS-styled slider renders no tick
-marks — a QStyleSheetStyle limitation), `QCheckBox` (rounded indicator with an accent fill + white SVG check
-mark; this is the app's one checkbox look, used e.g. by the sort popover's "Favorites first") and `QToolTip`
-(square on purpose — rounding a tooltip would need ComboPopupRounder-style hand-painting). The sheet is
+`QComboBox`, `QMenu`, `QMenuBar` (transparent bar, `QMenu`-matching hover pills on its items), `QScrollBar`,
+`QSlider` (horizontal only; note a QSS-styled slider renders no tick marks — a QStyleSheetStyle limitation),
+`QCheckBox` (rounded indicator with an accent fill + white SVG check mark; this is the app's one checkbox
+look, used e.g. by the sort popover's "Favorites first"), `QGroupBox` (hairline card, title straddling the
+top border), `QSplitter` (handle invisible until hovered/dragged, then `AccentBg`; needs `SplitterHandleHoverEnabler`
+setting `WA_Hover` on each handle, or the hover rule never matches - see the quirks doc) and `QToolTip` (square on
+purpose — rounding a tooltip would need ComboPopupRounder-style hand-painting). `QScrollArea` is deliberately
+**not** styled centrally: its two uses want different frames (FrameViewerWindow sets `NoFrame` — full-window
+content with nothing to frame off; IntegrityCheckDialog opts into the list-style hairline locally). The sheet is
 assembled from per-concern `constexpr` sections (buttons, text inputs, combos, menus, ...) written against
 named `%Token%` placeholders — spelled exactly like the `Theme::ThemeColors` field or `Theme::` constant they
 resolve to — and `styleSheetString()` concatenates the sections and resolves all tokens in one replace pass. It also carries the **grid card, star and thumbnail** styles (by object

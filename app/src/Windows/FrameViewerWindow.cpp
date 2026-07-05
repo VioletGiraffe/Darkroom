@@ -42,6 +42,7 @@ FrameViewerWindow::FrameViewerWindow(QWidget* parent)
 
 	m_scrollArea = new QScrollArea(this);
 	m_scrollArea->setWidgetResizable(true);
+	m_scrollArea->setFrameShape(QFrame::NoFrame);   // the whole client area is this scroll area - nothing to frame off
 	m_scrollArea->setFocusPolicy(Qt::StrongFocus);
 	m_scrollArea->viewport()->setMouseTracking(true);
 

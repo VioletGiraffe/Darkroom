@@ -201,6 +201,13 @@ the view — the same "MainWindow computes, card draws" split the cards use. The
 export dropping back onto the window's own import handler (`event->source() == m_mediaGrid` → ignored) — the
 import drop zone is for files from outside the app, not a card re-import of an already-tracked item.
 
+**Empty state**: `MediaGrid` paints a caller-set message (`setEmptyMessage`, `InstructionText`-colored,
+centered over the viewport) whenever **no item is visible** — whether none were built or the name filter hid
+them all; the paint checks live visibility, so it needs no hooks in `applyNameFilter`. The wording comes from
+`refreshMediaGrid` following the same computes/draws split: `Catalog::mediaItemCount() == 0` means the
+library itself is empty (message points at drag-drop and Quick Import), anything else means the filters
+matched nothing.
+
 **Selection highlight**: the `QListWidget::item:selected` background rule (`Theme::ListSelectedBg`) shows
 through because `MediaItemWidget` now paints a **transparent** normal background (it owns only a rounded
 border + hover fill). The opaque matte thumbnail covers its own area, so a selected card shows the highlight
