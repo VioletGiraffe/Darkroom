@@ -50,8 +50,8 @@ jobs:
       shell: cmd
       run: |
         %QT_ROOT_DIR%\bin\qmake.exe -v
-        %QT_ROOT_DIR%\bin\qmake.exe -tp vc -r
-        msbuild /t:Build /p:Configuration=Release;PlatformToolset=v143
+        %QT_ROOT_DIR%\bin\qmake.exe -tp vc -r || exit /b 1
+        msbuild /t:Build /p:Configuration=Release;PlatformToolset=v143 || exit /b 1
 
         @echo on
         set STAGING_DIR=dist

@@ -29,7 +29,10 @@ LZMAUseSeparateProcess=yes
 LZMABlockSize=8192
 
 [Files]
-Source: "{#SourcePath}\dist\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs; Excludes: "{#VCRedistExeName}"
+; Main exe has its own entry so ignoreversion forces overwrite on same-version rebuilds. Being a non-wildcard
+; Source, it also makes a missing exe (e.g. a failed build) a hard compile error instead of a silent broken installer.
+Source: "{#SourcePath}\dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourcePath}\dist\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs; Excludes: "{#VCRedistExeName},{#MyAppExeName}"
 Source: "{#SourcePath}\dist\{#VCRedistExeName}";  DestDir: "{tmp}"; Flags: deleteafterinstall
 Source: "{#SourcePath}\LICENSE"; DestDir: "{app}"
 Source: "{#SourcePath}\NOTICE";  DestDir: "{app}"
