@@ -1,4 +1,5 @@
 #include "UiComponents/MediaGrid.h"
+#include "Theme/Theme.h"
 
 #include <QColor>
 #include <QCursor>
@@ -41,6 +42,33 @@ void paintDragCountBadge(QPixmap& pixmap, int count)
 void MediaGrid::setDragUrlsProvider(std::function<QList<QUrl>(const QList<QListWidgetItem*>&)> provider)
 {
 	m_dragUrlsProvider = std::move(provider);
+}
+
+void MediaGrid::setEmptyMessage(const QString& message)
+{
+	if (m_emptyMessage == message)
+		return;
+	m_emptyMessage = message;
+	viewport()->update();
+}
+
+void MediaGrid::paintEvent(QPaintEvent* event)
+{
+	QListWidget::paintEvent(event);
+
+	if (m_emptyMessage.isEmpty())
+		return;
+	for (int row = 0; row < count(); ++row)   // any visible item -> no empty state (cheap: bool checks only)
+		if (!item(row)->isHidden())
+			return;
+
+	QPainter p{ viewport() };
+	p.setPen(QColor(QString::fromLatin1(Theme::current().InstructionText)));
+	QFont font = p.font();
+	font.setPointSizeF(font.pointSizeF() + 2);
+	p.setFont(font);
+	// Inset so a long message wraps well clear of the edges and any scrollbar.
+	p.drawText(viewport()->rect().adjusted(20, 20, -20, -20), Qt::AlignCenter | Qt::TextWordWrap, m_emptyMessage);
 }
 
 void MediaGrid::startDrag(Qt::DropActions /*supportedActions*/)

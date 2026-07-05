@@ -11,9 +11,9 @@
 
 class FrameViewerWindow;
 class LabelSidebar;
+class MediaGrid;
 class QComboBox;
 class QLineEdit;
-class QListWidget;
 class QListWidgetItem;
 class QTimer;
 class QUrl;
@@ -121,7 +121,7 @@ private:
 	SegmentedToggle*   m_mediaTypeFilter = nullptr;  // All / Videos / Photos grid filter
 	QComboBox*         m_previewFrameCountCombo = nullptr;
 	SortControl*       m_sortControl  = nullptr;
-	QListWidget*       m_mediaGrid    = nullptr;
+	MediaGrid*         m_mediaGrid    = nullptr;
 	QTimer*            m_gridZoomDebounce = nullptr;
 	FrameViewerWindow* m_frameViewer  = nullptr;
 

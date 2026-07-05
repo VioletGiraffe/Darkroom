@@ -212,8 +212,7 @@ void MainWindow::setupUI()
 	mainLayout->addWidget(headerWidget);
 
 	// Media item card grid
-	auto* grid = new MediaGrid();
-	m_mediaGrid = grid;
+	m_mediaGrid = new MediaGrid();
 	m_mediaGrid->setViewMode(QListView::IconMode);
 	m_mediaGrid->setFlow(QListView::LeftToRight);
 	m_mediaGrid->setWrapping(true);
@@ -230,7 +229,7 @@ void MainWindow::setupUI()
 	// through a plain press+move instead of collapsing it to the single card under the cursor (it defers the
 	// collapse while a drag is possible), so a whole group can be dragged out together.
 	m_mediaGrid->setDragEnabled(true);
-	grid->setDragUrlsProvider([this](const QList<QListWidgetItem*>& items) { return dragUrlsForItems(items); });
+	m_mediaGrid->setDragUrlsProvider([this](const QList<QListWidgetItem*>& items) { return dragUrlsForItems(items); });
 	m_mediaGrid->setSpacing(10);
 	m_mediaGrid->setStyleSheet(QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().AccentBg));
 
@@ -665,6 +664,13 @@ void MainWindow::refreshMediaGrid()
 		const Catalog::MediaType wanted = typeFilterIdx == 2 ? Catalog::MediaType::Photo : Catalog::MediaType::Video;
 		std::erase_if(mediaItems, [&](const MediaId& id) { return catalog.mediaType(id) != wanted; });
 	}
+
+	// Empty-state text, painted by the grid when no card is visible. "Library empty" is the catalog's own
+	// state, not something inferred from this rebuild's filters; every other empty case (label/type filter
+	// here, or the name filter hiding every card later) is the filters matching nothing.
+	m_mediaGrid->setEmptyMessage(catalog.mediaItemCount() == 0
+		? tr("The library is empty.\nDrop media files here, or use Tools > Quick import to collections.")
+		: tr("No items match the current filters."));
 
 	pendingAttach.reserve(mediaItems.size());
 
