@@ -1,6 +1,8 @@
 TEMPLATE = app
 TARGET   = Darkroom
 VERSION  = 1.0.0
+# Surface the version to C++ as a bare token (stringized in main.cpp -> QApplication::applicationVersion()).
+DEFINES += DARKROOM_VERSION=$$VERSION
 
 QMAKE_TARGET_PRODUCT     = Darkroom
 QMAKE_TARGET_COMPANY     = VioletGiraffe

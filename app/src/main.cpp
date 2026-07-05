@@ -2,6 +2,7 @@
 #include "Settings.h"
 #include "Theme/Style.h"
 #include "crashhandler/CCrashHandler.h"
+#include "utility/macro_utils.h"
 
 #include <QApplication>
 #include <QDebug>
@@ -9,11 +10,17 @@
 #include <QSettings>
 #include <QStyleHints>
 
+// DARKROOM_VERSION is injected from app.pro (DEFINES += DARKROOM_VERSION=$$VERSION); STRINGIFY_EXPANDED_ARGUMENT turns the raw token into "1.0.0".
+#ifndef DARKROOM_VERSION
+#error "DARKROOM_VERSION is not defined; set it in app.pro"
+#endif
+
 int main(int argc, char* argv[])
 {
 	QApplication app(argc, argv);
 	app.setOrganizationName("VioletGiraffe");
 	app.setApplicationName("Darkroom");
+	app.setApplicationVersion(STRINGIFY_EXPANDED_ARGUMENT(DARKROOM_VERSION));  // from VERSION in app.pro; surfaced in Help > About
 
 	CCrashHandler::setMinidumpsStorageFolderPath(QDir::tempPath().toStdString());
 	CCrashHandler crashHandler([](const wchar_t* msg) {

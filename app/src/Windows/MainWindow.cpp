@@ -21,6 +21,8 @@
 #include "Utils.h"
 #include "Settings.h"
 
+#include "aboutdialog/caboutdialog.h"
+
 #include <QApplication>
 #include <QClipboard>
 #include <QColor>
@@ -279,8 +281,14 @@ void MainWindow::setupMainMenu()
 	toolsMenu->addSeparator();
 	toolsMenu->addAction(tr("Re-export all videos"), QKeySequence("Ctrl+Shift+E"), this, &MainWindow::reExportAllVideos);
 
+	QMenu* helpMenu = new QMenu(tr("Help"), menuBar);
+	helpMenu->addAction(tr("About Darkroom..."), this, [this] {
+		CAboutDialog(QApplication::applicationVersion(), this).exec();
+	});
+
 	menuBar->addMenu(fileMenu);
 	menuBar->addMenu(toolsMenu);
+	menuBar->addMenu(helpMenu);
 
 	for (QAction* action : menuBar->actions())
 	{
