@@ -7,7 +7,6 @@ DEFINES += DARKROOM_VERSION=$$VERSION
 QMAKE_TARGET_PRODUCT     = Darkroom
 QMAKE_TARGET_COMPANY     = VioletGiraffe
 QMAKE_TARGET_COPYRIGHT   = Copyright (C) 2026 VioletGiraffe
-QMAKE_TARGET_DESCRIPTION = Video frame extractor and organizer
 
 QT = core gui widgets multimedia multimediawidgets svg
 
