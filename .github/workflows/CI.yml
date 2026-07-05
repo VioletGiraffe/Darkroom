@@ -1,6 +1,15 @@
 name: CI
 
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+    branches-ignore: [gh-pages]  # metrics commits to gh-pages must not re-trigger CI
+  pull_request:
+  workflow_dispatch:
+
+# github-action-benchmark pushes the metrics history to the gh-pages branch.
+permissions:
+  contents: write
+  deployments: write
 
 env:
   # Path to the solution file relative to the root of the project.
@@ -29,15 +38,21 @@ jobs:
 
     - name: LOC count - app
       if: "startsWith(matrix.os, 'windows')"
+      shell: pwsh
       run: |
         choco install cloc -y
-        cloc --include-lang="C,C++" --strip-str-comments --exclude-dir=tests,bin,build,.git,3rdparty ./app/
+        $loc = (cloc --include-lang="C,C++" --strip-str-comments --exclude-dir=tests,bin,build,.git,3rdparty --json --quiet ./app/ | ConvertFrom-Json).SUM.code
+        "App C/C++ code: $loc LOC"
+        "LOC_APP=$loc" >> $env:GITHUB_ENV
 
     - name: LOC count - libs
       if: "startsWith(matrix.os, 'windows')"
+      shell: pwsh
       run: |
         choco install cloc -y
-        cloc --include-lang="C,C++" --strip-str-comments --exclude-dir=tests,bin,build,.git,3rdparty,app .
+        $loc = (cloc --include-lang="C,C++" --strip-str-comments --exclude-dir=tests,bin,build,.git,3rdparty,app --json --quiet . | ConvertFrom-Json).SUM.code
+        "Libs C/C++ code: $loc LOC"
+        "LOC_LIBS=$loc" >> $env:GITHUB_ENV
 
     - name: Install Qt
       uses: jurplel/install-qt-action@v4
@@ -83,6 +98,34 @@ jobs:
       run: |
         $sizeKB = (Get-Item "bin\release\Darkroom.exe").Length / 1KB
         "{0:N2} KB" -f $sizeKB
+        "EXE_KB=$([math]::Round($sizeKB, 2))" >> $env:GITHUB_ENV
+
+    # Record LOC + exe size to the gh-pages history and regenerate the chart.
+    # Only on pushes to main so PRs/forks don't write history (and forks lack a write token).
+    - name: Assemble metrics data
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(matrix.os, 'windows')
+      shell: pwsh
+      run: |
+        $data = @(
+          @{ name = 'Lines of code (app)';  unit = 'LOC'; value = [int]$env:LOC_APP  }
+          @{ name = 'Lines of code (libs)'; unit = 'LOC'; value = [int]$env:LOC_LIBS }
+          @{ name = 'Darkroom.exe size';    unit = 'KB';  value = [double]$env:EXE_KB }
+        )
+        $data | ConvertTo-Json -AsArray | Out-File -FilePath metrics.json -Encoding utf8
+        Get-Content metrics.json
+
+    - name: Update metrics history & chart (gh-pages)
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(matrix.os, 'windows')
+      uses: benchmark-action/github-action-benchmark@v1
+      with:
+        name: Darkroom metrics
+        tool: customSmallerIsBetter
+        output-file-path: metrics.json
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+        # Don't treat a change as a regression
+        comment-on-alert: false
+        fail-on-alert: false
 
     - name: Mac
       if: startsWith(matrix.os, 'macos')
