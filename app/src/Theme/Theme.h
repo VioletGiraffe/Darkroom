@@ -20,8 +20,8 @@ inline constexpr int MenuItemRadius = 5;
 // SortControl's popped-out popover card - the largest radius in the app, for a free-floating, shadowed,
 // dialog-like surface (distinct from any inline control).
 inline constexpr int PopoverRadius = 10;
-// SortControl's hand-painted favourites checkbox. Shares its value with ThumbnailMatteRadius below by
-// coincidence only - two unrelated small surfaces that happen to look right at the same radius, not one
+// QCheckBox's indicator box (styled app-wide in Style.cpp). Shares its value with ThumbnailMatteRadius below
+// by coincidence only - two unrelated small surfaces that happen to look right at the same radius, not one
 // concept; keep them as separate constants so either can move independently.
 inline constexpr int CheckboxRadius = 4;
 // The recessed matte backdrop behind a borderless single-frame thumbnail (ThumbnailWidget, framed=false). See
@@ -31,6 +31,12 @@ inline constexpr int ThumbnailMatteRadius = 4;
 // thickness, so the handle is always a full pill regardless of thickness.
 inline constexpr int ScrollBarThickness = 10;
 inline constexpr int ScrollBarHandleRadius = ScrollBarThickness / 2;
+// QSlider's groove thickness and round handle diameter (both radii derived, not free: the groove is a full
+// pill, the handle a circle). The diameters/thicknesses are border-box sizes; the QSS subtracts its 1px border.
+inline constexpr int SliderGrooveThickness = 4;
+inline constexpr int SliderGrooveRadius = SliderGrooveThickness / 2;
+inline constexpr int SliderHandleDiameter = 16;
+inline constexpr int SliderHandleRadius = SliderHandleDiameter / 2;
 
 // Field comments name the mockup's CSS variable (docs/mockups/main-window-sidebar.html) each one is tuned
 // to, so a future retune can go back to that source instead of guessing.

@@ -2,14 +2,10 @@
 #include "UiComponents/SegmentedToggle.h"
 #include "Theme/Theme.h"
 
-#include <QFontMetrics>
+#include <QCheckBox>
 #include <QFrame>
 #include <QGraphicsDropShadowEffect>
 #include <QLabel>
-#include <QMouseEvent>
-#include <QPainter>
-#include <QPainterPath>
-#include <QPalette>
 #include <QScreen>
 #include <QSettings>
 #include <QVBoxLayout>
@@ -21,82 +17,6 @@ namespace {
 const QString SORT_BY_KEY         = "mainWindow/sortBy";
 const QString SORT_DESCENDING_KEY = "mainWindow/sortDescending";
 const QString FAVORITES_FIRST_KEY = "mainWindow/favoritesFirst";
-
-inline QColor colorFromHex(const char* hex) { return QColor(QString::fromLatin1(hex)); }
-
-// A small rounded checkbox painted to match the popover's bespoke look (the central QSS doesn't reach a
-// checkbox indicator without a checkmark image). Box + label paint together; a click anywhere toggles.
-class FavoritesCheck final : public QWidget
-{
-public:
-	explicit FavoritesCheck(const QString& text, bool checked, QWidget* parent = nullptr)
-		: QWidget(parent), m_text(text), m_checked(checked)
-	{
-		setCursor(Qt::PointingHandCursor);
-	}
-
-	std::function<void(bool)> onToggled;
-
-	[[nodiscard]] bool isChecked() const { return m_checked; }
-
-	[[nodiscard]] QSize sizeHint() const override
-	{
-		const QFontMetrics fm(font());
-		return { BOX + GAP + fm.horizontalAdvance(m_text), qMax<int>(BOX, fm.height()) };
-	}
-
-protected:
-	void paintEvent(QPaintEvent*) override
-	{
-		QPainter p(this);
-		p.setRenderHint(QPainter::Antialiasing);
-
-		const Theme::ThemeColors& t = Theme::current();
-		const QRectF box(0, (height() - BOX) / 2.0, BOX, BOX);
-
-		if (m_checked)
-		{
-			p.setPen(Qt::NoPen);
-			p.setBrush(colorFromHex(t.AccentBorder));
-			p.drawRoundedRect(box, Theme::CheckboxRadius, Theme::CheckboxRadius);
-
-			QPen tick(Qt::white, 1.6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-			p.setPen(tick);
-			QPainterPath path;
-			path.moveTo(box.left() + BOX * 0.26, box.top() + BOX * 0.52);
-			path.lineTo(box.left() + BOX * 0.43, box.top() + BOX * 0.68);
-			path.lineTo(box.left() + BOX * 0.74, box.top() + BOX * 0.32);
-			p.drawPath(path);
-		}
-		else
-		{
-			p.setPen(QPen(colorFromHex(t.BorderControl), 1));
-			p.setBrush(Qt::NoBrush);
-			p.drawRoundedRect(box.adjusted(0.5, 0.5, -0.5, -0.5), Theme::CheckboxRadius, Theme::CheckboxRadius);
-		}
-
-		p.setPen(palette().color(QPalette::Text));
-		p.drawText(QRectF(BOX + GAP, 0, width() - BOX - GAP, height()), Qt::AlignVCenter | Qt::AlignLeft, m_text);
-	}
-
-	void mousePressEvent(QMouseEvent* event) override
-	{
-		if (event->button() == Qt::LeftButton)
-		{
-			m_checked = !m_checked;
-			update();
-			if (onToggled)
-				onToggled(m_checked);
-		}
-		QWidget::mousePressEvent(event);
-	}
-
-private:
-	static constexpr int BOX = 16;  // checkbox side
-	static constexpr int GAP = 8;   // box-to-label spacing
-	QString m_text;
-	bool    m_checked;
-};
 
 // The popover card shown under the sort button. A frameless Qt::Popup top-level (auto-dismisses on an
 // outside click) whose translucent window leaves room around an inner shadowed card. Reports the full
@@ -156,8 +76,10 @@ public:
 		col->addWidget(divider);
 		col->addSpacing(2);
 
-		m_favorites = new FavoritesCheck(tr("Favorites first"), favoritesFirst, card);
-		m_favorites->onToggled = [this](bool) { notify(); };
+		m_favorites = new QCheckBox(tr("Favorites first"), card);
+		m_favorites->setChecked(favoritesFirst);
+		m_favorites->setCursor(Qt::PointingHandCursor);   // the popover's other controls (SegmentedToggle) use it too
+		connect(m_favorites, &QCheckBox::toggled, this, [this] { notify(); });
 		col->addWidget(m_favorites);
 	}
 
@@ -201,7 +123,7 @@ private:
 	std::function<void(int, bool, bool)> m_onChanged;
 	SegmentedToggle* m_field     = nullptr;
 	SegmentedToggle* m_direction = nullptr;
-	FavoritesCheck*  m_favorites = nullptr;
+	QCheckBox*       m_favorites = nullptr;
 };
 
 } // namespace

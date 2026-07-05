@@ -2,5 +2,6 @@
 <RCC version="1.0">
 	<qresource prefix="/UI">
 		<file>combobox_down_arrow.svg</file>
+		<file>checkbox_check.svg</file>
 	</qresource>
 </RCC>

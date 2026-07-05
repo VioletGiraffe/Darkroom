@@ -183,8 +183,7 @@ void MainWindow::setupUI()
 
 	headerLayout->addStretch(1);  // view controls sit on the right of the stretch, the name filter on the left
 
-	// Preview-frame-count selector. A drop-down is quicker to pick from than spinning a QSpinBox, and
-	// self-labelling items ("N frames per preview") replace the usual separate QLabel + control pair.
+	// Preview-frame-count selector. Self-labelling items ("N frames per preview") replace the usual separate QLabel + control pair.
 	m_previewFrameCountCombo = new QComboBox();
 	m_previewFrameCountCombo->setToolTip(tr("Number of preview frames shown on each video card"));
 	for (int n = MIN_PREVIEW_FRAME_COUNT; n <= MAX_PREVIEW_FRAME_COUNT; ++n)

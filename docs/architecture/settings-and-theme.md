@@ -43,14 +43,22 @@ color — pick the wrong half and it'll look subtly off.
 The app-wide `QPalette` (set in `Style::install()` alongside the stylesheet, re-applied on
 `colorSchemeChanged`) carries the theme's background/text/accent colors into the standard `QPalette` roles.
 This is what lets stock controls and native fallbacks (e.g. the combo drop-down's item selection) follow the
-themed ramps too, instead of staying on the OS-default grey palette.
+themed ramps too, instead of staying on the OS-default grey palette. The Disabled color group gets an explicit
+`MutedText` override for the text roles — without it, `setColor(role, ...)` fills every group with the
+full-strength colors and disabled controls would not dim at all.
 
 ## App-wide styling (`src/Theme/Style.h/.cpp`)
 
 `Style::install()` (called once in `main.cpp`, after the colour scheme is set, before the window shows)
 builds one `Theme`-driven stylesheet and applies it to `qApp`: the shared non-stock vocabulary (rounded
 corners, hairline borders, roomy padding, soft hover/focus) for stock controls — `QPushButton`, `QLineEdit`,
-`QComboBox`, `QMenu`, `QScrollBar`. It also carries the **grid card, star and thumbnail** styles (by object
+`QComboBox`, `QMenu`, `QScrollBar`, `QSlider` (horizontal only; note a QSS-styled slider renders no tick
+marks — a QStyleSheetStyle limitation), `QCheckBox` (rounded indicator with an accent fill + white SVG check
+mark; this is the app's one checkbox look, used e.g. by the sort popover's "Favorites first") and `QToolTip`
+(square on purpose — rounding a tooltip would need ComboPopupRounder-style hand-painting). The sheet is
+assembled from per-concern `constexpr` sections (buttons, text inputs, combos, menus, ...) written against
+named `%Token%` placeholders — spelled exactly like the `Theme::ThemeColors` field or `Theme::` constant they
+resolve to — and `styleSheetString()` concatenates the sections and resolves all tokens in one replace pass. It also carries the **grid card, star and thumbnail** styles (by object
 name, e.g. `#mediaItemCard`), moved here from per-instance `setStyleSheet` because those polished too slowly when
 the grid and frame viewer build hundreds at once — and, being in this sheet, they now follow a live theme
 switch too. Every corner radius used anywhere in the app is a named constant in `Theme.h` rather than a
