@@ -1,39 +1,22 @@
 # Darkroom
 
-A Qt desktop application (Windows-first) for extracting frames from videos with ffmpeg and organizing the
-resulting frame collections: labels, thumbnail grids, a frame viewer, and a built-in video player.
+Darkroom is a fast (and free) desktop software for organizing, inspecting, labeling your photos and videos.
 
-## Features
+Drop in your videos and photos to create an easily browsable library. You can pull frames out of any
+video, tag everything with colored labels, flip through thumbnails, and compare images side by side in a powerful UI with automatic image alignment.
 
-- **Import**: drag & drop video files (MP4, MOV, AVI, MKV, FLV) onto the window, or use the Quick Import
-  staging dialog — with duplicate detection, so the same video isn't ingested twice
-- **Frame extraction**: via ffmpeg, to JPEG or TIFF, with configurable encoding settings
-- **Labels**: organize videos with colored labels — assign from the sidebar by drag & drop or context menu;
-  filter the grid by label
-- **Video grid**: cards with preview thumbnails, adjustable zoom, name filter, sorting, multi-select
-- **Frame browsing**: per-video thumbnail viewer; open any frame in the system image viewer or in Explorer
-- **Video player**: built-in player with seeking and A-B loops, saved per video
-- **Frame comparison**: view frames side by side
-- **Catalog maintenance**: integrity check and untracked-file discovery
-- **Dark & light themes**
+## What you can do
 
-## Requirements
+- **Bring in your media**: just drag and drop videos or photos onto the window
+- **Pull frames from video**: split any video into still frames
+- **Tag with labels**: organize everything with colored labels you create and name
+- **Browse visually**: a grid of thumbnails you can scroll, filter, sort, and search by name
+- **Play video right inside the app**: with seeking, loop points you can save, and playback speed adjustment
+- **Compare photos side by side**: includes automatic alignment, so similar shots line up perfectly
+- **Light or dark look**: whichever is easier on your eyes
 
-- Windows (primary target)
-- [ffmpeg](https://ffmpeg.org/download.html) — found on `PATH`, or set the explicit path in the settings dialog
+## Getting started
 
-## Building
-
-qmake-based; requires Qt 6.5+ and a C++ toolchain (MSVC 2022 on Windows):
-
-```
-qmake -tp vc -r
-msbuild /t:Build /p:Configuration=Release
-```
-
-or open `Darkroom.pro` in Qt Creator. See [.github/workflows/CI.yml](.github/workflows/CI.yml) for the
-complete build and packaging steps.
-
-## License
-
-Apache-2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+1. Download and install Darkroom from Releases.
+2. [Download ffmpeg](https://ffmpeg.org/download.html) if you want video support, Darkroom needs it to read video files. Optional.
+3. Open Darkroom and drag videos, photos, or whole folders onto the window to get started.
