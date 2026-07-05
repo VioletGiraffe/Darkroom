@@ -179,7 +179,8 @@ at once behind a modal progress box. A staged *photo* skips all of that: its car
 (no temp dir — `StagedEntry::tempPreviewDir` stays empty, and the temp-dir cleanup paths guard on that, since
 `QDir("")` would name the working directory), it double-clicks into the system image viewer rather than the
 built-in player, and it stages instantly. Frame count is the same `Settings::PreviewFrameCount` the main grid uses
-(no separate setting). Each staged item is tracked by a `StagedEntry` (its path, temp preview dir, pending
+(no separate setting); staged cards also mirror the main grid's type-specific sizing — square photo cards, video
+strips widened to tile with them (`MediaItemWidget::videoCanvasWidthForTiling`). Each staged item is tracked by a `StagedEntry` (its path, temp preview dir, pending
 Best/labels, grid item), keyed by `MediaId` computed once at stage time while the source file still exists (see
 "Why `MediaId`, not path" below). The temp dir is deleted once the entry is unstaged or the dialog closes — but
 its frames aren't wasted: a successful Import copies them into the permanent `outputFolder/preview/` rather than

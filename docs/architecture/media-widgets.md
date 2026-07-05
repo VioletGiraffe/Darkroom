@@ -68,8 +68,12 @@ this reflects. Its position depends on the thumbnail width, so it's re-placed on
 just when set — that's what makes the initial placement self-correcting when the card's real width isn't known
 yet at construction (before the grid lays it out).
 
-Card image size = per-frame height × frame count wide, by that height tall — both the per-frame height and the
-frame count are user-adjustable at runtime (see "Card preview sizing & zoom" below).
+Card sizes are type-specific but share one **height** (the user's per-frame height): a **photo** card is
+**square** (that height on both sides); a **video** card is a horizontal strip showing `frameCount` frames.
+The video width isn't just height × count — it's chosen (`MediaItemWidget::videoCanvasWidthForTiling`) so a
+video card spans exactly `frameCount` photo-card columns *including the grid gaps between them*, which makes
+mixed photo/video cards align on a single column grid. Per-frame height and frame count are both
+user-adjustable at runtime (see "Card preview sizing & zoom" below).
 
 ### Dragging a card out (file export)
 
@@ -99,11 +103,14 @@ rescale only transiently (mid-resize). Deliberate: a calc bug shows as clipping,
 
 `sizeHint()` has two modes via `setDynamicSizeHint(bool)` (default **on**): dynamic returns the tight
 bounding box post-load (layout consumers re-query on `updateGeometry()` and reflow); **fixed** always
-returns the max-bound. **MainWindow's grid uses fixed by design** — a uniform grid is the intended look, and
-that uniformity is what lets the grid compute the card size hint **once** and reuse it for every item
-(alongside `setUniformItemSizes(true)`). Tight per-card sizing is deliberately **not** done: the image loads
-async, so the tight size isn't known when the item's hint is set, and re-querying per card would reintroduce
-the per-card relayout the grid build avoids.
+returns the max-bound. **MainWindow's grid uses fixed by design** — every card of a given media type is one
+fixed size, so the grid computes the card size hint **once per type** (a video's strip and a photo's square
+differ in width) and reuses it for every item of that type, activating at most two card layouts per rebuild
+instead of one per card. Because the two types differ in width, `setUniformItemSizes(true)` (which forces a
+single size on all items) **can't** be used; instead each item carries an explicit fixed hint, so per-item
+layout stays a cached-value lookup rather than a widget layout activation — essentially the same populate cost.
+Tight per-card sizing is deliberately **not** done: the image loads async, so the tight size isn't known when
+the item's hint is set, and re-querying per card would reintroduce the per-card relayout the grid build avoids.
 
 **Framing**: the composite constructor takes a `framed` flag (default true). `framed=false` — used by the
 grid card — drops the border, hover and padding, leaving just the recessed matte well, because
