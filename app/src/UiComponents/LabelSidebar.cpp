@@ -248,11 +248,11 @@ LabelSidebar::LabelSidebar(QWidget* parent) : QWidget(parent)
 	m_list->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(m_list, &QListWidget::customContextMenuRequested, this, &LabelSidebar::showRowContextMenu);
 
-	auto* addButton = new QPushButton(tr("Create label"));
-	addButton->setObjectName("addLabelButton");
-	addButton->setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_plus.svg"), &Theme::ThemeColors::MutedText));
-	layout->addWidget(addButton);
-	connect(addButton, &QPushButton::clicked, this, &LabelSidebar::addLabelRequested);
+	auto* btnCreateLabel = new QPushButton(tr("Create label"));
+	btnCreateLabel->setObjectName("addLabelButton");
+	btnCreateLabel->setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_plus.svg"), &Theme::ThemeColors::MutedText));
+	layout->addWidget(btnCreateLabel);
+	connect(btnCreateLabel, &QPushButton::clicked, this, &LabelSidebar::addLabelRequested);
 
 	rebuildRows();
 }
