@@ -411,6 +411,9 @@ QuickImportDialog::QuickImportDialog(Callbacks callbacks, const QString& suggest
 	m_labelList->setSelectionMode(QAbstractItemView::NoSelection);  // rows are dragged, never selected
 	m_labelList->setFrameShape(QFrame::NoFrame);
 	m_labelList->setMaximumWidth(220);
+	// Hover fill matches the main-window sidebar's active-row highlight (BackgroundSecondary + ControlRadius), for a consistent feel.
+	m_labelList->setStyleSheet(QStringLiteral("QListWidget::item:hover { background-color: %1; border-radius: %2px; }")
+		.arg(Theme::current().BackgroundSecondary).arg(Theme::ControlRadius));
 	m_labelList->viewport()->installEventFilter(this);  // drives the row-drag gesture (see eventFilter)
 	m_labelList->setContextMenuPolicy(Qt::CustomContextMenu);  // right-click a row to edit a provisional label
 	connect(m_labelList, &QListWidget::customContextMenuRequested, this, &QuickImportDialog::showLabelListContextMenu);
