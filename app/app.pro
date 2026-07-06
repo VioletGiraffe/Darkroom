@@ -49,7 +49,7 @@ HEADERS += \
 
 SOURCES += $$files(src/*.cpp, true)
 
-RESOURCES += res/UI/resources.qrc
+RESOURCES += res/resources.qrc
 
 ###################################################
 #                 LIBS

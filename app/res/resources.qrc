@@ -1,0 +1,13 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+	<qresource prefix="/">
+		<file>icon.svg</file>
+		<file>UI/combobox_down_arrow.svg</file>
+		<file>UI/checkbox_check.svg</file>
+		<file>UI/icon_stack.svg</file>
+		<file>UI/icon_plus.svg</file>
+		<file>UI/icon_search.svg</file>
+		<file>UI/icon_columns.svg</file>
+		<file>UI/icon_sort.svg</file>
+	</qresource>
+</RCC>

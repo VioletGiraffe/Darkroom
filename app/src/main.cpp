@@ -7,6 +7,7 @@
 #include <QApplication>
 #include <QDebug>
 #include <QDir>
+#include <QIcon>
 #include <QSettings>
 #include <QStyleHints>
 
@@ -20,6 +21,7 @@ int main(int argc, char* argv[])
 	app.setOrganizationName("VioletGiraffe");
 	app.setApplicationName("Darkroom");
 	app.setApplicationVersion(STRINGIFY_EXPANDED_ARGUMENT(DARKROOM_VERSION));  // from VERSION in app.pro; surfaced in Help > About
+	app.setWindowIcon(QIcon(":/icon.svg"));  // default window icon; Windows rides on RC_ICONS, this is for Linux/macOS
 
 	CCrashHandler::setMinidumpsStorageFolderPath(QDir::tempPath().toStdString());
 	CCrashHandler crashHandler([](const wchar_t* msg) {
