@@ -59,9 +59,8 @@ void SegmentedToggle::paintEvent(QPaintEvent*)
 	p.setRenderHint(QPainter::Antialiasing);
 
 	const Theme::ThemeColors& t = Theme::current();
-	const QColor border  = colorFromHex(t.BorderControl);
+	const QColor border  = colorFromHex(t.BorderStrong);
 	const QColor textCol = palette().color(QPalette::Text);
-	const QColor muted   = colorFromHex(t.MutedText);
 
 	p.setPen(QPen(border, 1));
 	p.setBrush(Qt::NoBrush);
@@ -98,7 +97,7 @@ void SegmentedToggle::paintEvent(QPaintEvent*)
 			p.drawRoundedRect(seg.adjusted(INSET, INSET, -INSET, -INSET), RADIUS - INSET, RADIUS - INSET);
 		}
 
-		p.setPen(selected ? colorFromHex(t.AccentText) : muted);   // accent text for the selected segment
+		p.setPen(selected ? colorFromHex(t.AccentText) : textCol);   // accent text on the selected fill, normal text on the rest
 		p.drawText(seg, Qt::AlignCenter, m_segments[i]);
 	}
 }

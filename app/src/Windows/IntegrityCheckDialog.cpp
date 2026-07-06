@@ -71,7 +71,7 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 	// of its own) in place of the native sunken panel; QScrollArea isn't styled centrally because its other
 	// use (FrameViewerWindow) wants no frame at all.
 	scroll->setStyleSheet(QStringLiteral("QScrollArea { border: 1px solid %1; border-radius: %2px; background: transparent; }")
-		.arg(Theme::current().BorderControl).arg(Theme::ControlRadius));
+		.arg(Theme::current().BorderMedium).arg(Theme::ControlRadius));
 	QWidget* content = new QWidget(scroll);
 	QVBoxLayout* contentLayout = new QVBoxLayout(content);
 

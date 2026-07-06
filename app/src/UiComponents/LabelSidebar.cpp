@@ -250,7 +250,7 @@ LabelSidebar::LabelSidebar(QWidget* parent) : QWidget(parent)
 
 	auto* btnCreateLabel = new QPushButton(tr("Create label"));
 	btnCreateLabel->setObjectName("addLabelButton");
-	btnCreateLabel->setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_plus.svg"), &Theme::ThemeColors::MutedText));
+	btnCreateLabel->setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_plus.svg"), &Theme::ThemeColors::TextPrimary));
 	layout->addWidget(btnCreateLabel);
 	connect(btnCreateLabel, &QPushButton::clicked, this, &LabelSidebar::addLabelRequested);
 

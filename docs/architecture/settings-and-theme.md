@@ -34,10 +34,12 @@ make the compiler catch a missing one.
 
 Each `ThemeColors` field is tuned to a specific CSS variable in the design mockup; the per-field comments in
 `Theme.h` name the source variable so a retune can go back to it instead of guessing. Two splits are worth
-knowing when picking a color at a new call site: hairlines are **`BorderSubtle`** (passive separators — card
-borders, dividers, panel edges) vs **`BorderControl`** (interactive outlines — buttons, inputs, popovers), and
-the emphasis hue is **`AccentBorder`** (accent borders/fills/dots) vs **`AccentText`** (text on an
-`AccentBg`-tinted surface). Both exist because the mockup uses different strengths for what could look like one
+knowing when picking a color at a new call site: borders come in three strengths — **`BorderSubtle`** (faint
+hairlines — card borders, dividers, panel edges), **`BorderMedium`** (floating-surface / container outlines —
+menus, tooltips, combo popups, list frames), and **`BorderStrong`** (the resting edge of inline interactive
+controls — buttons, inputs, combo field, slider handle, checkbox, segmented toggle; tuned toward `TextPrimary`
+so they don't read as disabled). The emphasis hue is **`AccentBorder`** (accent borders/fills/dots) vs
+**`AccentText`** (text on an `AccentBg`-tinted surface). Both exist because the mockup uses different strengths for what could look like one
 color — pick the wrong half and it'll look subtly off. Two colors deliberately sit *off* the neutral ramp
 (the mockup's hue-shift retune, adopted 2026-07): **`BackgroundSecondary`** (the raised/selected-row surface,
 e.g. the sidebar's active row) and **`MutedText`** — sage-tinted in light, wine-tinted in dark — so the

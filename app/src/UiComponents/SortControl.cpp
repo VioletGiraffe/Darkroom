@@ -45,7 +45,7 @@ public:
 		card->setObjectName("sortPopoverCard");
 		card->setStyleSheet(QStringLiteral(
 			"QFrame#sortPopoverCard { background-color: palette(window); border: 1px solid %1; border-radius: %2px; }")
-			.arg(t.BorderControl).arg(Theme::PopoverRadius));
+			.arg(t.BorderMedium).arg(Theme::PopoverRadius));
 
 		auto* shadow = new QGraphicsDropShadowEffect(card);
 		shadow->setBlurRadius(20);

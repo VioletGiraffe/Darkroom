@@ -23,7 +23,7 @@ namespace {
 
 constexpr char kButtons[] = R"(
 	QPushButton {
-		border: 1px solid %BorderControl%;
+		border: 1px solid %BorderStrong%;
 		border-radius: %ControlRadius%px;
 		padding: 4px 12px;
 		background: palette(button);
@@ -36,8 +36,8 @@ constexpr char kButtons[] = R"(
 	/* Transparent affordance for creating a label (sidebar / quick-import). Left-aligned icon+text, per the mockup. */
 	QPushButton#addLabelButton {
 		background: transparent;
-		border: 2px dashed %BorderControl%;
-		color: %MutedText%;
+		border: 2px dashed %BorderStrong%;
+		color: %TextPrimary%;
 		text-align: left;
 		padding-left: 6px;
 	}
@@ -46,7 +46,7 @@ constexpr char kButtons[] = R"(
 
 constexpr char kTextInputs[] = R"(
 	QLineEdit, QPlainTextEdit, QTextEdit {
-		border: 1px solid %BorderControl%;
+		border: 1px solid %BorderStrong%;
 		border-radius: %ControlRadius%px;
 		padding: 4px 8px;
 		background: palette(base);
@@ -57,7 +57,7 @@ constexpr char kTextInputs[] = R"(
 
 constexpr char kComboBoxes[] = R"(
 	QComboBox {
-		border: 1px solid %BorderControl%;
+		border: 1px solid %BorderStrong%;
 		border-radius: %ControlRadius%px;
 		padding: 3px 8px;
 		background: palette(button);
@@ -72,7 +72,7 @@ constexpr char kComboBoxes[] = R"(
 	}
 	QComboBox::down-arrow { image: url(:/UI/combobox_down_arrow.svg); width: 10px; height: 7px; }
 	QComboBox QAbstractItemView {
-		border: 1px solid %BorderControl%;
+		border: 1px solid %BorderMedium%;
 		border-radius: %ControlRadius%px;
 		padding: 4px;
 		background: palette(base);
@@ -82,14 +82,14 @@ constexpr char kComboBoxes[] = R"(
 
 constexpr char kMenus[] = R"(
 	QMenu {
-		border: 1px solid %BorderControl%;
+		border: 1px solid %BorderMedium%;
 		border-radius: %MenuRadius%px;
 		padding: 4px;
 		background: palette(window);
 	}
 	QMenu::item { border-radius: %MenuItemRadius%px; padding: 5px 24px 5px 12px; }
 	QMenu::item:selected { background: %AccentBg%; }
-	QMenu::separator { height: 1px; background: %BorderControl%; margin: 4px 8px; }
+	QMenu::separator { height: 1px; background: %BorderSubtle%; margin: 4px 8px; }
 )";
 
 constexpr char kMenuBar[] = R"(
@@ -107,7 +107,7 @@ constexpr char kLists[] = R"(
 	   their own "input" surface. Only the list's own frame/background, not item geometry, so it doesn't
 	   disturb the grid's sized cards. Per-item coloring (selection, hover) stays local to each list,
 	   since that varies by use. */
-	QListWidget { border: 1px solid %BorderControl%; border-radius: %ControlRadius%px; background: transparent; }
+	QListWidget { border: 1px solid %BorderMedium%; border-radius: %ControlRadius%px; background: transparent; }
 )";
 
 constexpr char kScrollBars[] = R"(
@@ -134,7 +134,7 @@ constexpr char kSliders[] = R"(
 		width: %SliderHandleContentWidth%px;
 		margin: -%SliderHandleOverhang%px 0;   /* let the round handle overhang the thin groove symmetrically */
 		background: palette(button);
-		border: 1px solid %BorderControl%;
+		border: 1px solid %BorderStrong%;
 		border-radius: %SliderHandleRadius%px;
 	}
 	QSlider::handle:horizontal:hover { border-color: %AccentBorder%; }
@@ -148,7 +148,7 @@ constexpr char kCheckBoxes[] = R"(
 	QCheckBox { spacing: 8px; }
 	QCheckBox::indicator {
 		width: 14px; height: 14px;
-		border: 1px solid %BorderControl%;
+		border: 1px solid %BorderStrong%;
 		border-radius: %CheckboxRadius%px;
 		background: transparent;
 	}
@@ -191,7 +191,7 @@ constexpr char kToolTips[] = R"(
 	QToolTip {
 		background-color: %BackgroundPrimary%;
 		color: %TextPrimary%;
-		border: 1px solid %BorderControl%;
+		border: 1px solid %BorderMedium%;
 		padding: 4px 8px;
 	}
 )";
@@ -229,7 +229,8 @@ QString styleSheetString()
 
 	const std::pair<QString, QString> tokens[] = {
 		{ QStringLiteral("%BorderSubtle%"),             QString::fromLatin1(t.BorderSubtle) },
-		{ QStringLiteral("%BorderControl%"),            QString::fromLatin1(t.BorderControl) },
+		{ QStringLiteral("%BorderMedium%"),             QString::fromLatin1(t.BorderMedium) },
+		{ QStringLiteral("%BorderStrong%"),             QString::fromLatin1(t.BorderStrong) },
 		{ QStringLiteral("%AccentBorder%"),             QString::fromLatin1(t.AccentBorder) },
 		{ QStringLiteral("%AccentBg%"),                 QString::fromLatin1(t.AccentBg) },
 		{ QStringLiteral("%MutedText%"),                QString::fromLatin1(t.MutedText) },
@@ -330,7 +331,7 @@ public:
 			QPainter p(container);
 			p.setRenderHint(QPainter::Antialiasing);
 			const QRectF r = QRectF(container->rect()).adjusted(0.5, 0.5, -0.5, -0.5);  // inset so the 1px stroke isn't clipped
-			p.setPen(QPen(QColor(QString::fromLatin1(t.BorderControl)), 1.0));
+			p.setPen(QPen(QColor(QString::fromLatin1(t.BorderMedium)), 1.0));
 			p.setBrush(container->palette().base());
 			p.drawRoundedRect(r, Theme::ControlRadius, Theme::ControlRadius);
 			return true;  // surface drawn; suppress the container's own paint so it doesn't overpaint us (items paint after)

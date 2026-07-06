@@ -50,8 +50,9 @@ struct ThemeColors {
 	const char* BackgroundSecondary; // --color-background-secondary: the raised/selected row fill (sidebar active row) - one
 	                                 // hue-shifted step off BackgroundPrimary, so other colors (per-label accent bars) sit on it cleanly
 	const char* TextPrimary;        // --color-text-primary: window/base/button text (drives the app QPalette)
-	const char* BorderSubtle;       // --color-border-tertiary: passive hairlines - card borders, dividers, panel edges
-	const char* BorderControl;      // --color-border-secondary: interactive control outlines - buttons, inputs, popovers
+	const char* BorderSubtle;       // --color-border-tertiary: faint hairlines - card borders, dividers, panel edges
+	const char* BorderMedium;       // --color-border-secondary: floating-surface / container outlines - menus, tooltips, combo popups, list frames
+	const char* BorderStrong;       // resting edge of inline interactive controls (buttons, inputs, combo field, slider handle, checkbox, segmented toggle) - tuned toward TextPrimary so they don't read as disabled
 	const char* AccentBorder;       // --color-border-info: accent-colored borders/fills/dots (hover border, accent bar, checkbox fill)
 	const char* AccentText;         // --color-text-info: text/icon color sitting on an AccentBg-tinted surface
 	const char* AccentBg;           // --color-background-info: accent-tinted surface fill (selected/segment fills, highlighted card)

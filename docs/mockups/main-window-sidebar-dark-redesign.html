@@ -26,9 +26,10 @@
     --color-background-tertiary: #e7e4db;
     --color-border-tertiary: rgba(20, 20, 16, 0.12);
     --color-border-secondary: rgba(20, 20, 16, 0.22);
+    --color-border-primary: rgba(20, 20, 16, 0.45);    /* strong tier: inline interactive control edges (buttons, inputs, toggles) - ~2x the secondary alpha */
     --color-border-info: #1aa6b5;
     --color-background-info: #ddf3f5;
-    --color-text-primary: #1a1a18;
+    --color-text-primary: #241d15;   /* near-black but visibly warm; high contrast on the paper surface */
     --color-text-secondary: #5f5e5a;
     --color-text-tertiary: #7b815f;         /* same sage-shifted hue as background-secondary, darkened for
                                                 real contrast against the page (was near-zero saturation, a
@@ -55,6 +56,7 @@
     --color-background-tertiary: #0f131b;  /* recessed wells (thumbnails) */
     --color-border-tertiary: rgba(206, 219, 238, 0.09);
     --color-border-secondary: rgba(206, 219, 238, 0.18);
+    --color-border-primary: rgba(206, 219, 238, 0.40);    /* strong tier: inline interactive control edges (buttons, inputs, toggles) - ~2x the secondary alpha */
     --color-border-info: #34bdd0;
     --color-background-info: #133f48;       /* teal fill — a distinct hue from the blue-gray neutral, kept clean (not muddy) so selected segments pop */
     --color-text-info: #c9f1f7;            /* bright teal active text — must override the light theme's dark navy
@@ -132,9 +134,9 @@
     <div style="width:178px; flex:0 0 178px; border-right:0.5px solid var(--color-border-tertiary); padding:10px 8px; display:flex; flex-direction:column; gap:2px;">
       <div style="display:flex; align-items:center; justify-content:space-between; padding:0 6px 6px;">
         <span style="font-size:12px; color:var(--color-text-secondary);">Labels</span>
-        <span style="display:inline-flex; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-md); overflow:hidden; font-size:11px;">
+        <span style="display:inline-flex; border:0.5px solid var(--color-border-primary); border-radius:var(--border-radius-md); overflow:hidden; font-size:11px;">
           <span style="padding:2px 7px; background:var(--color-background-info); color:var(--color-text-info);">OR</span>
-          <span style="padding:2px 7px; color:var(--color-text-tertiary);">AND</span>
+          <span style="padding:2px 7px; color:var(--color-text-primary);">AND</span>
         </span>
       </div>
 
@@ -170,7 +172,7 @@
         <span style="flex:1;">forest</span><span style="font-size:11px; color:var(--color-text-tertiary);">31</span>
       </div>
 
-      <div style="margin-top:auto; display:flex; align-items:center; gap:6px; padding:6px 8px; font-size:12px; color:var(--color-text-secondary); border:0.5px dashed var(--color-border-secondary); border-radius:var(--border-radius-md);">
+      <div style="margin-top:auto; display:flex; align-items:center; gap:6px; padding:6px 8px; font-size:12px; color:var(--color-text-primary); border:0.5px dashed var(--color-border-primary); border-radius:var(--border-radius-md);">
         <i class="ti ti-plus" aria-hidden="true" style="font-size:15px;"></i><span>Create label</span>
       </div>
     </div>
@@ -178,13 +180,13 @@
     <div style="flex:1; min-width:0; display:flex; flex-direction:column;">
 
       <div style="display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:0.5px solid var(--color-border-tertiary);">
-        <div style="flex:1; display:flex; align-items:center; gap:6px; height:32px; padding:0 10px; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-md); color:var(--color-text-tertiary); font-size:13px;">
+        <div style="flex:1; display:flex; align-items:center; gap:6px; height:32px; padding:0 10px; border:0.5px solid var(--color-border-primary); border-radius:var(--border-radius-md); color:var(--color-text-tertiary); font-size:13px;">
           <i class="ti ti-search" aria-hidden="true" style="font-size:15px;"></i><span>filter by name…</span>
         </div>
 
         <!-- Card-density control: its own inline control, separate from sort. Opens a 1..N dropdown
              (MIN_PREVIEW_FRAME_COUNT..MAX_PREVIEW_FRAME_COUNT) picking how many preview frames each card shows. -->
-        <div style="display:flex; align-items:center; gap:6px; height:32px; padding:0 9px; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-md); font-size:12px; color:var(--color-text-secondary);">
+        <div style="display:flex; align-items:center; gap:6px; height:32px; padding:0 9px; border:0.5px solid var(--color-border-primary); border-radius:var(--border-radius-md); font-size:12px; color:var(--color-text-secondary);">
           <i class="ti ti-layout-columns" aria-hidden="true" style="font-size:15px;"></i><span>3 frames</span>
           <i class="ti ti-chevron-down" aria-hidden="true" style="font-size:13px; color:var(--color-text-tertiary);"></i>
         </div>
@@ -200,14 +202,14 @@
           <!-- Drawn open to specify the options the popover contains (it is dismissible in the real app). -->
           <div style="position:absolute; top:38px; right:0; z-index:5; width:196px; padding:10px; background:var(--color-background-primary); border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-lg); box-shadow:0 6px 20px var(--color-shadow);">
             <div style="font-size:11px; color:var(--color-text-tertiary); padding:0 2px 5px;">Sort by</div>
-            <div style="display:flex; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-md); overflow:hidden; font-size:12px; margin-bottom:9px;">
-              <span style="flex:1; text-align:center; padding:5px 0; color:var(--color-text-secondary);">Name</span>
+            <div style="display:flex; border:0.5px solid var(--color-border-primary); border-radius:var(--border-radius-md); overflow:hidden; font-size:12px; margin-bottom:9px;">
+              <span style="flex:1; text-align:center; padding:5px 0; color:var(--color-text-primary);">Name</span>
               <span style="flex:1; text-align:center; padding:5px 0; background:var(--color-background-info); color:var(--color-text-info);">Date</span>
             </div>
 
             <div style="font-size:11px; color:var(--color-text-tertiary); padding:0 2px 5px;">Direction</div>
-            <div style="display:flex; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-md); overflow:hidden; font-size:12px; margin-bottom:10px;">
-              <span style="flex:1; text-align:center; padding:5px 0; color:var(--color-text-secondary);">↑ Ascending</span>
+            <div style="display:flex; border:0.5px solid var(--color-border-primary); border-radius:var(--border-radius-md); overflow:hidden; font-size:12px; margin-bottom:10px;">
+              <span style="flex:1; text-align:center; padding:5px 0; color:var(--color-text-primary);">↑ Ascending</span>
               <span style="flex:1; text-align:center; padding:5px 0; background:var(--color-background-info); color:var(--color-text-info);">↓ Descending</span>
             </div>
 
@@ -359,7 +361,7 @@
   const TOKENS = [
     "--color-background-primary", "--color-background-secondary", "--color-background-tertiary", "--color-page",
     "--color-text-primary", "--color-text-secondary", "--color-text-tertiary",
-    "--color-border-tertiary", "--color-border-secondary",
+    "--color-border-tertiary", "--color-border-secondary", "--color-border-primary",
     "--color-border-info", "--color-background-info", "--color-text-info", "--color-star-active",
   ];
 
@@ -409,7 +411,7 @@
   // original light/dark reference palettes -- tune the numbers to taste.
   const RAMP = {
     dark: {
-      page: "#000000", borderTintL: 85, borderAlpha: [0.09, 0.18], starL: [55, 68],
+      page: "#000000", borderTintL: 85, borderAlpha: [0.09, 0.18, 0.40], starL: [55, 68],
       primaryL: v => v,                                                  // slider value IS the dark surface L (1..14)
       bgRamp: (p, terD, secD) => [p, p + secD, Math.max(0, p - terD)],   // raised rows lighter, wells darkest (clamped >= 0)
       textRamp: (t1, t2, t3) => {                                        // bright text: tertiary < secondary < primary
@@ -418,7 +420,7 @@
       },
     },
     light: {
-      page: "#ffffff", borderTintL: 15, borderAlpha: [0.12, 0.22], starL: [40, 52],
+      page: "#ffffff", borderTintL: 15, borderAlpha: [0.12, 0.22, 0.45], starL: [40, 52],
       primaryL: v => lerp(86, 99, (v - 1) / 13),                         // surface near white; slider still reads "up = lighter"
       bgRamp: (p, terD, secD) => [p, p - secD, p - secD - terD],         // raised rows + wells step DOWN from the light surface
       textRamp: (t1, t2, t3) => {                                        // dark text: primary < secondary < tertiary
@@ -490,7 +492,7 @@
   }
 
   // ===== Derivation ========================================================================================
-  // Pure: state + slider value + theme -> the 13 CSS tokens. The single place the token mapping lives, so
+  // Pure: state + slider value + theme -> the 14 CSS tokens. The single place the token mapping lives, so
   // both themes (and the live lightness slider) flow through exactly the same code.
   function deriveTokens(s, v, theme) {
     const r = RAMP[theme];
@@ -509,6 +511,7 @@
       "--color-text-tertiary": hslToHex(s.minorHue, s.minorSat, txT),
       "--color-border-tertiary": `rgba(${br}, ${bg}, ${bb}, ${r.borderAlpha[0]})`,
       "--color-border-secondary": `rgba(${br}, ${bg}, ${bb}, ${r.borderAlpha[1]})`,
+      "--color-border-primary": `rgba(${br}, ${bg}, ${bb}, ${r.borderAlpha[2]})`,
       "--color-border-info": acc.border,
       "--color-background-info": acc.background,
       "--color-text-info": acc.text,
@@ -647,7 +650,7 @@
 
   // ===== Per-mockup color list =============================================================================
   // Dumps every applied token for each mockup, read live via getComputedStyle so it reflects whole-theme rolls,
-  // the lightness slider, and accent changes alike. Rebuilt wholesale on each change; cheap at 4 x 13 rows.
+  // the lightness slider, and accent changes alike. Rebuilt wholesale on each change; cheap at 4 x 14 rows.
   function renderColorList() {
     const container = document.getElementById("colorList");
     container.innerHTML = "";

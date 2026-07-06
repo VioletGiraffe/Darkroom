@@ -24,9 +24,10 @@
     --color-background-tertiary: #e7e4db;
     --color-border-tertiary: rgba(20, 20, 16, 0.12);
     --color-border-secondary: rgba(20, 20, 16, 0.22);
+    --color-border-primary: #918c85;    /* strong tier: inline interactive control edges (buttons, inputs, toggles), tuned toward text-primary (not a translucent hairline) */
     --color-border-info: #588a30;
     --color-background-info: #e9f1da;
-    --color-text-primary: #1a1a18;
+    --color-text-primary: #241d15;   /* near-black but visibly warm; high contrast on the paper surface */
     --color-text-secondary: #5f5e5a;
     --color-text-tertiary: #7b815f;         /* same sage-shifted hue as background-secondary, darkened for
                                                 real contrast against the page (was near-zero saturation, a
@@ -53,6 +54,7 @@
     --color-background-tertiary: #16120d;
     --color-border-tertiary: rgba(244, 238, 228, 0.10);
     --color-border-secondary: rgba(244, 238, 228, 0.20);
+    --color-border-primary: #78716a;    /* strong tier: inline interactive control edges (buttons, inputs, toggles), tuned toward text-primary (not a translucent hairline) */
     --color-border-info: #6db04f;
     --color-background-info: #2a3c1c;
     --color-text-primary: #ece5da;
@@ -114,9 +116,9 @@
     <div style="width:178px; flex:0 0 178px; border-right:0.5px solid var(--color-border-tertiary); padding:10px 8px; display:flex; flex-direction:column; gap:2px;">
       <div style="display:flex; align-items:center; justify-content:space-between; padding:0 6px 6px;">
         <span style="font-size:12px; color:var(--color-text-secondary);">Labels</span>
-        <span style="display:inline-flex; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-md); overflow:hidden; font-size:11px;">
+        <span style="display:inline-flex; border:0.5px solid var(--color-border-primary); border-radius:var(--border-radius-md); overflow:hidden; font-size:11px;">
           <span style="padding:2px 7px; background:var(--color-background-info); color:var(--color-text-info);">OR</span>
-          <span style="padding:2px 7px; color:var(--color-text-tertiary);">AND</span>
+          <span style="padding:2px 7px; color:var(--color-text-primary);">AND</span>
         </span>
       </div>
 
@@ -152,7 +154,7 @@
         <span style="flex:1;">forest</span><span style="font-size:11px; color:var(--color-text-tertiary);">31</span>
       </div>
 
-      <div style="margin-top:auto; display:flex; align-items:center; gap:6px; padding:6px 8px; font-size:12px; color:var(--color-text-secondary); border:0.5px dashed var(--color-border-secondary); border-radius:var(--border-radius-md);">
+      <div style="margin-top:auto; display:flex; align-items:center; gap:6px; padding:6px 8px; font-size:12px; color:var(--color-text-primary); border:0.5px dashed var(--color-border-primary); border-radius:var(--border-radius-md);">
         <i class="ti ti-plus" aria-hidden="true" style="font-size:15px;"></i><span>Create label</span>
       </div>
     </div>
@@ -160,13 +162,13 @@
     <div style="flex:1; min-width:0; display:flex; flex-direction:column;">
 
       <div style="display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:0.5px solid var(--color-border-tertiary);">
-        <div style="flex:1; display:flex; align-items:center; gap:6px; height:32px; padding:0 10px; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-md); color:var(--color-text-tertiary); font-size:13px;">
+        <div style="flex:1; display:flex; align-items:center; gap:6px; height:32px; padding:0 10px; border:0.5px solid var(--color-border-primary); border-radius:var(--border-radius-md); color:var(--color-text-tertiary); font-size:13px;">
           <i class="ti ti-search" aria-hidden="true" style="font-size:15px;"></i><span>filter by name…</span>
         </div>
 
         <!-- Card-density control: its own inline control, separate from sort. Opens a 1..N dropdown
              (MIN_PREVIEW_FRAME_COUNT..MAX_PREVIEW_FRAME_COUNT) picking how many preview frames each card shows. -->
-        <div style="display:flex; align-items:center; gap:6px; height:32px; padding:0 9px; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-md); font-size:12px; color:var(--color-text-secondary);">
+        <div style="display:flex; align-items:center; gap:6px; height:32px; padding:0 9px; border:0.5px solid var(--color-border-primary); border-radius:var(--border-radius-md); font-size:12px; color:var(--color-text-secondary);">
           <i class="ti ti-layout-columns" aria-hidden="true" style="font-size:15px;"></i><span>3 frames</span>
           <i class="ti ti-chevron-down" aria-hidden="true" style="font-size:13px; color:var(--color-text-tertiary);"></i>
         </div>
@@ -182,14 +184,14 @@
           <!-- Drawn open to specify the options the popover contains (it is dismissible in the real app). -->
           <div style="position:absolute; top:38px; right:0; z-index:5; width:196px; padding:10px; background:var(--color-background-primary); border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-lg); box-shadow:0 6px 20px var(--color-shadow);">
             <div style="font-size:11px; color:var(--color-text-tertiary); padding:0 2px 5px;">Sort by</div>
-            <div style="display:flex; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-md); overflow:hidden; font-size:12px; margin-bottom:9px;">
-              <span style="flex:1; text-align:center; padding:5px 0; color:var(--color-text-secondary);">Name</span>
+            <div style="display:flex; border:0.5px solid var(--color-border-primary); border-radius:var(--border-radius-md); overflow:hidden; font-size:12px; margin-bottom:9px;">
+              <span style="flex:1; text-align:center; padding:5px 0; color:var(--color-text-primary);">Name</span>
               <span style="flex:1; text-align:center; padding:5px 0; background:var(--color-background-info); color:var(--color-text-info);">Date</span>
             </div>
 
             <div style="font-size:11px; color:var(--color-text-tertiary); padding:0 2px 5px;">Direction</div>
-            <div style="display:flex; border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-md); overflow:hidden; font-size:12px; margin-bottom:10px;">
-              <span style="flex:1; text-align:center; padding:5px 0; color:var(--color-text-secondary);">↑ Ascending</span>
+            <div style="display:flex; border:0.5px solid var(--color-border-primary); border-radius:var(--border-radius-md); overflow:hidden; font-size:12px; margin-bottom:10px;">
+              <span style="flex:1; text-align:center; padding:5px 0; color:var(--color-text-primary);">↑ Ascending</span>
               <span style="flex:1; text-align:center; padding:5px 0; background:var(--color-background-info); color:var(--color-text-info);">↓ Descending</span>
             </div>
 

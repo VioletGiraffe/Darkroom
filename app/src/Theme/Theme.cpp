@@ -19,7 +19,8 @@ static constexpr Theme::ThemeColors Dark{
 	.BackgroundSecondary = "#3c2528",       // wine-tinted raised-row step up from BackgroundPrimary
 	.TextPrimary = "#ece5da",
 	.BorderSubtle = "#34302b",              // the mockup's rgba(244,238,228,.10) hairline flattened over BackgroundPrimary
-	.BorderControl = "#4a453f",             // ... and its .20 sibling, same derivation
+	.BorderMedium = "#4a453f",              // the .20 sibling of BorderSubtle - floating-surface / container outlines
+	.BorderStrong = "#78716a",              // inline-control resting edge, tuned toward TextPrimary (not a mockup token)
 	.AccentBorder = "#5aa0e8",
 	.AccentText = "#8fc3f0",
 	.AccentBg = "#22303f",
@@ -37,9 +38,10 @@ static constexpr Theme::ThemeColors Light{
 	.BackgroundPrimary = "#faf5f0",   // warm off-white surface — lighter than BackgroundSecondary/ThumbnailMatte,
 	                                  // just a visible step below a pure-white page/desktop
 	.BackgroundSecondary = "#edefe1", // sage-tinted raised-row step down from BackgroundPrimary
-	.TextPrimary = "#1a1a18",
+	.TextPrimary = "#241d15",         // near-black but visibly warm (on the brown neutral ramp), not a flat neutral - high contrast on the paper bg
 	.BorderSubtle = "#dedad5",        // the mockup's rgba(20,20,16,.12) hairline flattened over BackgroundPrimary
-	.BorderControl = "#c7c3bf",       // ... and its .22 sibling, same derivation
+	.BorderMedium = "#c7c3bf",        // the .22 sibling of BorderSubtle - floating-surface / container outlines
+	.BorderStrong = "#918c85",        // inline-control resting edge, tuned toward TextPrimary (not a mockup token)
 	.AccentBorder = "#378add",
 	.AccentText = "#185fa5",
 	.AccentBg = "#e6f1fb",
