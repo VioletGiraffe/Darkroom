@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783339579188,
+  "lastUpdate": 1783346828028,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -294,6 +294,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 260.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 20.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 288,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "3411483d2959f9f691637f50d235a8d36d8bc1fd",
+          "message": "Colors retuned closer to the mockup",
+          "timestamp": "2026-07-06T17:03:07+03:00",
+          "tree_id": "f98bc13b089984dd2f7d72be0a540f31398567a4",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/3411483d2959f9f691637f50d235a8d36d8bc1fd"
+        },
+        "date": 1783346825514,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 7281,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 3343,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1085,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 479,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 261,
             "unit": "KB"
           },
           {
