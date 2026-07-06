@@ -18,6 +18,7 @@
 #include "UiComponents/MediaItemWidget.h"
 #include "Windows/VideoPlayerWindow.h"
 #include "Theme/Icons.h"
+#include "Theme/Style.h"
 #include "Theme/Theme.h"
 #include "Utils.h"
 #include "Settings.h"
@@ -255,7 +256,9 @@ void MainWindow::setupUI()
 	m_mediaGrid->setDragEnabled(true);
 	m_mediaGrid->setDragUrlsProvider([this](const QList<QListWidgetItem*>& items) { return dragUrlsForItems(items); });
 	m_mediaGrid->setSpacing(10);
-	m_mediaGrid->setStyleSheet(QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().AccentBg));
+	Style::applyThemedSheet(m_mediaGrid, [] {
+		return QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().AccentBg);
+	});
 
 	mainLayout->addWidget(m_mediaGrid, 1);
 

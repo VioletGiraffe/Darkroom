@@ -1,5 +1,6 @@
 #include "Windows/SettingsDialog.h"
 #include "Settings.h"
+#include "Theme/Style.h"
 #include "Theme/Theme.h"
 
 #include <QFileDialog>
@@ -129,7 +130,9 @@ EncodingSettingsPage::EncodingSettingsPage(QWidget* parent) : CSettingsPage(pare
 	m_quality->setEnabled(!useTiff);
 
 	auto* qualityHint = new QLabel(tr("1 = best quality / largest file, 31 = worst / smallest"), this);
-	qualityHint->setStyleSheet(QStringLiteral("color: %1;").arg(Theme::current().InstructionText));
+	Style::applyThemedSheet(qualityHint, [] {
+		return QStringLiteral("color: %1;").arg(Theme::current().InstructionText);
+	});
 	qualityHint->setEnabled(!useTiff);
 
 	connect(m_jpeg, &QRadioButton::toggled, m_quality,   &QSpinBox::setEnabled);

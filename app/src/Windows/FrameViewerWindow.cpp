@@ -1,4 +1,5 @@
 #include "Windows/FrameViewerWindow.h"
+#include "Theme/Style.h"
 #include "Theme/Theme.h"
 #include "UiComponents/ThumbnailWidget.h"
 #include "Utils.h"
@@ -36,7 +37,9 @@ FrameViewerWindow::FrameViewerWindow(QWidget* parent)
 
 	m_instructionLabel = new QLabel(this);
 	m_instructionLabel->setAlignment(Qt::AlignCenter);
-	m_instructionLabel->setStyleSheet(QStringLiteral("font-size: 16pt; color: %1;").arg(Theme::current().InstructionText));
+	Style::applyThemedSheet(m_instructionLabel, [] {
+		return QStringLiteral("font-size: 16pt; color: %1;").arg(Theme::current().InstructionText);
+	});
 	m_instructionLabel->hide();
 	layout->addWidget(m_instructionLabel);
 

@@ -28,7 +28,8 @@ radios apply immediately via `setColorScheme()` (and again at startup in `main.c
 palette from the system color scheme. Usage: `Theme::current().Field` everywhere; invariant colors
 (`StarActive`, gold) are namespace constants. **`current()` is read at widget construction**, so most custom
 stylesheets don't update on a live theme change (intentional: "works after restart"; Qt's own widgets do
-update live). The exception is the app-wide `Style` sheet (below), which re-applies on `colorSchemeChanged`.
+update live). The exceptions both re-apply on `colorSchemeChanged`: the app-wide `Style` sheet (below), and
+any widget-local sheet that opts into it via `Style::applyThemedSheet` (also below).
 Adding a color means adding the field to **both** `Dark` and `Light` — the designated-initializer definitions
 make the compiler catch a missing one.
 
@@ -92,7 +93,15 @@ cards); selection/hover colors stay local to each list since they vary by use (s
 `FindUntrackedFilesDialog`, `MainWindow`'s grid, `LabelRowDelegate`). Because of this, each list's own
 `setFrameShape(QFrame::NoFrame)` calls were removed as redundant once this rule landed. It **re-applies on
 `QStyleHints::colorSchemeChanged`**, so the globally-styled chrome follows a live light/dark switch — unlike
-the per-widget construction-time stylesheets elsewhere.
+the per-widget construction-time stylesheets elsewhere. For the few widget-local sheets that *do* need to
+survive a live switch, **`Style::applyThemedSheet(widget, makeSheet)`** is the sanctioned escape hatch: it
+applies `makeSheet()` now and re-runs it (reading the fresh `Theme`) on each `colorSchemeChanged`, bound to
+the widget's lifetime — so the styling stays next to the widget while still tracking the theme, rather than
+being hoisted into the central sheet. Used by `MainWindow`'s grid-selection tint, `FrameViewerWindow`'s
+instruction label, and `SettingsDialog`'s JPEG-quality hint (that last one matters most: the theme toggle
+lives in that dialog, so a snapshot color would visibly lag the switch in front of the user). Reach for it
+instead of a bare `setStyleSheet` whenever a `Theme`-derived local sheet outlives a possible switch; a
+transient dialog that is rebuilt per-open (e.g. `FindUntrackedFilesDialog`) doesn't need it.
 
 This is the "central sheet + custom widgets" approach for matching the design mockup
 (`docs/mockups/main-window-sidebar.html`): the sheet covers what QSS can express app-wide; widgets needing

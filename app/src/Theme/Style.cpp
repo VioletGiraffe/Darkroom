@@ -379,4 +379,13 @@ void install()
 	});
 }
 
+void applyThemedSheet(QWidget* widget, std::function<QString()> makeSheet)
+{
+	widget->setStyleSheet(makeSheet());
+	// Bound to the widget's lifetime, so it auto-disconnects when the widget dies; qApp's styleHints() lives
+	// for the whole app. Re-invokes makeSheet each time so it reads the freshly-switched Theme.
+	QObject::connect(qApp->styleHints(), &QStyleHints::colorSchemeChanged, widget,
+	                 [widget, makeSheet = std::move(makeSheet)] { widget->setStyleSheet(makeSheet()); });
+}
+
 } // namespace Style
