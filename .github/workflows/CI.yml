@@ -61,8 +61,8 @@ jobs:
         target: desktop
         arch: 'win64_msvc2022_64'
         archives: 'qtbase icu qtsvg'
-        modules: 'qt5compat qtimageformats qtmultimedia'
-        cache: 'false'
+        modules: 'qtimageformats qtmultimedia'
+        cache: 'true'
 
     - name: Windows - setup MSBuild
       if: startsWith(matrix.os, 'windows')
