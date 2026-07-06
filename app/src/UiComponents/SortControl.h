@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QElapsedTimer>
 #include <QPushButton>
 
 // Sort field, persisted as an int. Order doubles as the field toggle's segment order (Name | Date).
@@ -31,4 +32,8 @@ private:
 	int  m_sortBy = SortBy::Name;
 	bool m_descending = false;
 	bool m_favoritesFirst = false;
+
+	// Time since the popover last dismissed itself, used to make a click on the button toggle the popover
+	// shut instead of reopening it. See openPopover() for the reopen-race it guards against.
+	QElapsedTimer m_sincePopoverClosed;
 };
