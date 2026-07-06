@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783362063895,
+  "lastUpdate": 1783365675322,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -575,6 +575,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .data",
             "value": 20.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 24.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 288,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "fd6f16ba28dcb97e41a8eda7f6398ac69e32632f",
+          "message": "Style.h: applyThemedSheet() mechanism to automatically apply theme switch at runtime; using it throughout (for non-transient widgets only)",
+          "timestamp": "2026-07-06T22:18:11+03:00",
+          "tree_id": "4575f158dc45e36b32fc2c3cec6ac7816b6ccf20",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/fd6f16ba28dcb97e41a8eda7f6398ac69e32632f"
+        },
+        "date": 1783365673336,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 7418,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 3343,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1098,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 484.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 267.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 21,
             "unit": "KB"
           },
           {
