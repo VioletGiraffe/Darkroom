@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783336585058,
+  "lastUpdate": 1783339579188,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -230,6 +230,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .data",
             "value": 20,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 288,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "51fc4543ea4e795c058cf932f5206ad62ee0d362",
+          "message": "SortControl popover behavior improved",
+          "timestamp": "2026-07-06T14:55:36+03:00",
+          "tree_id": "2ac894c5e51901a899152057452fdd42b7bc6df8",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/51fc4543ea4e795c058cf932f5206ad62ee0d362"
+        },
+        "date": 1783339576708,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 7277,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 3343,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1084.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 479,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 260.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 20.5,
             "unit": "KB"
           },
           {
