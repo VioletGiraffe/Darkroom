@@ -29,7 +29,7 @@ class QWidget;
 //
 // The label list holds the Catalog's real labels plus this session's *provisional* labels: dropping a folder
 // auto-creates one per folder (named for the folder's relative path, e.g. "Root-cars-2026") and pre-assigns
-// its files, and "+ Add label" makes one too. Provisional labels live only in this dialog - right-click to
+// its files, and "Create label" makes one too. Provisional labels live only in this dialog - right-click to
 // rename/recolor/delete them - and are created in the Catalog for real only when "Import" materializes the ones
 // actually used (see runImport); a real label can't be edited from here. Nothing is written to the
 // Catalog until "Import" runs: every staged item that's been labeled gets imported and removed from
@@ -153,7 +153,7 @@ private:
 	void runImport();
 	[[nodiscard]] const LabelOption* findLabelOption(const QString& id) const;
 
-	// --- Provisional labels (folder-derived or "+ Add label"); all mutate m_provisionalLabels and re-render via
+	// --- Provisional labels (folder-derived or "Create label"); all mutate m_provisionalLabels and re-render via
 	// refreshLabelList. See QuickImportDialog.cpp for the model. ---------------------------------------------------
 	[[nodiscard]] static bool isProvisionalId(const QString& id);
 	// The id of the label whose display name matches (case-insensitive), skipping excludeId; empty if none.

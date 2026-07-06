@@ -2,6 +2,7 @@
 #include "Core/Catalog.h"
 #include "UiComponents/LabelMimeType.h"
 #include "UiComponents/SegmentedToggle.h"
+#include "Theme/Icons.h"
 #include "Theme/Theme.h"
 
 #include <QAbstractItemView>
@@ -53,8 +54,9 @@ inline QColor swatchColorFor(const Catalog::Label& l)
 // rows and the ordinary labels.
 class LabelRowDelegate final : public QStyledItemDelegate {
 private:
-	static constexpr int DOT = 10;  // leading color dot diameter
-	static constexpr int GAP = 8;   // dot -> name gap
+	static constexpr int DOT = 10;  // leading color dot diameter (ordinary label rows)
+	static constexpr int ICON = 16; // leading glyph box (the All row's stack icon) - wider than a dot, per the mockup
+	static constexpr int GAP = 8;   // dot/icon -> name gap
 	static constexpr int PAD_L = 10;  // left breathing room
 	static constexpr int PAD_R = 12;  // right breathing room (count -> edge)
 	static constexpr int PAD_V = 6;   // vertical breathing room per row
@@ -74,10 +76,11 @@ public:
 
 		const QString name  = index.data(Qt::DisplayRole).toString();
 		const QString count = index.data(kCountRole).toString();
+		const int leading = index.data(kLabelIdRole).value<LabelId>() == AllLabelId ? ICON : DOT;  // the All row's stack icon is wider than a dot
 		const int starW = index.data(kStarRole).toBool() ? option.fontMetrics.horizontalAdvance(QStringLiteral("★")) + GAP : 0;
-		const int width = PAD_L + DOT + GAP + starW + option.fontMetrics.horizontalAdvance(name)
+		const int width = PAD_L + leading + GAP + starW + option.fontMetrics.horizontalAdvance(name)
 		                + COUNT_GAP + option.fontMetrics.horizontalAdvance(count) + PAD_R;
-		return { width, qMax(DOT, option.fontMetrics.height()) + 2 * PAD_V };
+		return { width, qMax(leading, option.fontMetrics.height()) + 2 * PAD_V };
 	}
 
 	void paint(QPainter* p, const QStyleOptionViewItem& option, const QModelIndex& index) const override
@@ -102,6 +105,7 @@ public:
 		const QColor  swatch = index.data(kSwatchColorRole).value<QColor>();
 		const bool    active = index.data(kActiveRole).toBool();
 		const bool    hover  = option.state & QStyle::State_MouseOver;
+		const bool    isAll  = index.data(kLabelIdRole).value<LabelId>() == AllLabelId;   // gets the stack glyph instead of a dot
 
 		// Active and hover get distinct shapes: active a filled pill in BackgroundSecondary (the raised-row
 		// surface - a hue-shifted step off the window background, neutral enough for the per-label accent bar
@@ -133,14 +137,16 @@ public:
 
 		const int cy   = r.center().y();
 		const int dotX = r.left() + PAD_L;
-		if (swatch.isValid())
+		if (isAll)
+			p->drawPixmap(QPointF(dotX, cy - ICON / 2.0), allRowIcon(colorFromHex(t.MutedText), iconDpr(option)));
+		else if (swatch.isValid())
 		{
 			p->setPen(Qt::NoPen);
 			p->setBrush(swatch);
 			p->drawEllipse(QPointF(dotX + DOT / 2.0, cy), DOT / 2.0, DOT / 2.0);
 		}
 
-		int nameX = dotX + DOT + GAP;
+		int nameX = dotX + (isAll ? ICON : DOT) + GAP;
 		if (index.data(kStarRole).toBool())   // the Best row: a gold star just right of its dot
 		{
 			const QString star  = QStringLiteral("★");
@@ -162,6 +168,26 @@ public:
 
 		p->restore();
 	}
+
+private:
+	static qreal iconDpr(const QStyleOptionViewItem& option) { return option.widget ? option.widget->devicePixelRatioF() : 1.0; }
+
+	// The All row's stack glyph, rasterized once and cached until the tint color (a theme switch) or the DPR
+	// changes - so paint() doesn't re-render the SVG on every hover/scroll repaint. Mutable because paint() is const.
+	const QPixmap& allRowIcon(const QColor& color, qreal dpr) const
+	{
+		if (m_allIcon.isNull() || m_allIconColor != color || !qFuzzyCompare(m_allIconDpr, dpr))
+		{
+			m_allIcon = Theme::tintedPixmap(QStringLiteral(":/UI/icon_stack.svg"), color, QSize(ICON, ICON), dpr);
+			m_allIconColor = color;
+			m_allIconDpr = dpr;
+		}
+		return m_allIcon;
+	}
+
+	mutable QPixmap m_allIcon;
+	mutable QColor  m_allIconColor;
+	mutable qreal   m_allIconDpr = 0.0;
 };
 
 // A QListWidget that reports the width its widest row actually needs (plus frame and, when shown, the
@@ -222,8 +248,9 @@ LabelSidebar::LabelSidebar(QWidget* parent) : QWidget(parent)
 	m_list->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(m_list, &QListWidget::customContextMenuRequested, this, &LabelSidebar::showRowContextMenu);
 
-	auto* addButton = new QPushButton(tr("+ Add label"));
+	auto* addButton = new QPushButton(tr("Create label"));
 	addButton->setObjectName("addLabelButton");
+	addButton->setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_plus.svg"), colorFromHex(Theme::current().MutedText), 15));
 	layout->addWidget(addButton);
 	connect(addButton, &QPushButton::clicked, this, &LabelSidebar::addLabelRequested);
 

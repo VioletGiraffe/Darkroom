@@ -195,7 +195,7 @@ re-running ffmpeg (the import-side reuse in "Import: preview frames only" above)
 
 The label-list panel (`refreshLabelList`) is this session's **provisional** labels followed by the Catalog's
 real ones: `Callbacks::getLabelOptions()` supplies every non-virtual `Catalog::allLabels()` entry (with color),
-and `m_provisionalLabels` holds those minted in-dialog — folder-derived (above) or via **+ Add label** — cached
+and `m_provisionalLabels` holds those minted in-dialog — folder-derived (above) or via **Create label** — cached
 together as `m_labelOptions`. A provisional label carries a synthetic id (`"new:<n>"`, tested by
 `isProvisionalId`), a swatch from `Callbacks::generateLabelColor()` (the Catalog's own `randomLabelColor`), and
 renders italic with a `(new)` suffix. It exists **only in the dialog** until Import; right-clicking a provisional

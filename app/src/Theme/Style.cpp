@@ -33,11 +33,12 @@ constexpr char kButtons[] = R"(
 	QPushButton:hover { border-color: %AccentBorder%; }
 	QPushButton:pressed, QPushButton:checked { background: %AccentBg%; border-color: %AccentBorder%; }
 
-	/* Transparent affordance for adding a label (sidebar). */
+	/* Transparent affordance for creating a label (sidebar / quick-import). Left-aligned icon+text, per the mockup. */
 	QPushButton#addLabelButton {
 		background: transparent;
 		border: 2px dashed %BorderControl%;
 		color: %MutedText%;
+		text-align: left;
 	}
 	QPushButton#addLabelButton:hover { border-color: %AccentBorder%; color: %AccentBorder%; }
 )";

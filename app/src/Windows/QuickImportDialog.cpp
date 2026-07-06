@@ -3,6 +3,7 @@
 #include "UiComponents/LabelMimeType.h"
 #include "UiComponents/LabelVisuals.h"
 #include "Settings.h"
+#include "Theme/Icons.h"
 #include "Theme/Theme.h"
 #include "Utils.h"
 #include "UiComponents/MediaItemWidget.h"
@@ -415,8 +416,9 @@ QuickImportDialog::QuickImportDialog(Callbacks callbacks, const QString& suggest
 	connect(m_labelList, &QListWidget::customContextMenuRequested, this, &QuickImportDialog::showLabelListContextMenu);
 	labelPaneLayout->addWidget(m_labelList, 1);
 
-	QPushButton* addLabelButton = new QPushButton(tr("+ Add label"));
+	QPushButton* addLabelButton = new QPushButton(tr("Create label"));
 	addLabelButton->setObjectName("addLabelButton");
+	addLabelButton->setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_plus.svg"), QColor(QString::fromLatin1(Theme::current().MutedText)), 15));
 	connect(addLabelButton, &QPushButton::clicked, this, [this] {
 		const QString name = QInputDialog::getText(this, tr("New Label"), tr("Label name:")).trimmed();
 		if (name.isEmpty())

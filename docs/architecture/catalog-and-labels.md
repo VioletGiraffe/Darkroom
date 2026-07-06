@@ -229,7 +229,7 @@ existed, looking for real gaps rather than just describing the design optimistic
 ### Bug found and fixed: reserved-name guard checked the wrong string
 
 `MainWindow`'s reserved-name guard on creating a new label/collection (`BEST_COLLECTION_NAME`, used by
-`createCollection`'s "+ Add label"/"New collection" validation) was still the **pre-Catalog tab name**
+`createCollection`'s "Create label"/"New collection" validation) was still the **pre-Catalog tab name**
 `"★ Best"`, never updated when Best's `Catalog` displayName became plain `"Best"` (set in
 `ensureBestLabelExists`). **Reachable through completely ordinary UI usage, not external disk tampering**:
 typing "Best" into the name prompt wasn't blocked. It would create a real folder named `Best`, and the next

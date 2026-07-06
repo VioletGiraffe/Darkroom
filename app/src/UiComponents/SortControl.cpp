@@ -1,5 +1,6 @@
 #include "UiComponents/SortControl.h"
 #include "UiComponents/SegmentedToggle.h"
+#include "Theme/Icons.h"
 #include "Theme/Theme.h"
 
 #include <QCheckBox>
@@ -159,6 +160,11 @@ SortControl::SortControl(QWidget* parent) : QPushButton(parent)
 	m_favoritesFirst = QSettings{}.value(FAVORITES_FIRST_KEY, false).toBool();
 
 	setToolTip(tr("Sort order"));
+	// The sort glyph's SVG carries right padding (a wider viewBox) for a gap before the text; render it
+	// non-square at that 4:3 aspect and reserve the same box on the button so it isn't clamped to a square.
+	const QSize sortIconSize(20, 15);
+	setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_sort.svg"), QColor(QString::fromLatin1(Theme::current().InstructionText)), sortIconSize));
+	setIconSize(sortIconSize);
 	updateFace();
 	connect(this, &QPushButton::clicked, this, &SortControl::openPopover);
 }

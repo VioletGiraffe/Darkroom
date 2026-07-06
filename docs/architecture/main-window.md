@@ -140,8 +140,8 @@ name/count column behaviour.)
 
 **OR/AND combine mode** is a **`SegmentedToggle`** (reusable custom widget — see
 [settings-and-theme.md](settings-and-theme.md)): `isAndMode()` == segment 1; `setActiveFilter` restores it
-silently via `setCurrentIndex`. **"+ Add label"** is a `QPushButton` with object name `addLabelButton`,
-styled dashed/transparent by the central app sheet.
+silently via `setCurrentIndex`. **"Create label"** is a `QPushButton` with object name `addLabelButton`,
+styled dashed/transparent (and left-aligned, with a leading `+` glyph) by the central app sheet.
 
 ## Sidebar label management
 

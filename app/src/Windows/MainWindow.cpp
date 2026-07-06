@@ -17,12 +17,14 @@
 #include "UiComponents/MediaGrid.h"
 #include "UiComponents/MediaItemWidget.h"
 #include "Windows/VideoPlayerWindow.h"
+#include "Theme/Icons.h"
 #include "Theme/Theme.h"
 #include "Utils.h"
 #include "Settings.h"
 
 #include "aboutdialog/caboutdialog.h"
 
+#include <QAbstractItemView>
 #include <QApplication>
 #include <QClipboard>
 #include <QColor>
@@ -49,6 +51,8 @@
 #include <QSettings>
 #include <QShortcut>
 #include <QSplitter>
+#include <QStyleOptionViewItem>
+#include <QStyledItemDelegate>
 #include <QTimer>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -60,6 +64,21 @@
 #include <functional>
 #include <utility>
 #include <vector>
+
+namespace {
+// Strips the decoration from a combo popup's rows, so an icon set on the combo's items shows only on the
+// closed control (which QComboBox paints from the current item) and isn't repeated down every dropdown row.
+class ClosedControlIconDelegate final : public QStyledItemDelegate {
+public:
+	using QStyledItemDelegate::QStyledItemDelegate;
+	void initStyleOption(QStyleOptionViewItem* option, const QModelIndex& index) const override
+	{
+		QStyledItemDelegate::initStyleOption(option, index);
+		option->features &= ~QStyleOptionViewItem::HasDecoration;
+		option->icon = QIcon();
+	}
+};
+}
 
 static MainWindow* s_instance = nullptr;
 
@@ -155,6 +174,8 @@ void MainWindow::setupUI()
 	m_nameFilter->setPlaceholderText(tr("filter by name..."));
 	m_nameFilter->setClearButtonEnabled(true);
 	m_nameFilter->setMinimumWidth(220);
+	m_nameFilter->addAction(Theme::tintedIcon(QStringLiteral(":/UI/icon_search.svg"),
+		QColor(QString::fromLatin1(Theme::current().MutedText)), 15), QLineEdit::LeadingPosition);
 	connect(m_nameFilter, &QLineEdit::textChanged, this, &MainWindow::applyNameFilter);
 	headerLayout->addWidget(m_nameFilter, 0, Qt::AlignVCenter);
 
@@ -186,8 +207,12 @@ void MainWindow::setupUI()
 	// Preview-frame-count selector. Self-labelling items ("N frames per preview") replace the usual separate QLabel + control pair.
 	m_previewFrameCountCombo = new QComboBox();
 	m_previewFrameCountCombo->setToolTip(tr("Number of preview frames shown on each video card"));
+	const QIcon previewCountIcon = Theme::tintedIcon(QStringLiteral(":/UI/icon_columns.svg"),
+		QColor(QString::fromLatin1(Theme::current().InstructionText)), 15);
 	for (int n = MIN_PREVIEW_FRAME_COUNT; n <= MAX_PREVIEW_FRAME_COUNT; ++n)
-		m_previewFrameCountCombo->addItem((n == 1 ? tr("%1 frame per preview") : tr("%1 frames per preview")).arg(n), n);
+		m_previewFrameCountCombo->addItem(previewCountIcon, (n == 1 ? tr("%1 frame per preview") : tr("%1 frames per preview")).arg(n), n);
+	// The icon labels the control's purpose; show it only on the closed box, not repeated on every popup row.
+	m_previewFrameCountCombo->view()->setItemDelegate(new ClosedControlIconDelegate(m_previewFrameCountCombo));
 
 	// Apply the saved value before connecting, so restoring it during setup doesn't fire a redundant refresh.
 	const int savedFrameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();

@@ -1,0 +1,8 @@
+<!-- viewBox is wider than the glyph (which occupies x=2..22): the extra width on the right is padding, so
+     the rendered icon has a gap before the sort button's text. Render at 4:3 (e.g. 20x15) to avoid distortion. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 24" fill="none" stroke="#000000" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+	<path d="M6 19 L6 5"/>
+	<path d="M2 10 L6 5 L10 10"/>
+	<path d="M18 5 L18 19"/>
+	<path d="M14 14 L18 19 L22 14"/>
+</svg>

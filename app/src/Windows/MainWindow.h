@@ -94,7 +94,7 @@ private:
 	std::vector<Import::PhotoResult> processPhotoBatch(LabelId labelId, const QStringList& photoPaths, Import::PhotoImportMode mode);
 	// Creates the collection folder + its label; returns the created-or-existing label's id, None if refused.
 	LabelId createCollection(const QString& name, const QString& color = {}, bool refreshList = true);
-	// Sidebar "+ Add label": prompts for a name and creates a folder-backed label (a collection folder).
+	// Sidebar "Create label": prompts for a name and creates a folder-backed label (a collection folder).
 	void createLabelInteractive();
 	// Sidebar label right-click menu: each prompts/confirms, mutates the Catalog, then refreshes the view.
 	void renameLabelInteractive(LabelId labelId);

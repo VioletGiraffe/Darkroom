@@ -104,3 +104,19 @@ A reusable segmented control: mutually-exclusive segments in one rounded pill, t
 `currentIndex()`, `setCurrentIndex()` (**silent**, for restoring persisted state without re-triggering work),
 and `currentChanged(int)` (emitted **only** on user clicks). Drives the sidebar's OR/AND combine mode; built
 reusable for the planned sort popover's field/direction toggles.
+
+### Icons (`src/Theme/Icons.h/.cpp`)
+
+The app's chrome glyphs (the mockup's Tabler-style icons). Assets are **monochrome SVGs** under `res/UI/`
+(`icon_stack`, `icon_plus`, `icon_search`, `icon_columns`, `icon_sort` — plus the older `combobox_down_arrow`
+and `checkbox_check` consumed by QSS `url()` rather than this helper). They're **original hand-authored
+glyphs**, not copied from Tabler, so the repo carries no third-party asset license. `Theme::tintedPixmap` /
+`Theme::tintedIcon` render an SVG through `QSvgRenderer` and recolor it with `CompositionMode_SourceIn`
+(keeps the glyph's antialiased alpha, replaces its RGB) — so one asset serves any theme color, and the SVG's
+own stroke color is irrelevant. Call sites: `LabelRowDelegate` (the "All" row's stack, painted + cached by
+tint/DPR), the sidebar "Create label" button, `MainWindow`'s name-filter search icon + preview-count combo, and
+`SortControl`'s chip. **The tint is captured when the icon is built**, so — like the per-widget construction
+stylesheets — the four `QIcon` call sites don't re-tint on a live light/dark switch (only after the widget is
+rebuilt); the delegate-drawn stack icon *does* follow live, since it re-renders on repaint when
+`Theme::current()` changes its cached tint. Best keeps its `★` glyph and labels keep their colour dots, per
+the mockup.
