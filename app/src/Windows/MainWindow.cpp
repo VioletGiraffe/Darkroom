@@ -300,7 +300,10 @@ void MainWindow::setupMainMenu()
 void MainWindow::saveSettings()
 {
 	saveWindowGeometry(this, "mainWindow");
-	QSettings{}.setValue("mainWindow/activeLabelIds", m_labelSidebar->activeLabelIds());
+	QVariantList activeIds;  // stored as native quint64s (a LabelId is not a QVariant-native type)
+	for (const LabelId id : m_labelSidebar->activeLabelIds())
+		activeIds << static_cast<qulonglong>(toUInt64(id));
+	QSettings{}.setValue("mainWindow/activeLabelIds", activeIds);
 	QSettings{}.setValue("mainWindow/labelsAndMode", m_labelSidebar->isAndMode());
 }
 
@@ -308,7 +311,9 @@ void MainWindow::restoreSettings()
 {
 	restoreWindowGeometry(this, "mainWindow");
 
-	const QStringList activeIds = QSettings{}.value("mainWindow/activeLabelIds").toStringList();
+	QList<LabelId> activeIds;
+	for (const QVariant& v : QSettings{}.value("mainWindow/activeLabelIds").toList())
+		activeIds << labelIdFromUInt64(v.toULongLong());  // an unparseable stored value reads back as None and is dropped on refresh
 	const bool andMode = QSettings{}.value("mainWindow/labelsAndMode", false).toBool();
 	m_labelSidebar->setActiveFilter(activeIds, andMode);  // silent; the grid refresh below applies it
 	refreshMediaGrid();
@@ -450,7 +455,7 @@ void applyLabelDots(Catalog& catalog, const MediaId& id, MediaItemWidget* card)
 {
 	std::vector<QColor> dotColors;
 	QStringList dotNames;
-	for (const QString& labelId : catalog.labelsForMediaItem(id))
+	for (const LabelId labelId : catalog.labelsForMediaItem(id))
 	{
 		const Catalog::Label* label = catalog.labelById(labelId);
 		if (!label)
@@ -614,10 +619,11 @@ void MainWindow::refreshMediaGrid()
 		// runs after the drop event unwinds (same reason MainWindow::dropEvent defers Quick Import).
 		card->setOnLabelDropped([this, id](const QString& labelId) {
 			const std::vector<MediaId> targets = effectiveSelection(id);
-			QMetaObject::invokeMethod(this, [this, targets, labelId] {
+			const LabelId dropped = labelIdFromString(labelId);  // the mime payload is the id's decimal string
+			QMetaObject::invokeMethod(this, [this, targets, dropped] {
 				Catalog::BatchScope batch;  // one store write for the whole selection instead of one per item
 				for (const MediaId& target : targets)
-					Catalog::instance().addLabel(target, labelId);
+					Catalog::instance().addLabel(target, dropped);
 				refreshLibraryView();
 			}, Qt::QueuedConnection);
 		});
@@ -638,7 +644,7 @@ void MainWindow::refreshMediaGrid()
 
 	// Media items to show = the sidebar's active label filter applied to the catalog (final order comes from
 	// sortItems() below, so the enumeration order here doesn't matter).
-	const QStringList activeLabelIds = m_labelSidebar->activeLabelIds();
+	const QList<LabelId> activeLabelIds = m_labelSidebar->activeLabelIds();
 	std::vector<MediaId> mediaItems;
 	if (activeLabelIds.isEmpty())
 	{
@@ -886,7 +892,7 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 			if (label.isVirtual())  // Best is the star / "Add to Best" action above, not a dot/checkbox
 				continue;
 			anyLabel = true;
-			const QString labelId = label.id;
+			const LabelId labelId = label.id;
 
 			int haveCount = 0;
 			for (const MediaId& sel : selection)
@@ -1293,7 +1299,7 @@ void MainWindow::processBatch(QStringList videoPaths, const QString& collectionP
 	refreshLibraryView();
 }
 
-std::vector<Import::PhotoResult> MainWindow::processPhotoBatch(const QString& labelId, const QStringList& photoPaths, Import::PhotoImportMode mode)
+std::vector<Import::PhotoResult> MainWindow::processPhotoBatch(LabelId labelId, const QStringList& photoPaths, Import::PhotoImportMode mode)
 {
 	Catalog& catalog = Catalog::instance();
 	const Catalog::Label* label = catalog.labelById(labelId);
@@ -1382,7 +1388,7 @@ void MainWindow::reExportAllVideos()
 	refreshMediaGrid();
 }
 
-QString MainWindow::createCollection(const QString& name, const QString& color, bool refreshList)
+LabelId MainWindow::createCollection(const QString& name, const QString& color, bool refreshList)
 {
 	// "Photos" is reserved for the owned-photo storage dir (<root>/Photos/<label>) - a collection folder by
 	// that name would intermingle with it. Catalog::renameLabel refuses the same name.
@@ -1400,7 +1406,7 @@ QString MainWindow::createCollection(const QString& name, const QString& color, 
 
 	// Register the folder label now: an empty collection has no item to derive it from, so the catalog
 	// won't surface it otherwise.
-	const QString labelId = Catalog::instance().createLabel(name, color);
+	const LabelId labelId = Catalog::instance().createLabel(name, color);
 
 	if (refreshList)
 		refreshLibraryView();
@@ -1414,7 +1420,7 @@ void MainWindow::createLabelInteractive()
 		createCollection(name);   // creates the backing folder; createCollection refreshes the view
 }
 
-void MainWindow::renameLabelInteractive(const QString& labelId)
+void MainWindow::renameLabelInteractive(LabelId labelId)
 {
 	const Catalog::Label* label = Catalog::instance().labelById(labelId);
 	if (!label)
@@ -1434,7 +1440,7 @@ void MainWindow::renameLabelInteractive(const QString& labelId)
 	refreshLibraryView();
 }
 
-void MainWindow::setLabelColorInteractive(const QString& labelId)
+void MainWindow::setLabelColorInteractive(LabelId labelId)
 {
 	const Catalog::Label* label = Catalog::instance().labelById(labelId);
 	if (!label)
@@ -1449,7 +1455,7 @@ void MainWindow::setLabelColorInteractive(const QString& labelId)
 	refreshLibraryView();
 }
 
-void MainWindow::deleteLabelInteractive(const QString& labelId)
+void MainWindow::deleteLabelInteractive(LabelId labelId)
 {
 	Catalog& catalog = Catalog::instance();
 	const Catalog::Label* label = catalog.labelById(labelId);
@@ -1490,7 +1496,7 @@ void MainWindow::quickImportToCollections(const QStringList& initialStaging)
 			std::vector<QuickImportDialog::LabelOption> options;
 			for (const Catalog::Label& label : Catalog::instance().allLabels())
 				if (!label.isVirtual())
-					options.push_back(QuickImportDialog::LabelOption{ label.id, label.displayName, label.color });
+					options.push_back(QuickImportDialog::LabelOption{ toString(label.id), label.displayName, label.color });  // dialog carries ids as strings
 			return options;
 		},
 		.addMediaItemsRequested = [this](const QString& collectionName, const QStringList& videoPaths,
@@ -1498,7 +1504,7 @@ void MainWindow::quickImportToCollections(const QStringList& initialStaging)
 			processBatch(videoPaths, rootFolder() + "/" + collectionName, stagedPreviewDirs);
 		},
 		.importPhotosRequested = [this](const QString& labelId, const QStringList& photoPaths, Import::PhotoImportMode mode) {
-			return processPhotoBatch(labelId, photoPaths, mode);
+			return processPhotoBatch(labelIdFromString(labelId), photoPaths, mode);
 		},
 		.findAlreadyImportedDuplicatePhoto = [](const QString& photoPath) -> QString {
 			// Byte-identical content already tracked as a photo, matched by size regardless of name - this is
@@ -1516,7 +1522,8 @@ void MainWindow::quickImportToCollections(const QStringList& initialStaging)
 			return {};
 		},
 		.createCollectionRequested = [this](const QString& name, const QString& color) -> QString {
-			return createCollection(name, color, /*refreshList*/ false);
+			const LabelId id = createCollection(name, color, /*refreshList*/ false);
+			return id == LabelId::None ? QString{} : toString(id);  // empty = refused, which the dialog treats as failure
 		},
 		.generateLabelColor = [] { return Catalog::randomLabelColor(); },
 		.isMediaItemTrackedInCollection = [](const MediaId& id, const QString& collectionName) {
@@ -1543,7 +1550,7 @@ void MainWindow::quickImportToCollections(const QStringList& initialStaging)
 				if (!Catalog::instance().containsMediaItem(assignment.mediaId))
 					continue;
 				for (const QString& labelId : assignment.labelIds)
-					Catalog::instance().addLabel(assignment.mediaId, labelId);
+					Catalog::instance().addLabel(assignment.mediaId, labelIdFromString(labelId));
 			}
 		},
 		.viewChanged = [this] { refreshLibraryView(); }

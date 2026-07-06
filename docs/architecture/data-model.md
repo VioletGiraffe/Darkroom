@@ -52,6 +52,27 @@ Stable identity for a media item's **source file** = its file name (matched case
   [catalog-and-labels.md](catalog-and-labels.md)), and `QuickImportDialog`'s file-relocation step separately
   detects a byte-identical duplicate at the destination path (see [import.md](import.md)).
 
+## `LabelId` (`src/Core/LabelId.h`)
+
+Stable identity for a **label** — a 64-bit value (`enum class LabelId : uint64_t`), never the display name.
+
+- **Assigned, not derived** — the mirror image of `MediaId`. A label has no underlying file to recompute an id
+  from, so `Catalog` mints one from a monotonic counter (`generateLabelId()` = `++_nextLabelId`), seeded on
+  load to the highest id already in the registry. That is *why* labels need a persisted registry
+  (`labels.json`) and media items don't.
+- **Reserved low range `[0, 1000]`** for special/virtual labels: `None = 0` (no/invalid label; also the
+  sidebar's "All" row), `Best = 1`. Real, user-created labels start at `1001`; `generateLabelId` never dips
+  into the reserved band.
+- **A scoped enum on purpose** — no implicit conversion to/from `QString` or `int`, so a label id can't be
+  mistaken for a display name, a folder name, or a `MediaId`; a misuse is a compile error, not a silent bug.
+  (It is also just a compact integer.)
+- **Serialization crosses two forms** (see `LabelId.h`): a **JSON number** in `labels.json` and in each item's
+  `"labels"` array; a native **`quint64`** in `QSettings` (the saved filter); and its **decimal-string** form
+  (`toString` / `labelIdFromString`) only at the string-based UI seam — `QuickImportDialog` carries ids as
+  strings so it can namespace not-yet-created labels as `"new:<n>"` (see [import.md](import.md)), and the
+  `LabelSidebar`↔`MainWindow` drag payload is a string too. `MainWindow`'s dialog callbacks are where the two
+  forms convert.
+
 ## `MetadataStore` (`src/Core/MetadataStore.h/.cpp`)
 
 Single shared store for per-item metadata. Dumb persistence only — it has no notion of what a "label" or a

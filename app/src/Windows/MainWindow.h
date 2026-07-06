@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Core/LabelId.h"
 #include "Core/MediaId.h"
 #include "Import.h"  // Import::PhotoImportMode / PhotoResult (processPhotoBatch's interface)
 
@@ -90,15 +91,15 @@ private:
 	// reports errors, applies a referenced photo's initial label (it has no storage folder to derive it
 	// from), and refreshes the view. Returns one result per path, in order - Quick Import's bookkeeping
 	// branches on them (see QuickImportDialog::Callbacks::importPhotosRequested).
-	std::vector<Import::PhotoResult> processPhotoBatch(const QString& labelId, const QStringList& photoPaths, Import::PhotoImportMode mode);
-	// Creates the collection folder + its label; returns the created-or-existing label's id, empty if refused.
-	QString createCollection(const QString& name, const QString& color = {}, bool refreshList = true);
+	std::vector<Import::PhotoResult> processPhotoBatch(LabelId labelId, const QStringList& photoPaths, Import::PhotoImportMode mode);
+	// Creates the collection folder + its label; returns the created-or-existing label's id, None if refused.
+	LabelId createCollection(const QString& name, const QString& color = {}, bool refreshList = true);
 	// Sidebar "+ Add label": prompts for a name and creates a folder-backed label (a collection folder).
 	void createLabelInteractive();
 	// Sidebar label right-click menu: each prompts/confirms, mutates the Catalog, then refreshes the view.
-	void renameLabelInteractive(const QString& labelId);
-	void setLabelColorInteractive(const QString& labelId);
-	void deleteLabelInteractive(const QString& labelId);
+	void renameLabelInteractive(LabelId labelId);
+	void setLabelColorInteractive(LabelId labelId);
+	void deleteLabelInteractive(LabelId labelId);
 	// Opens the Quick Import dialog; initialStaging pre-fills the staging area (used by scanForUntrackedFiles).
 	void quickImportToCollections(const QStringList& initialStaging = {});
 	// Tools menu: recursively scans a chosen folder for supported videos not yet tracked by any collection.

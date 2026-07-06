@@ -22,17 +22,19 @@
 #include <QScrollBar>
 #include <QStyle>
 #include <QStyledItemDelegate>
+#include <QVariant>
 #include <QVBoxLayout>
 
 namespace {
-constexpr int kLabelIdRole     = Qt::UserRole;       // QString: label id ("" == the All row)
+constexpr int kLabelIdRole     = Qt::UserRole;       // LabelId (QVariant::fromValue): the row's label; AllLabelId on the All row
 constexpr int kCountRole       = Qt::UserRole + 1;   // QString: the per-row item count, painted right-aligned
 constexpr int kSwatchColorRole = Qt::UserRole + 2;   // QColor: leading dot color (invalid == no dot, e.g. the All row)
 constexpr int kActiveRole      = Qt::UserRole + 3;   // bool: row is in the active filter (painted highlighted)
 constexpr int kStarRole        = Qt::UserRole + 4;   // bool: draw a gold star after the dot (the Best row)
 constexpr int kDividerRole     = Qt::UserRole + 5;   // bool: separator line between the pinned rows and the labels
 
-const QString AllLabelId = "7132b82a17dc479c876bCE651EA254F9";
+// The All row carries no real label - None is distinct from Best and every generated id.
+constexpr LabelId AllLabelId = LabelId::None;
 
 inline QColor colorFromHex(const char* hex) { return QColor(QString::fromLatin1(hex)); }
 
@@ -237,12 +239,12 @@ void LabelSidebar::rebuildRows()
 {
 	m_list->clear();
 	Catalog& catalog = Catalog::instance();
-	const QHash<QString, int> counts = catalog.labelMediaItemCounts();
+	const QHash<LabelId, int> counts = catalog.labelMediaItemCounts();
 	const std::vector<Catalog::Label>& labels = catalog.allLabels();
 
 	const auto addLabelRow = [&](const Catalog::Label& l, bool star) {
 		auto* item = new QListWidgetItem(l.displayName, m_list);
-		item->setData(kLabelIdRole, l.id);
+		item->setData(kLabelIdRole, QVariant::fromValue(l.id));
 		item->setData(kCountRole, QString::number(counts.value(l.id, 0)));
 		item->setData(kSwatchColorRole, swatchColorFor(l));
 		if (star)
@@ -251,7 +253,7 @@ void LabelSidebar::rebuildRows()
 
 	// Pinned rows: All, then Best (gold dot + star), separated from the ordinary labels by a divider.
 	auto* allItem = new QListWidgetItem(tr("All"), m_list);
-	allItem->setData(kLabelIdRole, AllLabelId);
+	allItem->setData(kLabelIdRole, QVariant::fromValue(AllLabelId));
 	allItem->setData(kCountRole, QString::number(catalog.mediaItemCount()));
 
 	for (const Catalog::Label& l : labels)
@@ -273,7 +275,7 @@ void LabelSidebar::rebuildRows()
 			addLabelRow(l, /*star*/ false);
 
 	// Drop any active ids whose label no longer exists.
-	QSet<QString> existing;
+	QSet<LabelId> existing;
 	for (const Catalog::Label& l : labels)
 		existing.insert(l.id);
 	m_activeLabelIds.intersect(existing);
@@ -289,7 +291,7 @@ void LabelSidebar::applyRowHighlight()
 		QListWidgetItem* item = m_list->item(i);
 		if (item->data(kDividerRole).toBool())
 			continue;
-		const QString id = item->data(kLabelIdRole).toString();
+		const LabelId id = item->data(kLabelIdRole).value<LabelId>();
 		const bool active = id == AllLabelId ? m_activeLabelIds.isEmpty() : m_activeLabelIds.contains(id);
 		item->setData(kActiveRole, active);
 	}
@@ -300,7 +302,7 @@ void LabelSidebar::onItemClicked(QListWidgetItem* item)
 {
 	if (item->data(kDividerRole).toBool())
 		return;   // the separator isn't a filter (also disabled, so this shouldn't be called at all)
-	const QString id = item->data(kLabelIdRole).toString();
+	const LabelId id = item->data(kLabelIdRole).value<LabelId>();
 	if (id == AllLabelId)
 	{
 		// If 'All' is already applied - don't emit a change (there was none)
@@ -334,8 +336,8 @@ bool LabelSidebar::eventFilter(QObject* watched, QEvent* event)
 	{
 		if (!m_pressedItem)
 			break;
-		const QString labelId = m_pressedItem->data(kLabelIdRole).toString();
-		// Only ordinary labels are draggable to assign; "All" (empty id) and the virtual Best are filter-only.
+		const LabelId labelId = m_pressedItem->data(kLabelIdRole).value<LabelId>();
+		// Only ordinary labels are draggable to assign; "All" and the virtual Best are filter-only.
 		if (labelId == AllLabelId || labelId == Catalog::BestLabelId)
 			break;
 
@@ -345,7 +347,7 @@ bool LabelSidebar::eventFilter(QObject* watched, QEvent* event)
 			m_list->viewport(), me,
 			[labelId] {
 				auto* mime = new QMimeData();
-				mime->setData(LabelMimeType, labelId.toUtf8());
+				mime->setData(LabelMimeType, toString(labelId).toUtf8());
 				return mime;
 			},
 			Qt::CopyAction, rowPixmap);
@@ -371,7 +373,7 @@ void LabelSidebar::showRowContextMenu(const QPoint& pos)
 	const QListWidgetItem* item = m_list->itemAt(pos);
 	if (!item)
 		return;
-	const QString labelId = item->data(kLabelIdRole).toString();
+	const LabelId labelId = item->data(kLabelIdRole).value<LabelId>();
 	if (labelId == AllLabelId || labelId == Catalog::BestLabelId)
 		return;  // "All" and the virtual Best aren't user-managed
 
@@ -383,9 +385,9 @@ void LabelSidebar::showRowContextMenu(const QPoint& pos)
 	menu.exec(m_list->viewport()->mapToGlobal(pos));
 }
 
-QStringList LabelSidebar::activeLabelIds() const
+QList<LabelId> LabelSidebar::activeLabelIds() const
 {
-	return QStringList(m_activeLabelIds.cbegin(), m_activeLabelIds.cend());
+	return QList<LabelId>(m_activeLabelIds.cbegin(), m_activeLabelIds.cend());
 }
 
 bool LabelSidebar::isAndMode() const
@@ -393,9 +395,9 @@ bool LabelSidebar::isAndMode() const
 	return m_andOrToggle->currentIndex() == 1;   // segment 1 == AND
 }
 
-void LabelSidebar::setActiveFilter(const QStringList& labelIds, bool andMode)
+void LabelSidebar::setActiveFilter(const QList<LabelId>& labelIds, bool andMode)
 {
-	m_activeLabelIds = QSet<QString>(labelIds.cbegin(), labelIds.cend());
+	m_activeLabelIds = QSet<LabelId>(labelIds.cbegin(), labelIds.cend());
 
 	m_andOrToggle->setCurrentIndex(andMode ? 1 : 0);   // silent; the caller refreshes the grid
 

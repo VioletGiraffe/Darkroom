@@ -1,10 +1,11 @@
 #pragma once
 
+#include "Core/LabelId.h"
 #include "UiComponents/DragGestureHelper.h"
 
+#include <QList>
 #include <QSet>
 #include <QString>
-#include <QStringList>
 #include <QWidget>
 
 class QListWidget;
@@ -25,20 +26,20 @@ public:
 	// longer exist. Does not emit filterChanged.
 	void refresh();
 
-	[[nodiscard]] QStringList activeLabelIds() const;   // empty == no filter (the "All" row)
+	[[nodiscard]] QList<LabelId> activeLabelIds() const;   // empty == no filter (the "All" row)
 	[[nodiscard]] bool isAndMode() const;
 
 	// Restores a persisted filter without emitting filterChanged (the caller refreshes the grid itself).
-	void setActiveFilter(const QStringList& labelIds, bool andMode);
+	void setActiveFilter(const QList<LabelId>& labelIds, bool andMode);
 
 signals:
 	void filterChanged();
 	void addLabelRequested();
 	// Per-label management, requested from a row's right-click menu. The owner (MainWindow) runs the dialog +
 	// Catalog mutation and refreshes the view, mirroring how addLabelRequested is handled.
-	void renameLabelRequested(const QString& labelId);
-	void setLabelColorRequested(const QString& labelId);
-	void deleteLabelRequested(const QString& labelId);
+	void renameLabelRequested(LabelId labelId);
+	void setLabelColorRequested(LabelId labelId);
+	void deleteLabelRequested(LabelId labelId);
 
 protected:
 	// Watches the list viewport to turn a press-and-drag on a label row into a QDrag that assigns the
@@ -54,7 +55,7 @@ private:
 private:
 	QListWidget*      m_list        = nullptr;   // flat single-column list; rows painted by a custom delegate
 	SegmentedToggle*  m_andOrToggle = nullptr;   // OR / AND combine-mode control (segment 1 == AND)
-	QSet<QString>     m_activeLabelIds;   // empty == All (no filter)
+	QSet<LabelId>     m_activeLabelIds;   // empty == All (no filter)
 	DragGestureHelper m_dragHelper;
 	QListWidgetItem*  m_pressedItem = nullptr;  // row under the last left-press, the drag's candidate label
 };

@@ -26,8 +26,6 @@ namespace
 	constexpr QStringView kPhotoTypeValue       = u"photo";
 }
 
-const QString Catalog::BestLabelId = "Best";
-
 Catalog& Catalog::instance()
 {
 	static Catalog catalog;
@@ -55,13 +53,14 @@ void Catalog::loadRegistry()
 	if (!file.open(QIODevice::ReadOnly))
 		return;
 
-	const QJsonObject root = QJsonDocument::fromJson(file.readAll()).object();
-	for (const QJsonValue& v : root.value(kLabelsField.toString()).toArray())
+	const QJsonArray labelArray = QJsonDocument::fromJson(file.readAll()).object().value(kLabelsField.toString()).toArray();
+	for (const QJsonValue& v : labelArray)
 	{
 		const QJsonObject o = v.toObject();
-		const QString id = o.value("id").toString();
-		if (id.isEmpty())
-			continue;
+		if (!o.value("id").isDouble())
+			continue;  // ids are JSON numbers; skip a malformed entry rather than mint a None-id label
+		const LabelId id = labelIdFromUInt64(static_cast<uint64_t>(o.value("id").toInteger()));
+		_nextLabelId = qMax(_nextLabelId, toUInt64(id));  // keep the counter ahead of every id already in use
 		_labels.push_back(Label{ id, o.value("displayName").toString(), o.value("color").toString() });
 	}
 }
@@ -72,7 +71,7 @@ void Catalog::saveRegistry() const
 	for (const Label& l : _labels)
 	{
 		QJsonObject o;
-		o.insert("id", l.id);
+		o.insert("id", QJsonValue(static_cast<qint64>(toUInt64(l.id))));  // decimal number; the full u64 round-trips through qint64
 		o.insert("displayName", l.displayName);
 		o.insert("color", l.color);
 		arr.append(o);
@@ -135,13 +134,13 @@ QString Catalog::randomLabelColor()
 
 bool Catalog::ensureFolderLabelExists(const QString& displayName, const QString& color)
 {
-	if (!ordinaryLabelIdByName(displayName).isEmpty())
+	if (ordinaryLabelIdByName(displayName) != LabelId::None)
 		return false;  // a folder-backed label with this name already exists
 	_labels.push_back(Label{ generateLabelId(), displayName, color.isEmpty() ? randomLabelColor() : color });
 	return true;
 }
 
-const Catalog::Label* Catalog::labelById(const QString& id) const
+const Catalog::Label* Catalog::labelById(LabelId id) const
 {
 	for (const Label& l : _labels)
 		if (l.id == id)
@@ -149,7 +148,7 @@ const Catalog::Label* Catalog::labelById(const QString& id) const
 	return nullptr;
 }
 
-Catalog::Label* Catalog::mutableLabelById(const QString& id)
+Catalog::Label* Catalog::mutableLabelById(LabelId id)
 {
 	for (Label& l : _labels)
 		if (l.id == id)
@@ -157,7 +156,7 @@ Catalog::Label* Catalog::mutableLabelById(const QString& id)
 	return nullptr;
 }
 
-QString Catalog::ordinaryLabelIdByName(const QString& displayName) const
+LabelId Catalog::ordinaryLabelIdByName(const QString& displayName) const
 {
 	// Case-insensitive: an ordinary label names a storage folder, and the (Windows) filesystem is
 	// case-insensitive - so a folder differing from the label's display name only in case is the same folder.
@@ -166,35 +165,33 @@ QString Catalog::ordinaryLabelIdByName(const QString& displayName) const
 	for (const Label& l : _labels)
 		if (!l.isVirtual() && l.displayName.compare(displayName, Qt::CaseInsensitive) == 0)
 			return l.id;
-	return {};
+	return LabelId::None;
 }
 
-QString Catalog::generateLabelId() const
+LabelId Catalog::generateLabelId()
 {
-	QString id;
-	do
-		id = "lbl_" + QString::number(QRandomGenerator::global()->generate(), 16);
-	while (id == BestLabelId || labelById(id) != nullptr);
-	return id;
+	// Monotonic counter, seeded on load to the max existing id (see loadRegistry): the next id is always fresh, so
+	// no collision check is needed. _nextLabelId starts at FirstRealLabelId - 1, so the first id handed out is 1001.
+	return labelIdFromUInt64(++_nextLabelId);
 }
 
 // --- Per-item stored label ids (MetadataStore "labels" field) ------------------------------------------
 
-QStringList Catalog::readStoredLabelIds(const MediaId& id)
+QList<LabelId> Catalog::readStoredLabelIds(const MediaId& id)
 {
 	const QJsonArray arr = MetadataStore::instance().get(id, kLabelsField).toArray();
-	QStringList out;
+	QList<LabelId> out;
 	out.reserve(arr.size());
 	for (const QJsonValue& v : arr)
-		out << v.toString();
+		out << labelIdFromUInt64(static_cast<uint64_t>(v.toInteger()));
 	return out;
 }
 
-void Catalog::writeStoredLabelIds(const MediaId& id, const QStringList& labelIds)
+void Catalog::writeStoredLabelIds(const MediaId& id, const QList<LabelId>& labelIds)
 {
 	QJsonArray arr;
-	for (const QString& labelId : labelIds)
-		arr.append(labelId);
+	for (const LabelId labelId : labelIds)
+		arr.append(QJsonValue(static_cast<qint64>(toUInt64(labelId))));
 	MetadataStore::instance().beginBatch().set(id, kLabelsField, arr);  // single write; the temporary Writer flushes right here (or joins an enclosing batch)
 }
 
@@ -216,10 +213,10 @@ QString Catalog::storageLabelNameOf(const Entry& e)
 	return e.type == MediaType::Photo ? QFileInfo(e.folder).fileName() : collectionNameOf(e.folder);
 }
 
-QString Catalog::storageLabelIdOf(const Entry& e) const
+LabelId Catalog::storageLabelIdOf(const Entry& e) const
 {
 	const QString name = storageLabelNameOf(e);
-	return name.isEmpty() ? QString{} : ordinaryLabelIdByName(name);
+	return name.isEmpty() ? LabelId::None : ordinaryLabelIdByName(name);
 }
 
 QString Catalog::relativeFolder(const QString& folderAbs)
@@ -239,15 +236,15 @@ QString Catalog::absoluteFolder(const QString& folderRel)
 
 // --- The model -----------------------------------------------------------------------------------------
 
-QStringList Catalog::computeLabelIds(const MediaId& id, const Entry& e) const
+QList<LabelId> Catalog::computeLabelIds(const MediaId& id, const Entry& e) const
 {
-	QStringList labelIds;
+	QList<LabelId> labelIds;
 
-	const QString storageLabelId = storageLabelIdOf(e);
-	if (!storageLabelId.isEmpty())
+	const LabelId storageLabelId = storageLabelIdOf(e);
+	if (storageLabelId != LabelId::None)
 		labelIds << storageLabelId;
 
-	for (const QString& stored : readStoredLabelIds(id))
+	for (const LabelId stored : readStoredLabelIds(id))
 		if (!labelIds.contains(stored))
 			labelIds << stored;
 
@@ -288,13 +285,13 @@ void Catalog::refreshMediaItemLabels(const MediaId& id)
 
 // --- Queries (MediaId-anchored) ------------------------------------------------------------------------
 
-QStringList Catalog::labelsForMediaItem(const MediaId& id) const
+QList<LabelId> Catalog::labelsForMediaItem(const MediaId& id) const
 {
 	const auto it = _mediaItems.constFind(id);
-	return it != _mediaItems.cend() ? it->labelIds : QStringList{};
+	return it != _mediaItems.cend() ? it->labelIds : QList<LabelId>{};
 }
 
-QSet<MediaId> Catalog::mediaItemsForLabel(const QString& labelId) const
+QSet<MediaId> Catalog::mediaItemsForLabel(LabelId labelId) const
 {
 	QSet<MediaId> out;
 	for (auto it = _mediaItems.cbegin(); it != _mediaItems.cend(); ++it)
@@ -303,17 +300,17 @@ QSet<MediaId> Catalog::mediaItemsForLabel(const QString& labelId) const
 	return out;
 }
 
-bool Catalog::mediaItemHasLabel(const MediaId& id, const QString& labelId) const
+bool Catalog::mediaItemHasLabel(const MediaId& id, LabelId labelId) const
 {
 	const auto it = _mediaItems.constFind(id);
 	return it != _mediaItems.cend() && it->labelIds.contains(labelId);
 }
 
-QHash<QString, int> Catalog::labelMediaItemCounts() const
+QHash<LabelId, int> Catalog::labelMediaItemCounts() const
 {
-	QHash<QString, int> counts;
+	QHash<LabelId, int> counts;
 	for (auto it = _mediaItems.cbegin(); it != _mediaItems.cend(); ++it)
-		for (const QString& labelId : it->labelIds)
+		for (const LabelId labelId : it->labelIds)
 			++counts[labelId];
 	return counts;
 }
@@ -358,14 +355,14 @@ QString Catalog::anySourceDir() const
 
 // --- Per-item membership (MediaId-anchored) -----------------------------------------------------------
 
-void Catalog::addLabel(const MediaId& id, const QString& labelId)
+void Catalog::addLabel(const MediaId& id, LabelId labelId)
 {
 	if (!id.isValid())
 	{
-		qWarning() << "Catalog: cannot add label" << labelId << "- invalid media id (source file missing?)";
+		qWarning() << "Catalog: cannot add label" << toUInt64(labelId) << "- invalid media id (source file missing?)";
 		return;
 	}
-	QStringList ids = readStoredLabelIds(id);
+	QList<LabelId> ids = readStoredLabelIds(id);
 	if (!ids.contains(labelId))
 	{
 		ids << labelId;
@@ -374,11 +371,11 @@ void Catalog::addLabel(const MediaId& id, const QString& labelId)
 	}
 }
 
-void Catalog::removeLabel(const MediaId& id, const QString& labelId)
+void Catalog::removeLabel(const MediaId& id, LabelId labelId)
 {
 	if (!id.isValid())
 	{
-		qWarning() << "Catalog: cannot remove label" << labelId << "- invalid media id (source file missing?)";
+		qWarning() << "Catalog: cannot remove label" << toUInt64(labelId) << "- invalid media id (source file missing?)";
 		return;
 	}
 
@@ -406,7 +403,7 @@ void Catalog::removeLabel(const MediaId& id, const QString& labelId)
 		}
 	}
 
-	QStringList ids = readStoredLabelIds(id);
+	QList<LabelId> ids = readStoredLabelIds(id);
 	if (ids.removeAll(labelId) > 0)
 	{
 		writeStoredLabelIds(id, ids);
@@ -535,9 +532,9 @@ void Catalog::markSplitComplete(const MediaId& id)
 	it->splitIntoFrames = true;
 }
 
-bool Catalog::hasOtherOrdinaryLabel(const MediaId& id, const QString& excludedLabelId) const
+bool Catalog::hasOtherOrdinaryLabel(const MediaId& id, LabelId excludedLabelId) const
 {
-	for (const QString& labelId : labelsForMediaItem(id))
+	for (const LabelId labelId : labelsForMediaItem(id))
 	{
 		if (labelId == excludedLabelId)
 			continue;
@@ -548,7 +545,7 @@ bool Catalog::hasOtherOrdinaryLabel(const MediaId& id, const QString& excludedLa
 	return false;
 }
 
-void Catalog::relocateFolderOffLabel(const MediaId& id, const QString& removedLabelId)
+void Catalog::relocateFolderOffLabel(const MediaId& id, LabelId removedLabelId)
 {
 	const auto entryIt = _mediaItems.find(id);
 	if (entryIt == _mediaItems.end())
@@ -556,7 +553,7 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, const QString& removedLa
 
 	// Destination = the alphabetically-first of the item's *remaining* ordinary (non-virtual) labels.
 	const Label* dest = nullptr;
-	for (const QString& labelId : entryIt->labelIds)
+	for (const LabelId labelId : entryIt->labelIds)
 	{
 		if (labelId == removedLabelId)
 			continue;
@@ -622,7 +619,7 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, const QString& removedLa
 	// The storage moved but the MediaId (name+size) and its metadata record did not. Strip removedLabelId from
 	// the stored list so it can't re-appear via the stored set, and drop dest's id since it is now the
 	// (derived) storage label rather than a stored extra.
-	QStringList ids = readStoredLabelIds(id);
+	QList<LabelId> ids = readStoredLabelIds(id);
 	bool changed = ids.removeAll(removedLabelId) > 0;
 	changed = (ids.removeAll(dest->id) > 0) || changed;
 	if (changed)
@@ -636,7 +633,7 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, const QString& removedLa
 
 // --- Registry mutations (the label objects) ------------------------------------------------------------
 
-bool Catalog::renameLabel(const QString& labelId, const QString& newDisplayName)
+bool Catalog::renameLabel(LabelId labelId, const QString& newDisplayName)
 {
 	Label* label = mutableLabelById(labelId);
 	if (!label)
@@ -721,7 +718,7 @@ bool Catalog::renameLabel(const QString& labelId, const QString& newDisplayName)
 	return true;
 }
 
-void Catalog::setColor(const QString& labelId, const QString& color)
+void Catalog::setColor(LabelId labelId, const QString& color)
 {
 	Label* label = mutableLabelById(labelId);
 	if (!label || label->color == color)
@@ -730,14 +727,14 @@ void Catalog::setColor(const QString& labelId, const QString& color)
 	saveRegistry();
 }
 
-QString Catalog::createLabel(const QString& displayName, const QString& color)
+LabelId Catalog::createLabel(const QString& displayName, const QString& color)
 {
 	if (ensureFolderLabelExists(displayName, color))
 		saveRegistry();
 	return ordinaryLabelIdByName(displayName);  // created or pre-existing, same answer
 }
 
-Catalog::DeleteImpact Catalog::deleteLabelImpact(const QString& labelId) const
+Catalog::DeleteImpact Catalog::deleteLabelImpact(LabelId labelId) const
 {
 	DeleteImpact impact;
 	const Label* label = labelById(labelId);
@@ -766,7 +763,7 @@ Catalog::DeleteImpact Catalog::deleteLabelImpact(const QString& labelId) const
 	return impact;
 }
 
-bool Catalog::deleteLabel(const QString& labelId)
+bool Catalog::deleteLabel(LabelId labelId)
 {
 	Label* label = mutableLabelById(labelId);
 	if (!label || label->isVirtual())
@@ -789,7 +786,7 @@ bool Catalog::deleteLabel(const QString& labelId)
 	{
 		if (!id.isValid())
 			continue;
-		QStringList ids = readStoredLabelIds(id);
+		QList<LabelId> ids = readStoredLabelIds(id);
 		if (ids.removeAll(labelId) > 0)
 		{
 			writeStoredLabelIds(id, ids);

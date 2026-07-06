@@ -24,10 +24,11 @@ point, import (`addMediaItem`); everywhere else an item is addressed by the `Med
 
 - **An item has a flat label set; there is no user-facing "primary" label.** One label happens to name the
   folder its frames sit in — a disk detail, not a concept the label itself knows about.
-- **Labels are objects with stable ids.** `Catalog::Label { id, displayName, color }`. The `id` is a stable
-  token (generated `lbl_<hex>`; the reserved `Catalog::BestLabelId == "Best"`), **never** the display name —
-  so renaming a label (changing `displayName`) leaves the id and every association intact. Per-item
-  membership in `MetadataStore`'s `"labels"` field is a list of **label ids**, not names.
+- **Labels are objects with stable ids.** `Catalog::Label { id, displayName, color }`. The `id` is a
+  `LabelId` — a 64-bit token from a monotonic counter (`Catalog::BestLabelId == LabelId::Best == 1`; real ids
+  from 1001; see [data-model.md](data-model.md)), **never** the display name — so renaming a label (changing
+  `displayName`) leaves the id and every association intact. Per-item membership in `MetadataStore`'s
+  `"labels"` field is a list of **label ids**, not names.
 - **A label owns nothing on disk.** It does not know about folders. It just so happens that an item's frames
   live in a collection folder whose name equals the `displayName` of one of the item's labels — a pure
   per-item **storage detail**, derived from disk, never recorded on the label and never a stored "primary"
@@ -55,7 +56,7 @@ the label itself changing identity).
   actually lives in (`ensureBestAndFolderLabels`/`ensureFolderLabelExists`). This is derived from the model,
   not a disk walk, which is why an **empty collection needs an explicit `createLabel(displayName)` call** —
   there's no item to derive its label from otherwise; `MainWindow::createCollection` calls it after `mkdir`.
-  Saved only when seeding actually adds an entry.
+  Saved only when seeding actually adds an entry. Each `id` persists as a **JSON number** (a `LabelId`).
 - Per-item extra labels live in `MetadataStore`'s `"labels"` field (a `QJsonArray` of label ids), keyed by
   `MediaId` — see [data-model.md](data-model.md).
 
@@ -68,7 +69,8 @@ nowhere else** — photos joined the same three points, no fourth was added:
 
 1. **Model→registry seed on rebuild** (`ensureBestAndFolderLabels`/`ensureFolderLabelExists`) — a storage
    location an item lives in implies its label exists; only ever *adds* missing registry entries, never
-   removes them (see "Known accepted gap" below). Referenced photos seed nothing — their stored label ids
+   removes them (a 0-item label is a normal state, see "Labels persist independent of item count" below).
+   Referenced photos seed nothing — their stored label ids
    must already exist in the registry.
 2. **`renameLabel`** — renames the backing folders (up to two: the collection folder and the label's
    `<root>/Photos/<label>` dir, both collision-checked before either rename runs, with a rollback if the
@@ -237,33 +239,17 @@ ordinary labels can name a folder), so it never recognizes the new folder as "al
 Best. Result: two rows both reading "Best" in the sidebar (one gold/virtual, one grey/ordinary). **Fixed**
 by correcting the constant's value to `"Best"`.
 
-### Deliberate non-fix: orphaned registry entries are never pruned
+### Labels persist independent of item count
 
-`rebuildIndex`/`ensureBestAndFolderLabels` only ever *adds* registry entries for collections an item in the
-model lives in; it never *removes* a label whose last item is gone. That label lingers in the sidebar with
-a 0 count until manually deleted via the UI. Two ways to reach it:
-- `removeMediaItem` (delete-all, or dedup cleanup) on a label's *last* remaining item — nothing relocates or
-  untags in this path (there's nothing left to relocate), so the now-empty label simply isn't re-derived
-  on the next `rebuildIndex`, but its existing `labels.json` entry isn't removed either. Reachable through
-  ordinary in-app use, not just external tampering.
-- A collection folder vanishing outside the app (e.g. deleted via Explorer while the app wasn't running) —
-  the model still has each item's *stored* folder field from `MetadataStore` (nothing in the app ran to
-  notice the deletion), so the label is still derived with its full stored count; the cards just render as
-  invisible "ghosts" in the grid (see "In-memory model" above) rather than disappearing from the sidebar.
-
-**Kept on purpose**, not fixed:
-- Auto-pruning on a label's count dropping to zero risks destroying a label's color/associations over a
-  **transient** state (mid-relocation, a momentarily-unmounted drive) rather than a genuine "this label is
-  done" decision. Silently discarding user data based on a moment-in-time count is a bigger risk than a
-  cosmetic 0-count row.
-- Matches the conservative bias already established elsewhere in `Catalog`: `removeLabel`'s refusal to
-  remove an item's last ordinary label, `deleteLabel`'s refusal to orphan an item, the refusal to drop a
-  registry entry that's still folder-backed after a blocked relocation — the API consistently **refuses or
-  no-ops on ambiguity rather than silently deleting**.
-
-Revisit only if orphaned labels turn out to be a real nuisance in practice — e.g. add an explicit "garbage
-collect empty/orphaned labels" action the user triggers deliberately, rather than an automatic one. The
-integrity tool (`CatalogIntegrity::scan`, `IntegrityCheckDialog`) would be a natural place to add this.
+`rebuildIndex`/`ensureBestAndFolderLabels` only ever *add* registry entries; they never *remove* a label
+whose last item is gone. This is intentional: a label is a first-class object, and **a 0-item label is a
+normal, valid state** — a freshly created empty collection, or a label whose items were all relabeled or
+removed. Such a label stays in the sidebar (with a 0 count) until the user explicitly deletes it via
+`deleteLabel`. There is deliberately no count-based auto-pruning: a transient 0 (mid-relocation, a
+momentarily-unmounted drive) is not a "this label is done" signal, and discarding a label's
+color/associations over a moment-in-time count would be the real bug. This matches `Catalog`'s conservative
+bias elsewhere — `removeLabel`/`deleteLabel` refuse to orphan an item, and a still-folder-backed label
+survives a blocked relocation — the API refuses or no-ops on ambiguity rather than silently deleting.
 
 ---
 
@@ -330,8 +316,8 @@ The scan reports three kinds of drift, each with its own resolution:
 
 `IntegrityCheckDialog::scanAndShowUi` owns all the scan/UI logic behind one static entry point; `MainWindow`
 only supplies the resolution callbacks that actually touch the `Catalog`/disk, including the manual "browse"
-paths (an untracked folder's source video, a moved referenced photo). Everything in the
-"deliberate non-fix"/"known wart" notes above defers to this tool for actual reconciliation.
+paths (an untracked folder's source video, a moved referenced photo). The catalog-vs-disk drift scenarios
+described above (ghost / invisible cards, missing sources) defer to this tool for actual reconciliation.
 
 ---
 

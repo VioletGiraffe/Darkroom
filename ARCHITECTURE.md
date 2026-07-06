@@ -118,6 +118,11 @@ card in one step.
 **Open:**
 - *Batch ffmpeg failures*: `processBatch` pops one modal `QMessageBox` per failure inside the loop, blocking
   the batch. Collect failures, show one summary at the end.
+- *Label-reference validation*: `CatalogIntegrity::scan` checks catalog-vs-disk but not label integrity — an
+  item whose stored `"labels"` id matches no registry label is neither flagged nor fixable. Add a "dangling
+  label reference" verdict to the scan (resolution: drop the dead id). Low urgency — the mutation API already
+  prevents it (`deleteLabel` strips references), so it'd arise only from external tampering or a bug — but it's
+  the one catalog-consistency dimension the integrity tool doesn't cover.
 
 **Decided against / deferred (don't re-litigate without new info):**
 - *Async ffmpeg* — synchronous `waitForFinished` blocking the GUI was judged a non-issue, not worth doing.
