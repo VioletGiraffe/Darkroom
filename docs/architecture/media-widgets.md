@@ -99,7 +99,10 @@ composes a canvas sized to the *actual tight content* (Σ fitted widths + gaps �
 image can be smaller than the bound. Gaps left transparent.
 
 `paintEvent` blits the loaded image **1:1 centered** when it fits the content area, falling back to a fast
-rescale only transiently (mid-resize). Deliberate: a calc bug shows as clipping, not a silent rescale.
+rescale only transiently (mid-resize). Deliberate: a calc bug shows as clipping, not a silent rescale. The
+image is clipped to an antialiased rounded path at `ThumbnailMatteRadius` — the well/frame around it is
+rounded but QSS `border-radius` can't clip child painting, so a flush image's square corners would otherwise
+overpaint the well's rounded corners.
 
 `sizeHint()` has two modes via `setDynamicSizeHint(bool)` (default **on**): dynamic returns the tight
 bounding box post-load (layout consumers re-query on `updateGeometry()` and reflow); **fixed** always

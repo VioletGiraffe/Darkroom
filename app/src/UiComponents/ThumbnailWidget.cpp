@@ -13,6 +13,7 @@
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
 #include <QRunnable>
 #include <QThreadPool>
 #include <QTimer>
@@ -396,23 +397,31 @@ void ThumbnailWidget::paintEvent(QPaintEvent*)
 
 	if (!m_image.isNull())
 	{
+		// The canvas was rendered for (at most) this area — blit it 1:1, centered. No rescale, so a wrong
+		// size shows as clipping or a floating gap rather than being silently hidden. A too-large canvas is
+		// transient (the area shrank, e.g. mid-resize, before the re-render landed): fast-scale it to fit.
 		const QSize imageLogical = m_image.deviceIndependentSize().toSize();
-		if (imageLogical.width() <= imageArea.width() && imageLogical.height() <= imageArea.height())
-		{
-			// The canvas was rendered for (at most) this area — blit it 1:1, centered. No rescale, so a
-			// wrong size shows as clipping or a floating gap rather than being silently hidden.
-			QRect r(QPoint(0, 0), imageLogical);
-			r.moveCenter(imageArea.center());
+		const bool fits = imageLogical.width() <= imageArea.width() && imageLogical.height() <= imageArea.height();
+		QRect r(QPoint(0, 0), fits ? imageLogical : imageLogical.scaled(imageArea.size(), Qt::KeepAspectRatio));
+		r.moveCenter(imageArea.center());
+
+		// Clip the image to softly rounded corners: the well/frame around it is rounded, but QSS
+		// border-radius can't clip child painting, so a flush image's square corners would overpaint that
+		// rounding. ThumbnailMatteRadius is the borderless well's own radius (the flush case); the framed
+		// variant's image sits inset from its frame anyway, where the same small rounding reads consistent.
+		painter.save();
+		QPainterPath roundedImage;
+		roundedImage.addRoundedRect(QRectF(r), Theme::ThumbnailMatteRadius, Theme::ThumbnailMatteRadius);
+		painter.setRenderHint(QPainter::Antialiasing);   // antialiases the clip edge, so the corners stay smooth
+		painter.setClipPath(roundedImage);
+		if (fits)
 			painter.drawImage(r.topLeft(), m_image);
-		}
 		else
 		{
-			// Transient: the area shrank (e.g. mid-resize) before the re-render landed. Fast-scale to fit.
 			painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
-			QRect r(QPoint(0, 0), imageLogical.scaled(imageArea.size(), Qt::KeepAspectRatio));
-			r.moveCenter(imageArea.center());
 			painter.drawImage(r, m_image);
 		}
+		painter.restore();   // the caption below must not inherit the clip
 	}
 	else
 		painter.drawText(content, Qt::AlignCenter, tr("Loading..."));
