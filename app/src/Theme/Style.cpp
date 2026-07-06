@@ -39,6 +39,7 @@ constexpr char kButtons[] = R"(
 		border: 2px dashed %BorderControl%;
 		color: %MutedText%;
 		text-align: left;
+		padding-left: 6px;
 	}
 	QPushButton#addLabelButton:hover { border-color: %AccentBorder%; color: %AccentBorder%; }
 )";
