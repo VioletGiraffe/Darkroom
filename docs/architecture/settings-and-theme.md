@@ -38,7 +38,12 @@ knowing when picking a color at a new call site: hairlines are **`BorderSubtle`*
 borders, dividers, panel edges) vs **`BorderControl`** (interactive outlines — buttons, inputs, popovers), and
 the emphasis hue is **`AccentBorder`** (accent borders/fills/dots) vs **`AccentText`** (text on an
 `AccentBg`-tinted surface). Both exist because the mockup uses different strengths for what could look like one
-color — pick the wrong half and it'll look subtly off.
+color — pick the wrong half and it'll look subtly off. Two colors deliberately sit *off* the neutral ramp
+(the mockup's hue-shift retune, adopted 2026-07): **`BackgroundSecondary`** (the raised/selected-row surface,
+e.g. the sidebar's active row) and **`MutedText`** — sage-tinted in light, wine-tinted in dark — so the
+selected-row fill and the least-prominent text have a character of their own rather than being more grey
+steps. The accent family stays **blue** on purpose where the mockup's `info` tokens are green: a settled
+divergence, not drift (the mockup's own selected-row bar uses this blue).
 
 The app-wide `QPalette` (set in `Style::install()` alongside the stylesheet, re-applied on
 `colorSchemeChanged`) carries the theme's background/text/accent colors into the standard `QPalette` roles.

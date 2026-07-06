@@ -103,15 +103,15 @@ public:
 		const bool    active = index.data(kActiveRole).toBool();
 		const bool    hover  = option.state & QStyle::State_MouseOver;
 
-		// Active and hover get distinct shapes: active a soft filled pill + accent bar, hover a dotted outline.
-		// Both colors are the text color as a translucent overlay, so they read against any background.
+		// Active and hover get distinct shapes: active a filled pill in BackgroundSecondary (the raised-row
+		// surface - a hue-shifted step off the window background, neutral enough for the per-label accent bar
+		// to sit on) plus that accent bar; hover a dotted outline in a translucent text-color overlay, so it
+		// reads against both the plain window and an active row's fill.
 		const QRect pill = r.adjusted(MARGIN, 1, -MARGIN, -1);
 		if (active)
 		{
-			QColor bg = option.palette.color(QPalette::Text);
-			bg.setAlpha(36);
 			p->setPen(Qt::NoPen);
-			p->setBrush(bg);
+			p->setBrush(colorFromHex(t.BackgroundSecondary));
 			p->drawRoundedRect(pill, RADIUS, RADIUS);
 
 			// Left accent bar in the label's own color (a fixed accent for the All row).
