@@ -1,9 +1,12 @@
 #include "Theme/Icons.h"
+#include "Theme/Theme.h"
 
 #include <QColor>
+#include <QGuiApplication>
 #include <QIconEngine>
 #include <QPaintDevice>
 #include <QPainter>
+#include <QPalette>
 #include <QRectF>
 #include <QSvgRenderer>
 
@@ -34,16 +37,19 @@ namespace {
 
 // Backs tintedIcon(): renders + tints the SVG on demand at exactly the size and device pixel ratio each
 // request carries, so the glyph is crisp at any (including fractional) display scaling - unlike pre-baking a
-// fixed 1x/2x pixmap that QIcon would then bitmap-scale for a 1.5x screen. Mode/state are ignored: these are
-// flat monochrome chrome glyphs with no disabled/selected variants.
+// fixed 1x/2x pixmap that QIcon would then bitmap-scale for a 1.5x screen.
 class TintedSvgIconEngine final : public QIconEngine
 {
-public:
-	TintedSvgIconEngine(QString resource, QColor color) : m_resource(std::move(resource)), m_color(std::move(color)) {}
+	// Disabled-icon opacity, applied to the palette's (opaque) muted disabled tone (see colorForMode).
+	static constexpr float DisabledOpacity = 0.5f;
 
-	QPixmap scaledPixmap(const QSize& size, QIcon::Mode, QIcon::State, qreal scale) override
+public:
+	TintedSvgIconEngine(QString resource, const char* Theme::ThemeColors::* colorField)
+		: m_resource(std::move(resource)), m_colorField(colorField) {}
+
+	QPixmap scaledPixmap(const QSize& size, QIcon::Mode mode, QIcon::State, qreal scale) override
 	{
-		return Theme::tintedPixmap(m_resource, m_color, size, scale);
+		return Theme::tintedPixmap(m_resource, colorForMode(mode), size, scale);
 	}
 	QPixmap pixmap(const QSize& size, QIcon::Mode mode, QIcon::State state) override
 	{
@@ -57,13 +63,28 @@ public:
 	QIconEngine* clone() const override { return new TintedSvgIconEngine(*this); }
 
 private:
+	// Resolved per render (not captured at construction): reading Theme::current() / the app palette here is
+	// what makes the icon follow a live colour-scheme switch, since the scheme-change repaint re-invokes this.
+	[[nodiscard]] QColor colorForMode(QIcon::Mode mode) const
+	{
+		if (mode == QIcon::Disabled)
+		{
+			// Both disabled cues combined: the palette's muted disabled tone, then dropped to half opacity
+			// (the palette colour is opaque, so setting the alpha == fading it).
+			QColor c = QGuiApplication::palette().color(QPalette::Disabled, QPalette::WindowText);
+			c.setAlphaF(DisabledOpacity);
+			return c;
+		}
+		return QColor(QString::fromLatin1(Theme::current().*m_colorField));
+	}
+
 	QString m_resource;
-	QColor  m_color;
+	const char* Theme::ThemeColors::* m_colorField;
 };
 
 } // namespace
 
-QIcon Theme::tintedIcon(const QString& svgResource, const QColor& color)
+QIcon Theme::tintedIcon(const QString& svgResource, const char* ThemeColors::* colorField)
 {
-	return QIcon(new TintedSvgIconEngine(svgResource, color));   // QIcon takes ownership of the engine
+	return QIcon(new TintedSvgIconEngine(svgResource, colorField));   // QIcon takes ownership of the engine
 }

@@ -120,8 +120,11 @@ consumer's own icon size drives it (no size argument; `SortControl` uses `setIco
 non-square padded box, whose SVG viewBox is a matching 32×24 so the render doesn't distort). Call sites:
 `LabelRowDelegate` (the "All" row's stack, drawn straight from `tintedPixmap` at the widget DPR + cached by
 tint/DPR), the sidebar "Create label" button, `MainWindow`'s name-filter search icon + preview-count combo,
-and `SortControl`'s chip. **The tint is captured when the icon is built** (the engine holds a fixed colour),
-so — like the per-widget construction stylesheets — the `QIcon` call sites don't re-tint on a live light/dark
-switch (only after the widget is rebuilt); the delegate-drawn stack icon *does* follow live, since it
-re-renders on repaint when `Theme::current()` changes its cached tint. Best keeps its `★` glyph and labels keep their colour dots, per
-the mockup.
+and `SortControl`'s chip. The tint is **named, not captured**: `tintedIcon` takes a pointer to the
+`ThemeColors` field to use (`&ThemeColors::MutedText`), which the engine resolves against `Theme::current()`
+on **every** render — so, unlike the per-widget construction stylesheets, these icons **do** follow a live
+light/dark switch. The mechanism is not a signal connection (a `QIconEngine` isn't a `QObject`): the
+scheme-change handler already repaints every widget, that repaint re-invokes the engine (QIcon doesn't cache
+a custom engine's output), and the engine reads the now-current theme. A **disabled** control's icon uses the
+palette's muted disabled tone (also live) faded to 50% alpha, combining both dim cues. Best keeps its `★`
+glyph and labels keep their colour dots, per the mockup.

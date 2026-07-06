@@ -162,7 +162,7 @@ SortControl::SortControl(QWidget* parent) : QPushButton(parent)
 	setToolTip(tr("Sort order"));
 	// The sort glyph's SVG carries right padding (a wider viewBox) for a gap before the text; the engine
 	// renders it to whatever box we reserve, so setIconSize to that non-square 4:3 to avoid a square clamp.
-	setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_sort.svg"), QColor(QString::fromLatin1(Theme::current().InstructionText))));
+	setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_sort.svg"), &Theme::ThemeColors::InstructionText));
 	setIconSize(QSize(20, 15));
 	updateFace();
 	connect(this, &QPushButton::clicked, this, &SortControl::openPopover);
