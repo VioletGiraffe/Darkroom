@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783291140914,
+  "lastUpdate": 1783336585058,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -166,6 +166,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 23.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 288,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "fa605386ca208a41650d91088c18f020eb099b8d",
+          "message": "Catalog: migration to strongly typed int label IDs",
+          "timestamp": "2026-07-06T14:12:10+03:00",
+          "tree_id": "2f9cd333b973e72aad7dfbca2542a0f457b8419f",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/fa605386ca208a41650d91088c18f020eb099b8d"
+        },
+        "date": 1783336581949,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 7260,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 3343,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1083.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 478.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 260.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 20,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 24,
             "unit": "KB"
           },
           {
