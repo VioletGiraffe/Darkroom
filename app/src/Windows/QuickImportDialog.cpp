@@ -418,7 +418,7 @@ QuickImportDialog::QuickImportDialog(Callbacks callbacks, const QString& suggest
 
 	QPushButton* addLabelButton = new QPushButton(tr("Create label"));
 	addLabelButton->setObjectName("addLabelButton");
-	addLabelButton->setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_plus.svg"), QColor(QString::fromLatin1(Theme::current().MutedText)), 15));
+	addLabelButton->setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_plus.svg"), QColor(QString::fromLatin1(Theme::current().MutedText))));
 	connect(addLabelButton, &QPushButton::clicked, this, [this] {
 		const QString name = QInputDialog::getText(this, tr("New Label"), tr("Label name:")).trimmed();
 		if (name.isEmpty())

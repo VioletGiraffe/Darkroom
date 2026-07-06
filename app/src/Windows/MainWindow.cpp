@@ -175,7 +175,7 @@ void MainWindow::setupUI()
 	m_nameFilter->setClearButtonEnabled(true);
 	m_nameFilter->setMinimumWidth(220);
 	m_nameFilter->addAction(Theme::tintedIcon(QStringLiteral(":/UI/icon_search.svg"),
-		QColor(QString::fromLatin1(Theme::current().MutedText)), 15), QLineEdit::LeadingPosition);
+		QColor(QString::fromLatin1(Theme::current().MutedText))), QLineEdit::LeadingPosition);
 	connect(m_nameFilter, &QLineEdit::textChanged, this, &MainWindow::applyNameFilter);
 	headerLayout->addWidget(m_nameFilter, 0, Qt::AlignVCenter);
 
@@ -208,7 +208,7 @@ void MainWindow::setupUI()
 	m_previewFrameCountCombo = new QComboBox();
 	m_previewFrameCountCombo->setToolTip(tr("Number of preview frames shown on each video card"));
 	const QIcon previewCountIcon = Theme::tintedIcon(QStringLiteral(":/UI/icon_columns.svg"),
-		QColor(QString::fromLatin1(Theme::current().InstructionText)), 15);
+		QColor(QString::fromLatin1(Theme::current().InstructionText)));
 	for (int n = MIN_PREVIEW_FRAME_COUNT; n <= MAX_PREVIEW_FRAME_COUNT; ++n)
 		m_previewFrameCountCombo->addItem(previewCountIcon, (n == 1 ? tr("%1 frame per preview") : tr("%1 frames per preview")).arg(n), n);
 	// The icon labels the control's purpose; show it only on the closed box, not repeated on every popup row.

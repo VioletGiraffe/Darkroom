@@ -16,13 +16,11 @@ namespace Theme {
 // only reflected on the next build (a delegate re-renders on repaint; QIcon consumers rebuild on refresh).
 [[nodiscard]] QPixmap tintedPixmap(const QString& svgResource, const QColor& color, QSize logicalSize, qreal dpr);
 
-// Convenience wrapper for QIcon consumers (QPushButton::setIcon, QLineEdit::addAction, combo items). Bakes a
-// 1x and a 2x pixmap so the icon stays crisp on any screen without the caller tracking device pixel ratio.
-[[nodiscard]] QIcon tintedIcon(const QString& svgResource, const QColor& color, int logicalSize = 16);
-
-// Non-square variant, for a glyph whose SVG carries asymmetric padding (e.g. the sort chip's icon has
-// right padding baked in for a gap before the button text). The caller must pass the same size to
-// QAbstractButton::setIconSize so the button reserves the padded box rather than clamping to a square.
-[[nodiscard]] QIcon tintedIcon(const QString& svgResource, const QColor& color, QSize logicalSize);
+// Convenience wrapper for QIcon consumers (QPushButton::setIcon, QLineEdit::addAction, combo items). The
+// returned icon is backed by an engine that renders + tints the SVG on demand at exactly the size and device
+// pixel ratio each request asks for, so it stays crisp at fractional display scaling (125/150/175%) instead
+// of being pre-rasterized at a fixed size and then bitmap-scaled. The consumer's own icon size drives it -
+// set QAbstractButton::setIconSize for a specific box (e.g. the sort chip's non-square padded 20x15).
+[[nodiscard]] QIcon tintedIcon(const QString& svgResource, const QColor& color);
 
 } // namespace Theme

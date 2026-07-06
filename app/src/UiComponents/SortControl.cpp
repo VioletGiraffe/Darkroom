@@ -160,11 +160,10 @@ SortControl::SortControl(QWidget* parent) : QPushButton(parent)
 	m_favoritesFirst = QSettings{}.value(FAVORITES_FIRST_KEY, false).toBool();
 
 	setToolTip(tr("Sort order"));
-	// The sort glyph's SVG carries right padding (a wider viewBox) for a gap before the text; render it
-	// non-square at that 4:3 aspect and reserve the same box on the button so it isn't clamped to a square.
-	const QSize sortIconSize(20, 15);
-	setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_sort.svg"), QColor(QString::fromLatin1(Theme::current().InstructionText)), sortIconSize));
-	setIconSize(sortIconSize);
+	// The sort glyph's SVG carries right padding (a wider viewBox) for a gap before the text; the engine
+	// renders it to whatever box we reserve, so setIconSize to that non-square 4:3 to avoid a square clamp.
+	setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_sort.svg"), QColor(QString::fromLatin1(Theme::current().InstructionText))));
+	setIconSize(QSize(20, 15));
 	updateFace();
 	connect(this, &QPushButton::clicked, this, &SortControl::openPopover);
 }

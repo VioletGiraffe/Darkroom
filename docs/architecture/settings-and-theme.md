@@ -110,13 +110,18 @@ reusable for the planned sort popover's field/direction toggles.
 The app's chrome glyphs (the mockup's Tabler-style icons). Assets are **monochrome SVGs** under `res/UI/`
 (`icon_stack`, `icon_plus`, `icon_search`, `icon_columns`, `icon_sort` — plus the older `combobox_down_arrow`
 and `checkbox_check` consumed by QSS `url()` rather than this helper). They're **original hand-authored
-glyphs**, not copied from Tabler, so the repo carries no third-party asset license. `Theme::tintedPixmap` /
-`Theme::tintedIcon` render an SVG through `QSvgRenderer` and recolor it with `CompositionMode_SourceIn`
-(keeps the glyph's antialiased alpha, replaces its RGB) — so one asset serves any theme color, and the SVG's
-own stroke color is irrelevant. Call sites: `LabelRowDelegate` (the "All" row's stack, painted + cached by
-tint/DPR), the sidebar "Create label" button, `MainWindow`'s name-filter search icon + preview-count combo, and
-`SortControl`'s chip. **The tint is captured when the icon is built**, so — like the per-widget construction
-stylesheets — the four `QIcon` call sites don't re-tint on a live light/dark switch (only after the widget is
-rebuilt); the delegate-drawn stack icon *does* follow live, since it re-renders on repaint when
-`Theme::current()` changes its cached tint. Best keeps its `★` glyph and labels keep their colour dots, per
+glyphs**, not copied from Tabler, so the repo carries no third-party asset license. `Theme::tintedPixmap`
+renders an SVG through `QSvgRenderer` and recolors it with `CompositionMode_SourceIn` (keeps the glyph's
+antialiased alpha, replaces its RGB) — so one asset serves any theme color, and the SVG's own stroke color is
+irrelevant. `Theme::tintedIcon` wraps that in a **`QIconEngine` that renders on demand** at exactly the size
+and device pixel ratio each request carries, so the glyph stays crisp at fractional display scaling
+(125/150/175%, the Windows norm) instead of being pre-rasterized at a fixed size and bitmap-scaled — and the
+consumer's own icon size drives it (no size argument; `SortControl` uses `setIconSize(20,15)` for its
+non-square padded box, whose SVG viewBox is a matching 32×24 so the render doesn't distort). Call sites:
+`LabelRowDelegate` (the "All" row's stack, drawn straight from `tintedPixmap` at the widget DPR + cached by
+tint/DPR), the sidebar "Create label" button, `MainWindow`'s name-filter search icon + preview-count combo,
+and `SortControl`'s chip. **The tint is captured when the icon is built** (the engine holds a fixed colour),
+so — like the per-widget construction stylesheets — the `QIcon` call sites don't re-tint on a live light/dark
+switch (only after the widget is rebuilt); the delegate-drawn stack icon *does* follow live, since it
+re-renders on repaint when `Theme::current()` changes its cached tint. Best keeps its `★` glyph and labels keep their colour dots, per
 the mockup.
