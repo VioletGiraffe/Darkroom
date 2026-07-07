@@ -148,9 +148,9 @@ constexpr char kSliders[] = R"(
 )";
 
 constexpr char kCheckBoxes[] = R"(
-	/* An empty rounded outline that fills with accent + a white check mark when checked. width/height size
-	   the content box; the 1px border brings the visual box to 16px. The check mark stays white by design:
-	   legible on the accent fill in both themes. */
+	/* An empty rounded outline that fills with the SelectionHighlight blue + a white check mark when checked.
+	   width/height size the content box; the 1px border brings the visual box to 16px. It reuses SelectionHighlight
+	   (the darkest accent blue) because AccentBorder was too light to carry a white check. Color: checkbox_check.svg. */
 	QCheckBox { spacing: 8px; }
 	QCheckBox::indicator {
 		width: 14px; height: 14px;
@@ -160,8 +160,8 @@ constexpr char kCheckBoxes[] = R"(
 	}
 	QCheckBox::indicator:hover { border-color: %AccentBorder%; }
 	QCheckBox::indicator:checked {
-		background: %AccentBorder%;
-		border-color: %AccentBorder%;
+		background: %SelectionHighlight%;
+		border-color: %SelectionHighlight%;
 		image: url(:/UI/checkbox_check.svg);
 	}
 )";
