@@ -8,7 +8,10 @@
 #include <QPainter>
 #include <QPalette>
 #include <QPen>
+#include <QProxyStyle>
+#include <QPushButton>
 #include <QStyleHints>
+#include <QStyleOption>
 #include <QWidget>
 
 #include <utility>
@@ -373,12 +376,46 @@ public:
 	}
 };
 
+// The keyboard-focus frame on a QPushButton is the base style's PE_FrameFocusRect, drawn around the button's
+// label sub-rect - so it hugs the text. QSS doesn't own it (there's no QPushButton:focus rule), so
+// QStyleSheetStyle delegates it down to the base style, which is what lets this proxy widen it. Only that one
+// primitive is intercepted; every other call passes straight through QProxyStyle to the base style unchanged.
+class FocusFrameStyle : public QProxyStyle
+{
+public:
+	using QProxyStyle::QProxyStyle;   // default-constructs with the platform default as the base style
+
+	void drawPrimitive(PrimitiveElement element, const QStyleOption* option, QPainter* painter, const QWidget* widget) const override
+	{
+		if (element == PE_FrameFocusRect && qobject_cast<const QPushButton*>(widget))
+		{
+			// qstyleoption_cast, not a sliced copy, so QStyleOptionFocusRect::backgroundColor survives the widen.
+			if (const auto* focusOption = qstyleoption_cast<const QStyleOptionFocusRect*>(option))
+			{
+				QStyleOptionFocusRect widened(*focusOption);
+				const int pad = Theme::FocusRectOutset;
+				// Grow outward from the label-hugging default, clamped inside the button's own 1px border so the
+				// frame nears the edge without sitting on top of it.
+				widened.rect = focusOption->rect.adjusted(-pad, -pad, pad, pad).intersected(widget->rect().adjusted(1, 1, -1, -1));
+				QProxyStyle::drawPrimitive(element, &widened, painter, widget);
+				return;
+			}
+		}
+		QProxyStyle::drawPrimitive(element, option, painter, widget);
+	}
+};
+
 } // namespace
 
 namespace Style {
 
 void install()
 {
+	// App-wide base style, wrapped by the stylesheet set just below: QStyleSheetStyle delegates whatever it
+	// doesn't own - here the push-button focus frame - down to this proxy. Set before the sheet so the wrap
+	// picks it up; deliberately not re-set on colorSchemeChanged, where re-applying the sheet re-wraps this
+	// same persistent proxy.
+	qApp->setStyle(new FocusFrameStyle);
 	qApp->setPalette(paletteFor(Theme::current()));
 	qApp->setStyleSheet(styleSheetString());
 

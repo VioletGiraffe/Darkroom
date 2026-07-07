@@ -89,7 +89,10 @@ round that popup itself. See
 [qt-styling-system-quirks.md](../tips/qt-styling-system-quirks.md) for the underlying Qt/QSS limitations this
 worked around (the arrow-via-border-hack dead end, `QProxyStyle` not being reachable once a subcontrol is
 styled, why the popup container can't be rounded with plain QSS); read it *before* attempting any further
-`QComboBox`/QSS customization to avoid re-discovering the same dead ends. Every `QListWidget` also gets a
+`QComboBox`/QSS customization to avoid re-discovering the same dead ends. `Style::install()` also sets an app-wide `QProxyStyle`
+(`FocusFrameStyle`) *before* the sheet, widening the `QPushButton` keyboard-focus rect off the label — reachable
+precisely because no `QPushButton:focus` rule means QSS leaves that primitive delegated to the base style (the
+reachable converse of the subcontrol limitation above). Every `QListWidget` also gets a
 blanket rule here — the same hairline
 border as the other stock controls, but `background: transparent` instead of a filled surface: per the
 mockup, plain lists blend into whatever surface hosts them (sidebar panel, dialog body) rather than standing

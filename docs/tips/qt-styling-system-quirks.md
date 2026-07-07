@@ -117,10 +117,6 @@ cards get rebuilt by their own menu actions), guard the widget with a `QPointer`
 
 ## General QSS gotchas
 
-- **`QString::arg` replaces every occurrence of the lowest-numbered placeholder in one call** (e.g. `%1` used
-  10 times is fully filled by one `.arg(...)`). `Style.cpp` has since moved from numbered placeholders to
-  named `%Token%` ones resolved via `QString::replace`, but the per-instance sheets elsewhere still use
-  `.arg()` and rely on this.
 - **`palette(...)` roles track the active theme automatically; hardcoded hex does not.** Anything built from
   a `Theme` hex must be rebuilt on a light/dark switch (we re-apply the whole sheet on
   `colorSchemeChanged`); `palette(base)` etc. update on their own.
@@ -128,7 +124,4 @@ cards get rebuilt by their own menu actions), guard the widget with a `QPointer`
   gives a text widget (`QLineEdit`/`QPlainTextEdit`/`QTextEdit`) a `selection-background-color`,
   `QStyleSheetStyle` owns that widget's selection painting and does *not* fall back to the palette's
   `HighlightedText` for the unset `selection-color` - the selected text keeps its **normal** foreground. On a
-  dark theme that's light text on the accent fill = unreadable. The app-wide palette `Highlight`/`HighlightedText`
-  still covers genuinely stock (unstyled) palette-driven selection, but a QSS rule that sets one selection color
-  must carry its matching half itself. (`Style.cpp`'s `kTextInputs` sets both, from the `SelectionHighlight` /
-  `SelectedText` theme pair.)
+  dark theme that's light text on the accent fill = unreadable. The app-wide palette `Highlight`/`HighlightedText` still covers genuinely stock (unstyled) palette-driven selection, but a QSS rule that sets one selection color must carry its matching half itself. (`Style.cpp`'s `kTextInputs` sets both, from the `SelectionHighlight` / `SelectedText` theme pair.)

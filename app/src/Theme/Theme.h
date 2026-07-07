@@ -38,6 +38,11 @@ inline constexpr int SliderGrooveRadius = SliderGrooveThickness / 2;
 inline constexpr int SliderHandleDiameter = 16;
 inline constexpr int SliderHandleRadius = SliderHandleDiameter / 2;
 
+// How far the push-button keyboard-focus frame is pushed outward from the base style's default, which draws it
+// tight around the label. FocusFrameStyle (Style.cpp) grows the focus rect by this many px on each side, so the
+// frame gets breathing room around the text instead of hugging it (clamped to stay inside the button's border).
+inline constexpr int FocusRectOutset = 2;
+
 // Field comments name the mockup's CSS variable (docs/mockups/main-window-sidebar.html) each one is tuned
 // to, so a future retune can go back to that source instead of guessing.
 struct ThemeColors {
