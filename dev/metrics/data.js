@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783448213195,
+  "lastUpdate": 1783458628367,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -1329,6 +1329,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 272,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 20.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 25,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "55b0fbf6c88206a951cee6601457559180cdf872",
+          "message": "More style fixes - menu accent color and QPalette::PlaceholderText",
+          "timestamp": "2026-07-08T00:07:07+03:00",
+          "tree_id": "c7327ad95a76714e8f4349f4355f2cbe295b862a",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/55b0fbf6c88206a951cee6601457559180cdf872"
+        },
+        "date": 1783458625739,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 7728,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 3343,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 857,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 502,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 273,
             "unit": "KB"
           },
           {
