@@ -41,6 +41,7 @@ struct ThumbnailWidget::LoadJob {
 	std::mutex m_mutex;
 	ThumbnailWidget* m_parent = nullptr;
 	QImage* m_target = nullptr;         // = &widget->m_image
+	QString* m_errorMsg = nullptr;      // = &widget->m_errorMessage
 	bool m_disarmed = false;
 
 	QStringList m_paths;                // source frame path(s), read by the read stage
@@ -139,6 +140,8 @@ namespace {
 				return;
 			if (!fitted.empty())
 				*job.m_target = std::move(canvas);
+			else if (job.m_errorMsg)
+				*job.m_errorMsg = ThumbnailWidget::tr("Failed to load");
 			// The image (and thus sizeHint()) changed, so the layout must re-query it, not just repaint.
 			QMetaObject::invokeMethod(job.m_parent, [parent = job.m_parent] {
 				parent->updateGeometry();
@@ -272,9 +275,12 @@ void ThumbnailWidget::scheduleRender()
 	// (e.g. 1.0 on a 150%-scaled display) the first time round; paintEvent re-checks and re-renders if so.
 	m_renderDpr = devicePixelRatioF();
 
+	m_errorMessage.clear();
+
 	m_job = std::make_shared<LoadJob>();
 	m_job->m_parent = this;
 	m_job->m_target = &m_image;
+	m_job->m_errorMsg = &m_errorMessage;
 	m_job->m_paths = m_sourcePaths;
 	m_job->m_canvasLogical = m_maxSize;
 	m_job->m_dpr = m_renderDpr;
@@ -423,6 +429,8 @@ void ThumbnailWidget::paintEvent(QPaintEvent*)
 		}
 		painter.restore();   // the caption below must not inherit the clip
 	}
+	else if (!m_errorMessage.isEmpty())
+		painter.drawText(content, Qt::AlignCenter, m_errorMessage);
 	else
 		painter.drawText(content, Qt::AlignCenter, tr("Loading..."));
 
@@ -485,6 +493,7 @@ void ThumbnailWidget::disarmAsyncTask()
 		m_job->m_disarmed = true;
 		m_job->m_parent = nullptr;
 		m_job->m_target = nullptr;
+		m_job->m_errorMsg = nullptr;
 	}
 	// An in-flight stage keeps the job alive through its own shared_ptr; it's freed when that stage ends.
 	m_job.reset();

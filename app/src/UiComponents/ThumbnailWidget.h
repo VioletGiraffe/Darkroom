@@ -65,6 +65,7 @@ private:
 	QStringList m_sourcePaths; // frame path(s) the loader renders into the canvas (1 = single frame, N = composite strip)
 	QString m_caption;
 	QImage m_image;
+	QString m_errorMessage; // non-empty after a completed load that produced no image (e.g. file not found)
 	QSize m_maxSize; // the image-area size the canvas is rendered to fill (deterministic, drives sizeHint)
 	qreal m_renderDpr = 0.0; // devicePixelRatioF() at the time of the most recently scheduled render; re-checked in paintEvent (see scheduleRender)
 
