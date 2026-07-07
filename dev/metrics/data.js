@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783422920652,
+  "lastUpdate": 1783426452663,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -777,6 +777,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 268.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 21,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 24.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "416abf693f770f3a9b6d8eb54ffcef0f07cace13",
+          "message": "\"Delete all\" also deletes non-owned photos",
+          "timestamp": "2026-07-07T14:58:23+03:00",
+          "tree_id": "b6f1a1000f9560d314bad9a1ac74960cc1971302",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/416abf693f770f3a9b6d8eb54ffcef0f07cace13"
+        },
+        "date": 1783426446514,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 7430,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 3343,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 834.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 484.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 268,
             "unit": "KB"
           },
           {
