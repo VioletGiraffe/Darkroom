@@ -2,17 +2,17 @@
 #include "Settings.h"
 #include "Theme/Style.h"
 #include "Theme/Theme.h"
+#include "UiComponents/SegmentedToggle.h"
 
+#include <QDialog>
 #include <QFileDialog>
 #include <QFormLayout>
-#include <QGroupBox>
 #include <QGuiApplication>
 #include <QStyleHints>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
-#include <QRadioButton>
 #include <QMessageBox>
 #include <QSettings>
 #include <QSpinBox>
@@ -56,48 +56,48 @@ GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent
 	form->addRow(tr("Root folder:"), folderRow);
 	form->addRow(tr("ffmpeg path:"), ffmpegRow);
 
-	const int savedScheme = s.value(Settings::ColorScheme, Defaults::ColorScheme).toInt();
-	m_schemeSystem = new QRadioButton(tr("System default"), this);
-	m_schemeLight  = new QRadioButton(tr("Light"),          this);
-	m_schemeDark   = new QRadioButton(tr("Dark"),           this);
+	// Segment order matches Qt::ColorScheme's own values (Unknown/System = 0, Light = 1, Dark = 2), so the
+	// segment index is directly the scheme value - no lookup table needed here or in acceptSettings().
+	m_originalScheme = s.value(Settings::ColorScheme, Defaults::ColorScheme).toInt();
+	m_schemeToggle = new SegmentedToggle({ tr("System"), tr("Light"), tr("Dark") }, this);
+	m_schemeToggle->setCurrentIndex(m_originalScheme);   // silent
 
-	if (savedScheme == static_cast<int>(Qt::ColorScheme::Dark))
-		m_schemeDark->setChecked(true);
-	else if (savedScheme == static_cast<int>(Qt::ColorScheme::Light))
-		m_schemeLight->setChecked(true);
-	else
-		m_schemeSystem->setChecked(true);
+	// Apply the scheme live as the user toggles, for immediate preview (Style::install() re-themes the app on
+	// QStyleHints::colorSchemeChanged). acceptSettings() only persists it; a cancel reverts it below.
+	connect(m_schemeToggle, &SegmentedToggle::currentChanged, this, [](int index) {
+		QGuiApplication::styleHints()->setColorScheme(static_cast<Qt::ColorScheme>(index));
+	});
 
-	auto* schemeGroup = new QGroupBox(tr("Color scheme"), this);
-	auto* schemeLayout = new QHBoxLayout(schemeGroup);
-	schemeLayout->addWidget(m_schemeSystem);
-	schemeLayout->addWidget(m_schemeLight);
-	schemeLayout->addWidget(m_schemeDark);
-	schemeLayout->addStretch();
+	// Undo the live preview when the dialog is dismissed without accepting (Cancel / Esc / close button all
+	// route through QDialog::reject()). On accept, only accepted() fires, so this leaves the choice in place.
+	if (auto* dialog = qobject_cast<QDialog*>(parent))
+		connect(dialog, &QDialog::rejected, this, [this] {
+			QGuiApplication::styleHints()->setColorScheme(static_cast<Qt::ColorScheme>(m_originalScheme));
+		});
+
+	form->addRow(tr("Color scheme:"), m_schemeToggle);
 
 	auto* layout = new QVBoxLayout(this);
 	layout->addLayout(form);
-	layout->addWidget(schemeGroup);
 	layout->addStretch();
 }
 
 void GeneralSettingsPage::acceptSettings()
 {
+	QSettings s;
+	// The scheme is already applied live; persist it here. Done before the root-folder guard so an empty-root
+	// warning doesn't discard the user's confirmed scheme choice.
+	s.setValue(Settings::ColorScheme, m_schemeToggle->currentIndex());
+
 	const QString root = m_rootFolder->text().trimmed();
 	if (root.isEmpty())
 	{
 		QMessageBox::warning(this, tr("Settings"), tr("Root folder cannot be empty."));
 		return;
 	}
-	const int scheme = m_schemeDark->isChecked()  ? static_cast<int>(Qt::ColorScheme::Dark)
-	                 : m_schemeLight->isChecked() ? static_cast<int>(Qt::ColorScheme::Light)
-	                 :                              static_cast<int>(Qt::ColorScheme::Unknown);
 
-	QSettings s;
-	s.setValue(Settings::RootFolder,  root);
-	s.setValue(Settings::FfmpegPath,  m_ffmpegPath->text().trimmed());
-	s.setValue(Settings::ColorScheme, scheme);
-	QGuiApplication::styleHints()->setColorScheme(static_cast<Qt::ColorScheme>(scheme));
+	s.setValue(Settings::RootFolder, root);
+	s.setValue(Settings::FfmpegPath, m_ffmpegPath->text().trimmed());
 }
 
 // ── EncodingSettingsPage ──────────────────────────────────────────────────────
@@ -111,17 +111,9 @@ EncodingSettingsPage::EncodingSettingsPage(QWidget* parent) : CSettingsPage(pare
 	const int  quality  = s.value(Settings::JpegQuality, Defaults::JpegQuality).toInt();
 	const int  step     = s.value(Settings::FrameStep,   Defaults::FrameStep).toInt();
 
-	// Output format
-	m_jpeg = new QRadioButton(tr("JPEG"), this);
-	m_tiff = new QRadioButton(tr("TIFF"), this);
-	m_jpeg->setChecked(!useTiff);
-	m_tiff->setChecked(useTiff);
-
-	auto* formatBox    = new QGroupBox(tr("Output format"), this);
-	auto* formatLayout = new QHBoxLayout(formatBox);
-	formatLayout->addWidget(m_jpeg);
-	formatLayout->addWidget(m_tiff);
-	formatLayout->addStretch();
+	// Output format - segment 0 = JPEG, 1 = TIFF
+	m_formatToggle = new SegmentedToggle({ tr("JPEG"), tr("TIFF") }, this);
+	m_formatToggle->setCurrentIndex(useTiff ? 1 : 0);   // silent
 
 	// JPEG quality (disabled when TIFF is selected)
 	m_quality = new QSpinBox(this);
@@ -135,8 +127,12 @@ EncodingSettingsPage::EncodingSettingsPage(QWidget* parent) : CSettingsPage(pare
 	});
 	qualityHint->setEnabled(!useTiff);
 
-	connect(m_jpeg, &QRadioButton::toggled, m_quality,   &QSpinBox::setEnabled);
-	connect(m_jpeg, &QRadioButton::toggled, qualityHint, &QLabel::setEnabled);
+	// JPEG quality only applies to JPEG output; grey it out (with its hint) while TIFF is selected.
+	connect(m_formatToggle, &SegmentedToggle::currentChanged, this, [this, qualityHint](int index) {
+		const bool jpeg = index == 0;
+		m_quality->setEnabled(jpeg);
+		qualityHint->setEnabled(jpeg);
+	});
 
 	auto* qualityRow = new QHBoxLayout;
 	qualityRow->addWidget(m_quality);
@@ -150,11 +146,11 @@ EncodingSettingsPage::EncodingSettingsPage(QWidget* parent) : CSettingsPage(pare
 
 	auto* form = new QFormLayout;
 	form->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
+	form->addRow(tr("Output format:"), m_formatToggle);
 	form->addRow(tr("JPEG quality:"), qualityRow);
 	form->addRow(tr("Extract every N-th frame:"), m_frameStep);
 
 	auto* layout = new QVBoxLayout(this);
-	layout->addWidget(formatBox);
 	layout->addLayout(form);
 	layout->addStretch();
 }
@@ -162,7 +158,7 @@ EncodingSettingsPage::EncodingSettingsPage(QWidget* parent) : CSettingsPage(pare
 void EncodingSettingsPage::acceptSettings()
 {
 	QSettings s;
-	s.setValue(Settings::UseTiff,     m_tiff->isChecked());
+	s.setValue(Settings::UseTiff,     m_formatToggle->currentIndex() == 1);
 	s.setValue(Settings::JpegQuality, m_quality->value());
 	s.setValue(Settings::FrameStep,   m_frameStep->value());
 }

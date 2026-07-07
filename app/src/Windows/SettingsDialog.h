@@ -4,8 +4,8 @@
 #include "settingsui/csettingspage.h"
 
 class QLineEdit;
-class QRadioButton;
 class QSpinBox;
+class SegmentedToggle;
 
 // ── General page: root folder + ffmpeg path ───────────────────────────────────
 
@@ -16,11 +16,13 @@ public:
 	void acceptSettings() override;
 
 private:
-	QLineEdit*    m_rootFolder    = nullptr;
-	QLineEdit*    m_ffmpegPath    = nullptr;
-	QRadioButton* m_schemeSystem  = nullptr;
-	QRadioButton* m_schemeLight   = nullptr;
-	QRadioButton* m_schemeDark    = nullptr;
+	QLineEdit*       m_rootFolder    = nullptr;
+	QLineEdit*       m_ffmpegPath    = nullptr;
+	SegmentedToggle* m_schemeToggle  = nullptr;
+	// The scheme applied when the dialog opened; restored live if the dialog is cancelled. Holds the stored
+	// Qt::ColorScheme value (not the effective one), so a "System" choice reverts back to System, not its
+	// resolved light/dark.
+	int              m_originalScheme = 0;
 };
 
 // ── Encoding page: output format + JPEG quality ───────────────────────────────
@@ -32,10 +34,9 @@ public:
 	void acceptSettings() override;
 
 private:
-	QRadioButton* m_jpeg      = nullptr;
-	QRadioButton* m_tiff      = nullptr;
-	QSpinBox*     m_quality   = nullptr;
-	QSpinBox*     m_frameStep = nullptr;
+	SegmentedToggle* m_formatToggle = nullptr;
+	QSpinBox*        m_quality      = nullptr;
+	QSpinBox*        m_frameStep    = nullptr;
 };
 
 // ── Top-level dialog ─────────────────────────────────────────────────────────
