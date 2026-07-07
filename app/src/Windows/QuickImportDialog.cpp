@@ -569,7 +569,13 @@ void QuickImportDialog::dropEvent(QDropEvent* event)
 			paths.push_back(std::move(path));
 	}
 	if (!paths.isEmpty())
-		stageMediaItems(paths);
+	{
+		raise();
+		activateWindow();
+		QMetaObject::invokeMethod(this, [this, paths=std::move(paths)] {
+			stageMediaItems(paths);
+		}, Qt::QueuedConnection);
+	}
 }
 
 bool QuickImportDialog::eventFilter(QObject* watched, QEvent* event)
