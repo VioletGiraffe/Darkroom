@@ -78,19 +78,24 @@ restyle needs an app-wide styled `QCheckBox`.
   "Open in Explorer" (the item's folder) and "Rename media file" are videos-only — a photo's
   `folderForMediaItem` is the shared `Photos/<label>` dir, or nothing when referenced; photos get "Open
   photo" where videos get "Play source video" (both `openSourceInSystemApp`; a video's *double-click* opens
-  the built-in player instead). **"Delete all" is per-type**: a video loses its frame folder + source file;
-  a photo loses its file (never the shared label dir) — the confirmation message spells out exactly what
-  applies to the selection at hand. **"Remove from library (untrack)"** (above "Delete all") drops the selection from the
-  catalog only (`Catalog::removeMediaItem`) — no file is touched, but the items' catalog metadata (labels
-  incl. Best, saved loops) is discarded; since the catalog is never re-derived from a disk walk, an
-  untracked video's frame folder simply stays on disk, surfaced again only by the integrity tool (or a
-  re-import of the source). Includes a **Labels** submenu: a checklist
+  the built-in player instead). **"Delete" is per-type** (Shift+Del): a video loses its frame folder +
+  source file; a photo loses its file (never the shared label dir) — the confirmation message spells out
+  exactly what applies to the selection at hand. **"Remove from library"** (Del) drops the selection from
+  the catalog only (`Catalog::removeMediaItem`) — no file is touched, but the items' catalog metadata
+  (labels incl. Best, saved loops) is discarded; since the catalog is never re-derived from a disk walk,
+  an untracked video's frame folder simply stays on disk, surfaced again only by the integrity tool (or a
+  re-import of the source). **"Rename"** (F2) renames a single video's frame folder + source file (videos
+  only). All three live in the **Edit** main menu (with shortcuts) and are reused in the context menu with
+  count-variant text; their shortcuts are scoped to the grid (`WidgetWithChildrenShortcut`) so they don't
+  fire while typing in the name filter. Includes a **Labels** submenu: a checklist
   of every ordinary label (check state from the right-clicked card via `Catalog::mediaItemHasLabel`); toggling
   one drives the whole effective selection to that state via `Catalog::addLabel`/`removeLabel`, then
   `refreshLibraryView()`.
-- `effectiveSelection(id)` — if `id` (a `MediaId`) is in the current multi-selection, returns every selected
-  card's id, else just `{id}`. **Shared** by the context menu (Inspect vs "Compare selected") and the
-  label-drop handler (drop on a card in the selection assigns the whole selection).
+- `effectiveSelection(id)` — takes `std::optional<MediaId>`: with an id, returns the multi-selection if the
+  id is in it, else just `{id}`; with nullopt, returns the raw grid selection (may be empty). The keyboard
+  shortcut path passes nullopt, the context menu path passes the right-clicked card's id (stored in
+  `m_contextMenuTarget` for the duration of `menu.exec()`). **Shared** by the context menu, the Edit menu
+  actions, and the label-drop handler.
 - `refreshLibraryView()` — `refreshMediaGrid()` **then** `m_labelSidebar->refresh()` (reads label counts from
   the now-current model); the order matters, the sidebar would read stale counts if reversed. **Never call
   `m_labelSidebar->refresh()` from inside `refreshMediaGrid()` itself**: the sidebar's `itemClicked` emits

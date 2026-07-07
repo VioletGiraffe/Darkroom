@@ -8,11 +8,13 @@
 #include <QMainWindow>
 #include <QStringList>
 
+#include <optional>
 #include <vector>
 
 class FrameViewerWindow;
 class LabelSidebar;
 class MediaGrid;
+class QAction;
 class QComboBox;
 class QLineEdit;
 class QListWidgetItem;
@@ -60,8 +62,9 @@ private:
 	// Ctrl+wheel handler from the cards: steps the preview image height and rebuilds the grid (debounced).
 	void zoomCards(int steps);
 	void showMediaItemContextMenu(const MediaId& id, const QPoint& globalPos);
-	// If id is part of the current multi-selection, returns all selected items' ids; otherwise just id alone.
-	[[nodiscard]] std::vector<MediaId> effectiveSelection(const MediaId& id) const;
+	// With id: if id is part of the current multi-selection, returns all selected ids, otherwise just id.
+	// Without id (nullopt): returns the raw grid selection (may be empty).
+	[[nodiscard]] std::vector<MediaId> effectiveSelection(std::optional<MediaId> id = std::nullopt) const;
 	// Bulleted list of the selection's item names for confirmation dialogs, capped so a huge selection stays readable.
 	[[nodiscard]] static QString bulletedItemNameList(const std::vector<MediaId>& selection);
 	// Source-file URLs for the given grid items, handed to MediaGrid to export them when a card is dragged out
@@ -112,6 +115,11 @@ private:
 	[[nodiscard]] static bool isInBest(const MediaId& id);
 	void toggleBestFolder(const MediaId& id);
 
+	void deleteSelectedItems();
+	void removeSelectedItemsFromLibrary();
+	void renameSelectedItemInteractive();
+	void updateEditActions();
+
 	void openSettings();
 	void renameMediaItemInteractive(const MediaId& id);
 	void renameMediaItem(const MediaId& oldId, const QString& newFolderPath);
@@ -126,6 +134,16 @@ private:
 	MediaGrid*         m_mediaGrid    = nullptr;
 	QTimer*            m_gridZoomDebounce = nullptr;
 	FrameViewerWindow* m_frameViewer  = nullptr;
+
+	// The right-clicked card's id while a context menu is open; nullopt when triggered via keyboard shortcut
+	// or main menu. Passed to effectiveSelection so that actions resolve to the right-click target when it
+	// falls outside the grid selection.
+	std::optional<MediaId> m_contextMenuTarget;
+
+	// Persistent actions for Edit menu / keyboard shortcuts. Created in setupMainMenu, reused in context menu.
+	QAction* m_deleteAction = nullptr;
+	QAction* m_removeFromLibraryAction = nullptr;
+	QAction* m_renameAction = nullptr;
 
 	// Guards against re-entering the frame-extraction loops (which pump events) from a new drop or menu action while one is already running.
 	bool m_isProcessing = false;

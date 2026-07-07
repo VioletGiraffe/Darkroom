@@ -291,6 +291,13 @@ void MainWindow::setupMainMenu()
 	fileMenu->addSeparator();
 	fileMenu->addAction(tr("Exit"), QKeySequence("Ctrl+Q"), this, &QMainWindow::close);
 
+	QMenu* editMenu = new QMenu(tr("Edit"), menuBar);
+	m_deleteAction = editMenu->addAction(tr("Delete"), QKeySequence(Qt::SHIFT | Qt::Key_Delete), this, &MainWindow::deleteSelectedItems);
+	m_removeFromLibraryAction = editMenu->addAction(tr("Remove from library"), QKeySequence(Qt::Key_Delete), this, &MainWindow::removeSelectedItemsFromLibrary);
+	m_renameAction = editMenu->addAction(tr("Rename"), QKeySequence(Qt::Key_F2), this, &MainWindow::renameSelectedItemInteractive);
+	connect(m_mediaGrid, &QListWidget::itemSelectionChanged, this, &MainWindow::updateEditActions);
+	updateEditActions();
+
 	QMenu* toolsMenu = new QMenu(tr("Tools"), menuBar);
 	toolsMenu->addAction(tr("Quick import to collections..."), QKeySequence("Ctrl+Shift+A"), this, [this] { quickImportToCollections(); });
 	toolsMenu->addAction(tr("Scan for untracked files..."), this, &MainWindow::scanForUntrackedFiles);
@@ -313,6 +320,7 @@ void MainWindow::setupMainMenu()
 	});
 
 	menuBar->addMenu(fileMenu);
+	menuBar->addMenu(editMenu);
 	menuBar->addMenu(toolsMenu);
 	menuBar->addMenu(helpMenu);
 
@@ -322,6 +330,13 @@ void MainWindow::setupMainMenu()
 			continue;
 		for (QAction* sub : action->menu()->actions())
 			sub->setShortcutContext(Qt::ApplicationShortcut);
+	}
+
+	// Del/Shift+Del/F2 must not fire while typing in a text field - scope them to the grid.
+	for (QAction* a : { m_deleteAction, m_removeFromLibraryAction, m_renameAction })
+	{
+		m_mediaGrid->addAction(a);
+		a->setShortcutContext(Qt::WidgetWithChildrenShortcut);
 	}
 }
 
@@ -766,13 +781,13 @@ void MainWindow::applyNameFilter()
 	renumberGridCaptions(m_mediaGrid);
 }
 
-std::vector<MediaId> MainWindow::effectiveSelection(const MediaId& id) const
+std::vector<MediaId> MainWindow::effectiveSelection(std::optional<MediaId> id) const
 {
 	std::vector<MediaId> selected;
 	for (const QListWidgetItem* item : m_mediaGrid->selectedItems())
 		selected.push_back(static_cast<const GridItem*>(item)->mediaId);
-	if (std::find(selected.cbegin(), selected.cend(), id) == selected.cend())
-		selected = { id };
+	if (id && std::find(selected.cbegin(), selected.cend(), *id) == selected.cend())
+		selected = { *id };
 	return selected;
 }
 
@@ -807,8 +822,157 @@ QString MainWindow::bulletedItemNameList(const std::vector<MediaId>& selection)
 	return list;
 }
 
+void MainWindow::deleteSelectedItems()
+{
+	const std::vector<MediaId> selection = effectiveSelection(m_contextMenuTarget);
+	if (selection.empty())
+		return;
+
+	Catalog& catalog = Catalog::instance();
+
+	// What "delete" means per type: a video loses its frame folder and source file; a photo loses its
+	// file ONLY - its folderForMediaItem is the shared Photos/<label> dir, home to sibling photos,
+	// and must never be deleted.
+
+	// The confirmation lists what goes. A single item: its exact paths. A multi-selection: the count plus
+	// the item names (capped, so a huge selection stays readable).
+	QString message;
+	if (selection.size() == 1)
+	{
+		const MediaId& sel = selection.front();
+		const QString sourcePath = catalog.sourcePathForMediaItem(sel);
+		if (catalog.mediaType(sel) == Catalog::MediaType::Photo)
+		{
+			message = tr("This will permanently delete:\n\n• %1").arg(sourcePath);
+		}
+		else
+		{
+			message = tr("This will permanently delete:\n\n• %1").arg(catalog.folderForMediaItem(sel));
+			if (!sourcePath.isEmpty())
+				message += "\n• " + sourcePath;
+		}
+	}
+	else
+	{
+		bool anyVideo = false, anyPhoto = false;
+		for (const MediaId& sel : selection)
+		{
+			if (catalog.mediaType(sel) == Catalog::MediaType::Video)
+				anyVideo = true;
+			else
+				anyPhoto = true;
+		}
+
+		QStringList deletedKinds;
+		if (anyVideo)
+			deletedKinds << tr("each video's frame folder and source file");
+		if (anyPhoto)
+			deletedKinds << tr("each photo's file");
+		message = tr("This will permanently delete %1 items - %2:\n").arg(selection.size()).arg(deletedKinds.join(", "));
+
+		message += bulletedItemNameList(selection);
+	}
+	message += tr("\n\nThis cannot be undone. Continue?");
+
+	if (QMessageBox::warning(this, tr("Delete"), message,
+		QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+		return;
+
+	Catalog::BatchScope batch;  // one store write for the whole selection instead of one per item
+	for (const MediaId& sel : selection)
+	{
+		const QString sourcePath = catalog.sourcePathForMediaItem(sel);
+		if (catalog.mediaType(sel) == Catalog::MediaType::Photo)
+		{
+			QFile::remove(sourcePath);
+			catalog.removeMediaItem(sel);
+			continue;
+		}
+
+		const QString folderPath = catalog.folderForMediaItem(sel);
+		deleteFolderRecursively(folderPath);
+		if (!sourcePath.isEmpty())
+			QFile::remove(sourcePath);
+		catalog.removeMediaItem(sel);
+
+		if (m_frameViewer->currentFolder() == folderPath)
+			m_frameViewer->showForFolder({});
+	}
+
+	refreshLibraryView();
+}
+
+void MainWindow::removeSelectedItemsFromLibrary()
+{
+	const std::vector<MediaId> selection = effectiveSelection(m_contextMenuTarget);
+	if (selection.empty())
+		return;
+
+	Catalog& catalog = Catalog::instance();
+
+	// Untrack drops the catalog entry only - nothing on disk is touched. The catalog is never re-derived
+	// from a disk walk, so an untracked video's frame folder stays out of the library until the integrity
+	// tool surfaces it as untracked (or the source video is re-imported).
+	QString message;
+	if (selection.size() == 1)
+	{
+		const MediaId& sel = selection.front();
+		message = tr("This will remove the item from the library:\n");
+		if (catalog.mediaType(sel) == Catalog::MediaType::Video)
+			message += "\n• " + catalog.folderForMediaItem(sel);
+		const QString sourcePath = catalog.sourcePathForMediaItem(sel);
+		if (!sourcePath.isEmpty())
+			message += "\n• " + sourcePath;
+	}
+	else
+	{
+		message = tr("This will remove %1 items from the library:\n").arg(selection.size());
+		message += bulletedItemNameList(selection);
+	}
+	message += "\n\n" + tr("No files will be deleted, but labels and other catalog metadata will be discarded. Continue?");
+
+	if (QMessageBox::question(this, tr("Remove from library"), message,
+		QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+		return;
+
+	Catalog::BatchScope batch;  // one store write for the whole selection instead of one per item
+	for (const MediaId& sel : selection)
+		catalog.removeMediaItem(sel);
+	// The frame viewer is deliberately left open if it's showing one of these folders - the frames stay on disk.
+
+	refreshLibraryView();
+}
+
+void MainWindow::renameSelectedItemInteractive()
+{
+	const auto selected = m_mediaGrid->selectedItems();
+	if (selected.size() != 1)
+		return;
+	const MediaId id = static_cast<const GridItem*>(selected.front())->mediaId;
+	if (Catalog::instance().mediaType(id) == Catalog::MediaType::Photo)
+		return;
+	renameMediaItemInteractive(id);
+}
+
+void MainWindow::updateEditActions()
+{
+	const auto selected = m_mediaGrid->selectedItems();
+	const bool hasSelection = !selected.empty();
+	m_deleteAction->setEnabled(hasSelection);
+	m_removeFromLibraryAction->setEnabled(hasSelection);
+
+	bool canRename = false;
+	if (selected.size() == 1)
+	{
+		const MediaId id = static_cast<const GridItem*>(selected.front())->mediaId;
+		canRename = Catalog::instance().mediaType(id) != Catalog::MediaType::Photo;
+	}
+	m_renameAction->setEnabled(canRename);
+}
+
 void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globalPos)
 {
+	m_contextMenuTarget = id;
 	Catalog& catalog = Catalog::instance();
 	const std::vector<MediaId> selection = effectiveSelection(id);
 	const QString folderPath = catalog.folderForMediaItem(id);
@@ -898,9 +1062,11 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 	// Rename renames the frame folder + source file as one unit - video-shaped paths, no photo support (v1).
 	if (!isPhoto)
 	{
-		menu.addAction(tr("Rename media file"), [this, id] {
+		auto* a = menu.addAction(tr("Rename media file"), [this, id] {
 			renameMediaItemInteractive(id);
 		});
+		a->setShortcut(m_renameAction->shortcut());
+		a->setShortcutContext(Qt::WidgetShortcut);
 	}
 	menu.addSeparator();
 
@@ -947,118 +1113,21 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 	}
 	menu.addSeparator();
 
-	menu.addAction(selection.size() > 1 ? tr("Remove %1 items from library (untrack)").arg(selection.size()) : tr("Remove from library (untrack)"), [this, selection] {
-		Catalog& catalog = Catalog::instance();
-
-		// Untrack drops the catalog entry only - nothing on disk is touched. The catalog is never re-derived
-		// from a disk walk, so an untracked video's frame folder stays out of the library until the integrity
-		// tool surfaces it as untracked (or the source video is re-imported).
-		QString message;
-		if (selection.size() == 1)
-		{
-			const MediaId& sel = selection.front();
-			message = tr("This will remove the item from the library:\n");
-			if (catalog.mediaType(sel) == Catalog::MediaType::Video)
-				message += "\n• " + catalog.folderForMediaItem(sel);
-			const QString sourcePath = catalog.sourcePathForMediaItem(sel);
-			if (!sourcePath.isEmpty())
-				message += "\n• " + sourcePath;
-		}
-		else
-		{
-			message = tr("This will remove %1 items from the library:\n").arg(selection.size());
-			message += bulletedItemNameList(selection);
-		}
-		message += "\n\n" + tr("No files will be deleted, but labels and other catalog metadata will be discarded. Continue?");
-
-		if (QMessageBox::question(this, tr("Remove from library"), message,
-			QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
-			return;
-
-		Catalog::BatchScope batch;  // one store write for the whole selection instead of one per item
-		for (const MediaId& sel : selection)
-			catalog.removeMediaItem(sel);
-		// The frame viewer is deliberately left open if it's showing one of these folders - the frames stay on disk.
-
-		refreshLibraryView();
-	});
-
-	menu.addAction(selection.size() > 1 ? tr("Delete all (%1 items)").arg(selection.size()) : tr("Delete all"), [this, selection] {
-		Catalog& catalog = Catalog::instance();
-
-		// What "delete" means per type: a video loses its frame folder and source file; a photo loses its
-		// file ONLY - its folderForMediaItem is the shared Photos/<label> dir, home to sibling photos,
-		// and must never be deleted.
-
-		// The confirmation lists what goes. A single item: its exact paths. A multi-selection: the count plus
-		// the item names (capped, so a huge selection stays readable).
-		QString message;
-		if (selection.size() == 1)
-		{
-			const MediaId& sel = selection.front();
-			const QString sourcePath = catalog.sourcePathForMediaItem(sel);
-			if (catalog.mediaType(sel) == Catalog::MediaType::Photo)
-			{
-				message = tr("This will permanently delete:\n\n• %1").arg(sourcePath);
-			}
-			else
-			{
-				message = tr("This will permanently delete:\n\n• %1").arg(catalog.folderForMediaItem(sel));
-				if (!sourcePath.isEmpty())
-					message += "\n• " + sourcePath;
-			}
-		}
-		else
-		{
-			bool anyVideo = false, anyPhoto = false;
-			for (const MediaId& sel : selection)
-			{
-				if (catalog.mediaType(sel) == Catalog::MediaType::Video)
-					anyVideo = true;
-				else
-					anyPhoto = true;
-			}
-
-			QStringList deletedKinds;
-			if (anyVideo)
-				deletedKinds << tr("each video's frame folder and source file");
-			if (anyPhoto)
-				deletedKinds << tr("each photo's file");
-			message = tr("This will permanently delete %1 items - %2:\n").arg(selection.size()).arg(deletedKinds.join(", "));
-
-			message += bulletedItemNameList(selection);
-		}
-		message += tr("\n\nThis cannot be undone. Continue?");
-
-		if (QMessageBox::warning(this, tr("Delete all"), message,
-			QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
-			return;
-
-		Catalog::BatchScope batch;  // one store write for the whole selection instead of one per item
-		for (const MediaId& sel : selection)
-		{
-			const QString sourcePath = catalog.sourcePathForMediaItem(sel);
-			if (catalog.mediaType(sel) == Catalog::MediaType::Photo)
-			{
-				QFile::remove(sourcePath);
-				catalog.removeMediaItem(sel);
-				continue;
-			}
-
-			const QString folderPath = catalog.folderForMediaItem(sel);
-			deleteFolderRecursively(folderPath);
-			if (!sourcePath.isEmpty())
-				QFile::remove(sourcePath);
-			catalog.removeMediaItem(sel);  // drop it from the catalog so it doesn't linger as a ghost
-
-			if (m_frameViewer->currentFolder() == folderPath)
-				m_frameViewer->showForFolder({});
-		}
-
-		refreshLibraryView();
-	});
+	{
+		auto* a = menu.addAction(selection.size() > 1 ? tr("Remove %1 items from library (untrack)").arg(selection.size()) : tr("Remove from library (untrack)"),
+			this, &MainWindow::removeSelectedItemsFromLibrary);
+		a->setShortcut(m_removeFromLibraryAction->shortcut());
+		a->setShortcutContext(Qt::WidgetShortcut);
+	}
+	{
+		auto* a = menu.addAction(selection.size() > 1 ? tr("Delete (%1 items)").arg(selection.size()) : tr("Delete"),
+			this, &MainWindow::deleteSelectedItems);
+		a->setShortcut(m_deleteAction->shortcut());
+		a->setShortcutContext(Qt::WidgetShortcut);
+	}
 
 	menu.exec(globalPos);
+	m_contextMenuTarget = std::nullopt;
 }
 
 void MainWindow::playVideo(const MediaId& id)
