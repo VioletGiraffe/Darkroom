@@ -53,6 +53,10 @@ way. Most came out of styling the `QComboBox` arrow and rounding its drop-down p
   it - you must add `QComboBox QAbstractItemView::item:selected { background: ...; color: ...; }`. (This is why the
   app's combo-popup selection neither tracks the theme's selection colors nor matches the `QMenu` `AccentBg` pill,
   and why repointing the palette's selection roles left it unchanged.)
+- **A fully QSS-styled `QComboBox` gets no style-drawn focus ring - add `:focus` yourself.** Styling the combo's
+  frame and subcontrols makes `QStyleSheetStyle` own it, and (unlike `QPushButton`, which keeps a style-drawn
+  focus frame) it draws no focus indication - so keyboard focus is invisible unless the sheet adds an explicit
+  `QComboBox:focus` rule. `Style.cpp` gives `:focus` the same accent border as `:hover`.
 
 ## The drop-down popup is a separate top-level window
 

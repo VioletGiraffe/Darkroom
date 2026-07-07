@@ -53,7 +53,8 @@ constexpr char kTextInputs[] = R"(
 		selection-background-color: %SelectionHighlight%;
 		selection-color: %SelectedText%;
 	}
-	QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus { border-color: %AccentBorder%; }
+	/* 2px border on focus, with 1px less padding per side so the border-box stays the same size and the text doesn't shift. */
+	QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus { border: 2px solid %AccentBorder%; padding: 3px 7px; }
 )";
 
 constexpr char kComboBoxes[] = R"(
@@ -63,7 +64,11 @@ constexpr char kComboBoxes[] = R"(
 		padding: 3px 8px;
 		background: palette(button);
 	}
+	/* :focus needs its own rule - the combo's QSS-owned frame gets no style-drawn focus ring (unlike QPushButton),
+	   so keyboard focus would otherwise be invisible. Hover just recolors the 1px edge; focus goes stronger with a
+	   2px border, dropping 1px of padding per side to hold the border-box constant so the text doesn't shift. */
 	QComboBox:hover { border-color: %AccentBorder%; }
+	QComboBox:focus { border: 2px solid %AccentBorder%; padding: 2px 7px; }
 	QComboBox::drop-down {
 		subcontrol-origin: padding;
 		subcontrol-position: center right;
