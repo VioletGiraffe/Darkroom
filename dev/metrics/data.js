@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783426452663,
+  "lastUpdate": 1783430156886,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -846,6 +846,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 268,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 21,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 24.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "cb5584334276254f942d34253af583d34c1c4c59",
+          "message": "ThumbnailWidget: reporting image load errors",
+          "timestamp": "2026-07-07T16:12:24+03:00",
+          "tree_id": "0e2a6b2a79fa4b4163770ab6adfbdd09ba94fc7a",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/cb5584334276254f942d34253af583d34c1c4c59"
+        },
+        "date": 1783430154267,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 7510,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 3343,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 838.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 487.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 269,
             "unit": "KB"
           },
           {
