@@ -986,9 +986,9 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 	menu.addAction(selection.size() > 1 ? tr("Delete all (%1 items)").arg(selection.size()) : tr("Delete all"), [this, selection] {
 		Catalog& catalog = Catalog::instance();
 
-		// What "delete" means per type: a video loses its frame folder and source file; an owned photo loses
-		// its file ONLY - its folderForMediaItem is the shared Photos/<label> dir, home to sibling photos,
-		// and must never be deleted; a referenced photo is only dropped from the catalog, its file untouched.
+		// What "delete" means per type: a video loses its frame folder and source file; a photo loses its
+		// file ONLY - its folderForMediaItem is the shared Photos/<label> dir, home to sibling photos,
+		// and must never be deleted.
 
 		// The confirmation lists what goes. A single item: its exact paths. A multi-selection: the count plus
 		// the item names (capped, so a huge selection stays readable).
@@ -997,11 +997,7 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 		{
 			const MediaId& sel = selection.front();
 			const QString sourcePath = catalog.sourcePathForMediaItem(sel);
-			if (catalog.isReferenced(sel))
-			{
-				message = tr("This will remove the item from the catalog:\n\n• %1\n\nThe file itself will not be touched.").arg(sourcePath);
-			}
-			else if (catalog.mediaType(sel) == Catalog::MediaType::Photo)
+			if (catalog.mediaType(sel) == Catalog::MediaType::Photo)
 			{
 				message = tr("This will permanently delete:\n\n• %1").arg(sourcePath);
 			}
@@ -1014,31 +1010,23 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 		}
 		else
 		{
-			bool anyVideo = false, anyOwnedPhoto = false, anyReferencedPhoto = false;
+			bool anyVideo = false, anyPhoto = false;
 			for (const MediaId& sel : selection)
 			{
 				if (catalog.mediaType(sel) == Catalog::MediaType::Video)
 					anyVideo = true;
-				else if (catalog.isReferenced(sel))
-					anyReferencedPhoto = true;
 				else
-					anyOwnedPhoto = true;
+					anyPhoto = true;
 			}
 
 			QStringList deletedKinds;
 			if (anyVideo)
 				deletedKinds << tr("each video's frame folder and source file");
-			if (anyOwnedPhoto)
-				deletedKinds << tr("each owned photo's file");
-			if (!deletedKinds.isEmpty())
-				message = tr("This will permanently delete %1 items - %2:\n").arg(selection.size()).arg(deletedKinds.join(", "));
-			else  // nothing but referenced photos selected - no file is deleted at all
-				message = tr("This will remove %1 items from the catalog - their files will not be touched:\n").arg(selection.size());
+			if (anyPhoto)
+				deletedKinds << tr("each photo's file");
+			message = tr("This will permanently delete %1 items - %2:\n").arg(selection.size()).arg(deletedKinds.join(", "));
 
 			message += bulletedItemNameList(selection);
-
-			if (anyReferencedPhoto && !deletedKinds.isEmpty())
-				message += "\n\n" + tr("Referenced photos in the selection are only removed from the catalog - their files are not touched.");
 		}
 		message += tr("\n\nThis cannot be undone. Continue?");
 
@@ -1052,8 +1040,7 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 			const QString sourcePath = catalog.sourcePathForMediaItem(sel);
 			if (catalog.mediaType(sel) == Catalog::MediaType::Photo)
 			{
-				if (!catalog.isReferenced(sel))
-					QFile::remove(sourcePath);
+				QFile::remove(sourcePath);
 				catalog.removeMediaItem(sel);
 				continue;
 			}
