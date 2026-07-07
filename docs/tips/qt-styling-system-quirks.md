@@ -39,6 +39,13 @@ way. Most came out of styling the `QComboBox` arrow and rounding its drop-down p
 - **`QProxyStyle::drawPrimitive(PE_IndicatorArrowDown)` is never reached when the subcontrol is styled in
   QSS** - `QStyleSheetStyle` owns the subcontrol and doesn't delegate. A proxy style can't customise the
   arrow while a stylesheet touches the combo.
+- **Styling the drop-down view collapses its row height - pin `QComboBox QAbstractItemView::item` padding.**
+  Once the view is styled (the `QComboBox QAbstractItemView { ... }` rule plus `ComboPopupRounder`'s
+  `setStyleSheet` on the view), `QStyleSheetStyle` takes over item sizing and drops the native per-item margins,
+  so rows collapse to about the text height. That bare default is also not stable across Qt versions - 6.9 and
+  6.10 render it differently. Set an explicit `::item { padding: ... }` (`Style.cpp` uses `5px 8px`, echoing the
+  `QMenu::item` vertical rhythm) so row height is both roomy and identical on every Qt version. Applies to any
+  styled `QAbstractItemView`, not just combos.
 
 ## The drop-down popup is a separate top-level window
 

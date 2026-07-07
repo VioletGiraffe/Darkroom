@@ -79,6 +79,11 @@ constexpr char kComboBoxes[] = R"(
 		background: palette(base);
 		outline: none;
 	}
+	/* Pin the dropdown row height: styling the view makes QStyleSheetStyle drop the native per-item margins, so
+	   without this the rows collapse toward the bare text height - and that default even differs between Qt 6.9
+	   and 6.10. Explicit padding keeps rows roomy and identical on every Qt version (vertical echoes QMenu::item,
+	   horizontal matches the closed combo field above). */
+	QComboBox QAbstractItemView::item { padding: 5px 8px; }
 )";
 
 constexpr char kMenus[] = R"(
