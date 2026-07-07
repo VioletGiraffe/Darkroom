@@ -41,7 +41,10 @@ menus, tooltips, combo popups, list frames), and **`BorderStrong`** (the resting
 controls — buttons, inputs, combo field, slider handle, checkbox, segmented toggle; tuned toward `TextPrimary`
 so they don't read as disabled). The emphasis hue is **`AccentBorder`** (accent borders/fills/dots) vs
 **`AccentText`** (text on an `AccentBg`-tinted surface). Both exist because the mockup uses different strengths for what could look like one
-color — pick the wrong half and it'll look subtly off. Two colors deliberately sit *off* the neutral ramp
+color — pick the wrong half and it'll look subtly off. Distinct from both, **`SelectionHighlight`**/**`SelectedText`** are the
+text-selection pair (the `QLineEdit`/text-edit selection and the app-wide `Highlight`/`HighlightedText` roles): `SelectionHighlight`
+is `AccentBorder` pushed away from the *un-inverted* selected text so it stays legible — darkened but still vivid in dark, kept bright
+in light — while `SelectedText` equals `TextPrimary` today but is its own token so a future theme can diverge. Two colors deliberately sit *off* the neutral ramp
 (the mockup's hue-shift retune, adopted 2026-07): **`BackgroundSecondary`** (the raised/selected-row surface,
 e.g. the sidebar's active row) and **`MutedText`** — sage-tinted in light, wine-tinted in dark — so the
 selected-row fill and the least-prominent text have a character of their own rather than being more grey
@@ -51,7 +54,9 @@ divergence, not drift (the mockup's own selected-row bar uses this blue).
 The app-wide `QPalette` (set in `Style::install()` alongside the stylesheet, re-applied on
 `colorSchemeChanged`) carries the theme's background/text/accent colors into the standard `QPalette` roles.
 This is what lets stock controls and native fallbacks (e.g. the combo drop-down's item selection) follow the
-themed ramps too, instead of staying on the OS-default grey palette. The Disabled color group gets an explicit
+themed ramps too, instead of staying on the OS-default grey palette. The selection roles `Highlight`/`HighlightedText` specifically
+carry the `SelectionHighlight`/`SelectedText` pair, so the combo drop-down and item-view selection match the `QLineEdit` selection the
+sheet styles with the same pair. The Disabled color group gets an explicit
 `MutedText` override for the text roles — without it, `setColor(role, ...)` fills every group with the
 full-strength colors and disabled controls would not dim at all.
 

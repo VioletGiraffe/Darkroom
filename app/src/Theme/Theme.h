@@ -56,6 +56,12 @@ struct ThemeColors {
 	const char* AccentBorder;       // --color-border-info: accent-colored borders/fills/dots (hover border, accent bar, checkbox fill)
 	const char* AccentText;         // --color-text-info: text/icon color sitting on an AccentBg-tinted surface
 	const char* AccentBg;           // --color-background-info: accent-tinted surface fill (selected/segment fills, highlighted card)
+	const char* SelectionHighlight; // no mockup token - text-selection background (app-wide QPalette::Highlight + the QLineEdit/QTextEdit
+	                                // selection). AccentBorder pushed away from SelectedText so the un-inverted text stays legible on it:
+	                                // darkened but still vivid in dark, kept bright in light.
+	const char* SelectedText;       // no mockup token - text-selection foreground (QPalette::HighlightedText). Equals TextPrimary today
+	                                // (the selection recolors the background only, it doesn't invert the text); its own token so a future
+	                                // theme can diverge or nudge it (e.g. pure white for more punch on the dark-theme selection).
 	const char* ThumbnailMatte;     // --color-background-tertiary: recessed image-well backdrop behind a single frame
 };
 

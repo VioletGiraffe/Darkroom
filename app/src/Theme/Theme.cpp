@@ -24,6 +24,8 @@ static constexpr Theme::ThemeColors Dark{
 	.AccentBorder = "#5aa0e8",
 	.AccentText = "#8fc3f0",
 	.AccentBg = "#22303f",
+	.SelectionHighlight = "#26619f",  // AccentBorder darkened, saturation kept - the light TextPrimary reads on it (~5:1)
+	.SelectedText = "#ece5da",        // == TextPrimary; the selection recolors the background only
 	.ThumbnailMatte = "#16120d",
 };
 
@@ -45,6 +47,8 @@ static constexpr Theme::ThemeColors Light{
 	.AccentBorder = "#378add",
 	.AccentText = "#185fa5",
 	.AccentBg = "#e6f1fb",
+	.SelectionHighlight = "#4a90da",  // AccentBorder kept bright - the dark TextPrimary reads on it (~5:1)
+	.SelectedText = "#241d15",        // == TextPrimary; the selection recolors the background only
 	.ThumbnailMatte = "#e7e4db",
 };
 

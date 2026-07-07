@@ -50,7 +50,8 @@ constexpr char kTextInputs[] = R"(
 		border-radius: %ControlRadius%px;
 		padding: 4px 8px;
 		background: palette(base);
-		selection-background-color: %AccentBorder%;
+		selection-background-color: %SelectionHighlight%;
+		selection-color: %SelectedText%;
 	}
 	QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus { border-color: %AccentBorder%; }
 )";
@@ -233,6 +234,8 @@ QString styleSheetString()
 		{ QStringLiteral("%BorderStrong%"),             QString::fromLatin1(t.BorderStrong) },
 		{ QStringLiteral("%AccentBorder%"),             QString::fromLatin1(t.AccentBorder) },
 		{ QStringLiteral("%AccentBg%"),                 QString::fromLatin1(t.AccentBg) },
+		{ QStringLiteral("%SelectionHighlight%"),       QString::fromLatin1(t.SelectionHighlight) },
+		{ QStringLiteral("%SelectedText%"),             QString::fromLatin1(t.SelectedText) },
 		{ QStringLiteral("%MutedText%"),                QString::fromLatin1(t.MutedText) },
 		{ QStringLiteral("%InstructionText%"),          QString::fromLatin1(t.InstructionText) },
 		{ QStringLiteral("%BackgroundPrimary%"),        QString::fromLatin1(t.BackgroundPrimary) },
@@ -265,9 +268,9 @@ QString styleSheetString()
 
 // The app-wide QPalette matching the current Theme: Window/Base/Button/Text drive every stock control's
 // background and text via the palette() QSS roles used above, so they pick up the warm ramps too instead of
-// staying on the native OS palette. Highlight/HighlightedText cover the one native selection state the sheet
-// above doesn't reach - the combo drop-down's item selection - so it reads as the same "accent surface" as the
-// rest of the app instead of the system's default blue.
+// staying on the native OS palette. Highlight/HighlightedText carry the SelectionHighlight/SelectedText pair to
+// the native selection states the sheet above doesn't reach - the combo drop-down and item views - so their
+// selection matches the QLineEdit (styled with the same pair above) instead of the system's default blue.
 QPalette paletteFor(const Theme::ThemeColors& t)
 {
 	QPalette p;
@@ -280,8 +283,8 @@ QPalette paletteFor(const Theme::ThemeColors& t)
 	p.setColor(QPalette::ButtonText, text);
 	p.setColor(QPalette::Text, text);
 	p.setColor(QPalette::Mid, QColor(QString::fromLatin1(t.MutedText)));
-	p.setColor(QPalette::Highlight, QColor(QString::fromLatin1(t.AccentBg)));
-	p.setColor(QPalette::HighlightedText, QColor(QString::fromLatin1(t.AccentText)));
+	p.setColor(QPalette::Highlight, QColor(QString::fromLatin1(t.SelectionHighlight)));
+	p.setColor(QPalette::HighlightedText, QColor(QString::fromLatin1(t.SelectedText)));
 
 	// setColor(role, ...) above fills all color groups, including Disabled, with the full-strength colors -
 	// without an explicit Disabled override a disabled control's text would not dim at all. Muted matches the

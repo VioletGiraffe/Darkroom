@@ -106,3 +106,11 @@ cards get rebuilt by their own menu actions), guard the widget with a `QPointer`
 - **`palette(...)` roles track the active theme automatically; hardcoded hex does not.** Anything built from
   a `Theme` hex must be rebuilt on a light/dark switch (we re-apply the whole sheet on
   `colorSchemeChanged`); `palette(base)` etc. update on their own.
+- **`selection-background-color` and `selection-color` are a set - specify both or neither.** Once a QSS rule
+  gives a text widget (`QLineEdit`/`QPlainTextEdit`/`QTextEdit`) a `selection-background-color`,
+  `QStyleSheetStyle` owns that widget's selection painting and does *not* fall back to the palette's
+  `HighlightedText` for the unset `selection-color` - the selected text keeps its **normal** foreground. On a
+  dark theme that's light text on the accent fill = unreadable. The app-wide palette `Highlight`/`HighlightedText`
+  still covers widgets the sheet doesn't reach (combo popup, item views), but a QSS rule that sets one selection
+  color must carry its matching half itself. (`Style.cpp`'s `kTextInputs` sets both, from the `SelectionHighlight`
+  / `SelectedText` theme pair.)
