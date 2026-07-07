@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783433176977,
+  "lastUpdate": 1783436362576,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -1063,6 +1063,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 24.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "f181d8d3e60f1426cab39e8eb81dc85bb9e89406",
+          "message": "Rich context menu for staged items in QuickImportDialog; Shortcuts.h created",
+          "timestamp": "2026-07-07T17:56:15+03:00",
+          "tree_id": "a374f2dbc3f0aadf098a537e43b643d8e6fc9205",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/f181d8d3e60f1426cab39e8eb81dc85bb9e89406"
+        },
+        "date": 1783436360600,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 7641,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 3343,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 850,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 496.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 271,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 21,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 25,
             "unit": "KB"
           },
           {
