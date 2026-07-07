@@ -36,27 +36,13 @@ jobs:
         submodules: recursive
         token: ${{ secrets.magic_pat }}
 
-    - name: Disable winget source auto-update
-      shell: pwsh
-      run: |
-        $settingsPath = "$env:LOCALAPPDATA\Packages\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\LocalState\settings.json"
-        $dir = Split-Path $settingsPath
-        # Ensure the directory exists
-        if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
-        # Create or overwrite settings.json to disable auto-update
-        $settings = @{
-            source = @{
-                autoUpdateIntervalInMinutes = 0
-            }
-        } | ConvertTo-Json
-        
-        Set-Content -Path $settingsPath -Value $settings
-
     - name: LOC count - app
       if: "startsWith(matrix.os, 'windows')"
       shell: pwsh
       run: |
         winget install --id AlDanial.Cloc --exact --silent --accept-package-agreements --accept-source-agreements
+        "$env:LOCALAPPDATA\Microsoft\WinGet\Links" >> $env:GITHUB_PATH
+
         $loc = (cloc --include-lang="C,C++" --strip-str-comments --exclude-dir=tests,bin,build,.git,3rdparty --json --quiet ./app/ | ConvertFrom-Json).SUM.code
         "App C/C++ code: $loc LOC"
         "LOC_APP=$loc" >> $env:GITHUB_ENV
