@@ -207,9 +207,14 @@ case-insensitive, matching the Catalog/filesystem rule. The panel supports the s
 `LabelSidebar` (`DragGestureHelper` + `LabelMimeType`, mirrored line-for-line). Dragging a label onto a
 staged card — or onto a multi-selection containing it, same effective-selection shape as the main grid's
 own card drop — appends the label id to that card's `pendingLabelIds` (no-op if already present) and
-re-renders its label dots. Right-clicking a card opens a checkable **Labels** menu (every ordinary label,
-toggling `pendingLabelIds` membership — the same pattern as the main grid's own card menu) plus **Remove
-from staging**; the Best star toggles `pendingBest` directly, with no Catalog write yet either.
+re-renders its label dots. Right-clicking a card opens a context menu mirroring the main grid's, adapted for untracked items: Compare
+photos, open/play/locate the source, copy its path, **Rename**, toggle Best, the checkable **Labels** menu,
+**Remove from staging**, and **Delete source file(s)** (deletes the pre-import original from disk, confirmed).
+`F2` / `Del` / `Shift+Del` accelerate rename / remove / delete via the shared `Shortcuts` struct
+(`src/Shortcuts.h`, also used by the main window). Nothing reaches the Catalog until Import — the Best star and
+every menu toggle mutate `pendingBest` / `pendingLabelIds` only. **Rename** additionally renames the file on
+disk and re-keys the `StagedEntry` to the new name+size `MediaId` (rebuilding the card in place), preserving the
+`staged key == the file's MediaId` invariant `runImport` relies on (below).
 
 A staged video needs exactly one frame folder, and that folder's name is implied by whichever label landed
 on it *first* — `pendingLabelIds.constFirst()`, used only inside `runImport()` below. This is deliberately
