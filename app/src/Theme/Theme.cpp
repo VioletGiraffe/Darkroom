@@ -22,7 +22,7 @@ static constexpr Theme::ThemeColors Dark{
 	.BorderMedium = "#4a453f",              // the .20 sibling of BorderSubtle - floating-surface / container outlines
 	.BorderStrong = "#78716a",              // inline-control resting edge, tuned toward TextPrimary (not a mockup token)
 	.AccentBorder = "#5aa0e8",
-	.AccentText = "#8fc3f0",
+	.AccentText = "#8fc3f0",          // text color on accent surface, tuned to be legible on AccentBg
 	.AccentBg = "#22303f",
 	.SelectionHighlight = "#26619f",  // AccentBorder darkened, saturation kept - the light TextPrimary reads on it (~5:1)
 	.SelectedText = "#ece5da",        // == TextPrimary; the selection recolors the background only

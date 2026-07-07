@@ -99,7 +99,7 @@ constexpr char kMenus[] = R"(
 		background: palette(window);
 	}
 	QMenu::item { border-radius: %MenuItemRadius%px; padding: 5px 24px 5px 12px; }
-	QMenu::item:selected { background: %AccentBg%; }
+	QMenu::item:selected { background: %AccentBg%; color: %AccentText%; }
 	QMenu::separator { height: 1px; background: %BorderSubtle%; margin: 4px 8px; }
 )";
 
@@ -108,8 +108,8 @@ constexpr char kMenuBar[] = R"(
 	   soft pill treatment as QMenu items. */
 	QMenuBar { background: transparent; }
 	QMenuBar::item { background: transparent; border-radius: %MenuItemRadius%px; padding: 4px 10px; }
-	QMenuBar::item:selected { background: %AccentBg%; }
-	QMenuBar::item:pressed { background: %AccentBg%; }
+	QMenuBar::item:selected { background: %AccentBg%; color: %AccentText%; }
+	QMenuBar::item:pressed { background: %AccentBg%; color: %AccentText%; }
 )";
 
 constexpr char kLists[] = R"(
@@ -244,6 +244,7 @@ QString styleSheetString()
 		{ QStringLiteral("%BorderStrong%"),             QString::fromLatin1(t.BorderStrong) },
 		{ QStringLiteral("%AccentBorder%"),             QString::fromLatin1(t.AccentBorder) },
 		{ QStringLiteral("%AccentBg%"),                 QString::fromLatin1(t.AccentBg) },
+		{ QStringLiteral("%AccentText%"),               QString::fromLatin1(t.AccentText) },
 		{ QStringLiteral("%SelectionHighlight%"),       QString::fromLatin1(t.SelectionHighlight) },
 		{ QStringLiteral("%SelectedText%"),             QString::fromLatin1(t.SelectedText) },
 		{ QStringLiteral("%MutedText%"),                QString::fromLatin1(t.MutedText) },
@@ -301,6 +302,7 @@ QPalette paletteFor(const Theme::ThemeColors& t)
 	// without an explicit Disabled override a disabled control's text would not dim at all. Muted matches the
 	// sheet's own muted vocabulary (and Mid above, so QSS palette(mid) users read the same tone).
 	const QColor muted(QString::fromLatin1(t.MutedText));
+	p.setColor(QPalette::PlaceholderText, muted);  // input placeholder hint - the muted tone, not Qt's default half-alpha Text
 	p.setColor(QPalette::Disabled, QPalette::WindowText, muted);
 	p.setColor(QPalette::Disabled, QPalette::Text, muted);
 	p.setColor(QPalette::Disabled, QPalette::ButtonText, muted);
