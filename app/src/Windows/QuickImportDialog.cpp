@@ -940,8 +940,11 @@ void QuickImportDialog::stageMediaItems(const QStringList& paths)
 	// that survived every filter above are considered, so a drop consisting entirely of duplicates mints no label.
 	QHash<QString, QString> labelIdByPath;
 	for (const QString& path : videoPaths + photoPaths)
+	{
 		if (const QString name = labelNameByPath.value(path); !name.isEmpty())
 			labelIdByPath.insert(path, ensureLabelForFolderName(name));
+	}
+
 	if (!labelIdByPath.isEmpty())
 		refreshLabelList();
 
