@@ -79,7 +79,7 @@ constexpr char kComboBoxes[] = R"(
 		background: transparent;
 		width: 18px;
 	}
-	QComboBox::down-arrow { image: url(:/UI/combobox_down_arrow.svg); width: 10px; height: 7px; }
+	QComboBox::down-arrow { image: url(%ComboArrowIcon%); width: 10px; height: 7px; }
 	QComboBox QAbstractItemView {
 		border: 1px solid %BorderMedium%;
 		border-radius: %ControlRadius%px;
@@ -273,6 +273,11 @@ QString styleSheetString()
 		// and how far the handle sticks out above/below the groove.
 		{ QStringLiteral("%SliderHandleContentWidth%"), QString::number(Theme::SliderHandleDiameter - 2) },
 		{ QStringLiteral("%SliderHandleOverhang%"),     QString::number((Theme::SliderHandleDiameter - Theme::SliderGrooveThickness) / 2) },
+		// Not a color: the combo down-arrow is a per-theme pre-colored SVG, because QSS url() can't recolor an
+		// image (no runtime tint, no data: URIs). Each variant is stroked to that theme's TextPrimary so the arrow
+		// matches the combo's own text - keep both SVGs in sync if TextPrimary changes in Theme.cpp.
+		{ QStringLiteral("%ComboArrowIcon%"), Theme::isDark() ? QStringLiteral(":/UI/combobox_down_arrow_dark.svg")
+		                                                      : QStringLiteral(":/UI/combobox_down_arrow_light.svg") },
 	};
 	for (const auto& [token, value] : tokens)
 		sheet.replace(token, value);

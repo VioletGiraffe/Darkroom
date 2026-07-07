@@ -70,6 +70,10 @@ struct ThemeColors {
 	const char* ThumbnailMatte;     // --color-background-tertiary: recessed image-well backdrop behind a single frame
 };
 
+// True when the active system color scheme is dark. Drives Theme::current()'s variant choice, and is exposed so
+// callers can pick a non-color, theme-specific asset - e.g. a pre-colored SVG that QSS url() can't recolor.
+bool isDark();
+
 // Returns the palette matching the current system color scheme.
 const ThemeColors& current();
 

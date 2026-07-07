@@ -52,8 +52,12 @@ static constexpr Theme::ThemeColors Light{
 	.ThumbnailMatte = "#e7e4db",
 };
 
+bool Theme::isDark()
+{
+	return QGuiApplication::styleHints()->colorScheme() == Qt::ColorScheme::Dark;
+}
+
 const Theme::ThemeColors& Theme::current()
 {
-	const bool dark = QGuiApplication::styleHints()->colorScheme() == Qt::ColorScheme::Dark;
-	return dark ? Dark : Light;
+	return isDark() ? Dark : Light;
 }
