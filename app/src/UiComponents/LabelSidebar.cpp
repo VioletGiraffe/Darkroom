@@ -1,5 +1,6 @@
 #include "UiComponents/LabelSidebar.h"
 #include "Core/Catalog.h"
+#include "UiComponents/ContentWidthListWidget.h"
 #include "UiComponents/LabelMimeType.h"
 #include "UiComponents/SegmentedToggle.h"
 #include "Theme/Icons.h"
@@ -20,7 +21,6 @@
 #include <QPen>
 #include <QPixmap>
 #include <QPushButton>
-#include <QScrollBar>
 #include <QStyle>
 #include <QStyledItemDelegate>
 #include <QVariant>
@@ -190,25 +190,6 @@ private:
 	mutable qreal   m_allIconDpr = 0.0;
 };
 
-// A QListWidget that reports the width its widest row actually needs (plus frame and, when shown, the
-// scrollbar), so the sidebar layout/splitter sizes the panel to hug its content instead of QListView's
-// large default. Height keeps the base behavior. The breathing room is folded into the delegate's sizeHint.
-class ContentWidthListWidget final : public QListWidget {
-public:
-	using QListWidget::QListWidget;
-
-	[[nodiscard]] QSize sizeHint() const override        { return { contentWidth(), QListWidget::sizeHint().height() }; }
-	[[nodiscard]] QSize minimumSizeHint() const override { return { contentWidth(), QListWidget::minimumSizeHint().height() }; }
-
-private:
-	[[nodiscard]] int contentWidth() const
-	{
-		int width = 2 * frameWidth() + qMax(sizeHintForColumn(0), 0);   // widest row via the delegate; -1 when empty
-		if (verticalScrollBar()->isVisible())
-			width += verticalScrollBar()->sizeHint().width();
-		return width;
-	}
-};
 }
 
 LabelSidebar::LabelSidebar(QWidget* parent) : QWidget(parent)

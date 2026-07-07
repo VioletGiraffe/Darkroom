@@ -1,5 +1,6 @@
 #include "Windows/QuickImportDialog.h"
 #include "Ffmpeg.h"
+#include "UiComponents/ContentWidthListWidget.h"
 #include "UiComponents/LabelMimeType.h"
 #include "UiComponents/LabelVisuals.h"
 #include "Settings.h"
@@ -53,6 +54,10 @@ constexpr int kLabelIdRole = Qt::UserRole;
 
 // Staged cards render at a fixed size - this dialog has no zoom control like the main grid's Ctrl+wheel.
 constexpr int STAGED_CARD_IMAGE_HEIGHT = 120;
+
+// The label list hugs its content width (ContentWidthListWidget) but is capped here so a pathologically long
+// label name can't grow the pane without bound - past this the row elides instead.
+constexpr int LABEL_LIST_MAX_WIDTH = 300;
 
 // A small filled circle, used as each label-list row's leading icon - the flat, non-interactive cousin of
 // LabelRowDelegate's dot (no active/hover states to paint here, so a plain decoration icon suffices).
@@ -407,10 +412,13 @@ QuickImportDialog::QuickImportDialog(Callbacks callbacks, const QString& suggest
 	labelPaneLayout->setContentsMargins(0, 0, 0, 0);
 	labelPaneLayout->addWidget(new QLabel(tr("Labels")));
 
-	m_labelList = new QListWidget();
+	m_labelList = new ContentWidthListWidget();  // hugs its content so the pane auto-fits the label names
 	m_labelList->setSelectionMode(QAbstractItemView::NoSelection);  // rows are dragged, never selected
 	m_labelList->setFrameShape(QFrame::NoFrame);
-	m_labelList->setMaximumWidth(220);
+	// Cap the content-hugging width so a pathologically long label name can't blow the pane up; the row elides
+	// instead (horizontal scrolling off). No explicit minimum width, so the minimum tracks content up to the cap.
+	m_labelList->setMaximumWidth(LABEL_LIST_MAX_WIDTH);
+	m_labelList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	// Hover fill matches the main-window sidebar's active-row highlight (BackgroundSecondary + ControlRadius), for a consistent feel.
 	m_labelList->setStyleSheet(QStringLiteral("QListWidget::item:hover { background-color: %1; border-radius: %2px; }")
 		.arg(Theme::current().BackgroundSecondary).arg(Theme::ControlRadius));
@@ -599,6 +607,8 @@ void QuickImportDialog::refreshLabelList()
 		}
 	}
 
+	// The row set changed the content width; let the layout/splitter re-fit the pane (mirrors LabelSidebar::rebuildRows).
+	m_labelList->updateGeometry();
 }
 
 const QuickImportDialog::LabelOption* QuickImportDialog::findLabelOption(const QString& id) const
