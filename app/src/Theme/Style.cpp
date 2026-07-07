@@ -273,9 +273,10 @@ QString styleSheetString()
 
 // The app-wide QPalette matching the current Theme: Window/Base/Button/Text drive every stock control's
 // background and text via the palette() QSS roles used above, so they pick up the warm ramps too instead of
-// staying on the native OS palette. Highlight/HighlightedText carry the SelectionHighlight/SelectedText pair to
-// the native selection states the sheet above doesn't reach - the combo drop-down and item views - so their
-// selection matches the QLineEdit (styled with the same pair above) instead of the system's default blue.
+// staying on the native OS palette. Highlight/HighlightedText set the palette's selection roles to the same
+// SelectionHighlight/SelectedText pair, so genuinely stock (unstyled) palette-driven selection stays consistent
+// with the QLineEdit selection styled above. It does NOT reach the QComboBox popup - that view is QSS-styled, so
+// QStyleSheetStyle draws its selection and ignores these roles (needs an explicit ::item:selected to change).
 QPalette paletteFor(const Theme::ThemeColors& t)
 {
 	QPalette p;

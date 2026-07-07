@@ -46,6 +46,13 @@ way. Most came out of styling the `QComboBox` arrow and rounding its drop-down p
   6.10 render it differently. Set an explicit `::item { padding: ... }` (`Style.cpp` uses `5px 8px`, echoing the
   `QMenu::item` vertical rhythm) so row height is both roomy and identical on every Qt version. Applies to any
   styled `QAbstractItemView`, not just combos.
+- **A styled item view's selection color does NOT come from `QPalette::Highlight` - style `::item:selected`.**
+  An unstyled item view fills the selected row with `QPalette::Highlight`. Once the view is QSS-styled (the combo
+  popup is, via `QComboBox QAbstractItemView` + `ComboPopupRounder`), `QStyleSheetStyle` draws the selection from
+  its own defaults and ignores `Highlight`/`HighlightedText`, so setting those in the app palette has no effect on
+  it - you must add `QComboBox QAbstractItemView::item:selected { background: ...; color: ...; }`. (This is why the
+  app's combo-popup selection neither tracks the theme's selection colors nor matches the `QMenu` `AccentBg` pill,
+  and why repointing the palette's selection roles left it unchanged.)
 
 ## The drop-down popup is a separate top-level window
 
@@ -118,6 +125,6 @@ cards get rebuilt by their own menu actions), guard the widget with a `QPointer`
   `QStyleSheetStyle` owns that widget's selection painting and does *not* fall back to the palette's
   `HighlightedText` for the unset `selection-color` - the selected text keeps its **normal** foreground. On a
   dark theme that's light text on the accent fill = unreadable. The app-wide palette `Highlight`/`HighlightedText`
-  still covers widgets the sheet doesn't reach (combo popup, item views), but a QSS rule that sets one selection
-  color must carry its matching half itself. (`Style.cpp`'s `kTextInputs` sets both, from the `SelectionHighlight`
-  / `SelectedText` theme pair.)
+  still covers genuinely stock (unstyled) palette-driven selection, but a QSS rule that sets one selection color
+  must carry its matching half itself. (`Style.cpp`'s `kTextInputs` sets both, from the `SelectionHighlight` /
+  `SelectedText` theme pair.)

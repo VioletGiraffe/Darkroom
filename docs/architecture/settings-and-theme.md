@@ -53,10 +53,12 @@ divergence, not drift (the mockup's own selected-row bar uses this blue).
 
 The app-wide `QPalette` (set in `Style::install()` alongside the stylesheet, re-applied on
 `colorSchemeChanged`) carries the theme's background/text/accent colors into the standard `QPalette` roles.
-This is what lets stock controls and native fallbacks (e.g. the combo drop-down's item selection) follow the
-themed ramps too, instead of staying on the OS-default grey palette. The selection roles `Highlight`/`HighlightedText` specifically
-carry the `SelectionHighlight`/`SelectedText` pair, so the combo drop-down and item-view selection match the `QLineEdit` selection the
-sheet styles with the same pair. The Disabled color group gets an explicit
+This is what lets stock controls and native fallbacks follow the themed ramps too, instead of staying on the
+OS-default grey palette. The selection roles `Highlight`/`HighlightedText` carry the `SelectionHighlight`/`SelectedText`
+pair, keeping any genuinely stock (unstyled) palette-driven selection consistent with the `QLineEdit` selection the
+sheet styles with the same pair. (This does *not* cover the `QComboBox` popup: its view is QSS-styled, so
+`QStyleSheetStyle` draws that selection and ignores the palette role — it needs an explicit `::item:selected` rule.)
+The Disabled color group gets an explicit
 `MutedText` override for the text roles — without it, `setColor(role, ...)` fills every group with the
 full-strength colors and disabled controls would not dim at all.
 
