@@ -206,17 +206,17 @@ MediaItemWidget::MediaItemWidget(
 	footerLayout->setContentsMargins(0, 0, 0, 0);
 	footerLayout->setSpacing(6);
 
-	auto* starButton = new QPushButton("★", m_footer);
-	starButton->setObjectName("cardStar");   // styled via #cardStar in the central sheet (Style.cpp)
-	starButton->setCheckable(true);
-	starButton->setChecked(inBest);
-	starButton->setFlat(true);
-	starButton->setCursor(Qt::PointingHandCursor);
-	starButton->setFixedSize(18, 18);
-	connect(starButton, &QPushButton::clicked, this, [onToggleBest = std::move(onToggleBest)]() {
+	m_starButton = new QPushButton("★", m_footer);
+	m_starButton->setObjectName("cardStar");   // styled via #cardStar in the central sheet (Style.cpp)
+	m_starButton->setCheckable(true);
+	m_starButton->setChecked(inBest);
+	m_starButton->setFlat(true);
+	m_starButton->setCursor(Qt::PointingHandCursor);
+	m_starButton->setFixedSize(18, 18);
+	connect(m_starButton, &QPushButton::clicked, this, [onToggleBest = std::move(onToggleBest)]() {
 		onToggleBest();
 	});
-	footerLayout->addWidget(starButton, 0, Qt::AlignVCenter);
+	footerLayout->addWidget(m_starButton, 0, Qt::AlignVCenter);
 
 	// Label-dot strip. Hidden until setLabelDots() supplies colors.
 	m_labelDots = new LabelDotStrip(m_footer);
@@ -236,6 +236,11 @@ MediaItemWidget::MediaItemWidget(
 	footerLayout->addWidget(name, 1);
 
 	layout->addWidget(m_footer, 0);
+}
+
+void MediaItemWidget::setInBest(bool inBest)
+{
+	m_starButton->setChecked(inBest);   // visual only - does not emit clicked(), so onToggleBest isn't re-invoked
 }
 
 void MediaItemWidget::setLabel(const QString& label)

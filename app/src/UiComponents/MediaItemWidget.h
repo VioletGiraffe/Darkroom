@@ -14,6 +14,7 @@ class QDragEnterEvent;
 class QDragMoveEvent;
 class QDropEvent;
 class QLabel;
+class QPushButton;
 class ThumbnailWidget;
 
 class MediaItemWidget final : public QWidget {
@@ -55,6 +56,10 @@ public:
 	// Updates the card's caption (the "N:  name" label) without re-rendering its thumbnail.
 	void setLabel(const QString& label);
 
+	// Reflects a Best change made elsewhere (e.g. a context-menu toggle) on the card's star, without invoking the
+	// onToggleBest callback - the caller owns the Best state; this only syncs the visual.
+	void setInBest(bool inBest);
+
 	// Sets the colored dots overlaid on the thumbnail (one per label the item carries, including Best);
 	// tooltip lists their names. An empty list hides the overlay. Colors are computed by the caller
 	// (MainWindow) from the Catalog.
@@ -87,6 +92,7 @@ private:
 private:
 	ThumbnailWidget*             m_thumb = nullptr;
 	QWidget*                     m_footer = nullptr;     // bottom row: star + dots + name (sibling of m_thumb)
+	QPushButton*                 m_starButton = nullptr; // Best toggle in the footer; setInBest() syncs its checked state
 	QLabel*                      m_name = nullptr;       // elided, right-aligned item name in the footer
 	QWidget*                     m_labelDots = nullptr;  // colored-dot strip (LabelDotStrip), child of m_footer
 	QWidget*                     m_splitPendingBadge = nullptr;  // top-right "not fully split" badge, child of m_thumb

@@ -4,14 +4,18 @@
 #include "UiComponents/LabelMimeType.h"
 #include "UiComponents/LabelVisuals.h"
 #include "Settings.h"
+#include "Shortcuts.h"
 #include "Theme/Icons.h"
 #include "Theme/Theme.h"
 #include "Utils.h"
 #include "UiComponents/MediaItemWidget.h"
+#include "Windows/PhotoCompareWindow.h"
 #include "Windows/VideoPlayerWindow.h"
 
 #include <QAbstractItemView>
+#include <QAction>
 #include <QApplication>
+#include <QClipboard>
 #include <QColor>
 #include <QColorDialog>
 #include <QComboBox>
@@ -143,6 +147,13 @@ enum class RelocateMode { LeaveInPlace, Copy, Move };
 	return destPath;
 }
 
+// Opens a VideoPlayerWindow for the file, parented to the given widget
+void playVideo(const QString& path, QWidget* parent)
+{
+	auto* player = new VideoPlayerWindow(path, MediaId::fromFile(path), parent);
+	player->show();
+}
+
 // ============================================================================
 // FileCollisionDialog - shown when the relocation destination already has a
 // file with the same name as the one being added.
@@ -188,17 +199,11 @@ public:
 			QWidget* previewParent = parent;
 
 			QPushButton* playStaged = new QPushButton(tr("Play Staged File"), this);
-			connect(playStaged, &QPushButton::clicked, this, [previewParent, stagedPath] {
-				auto* player = new VideoPlayerWindow(stagedPath, MediaId::fromFile(stagedPath), previewParent);
-				player->show();
-			});
+			connect(playStaged, &QPushButton::clicked, this, [previewParent, stagedPath] { playVideo(stagedPath, previewParent); });
 			buttonRow->addWidget(playStaged);
 
 			QPushButton* playExisting = new QPushButton(tr("Play Existing File"), this);
-			connect(playExisting, &QPushButton::clicked, this, [previewParent, destPath] {
-				auto* player = new VideoPlayerWindow(destPath, MediaId::fromFile(destPath), previewParent);
-				player->show();
-			});
+			connect(playExisting, &QPushButton::clicked, this, [previewParent, destPath] { playVideo(destPath, previewParent); });
 			buttonRow->addWidget(playExisting);
 		}
 
@@ -433,7 +438,7 @@ QuickImportDialog::QuickImportDialog(Callbacks callbacks, const QString& suggest
 	addLabelButton->setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_plus.svg"), &Theme::ThemeColors::TextPrimary));
 	// Ctrl+L mirrors LabelSidebar's Create-label button; keep the two in sync. The tooltip surfaces the shortcut
 	// (derived from it, so there's a single source of truth) since a button doesn't advertise one otherwise.
-	addLabelButton->setShortcut(QKeySequence("Ctrl+L"));
+	addLabelButton->setShortcut(QKeySequence(Shortcuts::CreateLabel));
 	addLabelButton->setToolTip(tr("Create a new label (%1)").arg(addLabelButton->shortcut().toString(QKeySequence::NativeText)));
 	connect(addLabelButton, &QPushButton::clicked, this, [this] {
 		const QString name = QInputDialog::getText(this, tr("New Label"), tr("Label name:")).trimmed();
@@ -464,6 +469,22 @@ QuickImportDialog::QuickImportDialog(Callbacks callbacks, const QString& suggest
 	// The cards are transparent (see MediaItemWidget), so the selection highlight has to come from the list
 	// item behind them - same rule the main grid uses.
 	m_stagedGrid->setStyleSheet(QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().AccentBg));
+
+	// Keyboard accelerators on the staged grid, mirroring MainWindow's edit actions: Del removes from staging,
+	// Shift+Del deletes the source file(s). WidgetWithChildrenShortcut scopes them to the grid so they don't fire
+	// while typing elsewhere in the dialog; the context menu shows the same shortcuts (see showStagedCardContextMenu).
+	auto* removeStagedAction = new QAction(tr("Remove from staging"), this);
+	removeStagedAction->setShortcut(QKeySequence(Shortcuts::RemoveFromList));
+	removeStagedAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+	connect(removeStagedAction, &QAction::triggered, this, [this] { removeStagedItems(selectedStagedIds()); });
+	m_stagedGrid->addAction(removeStagedAction);
+
+	auto* deleteStagedAction = new QAction(tr("Delete source file(s)"), this);
+	deleteStagedAction->setShortcut(QKeySequence(Shortcuts::DeleteFile));
+	deleteStagedAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+	connect(deleteStagedAction, &QAction::triggered, this, [this] { deleteStagedSourceFiles(selectedStagedIds()); });
+	m_stagedGrid->addAction(deleteStagedAction);
+
 	m_splitter->addWidget(m_stagedGrid);
 
 	m_splitter->setStretchFactor(0, 0);
@@ -873,7 +894,7 @@ void QuickImportDialog::stageMediaItems(const QStringList& paths)
 	// canvas, the preview images, the temp dir (photos have none) and the double-click action. labelIdByPath is
 	// captured by reference - stageCard is only ever called synchronously from within this function.
 	const auto stageCard = [this, &labelIdByPath](QSize canvasSize, const QString& path, const QStringList& previewPaths,
-		const QString& tempPreviewDir, std::function<void()> onDoubleClick) {
+		const QString& tempPreviewDir) {
 		const MediaId id = MediaId::fromFile(path);
 
 		auto* card = new MediaItemWidget(
@@ -886,7 +907,7 @@ void QuickImportDialog::stageMediaItems(const QStringList& paths)
 				if (it != m_staged.end())
 					it->pendingBest = !it->pendingBest;  // the star button's own checked state is Qt's, not ours
 			},
-			std::move(onDoubleClick),
+			[this, id] { previewStagedItem(id); },   // double-click: open the photo / play the video (same as the menu action)
 			[this, id](QPoint globalPos) { showStagedCardContextMenu(id, globalPos); },
 			/* dynamicSizeHint */ false
 		);
@@ -919,9 +940,7 @@ void QuickImportDialog::stageMediaItems(const QStringList& paths)
 
 	// Photo cards decode the file itself - no extraction step, so they stage instantly.
 	for (const QString& path : photoPaths)
-		stageCard(photoCanvas, path, { path }, /*tempPreviewDir*/ {}, [this, path] {
-			QDesktopServices::openUrl(QUrl::fromLocalFile(path));  // double-click previews in the system image viewer
-		});
+		stageCard(photoCanvas, path, { path }, /*tempPreviewDir*/ {});
 
 	if (videoPaths.isEmpty())
 		return;
@@ -958,10 +977,7 @@ void QuickImportDialog::stageMediaItems(const QStringList& paths)
 		for (const QString& file : previewDir.entryList(IMAGE_FILE_FILTERS, QDir::Files, QDir::Name))
 			previewPaths << previewDir.filePath(file);
 
-		stageCard(videoCanvas, path, previewPaths, job.destinationFolder, [this, path] {
-			auto* player = new VideoPlayerWindow(path, MediaId::fromFile(path), this);
-			player->show();
-		});
+		stageCard(videoCanvas, path, previewPaths, job.destinationFolder);
 	}
 }
 
@@ -1019,9 +1035,36 @@ void QuickImportDialog::showStagedCardContextMenu(const MediaId& id, const QPoin
 
 	QMenu menu(this);
 
-	// Labels checklist - mirrors MainWindow's showMediaItemContextMenu, but toggles the staged cards' pendingLabelIds
-	// instead of the Catalog (nothing is written there until "Import" runs). Each row's color-tinted checkbox
-	// reflects the whole staged selection; toggling makes it uniform (strip when all carry it, else add to all).
+	// Compare photos: synchronized zoom/pan over the staged photo files themselves (as in MainWindow), offered for
+	// an all-photo selection of 2+ - the file paths are ready even though nothing has been imported yet.
+	std::vector<MediaId> photoSelection;
+	for (const MediaId& sel : selection)
+		if (isSupportedImageFile(m_staged.value(sel).path))
+			photoSelection.push_back(sel);
+	if (photoSelection.size() == selection.size() && photoSelection.size() >= 2)
+	{
+		menu.addAction(tr("Compare photos"), this, [this, photoSelection] { compareStagedPhotos(photoSelection); });
+		menu.addSeparator();
+	}
+
+	// Single-target file actions act on the right-clicked card (like MainWindow's), not the whole selection.
+	const bool isPhoto = isSupportedImageFile(m_staged.value(id).path);
+	menu.addAction(isPhoto ? tr("Open photo") : tr("Play source video"), this, [this, id] { previewStagedItem(id); });
+	menu.addAction(tr("Locate source file"), this, [this, id] { locateStagedSourceFile(id); });
+	menu.addAction(tr("Copy source path to clipboard"), this, [this, id] { copyStagedSourcePath(id); });
+	menu.addSeparator();
+
+	// Add to / Remove from Best across the whole selection: a uniform toggle (remove when all already carry it, else
+	// add to all), the same shape the Labels checklist below uses.
+	const bool allBest = std::all_of(selection.cbegin(), selection.cend(),
+		[this](const MediaId& sel) { return m_staged.value(sel).pendingBest; });
+	menu.addAction(allBest ? tr("Remove from Best") : tr("Add to Best"), this, [this, selection, allBest] {
+		setBestForStagedSelection(selection, !allBest);
+	});
+
+	// Labels checklist - toggles the staged cards' pendingLabelIds instead of the Catalog (nothing is written there
+	// until "Import" runs). Each row's color-tinted checkbox reflects the whole staged selection; toggling makes it
+	// uniform (strip when all carry it, else add to all).
 	QMenu* labelsMenu = menu.addMenu(tr("Labels"));
 	if (m_labelOptions.empty())
 	{
@@ -1057,16 +1100,132 @@ void QuickImportDialog::showStagedCardContextMenu(const MediaId& id, const QPoin
 			});
 		}
 	}
-
 	menu.addSeparator();
-	// Deferred: this menu was opened from the card's own customContextMenuRequested handler, still on the
-	// call stack here - unstage() deletes that very card, so the delete must happen after this unwinds
-	// (same reason MainWindow defers a card's own label-drop mutation).
-	menu.addAction(tr("Remove from staging"), this, [this, id] {
-		QMetaObject::invokeMethod(this, [this, id] { unstage(id); }, Qt::QueuedConnection);
+
+	// Remove from staging (no disk change) and Delete (removes the source from disk). Both act on the effective staged
+	// selection and display the same accelerators as the grid actions set up in the constructor. Deferred via a queued
+	// call: this menu was opened from the card's own context-menu handler, still on the stack, and both actions delete
+	// that very card - the mutation must wait until this unwinds (same reason MainWindow defers a card's own mutation).
+	QAction* removeItem = menu.addAction(tr("Remove from staging"), this, [this, selection] {
+		QMetaObject::invokeMethod(this, [this, selection] { removeStagedItems(selection); }, Qt::QueuedConnection);
 	});
+	removeItem->setShortcut(QKeySequence(Shortcuts::RemoveFromList));
+	removeItem->setShortcutContext(Qt::WidgetShortcut);   // display-only in the menu; the real accelerator is the grid action
+
+	QAction* deleteItem = menu.addAction(tr("Delete source file(s)"), this, [this, selection] {
+		QMetaObject::invokeMethod(this, [this, selection] { deleteStagedSourceFiles(selection); }, Qt::QueuedConnection);
+	});
+	deleteItem->setShortcut(QKeySequence(Shortcuts::DeleteFile));
+	deleteItem->setShortcutContext(Qt::WidgetShortcut);
 
 	menu.exec(globalPos);
+}
+
+std::vector<MediaId> QuickImportDialog::selectedStagedIds() const
+{
+	const QList<QListWidgetItem*> selected = m_stagedGrid->selectedItems();
+	std::vector<MediaId> ids;
+	for (auto it = m_staged.constBegin(); it != m_staged.constEnd(); ++it)
+		if (selected.contains(it->item))
+			ids.push_back(it.key());
+	return ids;
+}
+
+void QuickImportDialog::previewStagedItem(const MediaId& id)
+{
+	const auto it = m_staged.constFind(id);
+	if (it == m_staged.constEnd())
+		return;
+	if (isSupportedImageFile(it->path))
+		QDesktopServices::openUrl(QUrl::fromLocalFile(it->path));  // a photo opens in the system image viewer
+	else
+		playVideo(it->path, this);
+}
+
+void QuickImportDialog::locateStagedSourceFile(const MediaId& id)
+{
+	const auto it = m_staged.constFind(id);
+	if (it == m_staged.constEnd())
+		return;
+	if (!QFileInfo::exists(it->path))  // openInExplorer silently no-ops on a missing path, so guard + report here
+		reportMissingFile(this, it->path);
+	else
+		openInExplorer(it->path);
+}
+
+void QuickImportDialog::copyStagedSourcePath(const MediaId& id)
+{
+	const auto it = m_staged.constFind(id);
+	if (it != m_staged.constEnd())
+		QApplication::clipboard()->setText(QDir::toNativeSeparators(it->path));
+}
+
+void QuickImportDialog::compareStagedPhotos(const std::vector<MediaId>& photoIds)
+{
+	QStringList paths;
+	paths.reserve(static_cast<int>(photoIds.size()));
+	for (const MediaId& id : photoIds)
+	{
+		const QString path = m_staged.value(id).path;
+		if (!path.isEmpty() && QFileInfo::exists(path))
+			paths << path;
+	}
+	if (paths.size() < 2)
+	{
+		QMessageBox::warning(this, tr("Error"), tr("The selected photo files could not be found on disk."));
+		return;
+	}
+	auto* w = new PhotoCompareWindow(paths, this);
+	w->setAttribute(Qt::WA_DeleteOnClose);
+	w->show();
+}
+
+void QuickImportDialog::setBestForStagedSelection(const std::vector<MediaId>& ids, bool inBest)
+{
+	for (const MediaId& id : ids)
+	{
+		auto it = m_staged.find(id);
+		if (it == m_staged.end())
+			continue;
+		it->pendingBest = inBest;
+		static_cast<MediaItemWidget*>(m_stagedGrid->itemWidget(it->item))->setInBest(inBest);  // sync the card's star
+	}
+}
+
+void QuickImportDialog::removeStagedItems(const std::vector<MediaId>& ids)
+{
+	for (const MediaId& id : ids)
+		unstage(id);
+}
+
+void QuickImportDialog::deleteStagedSourceFiles(const std::vector<MediaId>& ids)
+{
+	if (ids.empty())
+		return;
+
+	const QString question = ids.size() == 1
+		? tr("Permanently delete this source file from disk?\n\n%1").arg(QDir::toNativeSeparators(m_staged.value(ids.front()).path))
+		: tr("Permanently delete %1 source files from disk? This cannot be undone.").arg(ids.size());
+	if (QMessageBox::warning(this, tr("Delete source file(s)"), question,
+			QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+		return;
+
+	QStringList failed;
+	for (const MediaId& id : ids)
+	{
+		const auto it = m_staged.constFind(id);
+		if (it == m_staged.constEnd())
+			continue;
+		const QString path = it->path;
+		if (QFile::remove(path))
+			unstage(id);          // also removes the card and cleans a video's temp preview dir
+		else
+			failed << QDir::toNativeSeparators(path);   // leave it staged so the user still sees the failure
+	}
+
+	if (!failed.isEmpty())
+		QMessageBox::warning(this, tr("Delete source file(s)"),
+			tr("These files could not be deleted:\n\n%1").arg(failed.join("\n")));
 }
 
 void QuickImportDialog::materializeUsedProvisionalLabels()

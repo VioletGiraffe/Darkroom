@@ -148,6 +148,16 @@ private:
 	// multi-selection, otherwise just `id`. Mirrors MainWindow::effectiveSelection for the staged grid.
 	[[nodiscard]] std::vector<MediaId> stagedSelection(const MediaId& id) const;
 	void showStagedCardContextMenu(const MediaId& id, const QPoint& globalPos);
+	// Staged-card actions, mirroring MainWindow's media-item context menu but adapted for untracked items. The
+	// single-id ones act on the right-clicked card; the vector ones act on the effective staged selection.
+	void previewStagedItem(const MediaId& id);                       // open a photo in the system viewer / play a video
+	void locateStagedSourceFile(const MediaId& id);                  // reveal the source file in the file manager
+	void copyStagedSourcePath(const MediaId& id);                    // copy the native source path to the clipboard
+	void compareStagedPhotos(const std::vector<MediaId>& photoIds);  // open the staged photos in a PhotoCompareWindow
+	void setBestForStagedSelection(const std::vector<MediaId>& ids, bool inBest);  // set pendingBest + sync each card's star
+	void removeStagedItems(const std::vector<MediaId>& ids);         // drop from staging; no change on disk
+	void deleteStagedSourceFiles(const std::vector<MediaId>& ids);   // delete the source files from disk (confirmed), then unstage
+	[[nodiscard]] std::vector<MediaId> selectedStagedIds() const;    // ids under the grid's current selection (keyboard accelerators)
 	// Every staged entry whose pendingLabelIds isn't empty: grouped by its first label and imported via
 	// addMediaItemsRequested, then markBestRequested/assignExtraLabelsRequested for whatever landed.
 	void runImport();

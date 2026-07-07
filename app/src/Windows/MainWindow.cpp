@@ -22,6 +22,7 @@
 #include "Theme/Theme.h"
 #include "Utils.h"
 #include "Settings.h"
+#include "Shortcuts.h"
 
 #include "aboutdialog/caboutdialog.h"
 
@@ -292,8 +293,8 @@ void MainWindow::setupMainMenu()
 	fileMenu->addAction(tr("Exit"), QKeySequence("Ctrl+Q"), this, &QMainWindow::close);
 
 	QMenu* editMenu = new QMenu(tr("Edit"), menuBar);
-	m_deleteAction = editMenu->addAction(tr("Delete"), QKeySequence(Qt::SHIFT | Qt::Key_Delete), this, &MainWindow::deleteSelectedItems);
-	m_removeFromLibraryAction = editMenu->addAction(tr("Remove from library"), QKeySequence(Qt::Key_Delete), this, &MainWindow::removeSelectedItemsFromLibrary);
+	m_deleteAction = editMenu->addAction(tr("Delete"), QKeySequence(Shortcuts::DeleteFile), this, &MainWindow::deleteSelectedItems);
+	m_removeFromLibraryAction = editMenu->addAction(tr("Remove from library"), QKeySequence(Shortcuts::RemoveFromList), this, &MainWindow::removeSelectedItemsFromLibrary);
 	m_renameAction = editMenu->addAction(tr("Rename"), QKeySequence(Qt::Key_F2), this, &MainWindow::renameSelectedItemInteractive);
 	connect(m_mediaGrid, &QListWidget::itemSelectionChanged, this, &MainWindow::updateEditActions);
 	updateEditActions();

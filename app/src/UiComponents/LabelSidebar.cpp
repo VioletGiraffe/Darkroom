@@ -5,6 +5,7 @@
 #include "UiComponents/SegmentedToggle.h"
 #include "Theme/Icons.h"
 #include "Theme/Theme.h"
+#include "Shortcuts.h"
 
 #include <QAbstractItemView>
 #include <QColor>
@@ -235,7 +236,7 @@ LabelSidebar::LabelSidebar(QWidget* parent) : QWidget(parent)
 	btnCreateLabel->setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_plus.svg"), &Theme::ThemeColors::TextPrimary));
 	// Ctrl+L is mirrored on QuickImportDialog's Create-label button; keep the two in sync. The tooltip surfaces the
 	// shortcut (derived from it, so there's a single source of truth) since a button doesn't advertise one otherwise.
-	btnCreateLabel->setShortcut(QKeySequence("Ctrl+L"));
+	btnCreateLabel->setShortcut(QKeySequence(Shortcuts::CreateLabel));
 	btnCreateLabel->setToolTip(tr("Create a new label (%1)").arg(btnCreateLabel->shortcut().toString(QKeySequence::NativeText)));
 	layout->addWidget(btnCreateLabel);
 	connect(btnCreateLabel, &QPushButton::clicked, this, &LabelSidebar::addLabelRequested);
