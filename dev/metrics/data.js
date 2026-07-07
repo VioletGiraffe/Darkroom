@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783458628367,
+  "lastUpdate": 1783460799698,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -1403,6 +1403,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .data",
             "value": 20.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 25,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "e84489eada67ff2f54bfb28236194c29f8788765",
+          "message": "Proxy style added to make the QPushbutton focus rect less tight around the text",
+          "timestamp": "2026-07-08T00:43:24+03:00",
+          "tree_id": "e3ccf2d9a36d8fe42e5a33d8dc4b97940e169a2b",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/e84489eada67ff2f54bfb28236194c29f8788765"
+        },
+        "date": 1783460797424,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 7753,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 3343,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 862,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 502.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 277,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 21,
             "unit": "KB"
           },
           {
