@@ -28,6 +28,7 @@
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QInputDialog>
+#include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -430,6 +431,10 @@ QuickImportDialog::QuickImportDialog(Callbacks callbacks, const QString& suggest
 	QPushButton* addLabelButton = new QPushButton(tr("Create label"));
 	addLabelButton->setObjectName("addLabelButton");
 	addLabelButton->setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_plus.svg"), &Theme::ThemeColors::TextPrimary));
+	// Ctrl+L mirrors LabelSidebar's Create-label button; keep the two in sync. The tooltip surfaces the shortcut
+	// (derived from it, so there's a single source of truth) since a button doesn't advertise one otherwise.
+	addLabelButton->setShortcut(QKeySequence("Ctrl+L"));
+	addLabelButton->setToolTip(tr("Create a new label (%1)").arg(addLabelButton->shortcut().toString(QKeySequence::NativeText)));
 	connect(addLabelButton, &QPushButton::clicked, this, [this] {
 		const QString name = QInputDialog::getText(this, tr("New Label"), tr("Label name:")).trimmed();
 		if (name.isEmpty())
