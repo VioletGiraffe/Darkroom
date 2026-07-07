@@ -40,7 +40,7 @@ jobs:
       if: "startsWith(matrix.os, 'windows')"
       shell: pwsh
       run: |
-        choco install cloc -y
+        winget install --id AlDanial.Cloc --exact --silent --accept-package-agreements --accept-source-agreements
         $loc = (cloc --include-lang="C,C++" --strip-str-comments --exclude-dir=tests,bin,build,.git,3rdparty --json --quiet ./app/ | ConvertFrom-Json).SUM.code
         "App C/C++ code: $loc LOC"
         "LOC_APP=$loc" >> $env:GITHUB_ENV
@@ -49,7 +49,7 @@ jobs:
       if: "startsWith(matrix.os, 'windows')"
       shell: pwsh
       run: |
-        choco install cloc -y
+        winget install --id AlDanial.Cloc --exact --silent --accept-package-agreements --accept-source-agreements
         $loc = (cloc --include-lang="C,C++" --strip-str-comments --exclude-dir=tests,bin,build,.git,3rdparty,app --json --quiet . | ConvertFrom-Json).SUM.code
         "Libs C/C++ code: $loc LOC"
         "LOC_LIBS=$loc" >> $env:GITHUB_ENV
