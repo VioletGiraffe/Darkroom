@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783436362576,
+  "lastUpdate": 1783440137897,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -1127,6 +1127,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .data",
             "value": 21,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 25,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "e3a3bc84e103c088f5b1f998cf08b946b17c66de",
+          "message": "QuickImportDialog: \"Rename\" context menu command added",
+          "timestamp": "2026-07-07T18:56:00+03:00",
+          "tree_id": "1dfa6169ba3a03ab327532fff2f553599e22f9e0",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/e3a3bc84e103c088f5b1f998cf08b946b17c66de"
+        },
+        "date": 1783440135655,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 7709,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 3343,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 855,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 501,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 272,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 20.5,
             "unit": "KB"
           },
           {
