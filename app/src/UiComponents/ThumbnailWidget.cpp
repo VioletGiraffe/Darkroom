@@ -1,6 +1,7 @@
 #include "UiComponents/ThumbnailWidget.h"
 #include "Core/IoThreadPool.h"
 #include "Theme/Theme.h"
+#include "assert/advanced_assert.h"
 
 #include <QApplication>
 #include <QBuffer>
@@ -55,8 +56,8 @@ namespace {
 	// then install it into the widget's m_image and repaint. The heavy decode/compose runs outside the lock; the
 	// lock is taken only for the brief install, so paintEvent (which reads m_image under the same lock) barely waits.
 	struct DecodeStage final : public QRunnable {
-		DecodeStage(std::shared_ptr<ThumbnailWidget::LoadJob> job, std::vector<QByteArray> bytes)
-			: m_job{ std::move(job) }, m_bytes{ std::move(bytes) }
+		DecodeStage(std::shared_ptr<ThumbnailWidget::LoadJob> job, std::vector<QByteArray> bytes, QString readError)
+			: m_job{ std::move(job) }, m_bytes{ std::move(bytes) }, m_readError{ std::move(readError) }
 		{
 		}
 
@@ -82,6 +83,7 @@ namespace {
 			struct Fitted { QImage img; QSize logicalSize; };
 			std::vector<Fitted> fitted;
 			fitted.reserve(n);
+			QString firstError = m_readError;
 			for (QByteArray& bytes : m_bytes)   // non-const: QBuffer wraps a QByteArray*, so it can't be a const ref
 			{
 				QBuffer buffer(&bytes);
@@ -91,7 +93,11 @@ namespace {
 
 				const QSize rawSize = reader.size();   // header only, no full decode
 				if (rawSize.isEmpty())
+				{
+					if (firstError.isEmpty())
+						firstError = reader.errorString();
 					continue;
+				}
 
 				const bool swapsWH = reader.transformation().testFlag(QImageIOHandler::TransformationRotate90);
 				const QSize displayedSize = swapsWH ? rawSize.transposed() : rawSize;
@@ -102,6 +108,8 @@ namespace {
 				const QImage src = reader.read();   // reduced-scale decode + EXIF transform -> physicalSize, displayed orientation
 				if (!src.isNull())
 					fitted.push_back({ src, logicalSize });
+				else if (firstError.isEmpty())
+					firstError = reader.errorString();
 			}
 
 			// Nothing decoded (e.g. a cleared frame): leave m_image as-is but still repaint below so the previously
@@ -141,7 +149,10 @@ namespace {
 			if (!fitted.empty())
 				*job.m_target = std::move(canvas);
 			else if (job.m_errorMsg)
-				*job.m_errorMsg = ThumbnailWidget::tr("Failed to load");
+			{
+				assert_r(!firstError.isEmpty());
+				*job.m_errorMsg = ThumbnailWidget::tr("Failed to load:") + '\n' + firstError;
+			}
 			// The image (and thus sizeHint()) changed, so the layout must re-query it, not just repaint.
 			QMetaObject::invokeMethod(job.m_parent, [parent = job.m_parent] {
 				parent->updateGeometry();
@@ -151,6 +162,7 @@ namespace {
 
 		std::shared_ptr<ThumbnailWidget::LoadJob> m_job;
 		std::vector<QByteArray> m_bytes;
+		QString m_readError;
 	};
 
 	// Stage 1 (single I/O thread): read each source file into memory, then hand the bytes to the decode pool. It
@@ -168,11 +180,19 @@ namespace {
 			}
 
 			std::vector<QByteArray> bytes;
+			QString firstReadError;
 			bytes.reserve(job.m_paths.size());
 			for (const QString& path : std::as_const(job.m_paths))
 			{
 				QFile file(path);
-				bytes.push_back(file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray{});
+				if (file.open(QIODevice::ReadOnly))
+					bytes.push_back(file.readAll());
+				else
+				{
+					bytes.emplace_back();
+					if (firstReadError.isEmpty())
+						firstReadError = file.errorString();
+				}
 			}
 
 			{
@@ -180,7 +200,7 @@ namespace {
 				if (job.m_disarmed)   // disarmed while we were reading: don't bother decoding
 					return;
 			}
-			QThreadPool::globalInstance()->start(new DecodeStage{ m_job, std::move(bytes) });  // decode on the shared CPU pool
+			QThreadPool::globalInstance()->start(new DecodeStage{ m_job, std::move(bytes), std::move(firstReadError) });  // decode on the shared CPU pool
 		}
 
 		std::shared_ptr<ThumbnailWidget::LoadJob> m_job;
@@ -430,7 +450,7 @@ void ThumbnailWidget::paintEvent(QPaintEvent*)
 		painter.restore();   // the caption below must not inherit the clip
 	}
 	else if (!m_errorMessage.isEmpty())
-		painter.drawText(content, Qt::AlignCenter, m_errorMessage);
+		painter.drawText(content, Qt::AlignCenter | Qt::TextWordWrap, m_errorMessage);
 	else
 		painter.drawText(content, Qt::AlignCenter, tr("Loading..."));
 
