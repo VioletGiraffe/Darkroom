@@ -470,9 +470,19 @@ QuickImportDialog::QuickImportDialog(Callbacks callbacks, const QString& suggest
 	// item behind them - same rule the main grid uses.
 	m_stagedGrid->setStyleSheet(QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().AccentBg));
 
-	// Keyboard accelerators on the staged grid, mirroring MainWindow's edit actions: Del removes from staging,
-	// Shift+Del deletes the source file(s). WidgetWithChildrenShortcut scopes them to the grid so they don't fire
-	// while typing elsewhere in the dialog; the context menu shows the same shortcuts (see showStagedCardContextMenu).
+	// Keyboard accelerators on the staged grid, mirroring MainWindow's edit actions: F2 renames, Del removes from
+	// staging, Shift+Del deletes the source file(s). WidgetWithChildrenShortcut scopes them to the grid so they don't
+	// fire while typing elsewhere in the dialog; the context menu shows the same shortcuts (see showStagedCardContextMenu).
+	auto* renameStagedAction = new QAction(tr("Rename..."), this);
+	renameStagedAction->setShortcut(QKeySequence(Shortcuts::Rename));
+	renameStagedAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+	connect(renameStagedAction, &QAction::triggered, this, [this] {
+		const std::vector<MediaId> ids = selectedStagedIds();
+		if (ids.size() == 1)
+			renameStagedItem(ids.front());   // F2 renames only when exactly one item is selected
+	});
+	m_stagedGrid->addAction(renameStagedAction);
+
 	auto* removeStagedAction = new QAction(tr("Remove from staging"), this);
 	removeStagedAction->setShortcut(QKeySequence(Shortcuts::RemoveFromList));
 	removeStagedAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
@@ -800,6 +810,52 @@ void QuickImportDialog::addToStaging(const QStringList& paths)
 	QMetaObject::invokeMethod(this, [this, paths] { stageMediaItems(paths); }, Qt::QueuedConnection);
 }
 
+MediaItemWidget* QuickImportDialog::buildStagedCard(const MediaId& id, const QString& path, const QString& tempPreviewDir)
+{
+	// Card thumbnail canvas mirrors the main library grid: a photo is square and decodes its file directly; a video
+	// is a horizontal strip sized to tile with `frameCount` photo cards (so mixed cards line up on one column grid),
+	// showing the frames already extracted into its temp preview dir.
+	QSize canvasSize{ STAGED_CARD_IMAGE_HEIGHT, STAGED_CARD_IMAGE_HEIGHT };
+	QStringList previewPaths{ path };
+	if (!isSupportedImageFile(path))
+	{
+		const int frameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
+		canvasSize.setWidth(MediaItemWidget::videoCanvasWidthForTiling(STAGED_CARD_IMAGE_HEIGHT, frameCount, m_stagedGrid->spacing()));
+		previewPaths.clear();
+		const QDir previewDir(tempPreviewDir);
+		for (const QString& file : previewDir.entryList(IMAGE_FILE_FILTERS, QDir::Files, QDir::Name))
+			previewPaths << previewDir.filePath(file);
+	}
+
+	auto* card = new MediaItemWidget(
+		canvasSize,
+		previewPaths, QFileInfo(path).fileName(),
+		id,
+		/*inBest*/ false,
+		[this, id] {
+			auto it = m_staged.find(id);
+			if (it != m_staged.end())
+				it->pendingBest = !it->pendingBest;  // the star button's own checked state is Qt's, not ours
+		},
+		[this, id] { previewStagedItem(id); },   // double-click: open the photo / play the video (same as the menu action)
+		[this, id](QPoint globalPos) { showStagedCardContextMenu(id, globalPos); },
+		/* dynamicSizeHint */ false
+	);
+
+	// A label dropped here tags just this card, or the whole selection if this card is part of one.
+	card->setOnLabelDropped([this, id](const QString& labelId) {
+		for (const MediaId& target : stagedSelection(id))
+		{
+			auto it = m_staged.find(target);
+			if (it != m_staged.end() && !it->pendingLabelIds.contains(labelId))
+				it->pendingLabelIds << labelId;
+			updateCardLabelDots(target);
+		}
+	});
+
+	return card;
+}
+
 void QuickImportDialog::stageMediaItems(const QStringList& paths)
 {
 	// A dropped folder contributes every supported file under it (recursive, flattened), each tagged with the
@@ -885,43 +941,12 @@ void QuickImportDialog::stageMediaItems(const QStringList& paths)
 
 	const int frameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
 
-	// Card thumbnail canvases mirror the main library grid: a photo is square, a video is a horizontal strip
-	// sized to tile with `frameCount` photo cards, so mixed staged cards line up on one column grid.
-	const QSize photoCanvas{ STAGED_CARD_IMAGE_HEIGHT, STAGED_CARD_IMAGE_HEIGHT };
-	const QSize videoCanvas{ MediaItemWidget::videoCanvasWidthForTiling(STAGED_CARD_IMAGE_HEIGHT, frameCount, m_stagedGrid->spacing()), STAGED_CARD_IMAGE_HEIGHT };
-
-	// Builds one staged card + entry; shared by the photo and video paths below, which differ only in the card
-	// canvas, the preview images, the temp dir (photos have none) and the double-click action. labelIdByPath is
-	// captured by reference - stageCard is only ever called synchronously from within this function.
-	const auto stageCard = [this, &labelIdByPath](QSize canvasSize, const QString& path, const QStringList& previewPaths,
-		const QString& tempPreviewDir) {
+	// Builds one staged card + entry and inserts it into the grid; the per-type differences (canvas size, preview
+	// images) live in buildStagedCard. labelIdByPath is captured by reference - stageCard is only ever called
+	// synchronously from within this function.
+	const auto stageCard = [this, &labelIdByPath](const QString& path, const QString& tempPreviewDir) {
 		const MediaId id = MediaId::fromFile(path);
-
-		auto* card = new MediaItemWidget(
-			canvasSize,
-			previewPaths, QFileInfo(path).fileName(),
-			id,
-			/*inBest*/ false,
-			[this, id] {
-				auto it = m_staged.find(id);
-				if (it != m_staged.end())
-					it->pendingBest = !it->pendingBest;  // the star button's own checked state is Qt's, not ours
-			},
-			[this, id] { previewStagedItem(id); },   // double-click: open the photo / play the video (same as the menu action)
-			[this, id](QPoint globalPos) { showStagedCardContextMenu(id, globalPos); },
-			/* dynamicSizeHint */ false
-		);
-
-		// A label dropped here tags just this card, or the whole selection if this card is part of one.
-		card->setOnLabelDropped([this, id](const QString& labelId) {
-			for (const MediaId& target : stagedSelection(id))
-			{
-				auto it = m_staged.find(target);
-				if (it != m_staged.end() && !it->pendingLabelIds.contains(labelId))
-					it->pendingLabelIds << labelId;
-				updateCardLabelDots(target);
-			}
-		});
+		auto* card = buildStagedCard(id, path, tempPreviewDir);
 
 		auto* item = new QListWidgetItem();
 		item->setSizeHint(card->sizeHint());
@@ -940,7 +965,7 @@ void QuickImportDialog::stageMediaItems(const QStringList& paths)
 
 	// Photo cards decode the file itself - no extraction step, so they stage instantly.
 	for (const QString& path : photoPaths)
-		stageCard(photoCanvas, path, { path }, /*tempPreviewDir*/ {});
+		stageCard(path, /*tempPreviewDir*/ {});
 
 	if (videoPaths.isEmpty())
 		return;
@@ -969,16 +994,7 @@ void QuickImportDialog::stageMediaItems(const QStringList& paths)
 		});
 
 	for (const Ffmpeg::PreviewJob& job : jobs)
-	{
-		const QString& path = job.videoFilePath;
-
-		QDir previewDir(job.destinationFolder);
-		QStringList previewPaths;
-		for (const QString& file : previewDir.entryList(IMAGE_FILE_FILTERS, QDir::Files, QDir::Name))
-			previewPaths << previewDir.filePath(file);
-
-		stageCard(videoCanvas, path, previewPaths, job.destinationFolder);
-	}
+		stageCard(job.videoFilePath, job.destinationFolder);
 }
 
 void QuickImportDialog::unstage(const MediaId& id)
@@ -1052,6 +1068,12 @@ void QuickImportDialog::showStagedCardContextMenu(const MediaId& id, const QPoin
 	menu.addAction(isPhoto ? tr("Open photo") : tr("Play source video"), this, [this, id] { previewStagedItem(id); });
 	menu.addAction(tr("Locate source file"), this, [this, id] { locateStagedSourceFile(id); });
 	menu.addAction(tr("Copy source path to clipboard"), this, [this, id] { copyStagedSourcePath(id); });
+	// Deferred: rebuilding the card (setItemWidget) deletes the current one, which is still on the stack here.
+	QAction* renameItem = menu.addAction(tr("Rename..."), this, [this, id] {
+		QMetaObject::invokeMethod(this, [this, id] { renameStagedItem(id); }, Qt::QueuedConnection);
+	});
+	renameItem->setShortcut(QKeySequence(Shortcuts::Rename));
+	renameItem->setShortcutContext(Qt::WidgetShortcut);   // display-only; the real accelerator is the grid action
 	menu.addSeparator();
 
 	// Add to / Remove from Best across the whole selection: a uniform toggle (remove when all already carry it, else
@@ -1226,6 +1248,66 @@ void QuickImportDialog::deleteStagedSourceFiles(const std::vector<MediaId>& ids)
 	if (!failed.isEmpty())
 		QMessageBox::warning(this, tr("Delete source file(s)"),
 			tr("These files could not be deleted:\n\n%1").arg(failed.join("\n")));
+}
+
+void QuickImportDialog::renameStagedItem(const MediaId& id)
+{
+	const auto it = m_staged.constFind(id);
+	if (it == m_staged.constEnd())
+		return;
+
+	const StagedEntry entry = it.value();   // snapshot; carried over to the re-keyed entry below
+	const QFileInfo oldInfo(entry.path);
+	const QString oldBase = oldInfo.completeBaseName();
+	const QString suffix = oldInfo.suffix();   // kept fixed so the file stays the same type (and a valid MediaId)
+
+	bool ok = false;
+	const QString newBase = QInputDialog::getText(this, tr("Rename"),
+		suffix.isEmpty() ? tr("New name:") : tr("New name (.%1 is kept):").arg(suffix),
+		QLineEdit::Normal, oldBase, &ok).trimmed();
+	if (!ok || newBase.isEmpty() || newBase == oldBase)
+		return;
+	if (newBase.contains('/') || newBase.contains('\\'))
+	{
+		QMessageBox::warning(this, tr("Rename"), tr("A file name can't contain a path separator."));
+		return;
+	}
+
+	const QString newName = suffix.isEmpty() ? newBase : QStringLiteral("%1.%2").arg(newBase, suffix);
+	const QString newPath = oldInfo.dir().filePath(newName);
+	const MediaId newId = MediaId::fromNameAndSize(newName, id.size());
+
+	// Reject a clash with another staged item (same new name+size) or an existing on-disk file. A case-only change
+	// resolves to the same file, so it isn't treated as an on-disk clash.
+	if (newId != id && m_staged.contains(newId))
+	{
+		QMessageBox::warning(this, tr("Rename"), tr("Another staged item already has that name and size."));
+		return;
+	}
+	if (QFileInfo::exists(newPath) && QFileInfo(newPath) != oldInfo)
+	{
+		QMessageBox::warning(this, tr("Rename"), tr("A file named \"%1\" already exists in that folder.").arg(newName));
+		return;
+	}
+
+	if (!QFile::rename(entry.path, newPath))
+	{
+		QMessageBox::warning(this, tr("Rename"), tr("Could not rename the file (it may be open elsewhere):\n%1").arg(QDir::toNativeSeparators(entry.path)));
+		return;
+	}
+
+	// Re-key to the new identity and swap the card's widget in place (same grid item, so no reorder). The rebuilt
+	// card's callbacks bind to newId, preserving the "staged key == current file's MediaId" invariant runImport relies on.
+	StagedEntry renamed = entry;
+	renamed.path = newPath;
+	auto* card = buildStagedCard(newId, newPath, renamed.tempPreviewDir);
+	m_stagedGrid->setItemWidget(renamed.item, card);   // deletes the previous card
+	m_staged.remove(id);
+	m_staged.insert(newId, renamed);
+
+	if (renamed.pendingBest)
+		card->setInBest(true);
+	updateCardLabelDots(newId);
 }
 
 void QuickImportDialog::materializeUsedProvisionalLabels()

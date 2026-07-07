@@ -17,6 +17,7 @@ class QListWidget;
 class QListWidgetItem;
 class QSplitter;
 class QWidget;
+class MediaItemWidget;
 
 // ============================================================================
 // QuickImportDialog - stage new video and photo files, label them, then import everything labeled in one
@@ -139,6 +140,10 @@ private:
 	void refreshLabelList();
 	// Extracts temp preview frames for each path and adds it to the staged grid.
 	void stageMediaItems(const QStringList& paths);
+	// Builds and wires one staged card for the given identity/file (the caller inserts it into the grid). Per-type
+	// differences (canvas size, preview images) are derived from the path here. Shared by stageMediaItems and
+	// renameStagedItem.
+	[[nodiscard]] MediaItemWidget* buildStagedCard(const MediaId& id, const QString& path, const QString& tempPreviewDir);
 	// Deletes a staged entry's temp preview dir and removes its card; used by "Remove from staging" and
 	// once an entry has been successfully imported by runImport().
 	void unstage(const MediaId& id);
@@ -158,6 +163,10 @@ private:
 	void removeStagedItems(const std::vector<MediaId>& ids);         // drop from staging; no change on disk
 	void deleteStagedSourceFiles(const std::vector<MediaId>& ids);   // delete the source files from disk (confirmed), then unstage
 	[[nodiscard]] std::vector<MediaId> selectedStagedIds() const;    // ids under the grid's current selection (keyboard accelerators)
+	// Renames the staged file on disk and re-keys the entry to the new name-derived MediaId, rebuilding the card in
+	// place (same grid item) so its callbacks bind to the new id - preserving the "staged key == current file's
+	// MediaId" invariant runImport relies on. The extension is kept fixed so the type stays valid.
+	void renameStagedItem(const MediaId& id);
 	// Every staged entry whose pendingLabelIds isn't empty: grouped by its first label and imported via
 	// addMediaItemsRequested, then markBestRequested/assignExtraLabelsRequested for whatever landed.
 	void runImport();

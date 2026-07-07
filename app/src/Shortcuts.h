@@ -9,4 +9,5 @@ struct Shortcuts
 	static constexpr const char* CreateLabel    = "Ctrl+L";        // LabelSidebar + QuickImportDialog "Create label"
 	static constexpr const char* RemoveFromList = "Delete";        // MainWindow "Remove from library" / QuickImport "Remove from staging"
 	static constexpr const char* DeleteFile     = "Shift+Delete";  // MainWindow "Delete" / QuickImport "Delete source file(s)"
+	static constexpr const char* Rename         = "F2";            // MainWindow "Rename" / QuickImport "Rename..."
 };

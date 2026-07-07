@@ -295,7 +295,7 @@ void MainWindow::setupMainMenu()
 	QMenu* editMenu = new QMenu(tr("Edit"), menuBar);
 	m_deleteAction = editMenu->addAction(tr("Delete"), QKeySequence(Shortcuts::DeleteFile), this, &MainWindow::deleteSelectedItems);
 	m_removeFromLibraryAction = editMenu->addAction(tr("Remove from library"), QKeySequence(Shortcuts::RemoveFromList), this, &MainWindow::removeSelectedItemsFromLibrary);
-	m_renameAction = editMenu->addAction(tr("Rename"), QKeySequence(Qt::Key_F2), this, &MainWindow::renameSelectedItemInteractive);
+	m_renameAction = editMenu->addAction(tr("Rename"), QKeySequence(Shortcuts::Rename), this, &MainWindow::renameSelectedItemInteractive);
 	connect(m_mediaGrid, &QListWidget::itemSelectionChanged, this, &MainWindow::updateEditActions);
 	updateEditActions();
 
