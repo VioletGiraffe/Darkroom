@@ -212,6 +212,7 @@ MediaItemWidget::MediaItemWidget(
 	m_starButton->setChecked(inBest);
 	m_starButton->setFlat(true);
 	m_starButton->setCursor(Qt::PointingHandCursor);
+	m_starButton->setFocusPolicy(Qt::NoFocus);
 	m_starButton->setFixedSize(18, 18);
 	connect(m_starButton, &QPushButton::clicked, this, [onToggleBest = std::move(onToggleBest)]() {
 		onToggleBest();
