@@ -28,6 +28,7 @@ public:
 protected:
 	void startDrag(Qt::DropActions supportedActions) override;
 	void paintEvent(QPaintEvent* event) override;
+	void wheelEvent(QWheelEvent* event) override;
 
 private:
 	std::function<QList<QUrl>(const QList<QListWidgetItem*>&)> m_dragUrlsProvider;

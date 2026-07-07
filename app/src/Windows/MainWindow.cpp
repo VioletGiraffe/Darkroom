@@ -248,6 +248,7 @@ void MainWindow::setupUI()
 	// rather than a widget layout activation; populating hundreds of items is essentially as cheap as before.
 	m_mediaGrid->setUniformItemSizes(false);
 	m_mediaGrid->setMovement(QListView::Static);
+	m_mediaGrid->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
 	m_mediaGrid->setSelectionMode(QAbstractItemView::ExtendedSelection);
 	// Dragging a card exports its source file(s): MediaGrid::startDrag turns the view's drag into a file:// URL
 	// copy out to Explorer / another app. Enabling drags also makes the view keep an existing multi-selection

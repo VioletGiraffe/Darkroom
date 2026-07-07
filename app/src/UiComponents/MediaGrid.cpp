@@ -8,7 +8,9 @@
 #include <QMimeData>
 #include <QPainter>
 #include <QPixmap>
+#include <QScrollBar>
 #include <QUrl>
+#include <QWheelEvent>
 
 namespace {
 
@@ -69,6 +71,19 @@ void MediaGrid::paintEvent(QPaintEvent* event)
 	p.setFont(font);
 	// Inset so a long message wraps well clear of the edges and any scrollbar.
 	p.drawText(viewport()->rect().adjusted(20, 20, -20, -20), Qt::AlignCenter | Qt::TextWordWrap, m_emptyMessage);
+}
+
+void MediaGrid::wheelEvent(QWheelEvent* event)
+{
+	// QListView forces the scrollbar's singleStep to the row height on every layout pass. Bypass that by scrolling the viewport directly with a fixed pixel step.
+	const int dy = event->angleDelta().y();
+	if (dy != 0)
+	{
+		verticalScrollBar()->setValue(verticalScrollBar()->value() - dy);
+		event->accept();
+		return;
+	}
+	QListWidget::wheelEvent(event);
 }
 
 void MediaGrid::startDrag(Qt::DropActions /*supportedActions*/)
