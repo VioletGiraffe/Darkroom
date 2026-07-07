@@ -599,7 +599,6 @@ void QuickImportDialog::refreshLabelList()
 		}
 	}
 
-	m_labelList->adjustSize();
 }
 
 const QuickImportDialog::LabelOption* QuickImportDialog::findLabelOption(const QString& id) const
