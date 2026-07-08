@@ -65,9 +65,11 @@ jobs:
         modules: 'qtimageformats qtmultimedia'
         cache: 'true'
 
-    - name: Setup MSVC Developer Command Prompt
+    - name: Windows - set up MSVC environment
       if: startsWith(matrix.os, 'windows')
       uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
 
     - name: Windows
       if: startsWith(matrix.os, 'windows')
