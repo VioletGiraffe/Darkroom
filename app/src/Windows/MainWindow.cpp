@@ -1832,20 +1832,20 @@ void MainWindow::renameVideoInteractive(const MediaId& id)
 	}
 
 	// Build a confirmation message that spells out every change
-	QString message = tr("Rename \u201c%1\u201d to \u201c%2\u201d?\n\n").arg(oldName, newName);
+	QString message = tr("Rename “%1” to “%2”?\n\n").arg(oldName, newName);
 	if (sourceExists)
 	{
-		message += tr("\u2022 Source file:\n  %1\n  \u2192 %2\n\n").arg(oldSourcePath, newSourcePath);
+		message += tr("• Source file:\n  %1\n  → %2\n\n").arg(oldSourcePath, newSourcePath);
 	}
 	else if (!oldSourcePath.isEmpty())
 	{
-		message += tr("\u2022 Source file not found at stored path \u2014 it will not be renamed.\n"
+		message += tr("• Source file not found at stored path — it will not be renamed.\n"
 			"  The stored path will be updated to reflect the new name.\n\n");
 	}
-	message += tr("\u2022 Frame folder:\n  %1\n  \u2192 %2").arg(originalFolderPath, newFolderPath);
+	message += tr("• Frame folder:\n  %1\n  → %2").arg(originalFolderPath, newFolderPath);
 
 	if (isInBest(id))
-		message += tr("\n\n\u2022 Best collection reference will be updated.");
+		message += tr("\n\n• Best collection reference will be updated.");
 
 	if (QMessageBox::question(this, tr("Rename media file"), message,
 		QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes) != QMessageBox::Yes)
@@ -1874,7 +1874,7 @@ void MainWindow::renameVideo(const MediaId& oldId, const QString& newFolderPath)
 		{
 			if (!QFile::rename(oldSourcePath, newSourcePath))
 			{
-				QMessageBox::critical(this, dialogTitle, tr("Failed to rename the source file:\n%1\n\u2192 %2").arg(oldSourcePath, newSourcePath));
+				QMessageBox::critical(this, dialogTitle, tr("Failed to rename the source file:\n%1\n→ %2").arg(oldSourcePath, newSourcePath));
 				return;
 			}
 			sourceWasRenamed = true;
@@ -1887,7 +1887,7 @@ void MainWindow::renameVideo(const MediaId& oldId, const QString& newFolderPath)
 	{
 		if (sourceWasRenamed)
 			QFile::rename(newSourcePath, oldSourcePath);
-		QMessageBox::critical(this, dialogTitle, tr("Failed to rename the frame folder:\n%1\n\u2192 %2").arg(oldFolderPath, newFolderPath));
+		QMessageBox::critical(this, dialogTitle, tr("Failed to rename the frame folder:\n%1\n→ %2").arg(oldFolderPath, newFolderPath));
 		return;
 	}
 
