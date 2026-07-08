@@ -86,6 +86,12 @@ bool filesAreIdentical(const QString& pathA, const QString& pathB)
 	return true;
 }
 
+QString pathComparisonKey(const QString& path)
+{
+	const QString canonical = QFileInfo(path).canonicalFilePath();
+	return (canonical.isEmpty() ? QDir::cleanPath(path) : canonical).toLower();
+}
+
 const QStringList IMAGE_FILE_FILTERS { "*.jpg", "*.jpeg", "*.tif", "*.tiff", "*.png" };
 
 QDateTime parseTrailingTimestamp(const QString& text)

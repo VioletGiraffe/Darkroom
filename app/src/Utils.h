@@ -32,6 +32,12 @@ void clearStuckHoverIfCursorLeft(QWidget* w);
 // names collide but the content doesn't.
 [[nodiscard]] bool filesAreIdentical(const QString& pathA, const QString& pathB);
 
+// Case/separator-insensitive key for testing whether two paths refer to the same location when they may come
+// from different sources (e.g. a catalog-stored path vs. one freshly walked off disk). Canonical form when the
+// path exists (resolving symlinks and on-disk case), cleaned path otherwise, always lowercased - a lossy
+// equality key, not a path to display or reuse. Windows-oriented: the lowercasing assumes a case-insensitive FS.
+[[nodiscard]] QString pathComparisonKey(const QString& path);
+
 // Name filters (for QDir::entryList) matching the frame image files this app produces/reads.
 extern const QStringList IMAGE_FILE_FILTERS;
 

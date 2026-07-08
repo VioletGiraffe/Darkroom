@@ -79,15 +79,16 @@ IntegrityReport scan()
 	}
 
 	// Phase 2: collect every entry's frame folder (all types), to exclude them from the untracked walk below.
+	// Keyed by pathComparisonKey so a folder whose on-disk case differs from its stored case still matches.
 	QSet<QString> knownFolders;
 	for (const MediaId& id : catalog.allMediaItems())
-		knownFolders.insert(catalog.folderForMediaItem(id));
+		knownFolders.insert(pathComparisonKey(catalog.folderForMediaItem(id)));
 
 	// Phase 3: untracked - every non-empty frame folder on disk that no entry claims.
 	forEachFolder(rootFolder(), [&](const QString& collection, const QString& folderPath) {
 		if (collection.compare(PHOTOS_DIR_NAME, Qt::CaseInsensitive) == 0)
 			return;  // <root>/Photos holds owned photo files (one dir per label), not video frame folders
-		if (knownFolders.contains(folderPath))
+		if (knownFolders.contains(pathComparisonKey(folderPath)))
 			return;
 		if (QDir(folderPath).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty())
 			return;  // an empty/junk dir, not a video the catalog is missing

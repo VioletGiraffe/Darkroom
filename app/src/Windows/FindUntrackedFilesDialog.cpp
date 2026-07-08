@@ -28,14 +28,6 @@ namespace {
 // Last folder picked for scanning; local to this tool, not hoisted into the shared Settings.h.
 constexpr const char* LAST_FOLDER_KEY = "findUntrackedFilesDialog/lastFolder";
 
-// Normalized key for case/separator-insensitive path matching (Windows). Uses the
-// canonical form for files that exist, falling back to a cleaned path otherwise.
-QString normalizePath(const QString& path)
-{
-	const QString canonical = QFileInfo(path).canonicalFilePath();
-	return (canonical.isEmpty() ? QDir::cleanPath(path) : canonical).toLower();
-}
-
 } // namespace
 
 QStringList FindUntrackedFilesDialog::scanAndShowUi(const QString& rootFolder, QWidget* parent)
@@ -49,7 +41,7 @@ QStringList FindUntrackedFilesDialog::scanAndShowUi(const QString& rootFolder, Q
 	{
 		const QString sourcePath = catalog.sourcePathForMediaItem(id);
 		if (!sourcePath.isEmpty())
-			tracked.insert(normalizePath(sourcePath));
+			tracked.insert(pathComparisonKey(sourcePath));
 	}
 
 	QSettings settings;
@@ -70,7 +62,7 @@ QStringList FindUntrackedFilesDialog::scanAndShowUi(const QString& rootFolder, Q
 		if (!isSupportedVideoFile(path) && !isSupportedImageFile(path))
 			continue;
 
-		if (!tracked.contains(normalizePath(path)))
+		if (!tracked.contains(pathComparisonKey(path)))
 			untracked.push_back(QDir::toNativeSeparators(path));
 		else // This file is already tracked
 			++trackedCount;
