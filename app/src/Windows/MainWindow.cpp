@@ -1671,7 +1671,6 @@ void MainWindow::importToCollections(const QStringList& initialStaging)
 void MainWindow::scanForUntrackedFiles()
 {
 	// A media item is "tracked" iff the catalog records it as some item's source path.
-	// The first item's path becomes the default suggested folder to scan in.
 	QSet<QString> tracked;
 	Catalog& catalog = Catalog::instance();
 	for (const MediaId& id : catalog.allMediaItems())
