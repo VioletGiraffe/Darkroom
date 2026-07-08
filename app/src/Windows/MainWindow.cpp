@@ -646,7 +646,8 @@ void MainWindow::refreshMediaGrid()
 			// double-click: a video opens in the built-in player, a photo in the system image viewer
 			[this, id, isPhoto] { if (isPhoto) openSourceInSystemApp(id); else playVideo(id); },
 			[this, id](QPoint globalPos) { showMediaItemContextMenu(id, globalPos); },
-			/* dynamic size hint */false
+			/* dynamic size hint */false,
+			/* film strip */ !isPhoto   // videos read as a perforated film strip; photos stay a plain square
 		);
 		if (!isPhoto)  // the frame viewer browses a video's frame folder; a photo has no frames, so no middle-click
 		{

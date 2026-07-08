@@ -845,7 +845,8 @@ MediaItemWidget* QuickImportDialog::buildStagedCard(const MediaId& id, const QSt
 		},
 		[this, id] { previewStagedItem(id); },   // double-click: open the photo / play the video (same as the menu action)
 		[this, id](QPoint globalPos) { showStagedCardContextMenu(id, globalPos); },
-		/* dynamicSizeHint */ false
+		/* dynamicSizeHint */ false,
+		/* film strip */ !isSupportedImageFile(path)   // videos read as a perforated film strip; photos stay a plain square
 	);
 
 	// A label dropped here tags just this card, or the whole selection if this card is part of one.

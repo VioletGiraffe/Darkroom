@@ -237,10 +237,12 @@ MediaItemWidget::MediaItemWidget(
 	std::function<void()> onDoubleClick,
 	std::function<void(QPoint)> onContextMenu,
 	bool dynamicSizeHint,
+	bool filmStrip,
 	QWidget* parent
 )
 	: QWidget{ parent }
 	, m_mediaId{ mediaId }
+	, m_filmStrip{ filmStrip }
 	, m_onDoubleClick{ std::move(onDoubleClick) }
 	, m_onContextMenu{ std::move(onContextMenu) }
 {
@@ -260,7 +262,7 @@ MediaItemWidget::MediaItemWidget(
 	layout->setContentsMargins(0, 0, 0, 0);
 	layout->setSpacing(CARD_FOOTER_SPACING);
 
-	m_thumb = new ThumbnailWidget(previewPaths, QString(), this, maxImageSize, dynamicSizeHint, /*framed*/ false);
+	m_thumb = new ThumbnailWidget(previewPaths, QString(), this, maxImageSize, dynamicSizeHint, /*framed*/ false, /*filmStrip*/ m_filmStrip);
 	m_thumb->installEventFilter(this);
 
 	// "Not fully split" badge in the thumbnail's top-right corner. Hidden until setSplitPending(true).
@@ -357,7 +359,9 @@ void MediaItemWidget::setSplitPending(bool pending)
 void MediaItemWidget::repositionSplitPendingBadge()
 {
 	static constexpr int MARGIN = 4;
-	m_splitPendingBadge->move(m_thumb->width() - m_splitPendingBadge->width() - MARGIN, MARGIN);
+	// On a film-strip card, drop below the top sprocket band so the badge sits over a frame, not the perforations.
+	const int bandOffset = m_filmStrip ? ThumbnailWidget::filmStripBandHeight(m_thumb->height()) : 0;
+	m_splitPendingBadge->move(m_thumb->width() - m_splitPendingBadge->width() - MARGIN, MARGIN + bandOffset);
 }
 
 void MediaItemWidget::setDuration(qint64 durationMs)
@@ -375,8 +379,10 @@ void MediaItemWidget::setDuration(qint64 durationMs)
 void MediaItemWidget::repositionDurationBadge()
 {
 	static constexpr int MARGIN = 4;
+	// On a film-strip card, lift above the bottom sprocket band so the pill sits over a frame, not the perforations.
+	const int bandOffset = m_filmStrip ? ThumbnailWidget::filmStripBandHeight(m_thumb->height()) : 0;
 	m_durationBadge->move(m_thumb->width() - m_durationBadge->width() - MARGIN,
-	                      m_thumb->height() - m_durationBadge->height() - MARGIN);
+	                      m_thumb->height() - m_durationBadge->height() - MARGIN - bandOffset);
 }
 
 void MediaItemWidget::setOnMiddleButtonClick(std::function<void()> onClick)

@@ -20,7 +20,9 @@ public:
 	// into their slot. The widget grows by its caption strip and content margins around that area.
 	// framed=false drops the border/hover/padding, leaving just the recessed matte image well — used by the
 	// grid card, which draws its own frame (and hover) around the thumbnail + footer in MediaItemWidget.
-	ThumbnailWidget(const QStringList& compositePaths, const QString& label, QWidget* parent, QSize canvasSize, bool dynamicSizeHint = true, bool framed = true);
+	// filmStrip=true styles a video card as a film strip: a black base with the frames composited shorter so they
+	// sit between reserved, sprocket-perforated top/bottom bands, and the inter-frame gaps showing as black lines.
+	ThumbnailWidget(const QStringList& compositePaths, const QString& label, QWidget* parent, QSize canvasSize, bool dynamicSizeHint = true, bool framed = true, bool filmStrip = false);
 
 	~ThumbnailWidget() override;
 
@@ -40,6 +42,11 @@ public:
 	void setOnMouseWheelCallback(std::function<void(int steps)> handler);
 
 	QSize sizeHint() const override;
+
+	// Height of the reserved top (and bottom) band on a film-strip card, for a given image-area height - the
+	// space the frames give up to the perforated bands. Exposed so MediaItemWidget can lift its corner badges
+	// clear of the bands. Scales with the card so the bands stay proportional across zoom.
+	[[nodiscard]] static int filmStripBandHeight(int imageAreaHeight);
 
 protected:
 	void mouseDoubleClickEvent(QMouseEvent* event) override;
@@ -79,4 +86,5 @@ private:
 
 	const bool m_bDynamicSizeHint = true;
 	const bool m_framed = true;  // false = borderless matte-only well (grid card draws its own frame)
+	const bool m_filmStrip = false;  // true = video film-strip styling (black base, reserved sprocket bands, black inter-frame gaps)
 };

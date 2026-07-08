@@ -27,6 +27,7 @@ public:
 		std::function<void()> onDoubleClick = {},
 		std::function<void(QPoint globalPos)> onContextMenu = {},
 		bool dynamicSizeHint = true,
+		bool filmStrip = false,
 		QWidget* parent = nullptr
 	);
 
@@ -106,6 +107,7 @@ private:
 	QWidget*                     m_splitPendingBadge = nullptr;  // top-right "not fully split" badge, child of m_thumb
 	QWidget*                     m_durationBadge = nullptr;      // bottom-right play-triangle + duration overlay, child of m_thumb (shown for videos with a known duration)
 	MediaId                      m_mediaId;
+	bool                         m_filmStrip = false;    // video film-strip styling: reserves sprocket bands, so the corner badges lift clear of them
 	std::function<void()>               m_onMiddleButtonClick;
 	std::function<void()>               m_onDoubleClick;
 	std::function<void(QPoint)>         m_onContextMenu;

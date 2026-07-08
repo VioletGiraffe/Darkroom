@@ -6,6 +6,7 @@
 #include <QApplication>
 #include <QBuffer>
 #include <QByteArray>
+#include <QColor>
 #include <QDesktopServices>
 #include <QFile>
 #include <QImageIOHandler>
@@ -206,6 +207,43 @@ namespace {
 		std::shared_ptr<ThumbnailWidget::LoadJob> m_job;
 	};
 
+	// Film-strip chrome, painted by paintEvent over a video card. paintFilmBase lays the black film base across the
+	// whole image area (the frame composite's transparent gaps then read as black separators); paintSprockets punches
+	// evenly-spaced light perforations into the reserved top and bottom bands.
+	void paintFilmBase(QPainter& painter, const QRect& imageArea)
+	{
+		painter.save();
+		painter.setRenderHint(QPainter::Antialiasing);
+		painter.setPen(Qt::NoPen);
+		painter.setBrush(QColor(18, 18, 18));
+		painter.drawRoundedRect(imageArea, Theme::ThumbnailMatteRadius, Theme::ThumbnailMatteRadius);
+		painter.restore();
+	}
+
+	void paintSprockets(QPainter& painter, const QRect& imageArea, int bandHeight)
+	{
+		const int holeHeight = qMax(3, bandHeight * 40 / 100);
+		const int holeWidth  = qMax(4, holeHeight * 14 / 10);
+		const int pitch      = holeWidth * 14 / 5;   // hole plus a wide gap (~2.6x the hole width) -> sparse, well-separated perforations
+		const int count      = qMax(2, imageArea.width() / pitch);
+		const int cell       = imageArea.width() / count;
+		const int radius     = qMax(1, holeHeight / 3);
+		const int topY       = imageArea.top() + (bandHeight - holeHeight) / 2;
+		const int bottomY    = imageArea.bottom() - bandHeight + (bandHeight - holeHeight) / 2;
+
+		painter.save();
+		painter.setRenderHint(QPainter::Antialiasing);
+		painter.setPen(Qt::NoPen);
+		painter.setBrush(QColor(233, 231, 225));   // film base showing through the perforations - warm off-white, fixed in both themes
+		for (int i = 0; i < count; ++i)
+		{
+			const int x = imageArea.left() + i * cell + (cell - holeWidth) / 2;
+			painter.drawRoundedRect(QRect(x, topY, holeWidth, holeHeight), radius, radius);
+			painter.drawRoundedRect(QRect(x, bottomY, holeWidth, holeHeight), radius, radius);
+		}
+		painter.restore();
+	}
+
 } // anonymous namespace
 
 ThumbnailWidget::ThumbnailWidget(const QString& filePath, const QString& label, int thumbnailSize, QWidget* parent)
@@ -232,11 +270,12 @@ ThumbnailWidget::ThumbnailWidget(const QString& filePath, const QString& label, 
 	};
 }
 
-ThumbnailWidget::ThumbnailWidget(const QStringList& compositePaths, const QString& label, QWidget* parent, QSize canvasSize, bool dynamicSizeHint, bool framed)
+ThumbnailWidget::ThumbnailWidget(const QStringList& compositePaths, const QString& label, QWidget* parent, QSize canvasSize, bool dynamicSizeHint, bool framed, bool filmStrip)
 	: QWidget(parent)
 	, m_caption{ label }
 	, m_bDynamicSizeHint{ dynamicSizeHint }
 	, m_framed{ framed }
+	, m_filmStrip{ filmStrip }
 {
 	setFocusPolicy(Qt::NoFocus);
 	applyStyleSettings();
@@ -286,6 +325,13 @@ QSize ThumbnailWidget::currentImageArea() const
 	return QSize(c.width(), c.height() - labelHeight);
 }
 
+int ThumbnailWidget::filmStripBandHeight(int imageAreaHeight)
+{
+	// Scaled to the card so the bands stay proportional across zoom, bounded so they never dominate a small
+	// card or read as a thick letterbox on a large one.
+	return qBound(7, imageAreaHeight / 11, 18);
+}
+
 void ThumbnailWidget::scheduleRender()
 {
 	disarmAsyncTask();  // no-op if none is scheduled yet (first render); otherwise disarms the in-flight one
@@ -302,7 +348,11 @@ void ThumbnailWidget::scheduleRender()
 	m_job->m_target = &m_image;
 	m_job->m_errorMsg = &m_errorMessage;
 	m_job->m_paths = m_sourcePaths;
-	m_job->m_canvasLogical = m_maxSize;
+	// Film-strip cards reserve top and bottom bands, so frames are composited into a shorter canvas; the full
+	// m_maxSize still drives the widget size / sizeHint, and paintEvent centers the shorter strip between the bands.
+	m_job->m_canvasLogical = m_filmStrip
+		? QSize(m_maxSize.width(), qMax(1, m_maxSize.height() - 2 * filmStripBandHeight(m_maxSize.height())))
+		: m_maxSize;
 	m_job->m_dpr = m_renderDpr;
 	IoThreadPool::start(new ReadStage{ m_job });   // stage 1 (read) on the single I/O thread; it posts stage 2 (decode) to the CPU pool
 }
@@ -414,6 +464,13 @@ void ThumbnailWidget::paintEvent(QPaintEvent*)
 	const int labelHeight = m_caption.isEmpty() ? 0 : THUMBNAIL_LABEL_HEIGHT;
 	const QRect imageArea(content.left(), content.top(), content.width(), content.height() - labelHeight);
 
+	// Film-strip video card: lay the black film base first, so the frame composite's transparent inter-frame gaps
+	// (and the reserved top/bottom bands) read as black. The frames are rendered shorter (see scheduleRender) and
+	// centered below, landing between the bands; the sprockets are punched into the bands last.
+	const int bandHeight = m_filmStrip ? filmStripBandHeight(imageArea.height()) : 0;
+	if (m_filmStrip)
+		paintFilmBase(painter, imageArea);
+
 	// Lock the image while drawing so the decode stage can't swap it mid-paint. During the dwell before the first
 	// render there is no job yet (and m_image is null, touched only by this thread), so there is nothing to lock
 	// against - fall through unlocked and draw the "Loading..." placeholder.
@@ -431,28 +488,42 @@ void ThumbnailWidget::paintEvent(QPaintEvent*)
 		QRect r(QPoint(0, 0), fits ? imageLogical : imageLogical.scaled(imageArea.size(), Qt::KeepAspectRatio));
 		r.moveCenter(imageArea.center());
 
-		// Clip the image to softly rounded corners: the well/frame around it is rounded, but QSS
-		// border-radius can't clip child painting, so a flush image's square corners would overpaint that
-		// rounding. ThumbnailMatteRadius is the borderless well's own radius (the flush case); the framed
-		// variant's image sits inset from its frame anyway, where the same small rounding reads consistent.
-		painter.save();
-		QPainterPath roundedImage;
-		roundedImage.addRoundedRect(QRectF(r), Theme::ThumbnailMatteRadius, Theme::ThumbnailMatteRadius);
-		painter.setRenderHint(QPainter::Antialiasing);   // antialiases the clip edge, so the corners stay smooth
-		painter.setClipPath(roundedImage);
-		if (fits)
-			painter.drawImage(r.topLeft(), m_image);
+		const auto blit = [&] {
+			if (fits)
+				painter.drawImage(r.topLeft(), m_image);
+			else
+			{
+				painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+				painter.drawImage(r, m_image);
+			}
+		};
+
+		if (m_filmStrip)
+			// The frames are windows in the already-rounded black base, inset from its corners by the bands, so
+			// their square corners never reach the rounding - no per-frame clip needed, and the gaps stay black.
+			blit();
 		else
 		{
-			painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
-			painter.drawImage(r, m_image);
+			// Clip the image to softly rounded corners: the well/frame around it is rounded, but QSS
+			// border-radius can't clip child painting, so a flush image's square corners would overpaint that
+			// rounding. ThumbnailMatteRadius is the borderless well's own radius (the flush case); the framed
+			// variant's image sits inset from its frame anyway, where the same small rounding reads consistent.
+			painter.save();
+			QPainterPath roundedImage;
+			roundedImage.addRoundedRect(QRectF(r), Theme::ThumbnailMatteRadius, Theme::ThumbnailMatteRadius);
+			painter.setRenderHint(QPainter::Antialiasing);   // antialiases the clip edge, so the corners stay smooth
+			painter.setClipPath(roundedImage);
+			blit();
+			painter.restore();   // the caption below must not inherit the clip
 		}
-		painter.restore();   // the caption below must not inherit the clip
 	}
 	else if (!m_errorMessage.isEmpty())
 		painter.drawText(content, Qt::AlignCenter | Qt::TextWordWrap, m_errorMessage);
 	else
 		painter.drawText(content, Qt::AlignCenter, tr("Loading..."));
+
+	if (m_filmStrip)
+		paintSprockets(painter, imageArea, bandHeight);
 
 	if (!m_caption.isEmpty())
 	{
