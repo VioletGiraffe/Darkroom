@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783469601480,
+  "lastUpdate": 1783506152278,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -1684,6 +1684,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 25.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "220463cf7029e4376d81c23523e4e726182d0c3f",
+          "message": "Film strip frame for video cards",
+          "timestamp": "2026-07-08T13:18:50+03:00",
+          "tree_id": "c532543173985bc4a68be56182216eadd03d132a",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/220463cf7029e4376d81c23523e4e726182d0c3f"
+        },
+        "date": 1783506149562,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 7933,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 3343,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 862.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 505,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 275,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 21,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 25,
             "unit": "KB"
           },
           {
