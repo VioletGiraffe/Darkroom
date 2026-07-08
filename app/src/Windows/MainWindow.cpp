@@ -5,7 +5,6 @@
 #include "Ffmpeg.h"
 #include "Import.h"
 #include "Windows/FrameViewerWindow.h"
-#include "Windows/FindUntrackedFilesDialog.h"
 #include "Windows/IntegrityCheckDialog.h"
 #include "UiComponents/LabelSidebar.h"
 #include "UiComponents/LabelVisuals.h"
@@ -34,8 +33,10 @@
 #include <QComboBox>
 #include <QDesktopServices>
 #include <QDir>
+#include <QDirIterator>
 #include <QDragEnterEvent>
 #include <QFile>
+#include <QFileDialog>
 #include <QFileInfo>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -1669,9 +1670,43 @@ void MainWindow::importToCollections(const QStringList& initialStaging)
 
 void MainWindow::scanForUntrackedFiles()
 {
-	const QStringList untrackedFiles = FindUntrackedFilesDialog::scanAndShowUi(rootFolder(), this);
-	if (!untrackedFiles.isEmpty())
-		importToCollections(untrackedFiles);
+	// A media item is "tracked" iff the catalog records it as some item's source path.
+	// The first item's path becomes the default suggested folder to scan in.
+	QSet<QString> tracked;
+	Catalog& catalog = Catalog::instance();
+	for (const MediaId& id : catalog.allMediaItems())
+	{
+		const QString sourcePath = catalog.sourcePathForMediaItem(id);
+		if (!sourcePath.isEmpty())
+			tracked.insert(pathComparisonKey(sourcePath));
+	}
+
+	QSettings settings;
+	constexpr const char* lastFolderKey = "untrackedScan/lastFolder";
+	const QString defaultStartDir = tracked.empty() ? rootFolder() : QFileInfo(*tracked.begin()).absolutePath();
+	const QString startDir = settings.value(lastFolderKey, defaultStartDir).toString();
+	const QString dir = QFileDialog::getExistingDirectory(this, tr("Scan folder for untracked media"), startDir);
+	if (dir.isEmpty())
+		return;
+	settings.setValue(lastFolderKey, dir);
+
+	QStringList untracked;
+	QDirIterator it(dir, QDir::Files, QDirIterator::Subdirectories);
+	while (it.hasNext())
+	{
+		const QString path = it.next();
+		if ((isSupportedVideoFile(path) || isSupportedImageFile(path)) && !tracked.contains(pathComparisonKey(path)))
+			untracked.push_back(QDir::toNativeSeparators(path));
+	}
+
+	if (untracked.isEmpty())
+	{
+		QMessageBox::information(this, tr("Scan complete"), tr("No untracked media files were found under:\n%1").arg(QDir::toNativeSeparators(dir)));
+		return;
+	}
+
+	untracked.sort(Qt::CaseInsensitive);
+	importToCollections(untracked);   // ImportDialog's staging is the rich triage UI: preview, remove, label, compare
 }
 
 void MainWindow::checkCatalogIntegrity()

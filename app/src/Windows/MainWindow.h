@@ -108,7 +108,8 @@ private:
 	void deleteLabelInteractive(LabelId labelId);
 	// Opens the Import dialog; initialStaging pre-fills the staging area (used by scanForUntrackedFiles).
 	void importToCollections(const QStringList& initialStaging = {});
-	// Tools menu: recursively scans a chosen folder for supported videos not yet tracked by any collection.
+	// Tools menu: recursively scans a chosen folder for supported media (videos and photos) not tracked by any
+	// collection, sending any found straight to the Import dialog for staging.
 	void scanForUntrackedFiles();
 	// Tools menu: scans the catalog against disk for drift (untracked frame folders and broken video
 	// entries) and lets the user resolve each finding via IntegrityCheckDialog.

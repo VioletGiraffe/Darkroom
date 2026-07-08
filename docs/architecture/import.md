@@ -175,7 +175,7 @@ Four independent layers, at different points and catching different things:
 The dialog is one big staging area (a media-item-card grid) plus a small label-list panel beside it — the same
 `[label list | grid]` split as `MainWindow`'s `[LabelSidebar | grid]`, and the same card widget
 (`MediaItemWidget`, reused unmodified). Dropping a file or folder onto the dialog, or `addToStaging()` (used by
-`MainWindow`'s own drop and `FindUntrackedFilesDialog`'s "send to staging"), calls `stageMediaItems()`, which
+`MainWindow`'s own drop and to pre-fill staging from the untracked-file scan via `importToCollections`), calls `stageMediaItems()`, which
 first flattens its input — a dropped **folder** is scanned recursively and contributes every supported
 video/photo file under it (`flattenToSupportedMediaFiles`), so a folder drops in exactly as if its files were
 selected individually. Each file harvested from a folder also carries a **folder-derived label name**: the path

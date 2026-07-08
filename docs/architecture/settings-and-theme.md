@@ -100,7 +100,7 @@ out as their own "input" surface, matching the window/parent background instead 
 `QPalette::Base` fill a scroll area defaults to. That's the *only* thing styled globally for lists — it
 deliberately does **not** reach into item geometry or per-item coloring (that would disturb the grid's sized
 cards); selection/hover colors stay local to each list since they vary by use (see
-`FindUntrackedFilesDialog`, `MainWindow`'s grid, `LabelRowDelegate`). Because of this, each list's own
+`MainWindow`'s grid, `LabelRowDelegate`). Because of this, each list's own
 `setFrameShape(QFrame::NoFrame)` calls were removed as redundant once this rule landed. It **re-applies on
 `QStyleHints::colorSchemeChanged`**, so the globally-styled chrome follows a live light/dark switch — unlike
 the per-widget construction-time stylesheets elsewhere. For the few widget-local sheets that *do* need to
@@ -111,7 +111,7 @@ being hoisted into the central sheet. Used by `MainWindow`'s grid-selection tint
 instruction label, and `SettingsDialog`'s JPEG-quality hint (that last one matters most: the theme toggle
 lives in that dialog, so a snapshot color would visibly lag the switch in front of the user). Reach for it
 instead of a bare `setStyleSheet` whenever a `Theme`-derived local sheet outlives a possible switch; a
-transient dialog that is rebuilt per-open (e.g. `FindUntrackedFilesDialog`) doesn't need it.
+transient dialog that is rebuilt per-open (e.g. `IntegrityCheckDialog`) doesn't need it.
 
 This is the "central sheet + custom widgets" approach for matching the design mockup
 (`docs/mockups/main-window-sidebar.html`): the sheet covers what QSS can express app-wide; widgets needing
