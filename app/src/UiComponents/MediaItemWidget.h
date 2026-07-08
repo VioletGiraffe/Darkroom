@@ -61,14 +61,15 @@ public:
 	// onToggleBest callback - the caller owns the Best state; this only syncs the visual.
 	void setInBest(bool inBest);
 
-	// Sets the colored dots overlaid on the thumbnail (one per label the item carries, including Best);
-	// tooltip lists their names. An empty list hides the overlay. Colors are computed by the caller
-	// (MainWindow) from the Catalog.
+	// Sets the colored dots overlaid on the thumbnail (one per label the item carries, including Best). An
+	// empty list hides the overlay. Colors are computed by the caller (MainWindow) from the Catalog. `tooltip`
+	// is the card's whole-thumbnail tooltip, composed by the caller (a video's extraction state, then labels).
 	void setLabelDots(const std::vector<QColor>& colors, const QString& tooltip);
 
-	// Shows/hides a small top-right badge marking a video that hasn't had its full frame set extracted yet
-	// (only its permanent preview frames exist so far) - see Catalog::isSplitIntoFrames.
-	void setSplitPending(bool pending);
+	// Shows/hides a small top-right badge (a green contact-sheet grid icon) marking a video whose full frame set has
+	// been extracted - hidden while only preview frames exist, and never shown for photos (the caller gates it).
+	// See Catalog::isSplitIntoFrames.
+	void setFramesExtracted(bool extracted);
 
 	// Shows a small bottom-right overlay - a play triangle followed by the video's duration (M:SS, or H:MM:SS
 	// past an hour) - marking the card as a video. A non-positive ms hides it: a photo, or a video whose
@@ -93,7 +94,7 @@ protected:
 private:
 	// Keeps the badge pinned to the thumbnail's top-right corner across resizes (unlike the top-left label
 	// dots, its position depends on the thumbnail's width).
-	void repositionSplitPendingBadge();
+	void repositionFramesReadyBadge();
 	// Pins the duration overlay to the thumbnail's bottom-right corner across resizes (depends on both the
 	// thumbnail's size and the overlay's own, which varies with the duration text).
 	void repositionDurationBadge();
@@ -104,7 +105,7 @@ private:
 	QPushButton*                 m_starButton = nullptr; // Best toggle in the footer; setInBest() syncs its checked state
 	QLabel*                      m_name = nullptr;       // elided, right-aligned item name in the footer
 	QWidget*                     m_labelDots = nullptr;  // colored-dot strip (LabelDotStrip), child of m_footer
-	QWidget*                     m_splitPendingBadge = nullptr;  // top-right "not fully split" badge, child of m_thumb
+	QWidget*                     m_framesReadyBadge = nullptr;   // top-right green "frames extracted" badge, child of m_thumb
 	QWidget*                     m_durationBadge = nullptr;      // bottom-right play-triangle + duration overlay, child of m_thumb (shown for videos with a known duration)
 	MediaId                      m_mediaId;
 	bool                         m_filmStrip = false;    // video film-strip styling: reserves sprocket bands, so the corner badges lift clear of them

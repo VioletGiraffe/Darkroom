@@ -59,14 +59,23 @@ longer an overlay in the thumbnail's corner — so it paints the dots **flat** o
 v1 shows dots; named chips with drag-out removal are deferred polish — see
 [catalog-and-labels.md](catalog-and-labels.md#deferred-polish-post-v1).
 
-### Split-pending badge
+### Frames-extracted badge
 
-`setSplitPending(bool)` shows/hides a small badge (an hourglass glyph on a translucent backdrop) in the
-thumbnail's **top-right** corner (uncontested since the dots moved to the footer). `MainWindow::refreshMediaGrid`
-sets it from whether the video is split yet — see [import.md](import.md) for the on-demand-split design
-this reflects. Its position depends on the thumbnail width, so it's re-placed on every thumbnail resize, not
-just when set — that's what makes the initial placement self-correcting when the card's real width isn't known
-yet at construction (before the grid lays it out).
+`setFramesExtracted(bool)` shows/hides a small badge in the thumbnail's **top-right** corner — a green
+(`Theme::ReadyGreen`) contact-sheet grid icon marking a **video whose full frame set has been extracted**. It's a
+*positive* marker of the ready state, deliberately inverted from an earlier "pending" badge: a green "frames"
+glyph reads as done to a newcomer, where an abstract "not-done" glyph never did. **MainWindow gates it to
+videos** (`refreshMediaGrid`) — a preview-only video shows nothing, and a photo never shows it even though it
+reports `isSplitIntoFrames() == true` (photos have no frames; see [import.md](import.md)). Extraction is
+on-demand, so extracted is the minority state and the marker stays sparse. Its position depends on the
+thumbnail width, so it's re-placed on every thumbnail resize, not just when set — the self-correcting placement
+that handles the card's real width not being known at construction (before the grid lays it out). The badge is
+`WA_TransparentForMouseEvents`, so hover falls through to the thumbnail — it carries no tooltip of its own.
+
+The card has **one tooltip**, on the thumbnail, composed by `MainWindow` (`applyLabelDots`): a video's
+extraction state on the first line (`Frames extracted` / `Not extracted yet — middle-click to extract`), then
+`Labels: …`; a photo gets just the labels line. One tooltip for the whole card — no per-sub-widget tooltips, so
+hovering anywhere gives the same complete text.
 
 Card sizes are type-specific but share one **height** (the user's per-frame height): a **photo** card is
 **square** (that height on both sides); a **video** card is a horizontal strip showing `frameCount` frames.
@@ -81,7 +90,7 @@ user-adjustable at runtime (see "Card preview sizing & zoom" below).
 by the video's duration (`M:SS`, or `H:MM:SS` past an hour) — which is what marks a card as a video at a
 glance. A non-positive `ms` hides it: a photo, or a video whose duration isn't known yet
 (`Catalog::durationMsForMediaItem` returned `-1`; see [catalog-and-labels.md](catalog-and-labels.md)). Like the
-split-pending badge, its position depends on the thumbnail's size (and on its own, which grows with the text),
+frames-extracted badge, its position depends on the thumbnail's size (and on its own, which grows with the text),
 so it's re-placed on every thumbnail resize rather than only when set — the same self-correcting placement.
 **MainWindow** supplies the duration from the `Catalog`, matching the "MainWindow computes, card draws" split
 above; the card never queries the catalog itself.

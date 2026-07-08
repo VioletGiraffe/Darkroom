@@ -494,7 +494,8 @@ QString gridCaption(int displayNumber, const QString& name)
 
 // Computes and applies one card's colored label-dot overlay from the catalog's current label set for
 // that item, including Best - the star button stays as a fast one-click toggle, but the dot strip still
-// shows Best so the card's label display is uniform across all labels.
+// shows Best so the card's label display is uniform across all labels. Also composes the card's single
+// tooltip (owned by the thumbnail): for a video, its frame-extraction state on the first line, then the labels.
 void applyLabelDots(Catalog& catalog, const MediaId& id, MediaItemWidget* card)
 {
 	std::vector<QColor> dotColors;
@@ -507,7 +508,13 @@ void applyLabelDots(Catalog& catalog, const MediaId& id, MediaItemWidget* card)
 		dotColors.push_back(label->color.isEmpty() ? QColor() : QColor(label->color));
 		dotNames << label->displayName;
 	}
-	card->setLabelDots(dotColors, dotNames.join(", "));
+
+	QString stateLine;
+	if (catalog.mediaType(id) == Catalog::MediaType::Video)  // photos have no frames to extract, so no state line
+		stateLine = (catalog.isSplitIntoFrames(id) ? MainWindow::tr("Frames extracted")
+		                                           : MainWindow::tr("Not extracted yet - middle-click to extract"))
+		            + QLatin1String("\n");
+	card->setLabelDots(dotColors, stateLine + MainWindow::tr("Labels: %1").arg(dotNames.join(", ")));
 }
 
 // Numbers the "N:" caption of each *visible* card 1..M in row order, after a sort reorders them or the
@@ -657,7 +664,7 @@ void MainWindow::refreshMediaGrid()
 			});
 		}
 		card->setOnMouseWheelCallback([this](int steps) { zoomCards(steps); });
-		card->setSplitPending(!catalog.isSplitIntoFrames(id));
+		card->setFramesExtracted(!isPhoto && catalog.isSplitIntoFrames(id));  // green "frames ready" badge - videos only (a photo reports split==true but has no frames)
 		card->setDuration(catalog.durationMsForMediaItem(id));  // shows the duration pill on videos; photos / not-yet-probed videos return -1 -> no pill
 
 		// A label dragged from the sidebar onto this card is added to it (or to the whole selection if this card

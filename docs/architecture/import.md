@@ -62,9 +62,9 @@ Import's staging uses (the main window's combo persists every change there immed
 
 It does not extract the full frame set. It creates the output folder, puts a few
 permanent preview frames into `outputFolder/preview/`, then registers the video via `Catalog::addMediaItem(...,
-/*splitIntoFrames=*/false)` immediately — the video appears in the grid right away, with a small "split
-pending" badge (see [media-widgets.md](media-widgets.md)) on its card, and the expensive full extraction only
-happens later via `ensureFramesSplit`. `processBatch`'s progress text reads "Adding video X/Y...", since no
+/*splitIntoFrames=*/false)` immediately — the video appears in the grid right away with no badge yet (the green
+"frames extracted" marker appears only once the full set exists; see [media-widgets.md](media-widgets.md)), and
+the expensive full extraction only happens later via `ensureFramesSplit`. `processBatch`'s progress text reads "Adding video X/Y...", since no
 full extraction happens here.
 
 Those preview frames are normally *reused, not re-extracted*: `QuickImportDialog` already ran ffmpeg to build

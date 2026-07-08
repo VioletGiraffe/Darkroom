@@ -68,6 +68,8 @@ struct ThemeColors {
 	                                // (the selection recolors the background only, it doesn't invert the text); its own token so a future
 	                                // theme can diverge or nudge it (e.g. pure white for more punch on the dark-theme selection).
 	const char* ThumbnailMatte;     // --color-background-tertiary: recessed image-well backdrop behind a single frame
+	const char* ReadyGreen;         // no mockup token - green tint for the "frames extracted" card badge. Its backdrop is
+	                                // translucent-dark in both themes, so both values are tuned to read as green on dark.
 };
 
 // True when the active system color scheme is dark. Drives Theme::current()'s variant choice, and is exposed so

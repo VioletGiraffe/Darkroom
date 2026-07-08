@@ -2,6 +2,7 @@
 #include "UiComponents/LabelMimeType.h"
 #include "UiComponents/ThumbnailWidget.h"
 #include "Theme/Theme.h"
+#include "Theme/Icons.h"
 #include "Utils.h"
 
 #include <QContextMenuEvent>
@@ -12,6 +13,7 @@
 #include <QFontMetrics>
 #include <QGuiApplication>
 #include <QHBoxLayout>
+#include <QIcon>
 #include <QLabel>
 #include <QMimeData>
 #include <QMouseEvent>
@@ -110,15 +112,16 @@ private:
 	QString m_full;
 };
 
-// A tiny mouse-transparent badge marking a card whose video hasn't had its full frame set extracted yet
-// (only its permanent preview frames exist so far) - see Catalog::isSplitIntoFrames. Mirrors LabelDotStrip's
-// translucent-backdrop look but lives in the thumbnail's top-right corner instead of its top-left.
-class SplitPendingBadge final : public QWidget {
+// A tiny mouse-transparent badge in the thumbnail's top-right corner, shown on a video whose full frame set has
+// been extracted (Catalog::isSplitIntoFrames): a green contact-sheet grid icon that reads "frames ready" at a glance.
+// Hidden while only preview frames exist, and never shown on photos. Mouse-transparent so hover falls through
+// to the thumbnail, which carries the card's single tooltip (extraction state + labels; composed in MainWindow).
+class FramesReadyBadge final : public QWidget {
 public:
-	explicit SplitPendingBadge(QWidget* parent) : QWidget(parent)
+	explicit FramesReadyBadge(QWidget* parent)
+		: QWidget(parent), m_icon(Theme::tintedIcon(QStringLiteral(":/UI/icon_grid.svg"), &Theme::ThemeColors::ReadyGreen))
 	{
 		setAttribute(Qt::WA_TransparentForMouseEvents);
-		setToolTip(tr("Only preview frames extracted so far - open the frame viewer to extract the rest"));
 		resize(sizeHint());
 	}
 
@@ -130,21 +133,20 @@ protected:
 		QPainter p{ this };
 		p.setRenderHint(QPainter::Antialiasing);
 
-		const double radius = (2 * PAD + SIZE) / 2.0;
+		// Rounded-square backdrop matching the grid icon's own outline (a full circle would clash with the square icon).
 		p.setPen(Qt::NoPen);
 		p.setBrush(QColor(0, 0, 0, 90));
-		p.drawRoundedRect(rect(), radius, radius);
+		p.drawRoundedRect(rect(), BACKDROP_RADIUS, BACKDROP_RADIUS);
 
-		auto font = p.font();
-		font.setPointSize(SIZE - 5);
-		p.setFont(font);
-		p.setPen(QColor(255, 255, 255, 220));
-		p.drawText(rect(), Qt::AlignCenter, QStringLiteral("⏳"));
+		// The icon engine tints the SVG with Theme::ReadyGreen and renders it at the badge's device pixel ratio.
+		m_icon.paint(&p, QRect(PAD, PAD, SIZE, SIZE));
 	}
 
 private:
-	static constexpr int SIZE = 16; // badge diameter
-	static constexpr int PAD = 3;   // backdrop padding around the glyph
+	static constexpr int SIZE = 16;            // the icon's box; the backdrop adds PAD around it
+	static constexpr int PAD = 3;              // backdrop padding around the icon
+	static constexpr int BACKDROP_RADIUS = 6;  // rounded-square corners, ~concentric with the grid icon's outline (not a circle)
+	QIcon m_icon;                              // green "frames extracted" contact-sheet grid glyph
 };
 
 // Compact video-duration text: M:SS under an hour, H:MM:SS at or past it, no leading zero on the leading
@@ -265,9 +267,9 @@ MediaItemWidget::MediaItemWidget(
 	m_thumb = new ThumbnailWidget(previewPaths, QString(), this, maxImageSize, dynamicSizeHint, /*framed*/ false, /*filmStrip*/ m_filmStrip);
 	m_thumb->installEventFilter(this);
 
-	// "Not fully split" badge in the thumbnail's top-right corner. Hidden until setSplitPending(true).
-	m_splitPendingBadge = new SplitPendingBadge(m_thumb);
-	m_splitPendingBadge->hide();
+	// "Frames extracted" badge in the thumbnail's top-right corner. Hidden until setFramesExtracted(true).
+	m_framesReadyBadge = new FramesReadyBadge(m_thumb);
+	m_framesReadyBadge->hide();
 
 	// Duration overlay in the thumbnail's bottom-right corner. Hidden until setDuration() is given a video's length.
 	m_durationBadge = new DurationBadge(m_thumb);
@@ -343,25 +345,25 @@ void MediaItemWidget::setLabelDots(const std::vector<QColor>& colors, const QStr
 	auto* strip = static_cast<LabelDotStrip*>(m_labelDots);
 	strip->setColors(colors);            // updates its sizeHint; the footer layout re-fits it
 	strip->setVisible(!colors.empty());
-	m_thumb->setToolTip(tooltip);        // hovering the card lists its label names
+	m_thumb->setToolTip(tooltip);        // the card's single tooltip, composed by the caller (video extraction state + labels)
 }
 
-void MediaItemWidget::setSplitPending(bool pending)
+void MediaItemWidget::setFramesExtracted(bool extracted)
 {
-	m_splitPendingBadge->setVisible(pending);
-	if (pending)
+	m_framesReadyBadge->setVisible(extracted);
+	if (extracted)
 	{
-		repositionSplitPendingBadge();
-		m_splitPendingBadge->raise();
+		repositionFramesReadyBadge();
+		m_framesReadyBadge->raise();
 	}
 }
 
-void MediaItemWidget::repositionSplitPendingBadge()
+void MediaItemWidget::repositionFramesReadyBadge()
 {
 	static constexpr int MARGIN = 4;
 	// On a film-strip card, drop below the top sprocket band so the badge sits over a frame, not the perforations.
 	const int bandOffset = m_filmStrip ? ThumbnailWidget::filmStripBandHeight(m_thumb->height()) : 0;
-	m_splitPendingBadge->move(m_thumb->width() - m_splitPendingBadge->width() - MARGIN, MARGIN + bandOffset);
+	m_framesReadyBadge->move(m_thumb->width() - m_framesReadyBadge->width() - MARGIN, MARGIN + bandOffset);
 }
 
 void MediaItemWidget::setDuration(qint64 durationMs)
@@ -472,7 +474,7 @@ bool MediaItemWidget::eventFilter(QObject* watched, QEvent* event)
 		// well as Resize: with a fixed size hint the thumbnail's only resize (0 -> final) can arrive while the
 		// card is still hidden during grid layout, and no further resize follows on show - so a visibility- or
 		// resize-only handler would leave a badge stuck at its pre-size position. Moving a hidden badge is a no-op.
-		repositionSplitPendingBadge();
+		repositionFramesReadyBadge();
 		repositionDurationBadge();
 	}
 

@@ -27,6 +27,7 @@ static constexpr Theme::ThemeColors Dark{
 	.SelectionHighlight = "#26619f",  // AccentBorder darkened, saturation kept - the light TextPrimary reads on it (~5:1)
 	.SelectedText = "#ece5da",        // == TextPrimary; the selection recolors the background only
 	.ThumbnailMatte = "#16120d",
+	.ReadyGreen = "#69c06d",
 };
 
 // Warm paper light ramp, the sibling of the dark ramp above - same source, not a derivative of the old greys.
@@ -50,6 +51,7 @@ static constexpr Theme::ThemeColors Light{
 	.SelectionHighlight = "#4a90da",  // AccentBorder kept bright - the dark TextPrimary reads on it (~5:1)
 	.SelectedText = "#241d15",        // == TextPrimary; the selection recolors the background only
 	.ThumbnailMatte = "#e7e4db",
+	.ReadyGreen = "#3fa257",
 };
 
 bool Theme::isDark()

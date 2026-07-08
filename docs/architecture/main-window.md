@@ -23,8 +23,9 @@ unmounted drive) renders a blank card rather than hiding the item (accepted v1 b
 name comes from its id's file name (`itemInfoFor`), since no frame folder names it; its date sort uses the
 same `getSourceFileDate` (file-name timestamp, then birth time). **Per-type gates**: a photo card's
 double-click opens the file in the system image viewer (`openSourceInSystemApp`) instead of the built-in
-player; middle-click (frame viewer) is not wired on photo cards — a photo has no frames; the split-pending
-badge never shows (photos report `isSplitIntoFrames() == true`); the context menu adapts per type — see
+player; middle-click (frame viewer) is not wired on photo cards — a photo has no frames; the green "frames
+extracted" badge never shows (it's gated to videos — a photo reports `isSplitIntoFrames() == true` but has no
+frames); the context menu adapts per type — see
 `showMediaItemContextMenu` below.
 
 ## Name filter
