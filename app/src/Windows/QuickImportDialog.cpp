@@ -366,6 +366,9 @@ QuickImportDialog::QuickImportDialog(Callbacks callbacks, const QString& suggest
 	, m_callbacks(std::move(callbacks))
 {
 	setWindowTitle(tr("Quick Import"));
+	// Opens maximized and acts as a full workspace window: give it real min/max caption buttons (a QDialog has
+	// none by default) and no "?" context-help button.
+	setWindowFlags((windowFlags() | Qt::WindowMinMaxButtonsHint) & ~Qt::WindowContextHelpButtonHint);
 	setAcceptDrops(true);  // media files dropped anywhere on the dialog are staged - see dragEnterEvent/dropEvent
 
 	QVBoxLayout* outerLayout = new QVBoxLayout(this);
@@ -520,8 +523,13 @@ QuickImportDialog::QuickImportDialog(Callbacks callbacks, const QString& suggest
 
 	refreshLabelList();
 
-	// Restore persisted window geometry and splitter position (no-ops on first run).
-	restoreWindowGeometry(this, "quickImportDialog");
+	// Restore persisted window geometry; with nothing stored yet (first run) open maximized - this is a full
+	// workspace - letting the saved geometry rule on every run thereafter.
+	if (!restoreWindowGeometry(this, "quickImportDialog"))
+	{
+		resize(1200, 800);  // the size the dialog falls back to when un-maximized
+		setWindowState(Qt::WindowMaximized);
+	}
 	const QByteArray splitterState = QSettings{}.value("quickImportDialog/splitter").toByteArray();
 	if (!splitterState.isEmpty())
 		m_splitter->restoreState(splitterState);
