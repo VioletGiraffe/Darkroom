@@ -48,43 +48,38 @@ IntegrityReport scan()
 	Catalog& catalog = Catalog::instance();
 	IntegrityReport report;
 
-	// Phase 1: per-video-entry issue checks.
-	for (const MediaId& id : catalog.allMediaItems())
+	// Phases 1 + 2 in one pass over the model: record a per-entry issue for anything non-healthy, and collect
+	// every entry's folder (all types) to exclude from the untracked walk below. Folders are keyed by
+	// pathComparisonKey so one whose on-disk case differs from its stored case still matches.
+	QSet<QString> knownFolders;
+	for (const auto& [id, entry] : catalog.mediaItems().asKeyValueRange())
 	{
-		const QString source = catalog.sourcePathForMediaItem(id);
+		knownFolders.insert(pathComparisonKey(entry.folder));
 
-		if (catalog.mediaType(id) == Catalog::MediaType::Photo)
+		if (entry.type == Catalog::MediaType::Photo)
 		{
 			// A photo is source-only (the card decodes the file itself) - no frames or preview to probe. Its
 			// sole failure is the file going missing: owned -> LOST, referenced -> GONE.
-			if (source.isEmpty() || !QFileInfo::exists(source))
-				report.photoIssues.push_back({ id, source, catalog.isReferenced(id) });
+			if (entry.sourcePath.isEmpty() || !QFileInfo::exists(entry.sourcePath))
+				report.photoIssues.push_back({ id, entry.sourcePath, entry.referenced });
 			continue;
 		}
-
-		const QString folder = catalog.folderForMediaItem(id);
 
 		// Probe the entry's on-disk backing; record a MediaIssue for anything non-healthy. The verdicts
 		// (ghost / invisible / stale / source-missing) are orthogonal - see the state grid above.
 		MediaIssue issue;
 		issue.id                = id;
-		issue.folder            = folder;
-		issue.sourcePath        = source;
-		issue.sourcePresent     = !source.isEmpty() && QFileInfo::exists(source);
-		issue.splitComplete     = catalog.isSplitIntoFrames(id);
-		issue.realFramesPresent = !QDir(folder).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty();
-		issue.previewPresent    = !QDir(Catalog::previewDirFor(folder)).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty();
+		issue.folder            = entry.folder;
+		issue.sourcePath        = entry.sourcePath;
+		issue.sourcePresent     = !entry.sourcePath.isEmpty() && QFileInfo::exists(entry.sourcePath);
+		issue.splitComplete     = entry.splitIntoFrames;
+		issue.realFramesPresent = !QDir(entry.folder).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty();
+		issue.previewPresent    = !QDir(Catalog::previewDirFor(entry.folder)).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty();
 		if (!issue.healthy())
 			report.issues.push_back(issue);
 	}
 
-	// Phase 2: collect every entry's frame folder (all types), to exclude them from the untracked walk below.
-	// Keyed by pathComparisonKey so a folder whose on-disk case differs from its stored case still matches.
-	QSet<QString> knownFolders;
-	for (const MediaId& id : catalog.allMediaItems())
-		knownFolders.insert(pathComparisonKey(catalog.folderForMediaItem(id)));
-
-	// Phase 3: untracked - every non-empty frame folder on disk that no entry claims.
+	// Untracked - every non-empty frame folder on disk that no entry claims.
 	forEachFolder(rootFolder(), [&](const QString& collection, const QString& folderPath) {
 		if (collection.compare(PHOTOS_DIR_NAME, Qt::CaseInsensitive) == 0)
 			return;  // <root>/Photos holds owned photo files (one dir per label), not video frame folders

@@ -703,7 +703,8 @@ void MainWindow::refreshMediaGrid()
 	std::vector<MediaId> mediaItems;
 	if (activeLabelIds.isEmpty())
 	{
-		mediaItems = catalog.allMediaItems();  // no filter ("All"): the whole catalog
+		const auto& all = catalog.mediaItems();  // no filter ("All"): the whole catalog
+		mediaItems.assign(all.keyBegin(), all.keyEnd());
 	}
 	else
 	{
@@ -1449,14 +1450,13 @@ void MainWindow::reExportAllVideos()
 	};
 	std::vector<VideoItem> toReExport;
 	Catalog& catalog = Catalog::instance();
-	for (const MediaId& id : catalog.allMediaItems())
+	for (const Catalog::Entry& entry : catalog.mediaItems())
 	{
-		if (catalog.mediaType(id) != Catalog::MediaType::Video)
+		if (entry.type != Catalog::MediaType::Video)
 			continue;  // a photo has no frames to re-export - and its "folder" is the shared Photos/<label> dir, which resplit would wipe
 
-		const QString videoPath = catalog.sourcePathForMediaItem(id);
-		if (!videoPath.isEmpty() && QFile::exists(videoPath))
-			toReExport.push_back({ videoPath, catalog.folderForMediaItem(id) });
+		if (!entry.sourcePath.isEmpty() && QFile::exists(entry.sourcePath))
+			toReExport.push_back({ entry.sourcePath, entry.folder });
 	}
 
 	if (toReExport.empty())
@@ -1612,13 +1612,12 @@ void MainWindow::importToCollections(const QStringList& initialStaging)
 			// what catches renamed duplicates. The size gate keeps the byte comparison rare.
 			Catalog& catalog = Catalog::instance();
 			const qint64 photoSize = QFileInfo(photoPath).size();
-			for (const MediaId& id : catalog.allMediaItems())
+			for (const auto& [id, entry] : catalog.mediaItems().asKeyValueRange())
 			{
-				if (catalog.mediaType(id) != Catalog::MediaType::Photo || id.size() != photoSize)
+				if (entry.type != Catalog::MediaType::Photo || id.size() != photoSize)
 					continue;
-				const QString existingPath = catalog.sourcePathForMediaItem(id);
-				if (filesAreIdentical(photoPath, existingPath))
-					return existingPath;
+				if (filesAreIdentical(photoPath, entry.sourcePath))
+					return entry.sourcePath;
 			}
 			return {};
 		},
@@ -1673,11 +1672,10 @@ void MainWindow::scanForUntrackedFiles()
 	// A media item is "tracked" iff the catalog records it as some item's source path.
 	QSet<QString> tracked;
 	Catalog& catalog = Catalog::instance();
-	for (const MediaId& id : catalog.allMediaItems())
+	for (const Catalog::Entry& entry : catalog.mediaItems())
 	{
-		const QString sourcePath = catalog.sourcePathForMediaItem(id);
-		if (!sourcePath.isEmpty())
-			tracked.insert(pathComparisonKey(sourcePath));
+		if (!entry.sourcePath.isEmpty())
+			tracked.insert(pathComparisonKey(entry.sourcePath));
 	}
 
 	QSettings settings;

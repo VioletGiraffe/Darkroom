@@ -69,8 +69,25 @@ public:
 	[[nodiscard]] QSet<MediaId> mediaItemsForLabel(LabelId labelId) const;
 	[[nodiscard]] bool mediaItemHasLabel(const MediaId& id, LabelId labelId) const;
 
+	// The per-item record: every disk/type fact the catalog tracks for one media item. Exposed read-only (via
+	// mediaItems() below) so an enumeration reads all of an item's facts off one struct instead of a per-field
+	// re-query. Mutated only inside Catalog; labelIds is the derived cache that labelsForMediaItem() returns.
+	struct Entry
+	{
+		QString       folder;         // absolute; a video's frame folder, an owned photo's <root>/Photos/<label> dir (both stored relative-to-root in JSON), empty for a referenced photo
+		QString       sourcePath;     // absolute; may point at a missing/unmounted file. An owned photo's file lives inside its folder
+		QList<LabelId> labelIds;      // derived storage-label id (first when known) + stored extra ids
+		bool        splitIntoFrames = true;  // false = only preview frames exist yet; see isSplitIntoFrames. Video-only; photos keep the default
+		qint64      durationMs = -1;         // video source length in ms; -1 = unknown (not probed yet / photo). See durationMsForMediaItem
+		MediaType   type = MediaType::Video;
+		bool        referenced = false;      // photos only; see isReferenced
+	};
+
 	// Enumeration / counts.
-	[[nodiscard]] std::vector<MediaId> allMediaItems() const { return std::vector<MediaId>(_mediaItems.keyBegin(), _mediaItems.keyEnd()); }
+	// mediaItems() is the one enumeration primitive: a const borrow of the live model (no copy), keyed by
+	// MediaId - read each item's facts straight off its Entry. Order is unspecified; QHash's ranged-for yields
+	// values (Entry), so use asKeyValueRange() when the MediaId key is needed too.
+	[[nodiscard]] const QHash<MediaId, Entry>& mediaItems() const { return _mediaItems; }
 	[[nodiscard]] bool containsMediaItem(const MediaId& id) const { return _mediaItems.contains(id); }
 	[[nodiscard]] int mediaItemCount() const { return static_cast<int>(_mediaItems.size()); }
 	// labelId -> number of items carrying it, computed in one pass (for the sidebar's per-label counts).
@@ -217,17 +234,6 @@ private:
 	[[nodiscard]] LabelId generateLabelId();  // ++_nextLabelId; monotonic, so never collides. Non-const.
 	[[nodiscard]] LabelId ordinaryLabelIdByName(const QString& displayName) const;  // non-virtual displayName match (case-insensitive); None if none
 	[[nodiscard]] static QString registryPath();
-
-	struct Entry
-	{
-		QString       folder;         // absolute; a video's frame folder, an owned photo's <root>/Photos/<label> dir (both stored relative-to-root in JSON), empty for a referenced photo
-		QString       sourcePath;     // absolute; may point at a missing/unmounted file. An owned photo's file lives inside its folder
-		QList<LabelId> labelIds;      // derived storage-label id (first when known) + stored extra ids
-		bool        splitIntoFrames = true;  // false = only preview frames exist yet; see isSplitIntoFrames. Video-only; photos keep the default
-		qint64      durationMs = -1;         // video source length in ms; -1 = unknown (not probed yet / photo). See durationMsForMediaItem
-		MediaType   type = MediaType::Video;
-		bool        referenced = false;      // photos only; see isReferenced
-	};
 
 	[[nodiscard]] static QString collectionNameOf(const QString& folderAbs);  // the collection-folder name (a *video's* storage-label display name)
 	// The label display name the entry's storage location implies: the collection-folder name for a video

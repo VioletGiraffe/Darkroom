@@ -64,7 +64,7 @@ restyle needs an app-wide styled `QCheckBox`.
 
 - `refreshMediaGrid()` — clears and rebuilds `m_mediaGrid`, one `GridItem` (a `QListWidgetItem` carrying the
   card's `MediaId`) per shown item. Reads `cardImageHeight()` and `previewFrameCount` each rebuild, builds
-  the card set from `Catalog::allMediaItems()` filtered by the sidebar's **label** filter
+  the card set from `Catalog::mediaItems()` filtered by the sidebar's **label** filter
   (`Catalog::mediaItemsForLabel`), then ends with `applyNameFilter()` so the active name filter is honoured on the
   freshly built cards. Deliberately does **not** call `Catalog::rebuildIndex()` — see
   [catalog-and-labels.md](catalog-and-labels.md#in-memory-model) for why.

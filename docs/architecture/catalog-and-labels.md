@@ -94,11 +94,13 @@ stores it as a member), so nothing needs to bridge folder→id at call sites any
 still carries its id (identity is the stored name+size, not whether the file is currently present), so even
 that case stays clean.
 
-- **Queries**: `labelsForMediaItem`, `mediaItemsForLabel`, `mediaItemHasLabel`; enumeration via `allMediaItems`,
-  `containsMediaItem`, `mediaItemCount`, `labelMediaItemCounts` (per-label counts in one pass, for the
-  sidebar); per-item facts via `folderForMediaItem` (absolute), `sourcePathForMediaItem`, `mediaType`,
-  `isReferenced`, `durationMsForMediaItem`, and `anySourceDir` (a sensible default destination for relocating newly added source
-  files — the directory of the first *video* whose source file is currently present).
+- **Queries**: `labelsForMediaItem`, `mediaItemsForLabel`, `mediaItemHasLabel`; enumeration via `mediaItems`
+  (a const ref to the whole `MediaId`→`Entry` model — read every fact of an item straight off its `Entry`
+  rather than re-querying per field), `containsMediaItem`, `mediaItemCount`, `labelMediaItemCounts` (per-label
+  counts in one pass, for the sidebar); per-item facts via `folderForMediaItem` (absolute),
+  `sourcePathForMediaItem`, `mediaType`, `isReferenced`, `durationMsForMediaItem` (single-id lookups — prefer
+  `mediaItems` when scanning the whole set), and `anySourceDir` (a sensible default destination for relocating
+  newly added source files — the directory of the first *video* whose source file is currently present).
 - **Mutations**: `addLabel`/`removeLabel`. `addLabel` only writes the stored id list (no-op on an invalid id —
   a missing-source item can't be labeled). `removeLabel` is metadata-only too, **except** when the label
   names the item's storage location: then it relocates that storage (a video's frame folder into the
