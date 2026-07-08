@@ -97,7 +97,7 @@ that case stays clean.
 - **Queries**: `labelsForMediaItem`, `mediaItemsForLabel`, `mediaItemHasLabel`; enumeration via `allMediaItems`,
   `containsMediaItem`, `mediaItemCount`, `labelMediaItemCounts` (per-label counts in one pass, for the
   sidebar); per-item facts via `folderForMediaItem` (absolute), `sourcePathForMediaItem`, `mediaType`,
-  `isReferenced`, and `anySourceDir` (a sensible default destination for relocating newly added source
+  `isReferenced`, `durationMsForMediaItem`, and `anySourceDir` (a sensible default destination for relocating newly added source
   files — the directory of the first *video* whose source file is currently present).
 - **Mutations**: `addLabel`/`removeLabel`. `addLabel` only writes the stored id list (no-op on an invalid id —
   a missing-source item can't be labeled). `removeLabel` is metadata-only too, **except** when the label
@@ -129,7 +129,11 @@ that case stays clean.
   permanent preview frames exist yet, a full extraction is still owed; `Catalog::isSplitIntoFrames(id)`
   queries it, and `CatalogIntegrity::scan`'s ghost verdict is guarded by it so a video that's legitimately still
   preview-only is never misreported as a ghost (see [import.md](import.md) for the full on-demand-split
-  design).
+  design). It also records the video's **duration** (ms, from the import-time probe) when a positive value is
+  passed; `-1` (unknown) leaves any already-stored duration intact, so a re-registration never erases it.
+  `setDurationMs(id, ms)` backfills it onto an already-registered item for the paths that learn the duration
+  after the fact — preview regeneration and re-export — and `durationMsForMediaItem(id)` reads it back (`-1`
+  for a photo, an unknown id, or a pre-duration import not yet backfilled).
 - **`removeMediaItem(id)`** drops an item from the catalog entirely (used by delete-all and dedup-cleanup), so it
   doesn't linger as a ghost now that the catalog — not a disk walk — is the authoritative set.
 - **`applyRename(oldId, newId, newSourcePath, newFolderAbs)`** — the rename counterpart to `addMediaItem`:
@@ -192,7 +196,7 @@ library; the guards only prevent creating the conflict from here on.
 ## In-memory model
 
 `QHash<MediaId, Entry>` where `Entry{folder (abs; empty for a referenced photo), sourcePath, labelIds,
-splitIntoFrames, type, referenced}` — this **is** the catalog; see "Catalog is the authoritative in-memory
+splitIntoFrames, durationMs, type, referenced}` — this **is** the catalog; see "Catalog is the authoritative in-memory
 model" in [data-model.md](data-model.md). `rebuildIndex()` re-seeds the registry from the model
 (`ensureBestAndFolderLabels`) and reloads every entry fresh from `MetadataStore::allMediaIds()` + per-id
 field reads. A folder-less record is skipped as a non-item (a legacy orphan carrying only labels) **unless**

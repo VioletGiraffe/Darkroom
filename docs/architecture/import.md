@@ -70,9 +70,11 @@ full extraction happens here.
 Those preview frames are normally *reused, not re-extracted*: `QuickImportDialog` already ran ffmpeg to build
 each staged card's preview (see "Staging area" below), so import is handed each video's staging temp dir —
 keyed by the stable `MediaId` so it survives relocation moving the file — and copies those frames into
-`outputFolder/preview/`. A fresh extraction runs only as a fallback, when nothing staged is available. On a
-registration collision the whole output folder (previews included) is deleted, the same as any other import
-failure.
+`outputFolder/preview/`. A fresh extraction runs only as a fallback, when nothing staged is available. The **duration** Quick Import
+probed while staging rides along the same handoff — passed to `importVideo` and stored on the item, so it isn't
+probed a second time; the fresh-extraction fallback probes anyway and its result supersedes an unknown staged
+value. On a registration collision the whole output folder (previews included) is deleted, the same as any
+other import failure.
 
 ## Photo import: `Import::importPhoto`
 
@@ -106,8 +108,12 @@ timestamp in a single multi-seek ffmpeg run — seeking per-output on one open i
 process per frame or decoding the whole video. Thumbnail height and JPEG quality are fixed constants,
 independent of the user's full-split quality. Callers pass the exact destination folder — a frame folder's
 `preview/` subdir (via `Catalog::previewDirFor`) or a staging scratch dir — so the engine itself knows nothing
-of the `preview/` convention. Best-effort throughout: any failure just leaves that folder empty or partial,
-and import never gates on it succeeding.
+of the `preview/` convention. Each call returns a per-job **`PreviewResult`** — a status plus the video's
+**duration**, which the probe had to read anyway to place the timestamps, handed back so the caller can persist
+it (`Catalog::durationMsForMediaItem`, see [data-model.md](data-model.md)) instead of re-probing for the number
+alone. Best-effort throughout: a failed job never aborts the batch and import never gates on it succeeding —
+the status just separates a probe failure (corrupt input, nothing extracted) from an extraction failure
+(duration known, frames didn't write), for the caller to act on or ignore.
 
 It also has a batch form that extracts several videos' previews at once, used by Quick Import staging. The
 concurrency is deliberately thread-free — each ffmpeg is its own OS process, so a bounded number run together
@@ -185,7 +191,7 @@ at once behind a modal progress box. A staged *photo* skips all of that: its car
 `QDir("")` would name the working directory), it double-clicks into the system image viewer rather than the
 built-in player, and it stages instantly. Frame count is the same `Settings::PreviewFrameCount` the main grid uses
 (no separate setting); staged cards also mirror the main grid's type-specific sizing — square photo cards, video
-strips widened to tile with them (`MediaItemWidget::videoCanvasWidthForTiling`). Each staged item is tracked by a `StagedEntry` (its path, temp preview dir, pending
+strips widened to tile with them (`MediaItemWidget::videoCanvasWidthForTiling`). Each staged item is tracked by a `StagedEntry` (its path, temp preview dir, probed duration, pending
 Best/labels, grid item), keyed by `MediaId` computed once at stage time while the source file still exists (see
 "Why `MediaId`, not path" below). The temp dir is deleted once the entry is unstaged or the dialog closes — but
 its frames aren't wasted: a successful Import copies them into the permanent `outputFolder/preview/` rather than

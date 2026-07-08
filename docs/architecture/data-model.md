@@ -5,7 +5,8 @@
 ## `Catalog` is the authoritative in-memory model
 
 `Catalog` (see [catalog-and-labels.md](catalog-and-labels.md)) holds the media-item set in memory, keyed by
-`MediaId`: for every item, its frame folder, its source path, and its full label-id set. It is kept
+`MediaId`: for every item, its frame folder, its source path, its full label-id set, and (for a video) its
+probed duration. It is kept
 current by its own mutation API (`addMediaItem`/`removeMediaItem`/`applyRename`/`addLabel`/`removeLabel`/...), not by
 re-deriving from disk on every refresh — during normal operation the filesystem is never walked (only the
 on-demand integrity tool walks it; see [catalog-and-labels.md](catalog-and-labels.md)). `MetadataStore`

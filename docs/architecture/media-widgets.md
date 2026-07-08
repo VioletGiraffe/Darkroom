@@ -75,6 +75,28 @@ video card spans exactly `frameCount` photo-card columns *including the grid gap
 mixed photo/video cards align on a single column grid. Per-frame height and frame count are both
 user-adjustable at runtime (see "Card preview sizing & zoom" below).
 
+### Duration badge
+
+`setDuration(ms)` shows a small overlay in the thumbnail's **bottom-right** corner — a play triangle followed
+by the video's duration (`M:SS`, or `H:MM:SS` past an hour) — which is what marks a card as a video at a
+glance. A non-positive `ms` hides it: a photo, or a video whose duration isn't known yet
+(`Catalog::durationMsForMediaItem` returned `-1`; see [catalog-and-labels.md](catalog-and-labels.md)). Like the
+split-pending badge, its position depends on the thumbnail's size (and on its own, which grows with the text),
+so it's re-placed on every thumbnail resize rather than only when set — the same self-correcting placement.
+**MainWindow** supplies the duration from the `Catalog`, matching the "MainWindow computes, card draws" split
+above; the card never queries the catalog itself.
+
+### Film-strip treatment (video cards)
+
+A video card renders with a **film-strip** look — sprocket-perforated bands top and bottom with the frames
+between them — so it reads as video at a glance, distinct from a photo's plain square. The card passes a
+`filmStrip` flag into the composite `ThumbnailWidget`, which reserves the two bands, shrinks the rendered frame
+strip to sit between them, and paints a **dark film base** behind everything. The frames keep their usual
+transparent inter-frame gaps, and because the base behind them is dark those gaps read as **black divider lines
+for free** — no separate divider drawing. The band height scales with the thumbnail height
+(`ThumbnailWidget::filmStripBandHeight`, public so the card can reuse it): both corner badges above offset
+inward by one band so they clear the perforations instead of landing on them.
+
 ### Dragging a card out (file export)
 
 The card *widget* originates no drag itself — `MediaItemWidget`/`ThumbnailWidget` leave a left-drag to fall
@@ -120,6 +142,11 @@ grid card — drops the border, hover and padding, leaving just the recessed mat
 `MediaItemWidget` draws the card frame around thumbnail + footer instead (see "Card layout & frame" above).
 The grid also constructs it caption-less (the name lives in the footer), so its caption strip collapses to
 zero. Framed, captioned thumbnails (single-frame viewers, Compare) are unchanged.
+
+The composite constructor also takes a `filmStrip` flag (default false, set only by the grid's video cards):
+it reserves the sprocket bands and reduces the rendered canvas height to match, so the frames sit between the
+bands — the film-strip video-card look described under `MediaItemWidget` above. The rest of the render/paint
+path is shared.
 
 ### Loading
 
