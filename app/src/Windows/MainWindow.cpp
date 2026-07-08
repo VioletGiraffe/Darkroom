@@ -48,7 +48,6 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMimeData>
-#include <QProcess>
 #include <QScrollBar>
 #include <QSet>
 #include <QSettings>
@@ -1209,92 +1208,34 @@ void MainWindow::ensureFramesSplit(const MediaId& id)
 
 void MainWindow::splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder)
 {
-	// Check the source is actually there before doing anything: otherwise ffmpeg fails on the missing input
-	// and the user gets its raw stderr dump instead of a clear "the file is gone" message.
-	if (!QFileInfo::exists(videoFilePath))
+	// The ffmpeg invocation itself lives in the Ffmpeg module; this wrapper only supplies the settings-derived
+	// options, renders the outcome, and - on success - registers the video in the catalog.
+	const Ffmpeg::SplitOptions options{ .tiff = useTiff(), .jpegQuality = jpegQuality(), .frameStep = frameStep() };
+	const Ffmpeg::SplitResult result = Ffmpeg::splitVideoIntoFrames(videoFilePath, outputFolder, options);
+
+	using Status = Ffmpeg::SplitResult::Status;
+	switch (result.status)
 	{
+	case Status::Ok:
+		break;
+	case Status::SourceMissing:
 		reportMissingFile(this, videoFilePath);
 		return;
-	}
-
-	const QString baseName = QFileInfo(videoFilePath).completeBaseName();
-
-	if (!QDir{}.mkpath(outputFolder))
-	{
+	case Status::FolderCreateFailed:
 		QMessageBox::critical(this, tr("Error"), tr("Failed to create output folder:\n%1").arg(outputFolder));
 		return;
-	}
-
-	// Removes outputFolder on any failure path below. Callers always delete it before calling
-	// this function, so it's safe to wipe wholesale - this just undoes the mkpath above plus
-	// whatever ffmpeg partially wrote, so a failed extraction doesn't leave debris behind.
-	auto cleanupAfterFailure = [&outputFolder] { QDir(outputFolder).removeRecursively(); };
-
-	// Build ffmpeg command
-	const bool tiff = useTiff();
-	const QString outputPattern = outputFolder + "/%04d_" + baseName + (tiff ? ".tif" : ".jpg");
-
-	QStringList arguments;
-	arguments << "-i" << QDir::toNativeSeparators(videoFilePath)
-		<< "-an" << "-sn" << "-dn" // No audio, no subtitles, no data
-		<< "-y"; // Overwrite output files without asking
-
-	const int step = frameStep();
-	if (step > 1)
-	{
-		// The comma inside mod(n,N) must be escaped: ffmpeg's filtergraph parser splits filters on
-		// commas and doesn't track parentheses, so an unescaped one would truncate the select
-		// expression. The comma before format= is left bare - it's the real select->format chain separator.
-		arguments << "-filter:v" << QString("select=not(mod(n\\,%1)),format=pix_fmts=rgb24").arg(step)
-			<< "-fps_mode" << "vfr";
-	}
-	else
-	{
-		arguments << "-filter:v" << "format=pix_fmts=rgb24";
-	}
-
-	// Per-format encoder option: -compression_algo is TIFF-only (deflate - lossless, and far better than the
-	// encoder's packbits default on photographic frames); -qscale:v is the JPEG quality knob, meaningless for TIFF.
-	if (tiff)
-		arguments << "-compression_algo" << "deflate";
-	else
-		arguments << "-qscale:v" << QString::number(jpegQuality());
-	arguments << QDir::toNativeSeparators(outputPattern);
-
-	// Execute ffmpeg
-	QProcess process;
-	process.start(ffmpegPath(), arguments);
-
-	if (!process.waitForStarted())
-	{
+	case Status::StartFailed:
 		QMessageBox::critical(this, tr("Error"), tr("Failed to start FFMPEG process, check that it's present in PATH or configured in Settings.\nConfigured path: %1").arg(ffmpegPath()));
-		cleanupAfterFailure();
 		return;
-	}
-
-	if (!process.waitForFinished(300000)) // 5 minutes timeout
-	{
-		process.kill();
+	case Status::TimedOut:
 		QMessageBox::critical(this, tr("Error"), tr("FFMPEG process timeout (5 minutes)"));
-		cleanupAfterFailure();
 		return;
-	}
-
-	if (process.exitCode() != 0)
-	{
-		const QString errorOutput = process.readAllStandardError() + "\n" + process.readAllStandardOutput();
+	case Status::ExtractionFailed:
 		QMessageBox::critical(this, tr("Error"),
-			tr("FFMPEG failed with exit code %1\n\nError output:\n%2").arg(process.exitCode()).arg(errorOutput));
-		cleanupAfterFailure();
+			tr("FFMPEG failed with exit code %1\n\nError output:\n%2").arg(result.exitCode).arg(result.errorOutput));
 		return;
-	}
-
-	// Check if frames were created
-	const qsizetype frameCount = QDir(outputFolder).entryList({ "*.jpg", "*.tif" }, QDir::Files).count();
-	if (frameCount == 0)
-	{
+	case Status::NoFrames:
 		QMessageBox::warning(this, tr("Warning"), tr("No frames were extracted from:\n%1").arg(videoFilePath));
-		cleanupAfterFailure();
 		return;
 	}
 
@@ -1308,7 +1249,7 @@ void MainWindow::splitVideoIntoFrames(const QString& videoFilePath, const QStrin
 	{
 		QMessageBox::critical(this, tr("Error"),
 			tr("An item with the same name and file size is already tracked in a different collection:\n%1").arg(videoFilePath));
-		cleanupAfterFailure();
+		QDir(outputFolder).removeRecursively();
 	}
 }
 

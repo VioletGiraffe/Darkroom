@@ -2,6 +2,7 @@
 #include "Utils.h"
 
 #include <QDir>
+#include <QFileInfo>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QStringList>
@@ -198,6 +199,97 @@ std::vector<PreviewResult> generatePreviewFrames(const std::vector<PreviewJob>& 
 PreviewResult generatePreviewFrames(const QString& videoFilePath, const QString& destinationFolder, int frameCount)
 {
 	return generatePreviewFrames({ PreviewJob{ videoFilePath, destinationFolder } }, frameCount, /*maxConcurrentProcesses*/ 1).front();
+}
+
+SplitResult splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder, const SplitOptions& options)
+{
+	SplitResult result;
+
+	// The source must be present before anything runs: otherwise ffmpeg fails on the missing input and its raw
+	// stderr stands in for a clear "the file is gone" report (which the caller renders from SourceMissing).
+	if (!QFileInfo::exists(videoFilePath))
+	{
+		result.status = SplitResult::Status::SourceMissing;
+		return result;
+	}
+
+	if (!QDir{}.mkpath(outputFolder))
+	{
+		result.status = SplitResult::Status::FolderCreateFailed;
+		return result;
+	}
+
+	// Removes outputFolder on any failure path below, so a failed extraction leaves no debris - this undoes the
+	// mkpath above plus whatever ffmpeg partially wrote (callers always wipe the folder before calling anyway).
+	const auto cleanupAfterFailure = [&outputFolder] { QDir(outputFolder).removeRecursively(); };
+
+	const QString baseName      = QFileInfo(videoFilePath).completeBaseName();
+	const QString outputPattern = outputFolder + "/%04d_" + baseName + (options.tiff ? ".tif" : ".jpg");
+
+	QStringList arguments;
+	arguments << "-i" << QDir::toNativeSeparators(videoFilePath)
+		<< "-an" << "-sn" << "-dn" // No audio, no subtitles, no data
+		<< "-y"; // Overwrite output files without asking
+
+	if (options.frameStep > 1)
+	{
+		// The comma inside mod(n,N) must be escaped: ffmpeg's filtergraph parser splits filters on commas and
+		// doesn't track parentheses, so an unescaped one would truncate the select expression. The comma before
+		// format= is left bare - it's the real select->format chain separator.
+		arguments << "-filter:v" << QString("select=not(mod(n\\,%1)),format=pix_fmts=rgb24").arg(options.frameStep)
+			<< "-fps_mode" << "vfr";
+	}
+	else
+	{
+		arguments << "-filter:v" << "format=pix_fmts=rgb24";
+	}
+
+	// Per-format encoder option: -compression_algo is TIFF-only (deflate - lossless, and far better than the
+	// encoder's packbits default on photographic frames); -qscale:v is the JPEG quality knob, meaningless for TIFF.
+	if (options.tiff)
+		arguments << "-compression_algo" << "deflate";
+	else
+		arguments << "-qscale:v" << QString::number(options.jpegQuality);
+	arguments << QDir::toNativeSeparators(outputPattern);
+
+	QProcess process;
+	process.start(ffmpegPath(), arguments);
+
+	if (!process.waitForStarted())
+	{
+		cleanupAfterFailure();
+		result.status = SplitResult::Status::StartFailed;
+		return result;
+	}
+
+	if (!process.waitForFinished(300000)) // 5-minute timeout
+	{
+		process.kill();
+		process.waitForFinished();  // reap the killed process rather than leaving it orphaned
+		cleanupAfterFailure();
+		result.status = SplitResult::Status::TimedOut;
+		return result;
+	}
+
+	if (process.exitCode() != 0)
+	{
+		result.exitCode    = process.exitCode();
+		result.errorOutput = process.readAllStandardError() + "\n" + process.readAllStandardOutput();
+		cleanupAfterFailure();
+		result.status = SplitResult::Status::ExtractionFailed;
+		return result;
+	}
+
+	const int frameCount = static_cast<int>(QDir(outputFolder).entryList({ "*.jpg", "*.tif" }, QDir::Files).count());
+	if (frameCount == 0)
+	{
+		cleanupAfterFailure();
+		result.status = SplitResult::Status::NoFrames;
+		return result;
+	}
+
+	result.frameCount = frameCount;
+	return result;
 }
 
 } // namespace Ffmpeg
