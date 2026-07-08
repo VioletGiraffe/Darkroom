@@ -211,7 +211,7 @@ import drop zone is for files from outside the app, not a card re-import of an a
 centered over the viewport) whenever **no item is visible** — whether none were built or the name filter hid
 them all; the paint checks live visibility, so it needs no hooks in `applyNameFilter`. The wording comes from
 `refreshMediaGrid` following the same computes/draws split: `Catalog::mediaItemCount() == 0` means the
-library itself is empty (message points at drag-drop and Quick Import), anything else means the filters
+library itself is empty (message points at drag-drop and the Import dialog), anything else means the filters
 matched nothing.
 
 **Selection highlight**: the `QListWidget::item:selected` background rule (`Theme::ListSelectedBg`) shows

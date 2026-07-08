@@ -394,7 +394,7 @@ void MainWindow::dragEnterEvent(QDragEnterEvent* event)
 
 void MainWindow::dropEvent(QDropEvent* event)
 {
-	// Files and folders are forwarded as-is; Quick Import expands any folder into the supported files under it.
+	// Files and folders are forwarded as-is; the Import dialog expands any folder into the supported files under it.
 	QStringList paths;
 	for (const QUrl& url : event->mimeData()->urls())
 	{
@@ -403,7 +403,7 @@ void MainWindow::dropEvent(QDropEvent* event)
 			paths.push_back(std::move(path));
 	}
 
-	// There is no "current collection" in the label model, so hand the dropped paths to Quick Import, where the
+	// There is no "current collection" in the label model, so hand the dropped paths to the Import dialog, where the
 	// user picks the destination label(s). Deferred so the drop source application is released promptly
 	// instead of being held in the drag state until processing finishes.
 	QMetaObject::invokeMethod(this, [this, paths = std::move(paths)] {
@@ -670,7 +670,7 @@ void MainWindow::refreshMediaGrid()
 		// A label dragged from the sidebar onto this card is added to it (or to the whole selection if this card
 		// is part of it). Mirrors the context-menu "Labels" add path; drag only ever adds, never removes.
 		// Deferred: refreshLibraryView rebuilds the grid, deleting this very card mid-dropEvent, so the mutation
-		// runs after the drop event unwinds (same reason MainWindow::dropEvent defers Quick Import).
+		// runs after the drop event unwinds (same reason MainWindow::dropEvent defers opening the Import dialog).
 		card->setOnLabelDropped([this, id](const QString& labelId) {
 			const std::vector<MediaId> targets = effectiveSelection(id);
 			const LabelId dropped = labelIdFromString(labelId);  // the mime payload is the id's decimal string

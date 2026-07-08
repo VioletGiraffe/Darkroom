@@ -26,11 +26,11 @@ struct Result
 };
 
 // Creates <collectionPath>/<video base name>/ (wiping a pre-existing one when overwriteExisting allows it),
-// fills its preview/ subfolder (copied from stagedPreviewDir when Quick Import already extracted frames
+// fills its preview/ subfolder (copied from stagedPreviewDir when the Import dialog already extracted frames
 // there, extracted fresh otherwise) and registers the video in the Catalog with the full frame split
 // deferred. A registration refusal (name+size collision with an item tracked elsewhere) deletes the
 // just-created folder again and reports as an Error.
-// stagedDurationMs is the duration Quick Import already probed while staging this video (-1 when unknown, e.g.
+// stagedDurationMs is the duration the Import dialog already probed while staging this video (-1 when unknown, e.g.
 // a direct import that reuses no staged frames); it's recorded on the item, saving a redundant probe. The
 // fresh-extraction fallback probes anyway, so its result supersedes a -1 here.
 [[nodiscard]] Result importVideo(const QString& videoPath, const QString& collectionPath, const QString& stagedPreviewDir, bool overwriteExisting, qint64 stagedDurationMs = -1);

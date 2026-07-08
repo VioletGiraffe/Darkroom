@@ -57,8 +57,8 @@ comes back as an `Import::Result` (`Success` / `FolderConflict` / `Error` with a
 partition/prompt (a `FolderConflict` result — the output folder exists and overwrite wasn't granted, nothing
 touched — is resolved by asking the user about that one item and retrying the call with
 `overwriteExisting = true`), the per-item error boxes, `Catalog::BatchScope`, and the view refresh. The
-worker reads the preview frame count straight from `Settings::PreviewFrameCount` — the same source Quick
-Import's staging uses (the main window's combo persists every change there immediately).
+worker reads the preview frame count straight from `Settings::PreviewFrameCount` — the same source the Import dialog's
+staging uses (the main window's combo persists every change there immediately).
 
 It does not extract the full frame set. It creates the output folder, puts a few
 permanent preview frames into `outputFolder/preview/`, then registers the video via `Catalog::addMediaItem(...,
@@ -70,7 +70,7 @@ full extraction happens here.
 Those preview frames are normally *reused, not re-extracted*: `ImportDialog` already ran ffmpeg to build
 each staged card's preview (see "Staging area" below), so import is handed each video's staging temp dir —
 keyed by the stable `MediaId` so it survives relocation moving the file — and copies those frames into
-`outputFolder/preview/`. A fresh extraction runs only as a fallback, when nothing staged is available. The **duration** Quick Import
+`outputFolder/preview/`. A fresh extraction runs only as a fallback, when nothing staged is available. The **duration** the Import dialog
 probed while staging rides along the same handoff — passed to `importVideo` and stored on the item, so it isn't
 probed a second time; the fresh-extraction fallback probes anyway and its result supersedes an unknown staged
 value. On a registration collision the whole output folder (previews included) is deleted, the same as any
@@ -81,8 +81,8 @@ other import failure.
 `Import::importPhoto(photoPath, labelDisplayName, mode)` is the photo counterpart to `importVideo` — equally
 UI-free, returning an `Import::PhotoResult` (`Success` / `IdCollision` / `Error` + message + the
 **`registeredId`** actually registered). `MainWindow::processPhotoBatch` is its coordinator (batch scope,
-error boxes, view refresh), driven from Quick Import via the `importPhotosRequested` callback. The
-`PhotoImportMode` comes from Quick Import's existing relocation combo, which doubles as the photo import
+error boxes, view refresh), driven from the Import dialog via the `importPhotosRequested` callback. The
+`PhotoImportMode` comes from the Import dialog's existing relocation combo, which doubles as the photo import
 mode: **Copy/Move** land the file in `<root>/Photos/<label>/` (created lazily), **"leave in place" means
 Reference** — the file is tracked where it is and the catalog entry is marked referenced
 (`Catalog::addPhoto`, see [catalog-and-labels.md](catalog-and-labels.md)).
@@ -91,17 +91,17 @@ Reference** — the file is tracked where it is and the catalog entry is marked 
   `MediaId` are free — one rename (`name_2.ext`, `name_3.ext`, ...) resolves a disk collision and a catalog
   id collision alike, since a copy/move preserves the byte size. A byte-identical file already at the
   destination (including the file itself on a re-import) is *adopted* — registered as-is, not copied again.
-  Because the registered identity can differ from the staged file's, all of Quick Import's post-import
+  Because the registered identity can differ from the staged file's, all of the Import dialog's post-import
   bookkeeping (Best, extra labels) re-keys to `PhotoResult::registeredId`.
 - **Reference import collision**: a referenced photo has no owned copy to rename, so an id already tracked
-  as a different item is refused with `IdCollision`; Quick Import then offers the escape hatch — "import an
+  as a different item is refused with `IdCollision`; the Import dialog then offers the escape hatch — "import an
   owned copy instead?" — which routes the file through the Copy path where the auto-rename works.
 - **A referenced photo's first label** is applied by `processPhotoBatch` via `Catalog::addLabel` right after
   registration (it has no storage folder to derive a label from); an owned photo's first label derives from
   the `Photos/<label>` dir it landed in, exactly like a video's collection folder.
 
 `Ffmpeg::generatePreviewFrames` (`src/Ffmpeg.h/.cpp`, free functions) is that extraction engine, used whenever
-a fresh preview is needed — the fallback above, the re-split paths, and Quick Import's staging. Given a video's
+a fresh preview is needed — the fallback above, the re-split paths, and the Import dialog's staging. Given a video's
 duration (probed from ffmpeg's own output, since no `ffprobe` ships here), it picks `frameCount` evenly-spaced
 timestamps across the same 10%–90% window used for real-frame sampling and pulls one downscaled thumbnail per
 timestamp in a single multi-seek ffmpeg run — seeking per-output on one open input rather than spawning a
@@ -115,7 +115,7 @@ alone. Best-effort throughout: a failed job never aborts the batch and import ne
 the status just separates a probe failure (corrupt input, nothing extracted) from an extraction failure
 (duration known, frames didn't write), for the caller to act on or ignore.
 
-It also has a batch form that extracts several videos' previews at once, used by Quick Import staging. The
+It also has a batch form that extracts several videos' previews at once, used by the Import dialog's staging. The
 concurrency is deliberately thread-free — each ffmpeg is its own OS process, so a bounded number run together
 and are waited on, all on the calling thread. A video whose probe fails is skipped (its destination left empty),
 and a progress callback reports completions for the staging dialog's counter.

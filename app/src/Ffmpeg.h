@@ -6,7 +6,7 @@
 #include <vector>
 
 // Thin wrapper over invoking the ffmpeg binary (see Utils.h's ffmpegPath()) for the one operation shared
-// across import, Quick Import's staging previews, and the integrity tool's preview regeneration: pulling a
+// across import, the Import dialog's staging previews, and the integrity tool's preview regeneration: pulling a
 // handful of evenly-spaced still frames out of a video file.
 namespace Ffmpeg {
 

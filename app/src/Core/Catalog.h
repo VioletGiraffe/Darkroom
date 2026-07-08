@@ -173,7 +173,7 @@ public:
 	LabelId createLabel(const QString& displayName, const QString& color = {});
 
 	// A pleasant, randomized label color ("#rrggbb") - the same generator new labels get on creation, exposed so
-	// callers minting a label elsewhere (e.g. the Quick Import staging dialog) can show a matching swatch up front.
+	// callers minting a label elsewhere (e.g. the Import dialog's staging area) can show a matching swatch up front.
 	static QString randomLabelColor();
 
 	// What deleting a label would do, for a confirmation dialog / pre-flight check (computed, no mutation).

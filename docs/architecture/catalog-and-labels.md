@@ -151,12 +151,12 @@ Every Catalog mutation writes the store through its own `MetadataStore::Writer` 
 [data-model.md](data-model.md)) — so a multi-field mutation (`addMediaItem`, `addPhoto`, `applyRename`,
 the relocate path) hits disk as **one atomic write of the finished record state**, never
 a partially-updated one, and each single mutation is one write. But a loop over many items
-(a drag-drop batch, re-export-all, the Best/extra-label flush after a Quick Import session) would still
+(a drag-drop batch, re-export-all, the Best/extra-label flush after an Import dialog session) would still
 re-serialize the *entire* store once per call, making an n-item loop write O(n²) bytes overall.
 `Catalog::BatchScope` is an RAII guard — construct one at the top of such a loop — that defers the physical
 write until the **outermost** scope is destroyed (nests freely), collapsing the whole loop into one write.
 It simply owns a Writer it never writes through; the mutations' own nested Writers coalesce into it. Used by
-the multi-item loops: Quick Import's batch import, re-export-all, and the post-Import
+the multi-item loops: the Import dialog's batch import, re-export-all, and the post-Import
 Best/extra-label flush.
 
 ## Registry mutations (the label objects themselves)
@@ -165,7 +165,7 @@ Best/extra-label flush.
   (with the given color, or a random one), and returns the created-or-existing label's id. Exists
   because empty collections have no item to derive a folder-label from (see "Persistence" above);
   `createCollection` calls it explicitly after creating the on-disk folder and passes the id through to its
-  own caller (Quick Import's provisional-label materialization keys on it — see
+  own caller (the Import dialog's provisional-label materialization keys on it — see
   [import.md](import.md#runimport-the-import-button)). Registry-idempotent if the name is taken: the existing
   label keeps its color, and its id is returned all the same.
 - **`renameLabel(labelId, newName)`** — uniqueness-checked (case-insensitive); renames the backing folders

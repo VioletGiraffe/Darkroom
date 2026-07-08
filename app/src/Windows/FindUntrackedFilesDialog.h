@@ -11,7 +11,7 @@ class QPushButton;
 // for supported video files that aren't "tracked" (i.e. not recorded as the
 // source of any collection's frame folder), and lists the untracked ones.
 // Double-clicking a row previews it in the built-in player; the user can
-// multi-select rows and send them to the Quick Import staging area via "Send
+// multi-select rows and send them to the Import staging area via "Send
 // selected to staging", which closes this dialog.
 //
 // All of the scan/folder-picking logic lives here, behind the static scanAndShowUi()

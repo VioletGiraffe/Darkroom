@@ -53,9 +53,9 @@ Import::Result Import::importVideo(const QString& videoPath, const QString& coll
 		return { Status::Error, QObject::tr("Failed to create output folder:\n%1").arg(outputFolder) };
 
 	// The full frame set is extracted on demand (see MainWindow::ensureFramesSplit), not here - import only
-	// needs a few permanent preview frames up front, then registers the video right away. Quick Import already
+	// needs a few permanent preview frames up front, then registers the video right away. The Import dialog already
 	// extracted exactly these for its staging card, so reuse them by copy; fall back to a fresh ffmpeg pass only
-	// when there's nothing staged to reuse (not reached via Quick Import, or staging's probe produced no frames).
+	// when there's nothing staged to reuse (not reached via the Import dialog, or staging's probe produced no frames).
 	// The staged scratch dir holds those frames directly; the frame folder nests its own under preview/.
 	qint64 durationMs = stagedDurationMs;   // reuse the duration staging already probed; superseded below if we extract fresh
 	if (stagedPreviewDir.isEmpty() || !copyPreviewFrames(stagedPreviewDir, Catalog::previewDirFor(outputFolder)))

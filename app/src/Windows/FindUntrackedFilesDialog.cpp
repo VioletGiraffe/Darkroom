@@ -95,7 +95,7 @@ FindUntrackedFilesDialog::FindUntrackedFilesDialog(const QStringList& untrackedF
 
 	QLabel* instructions = new QLabel(
 		tr("Found %1 untracked video file(s) - not part of any collection yet. Double-click to "
-		   "preview; select files and send them to Quick Import staging. Tracked files found: %2").arg(untrackedFiles.size()).arg(trackedCount), this);
+		   "preview; select files and send them to Import staging. Tracked files found: %2").arg(untrackedFiles.size()).arg(trackedCount), this);
 	instructions->setWordWrap(true);
 	instructions->setStyleSheet(QStringLiteral("color: %1;").arg(Theme::current().InstructionText));
 	layout->addWidget(instructions);
