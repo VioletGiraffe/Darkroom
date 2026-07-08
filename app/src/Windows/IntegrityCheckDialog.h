@@ -13,8 +13,11 @@
 // files, broken video entries, and photos whose source file is missing) and lets the user resolve each one:
 // register an untracked folder against its source; add an untracked photo to the catalog; per broken video,
 // re-import / regenerate preview / mark-fully-split / remove; per missing photo, locate the moved file
-// (referenced only) or remove. All UI logic lives here behind the static scanAndShowUi() entry point -
-// MainWindow only supplies the callbacks that actually touch the Catalog/disk.
+// (referenced only) or remove. Each section that admits a uniform batch also carries a blanket action over its
+// rows - add all untracked photos; re-import / regenerate / remove all broken videos; locate (search a folder
+// recursively and relink by identity) / remove all missing photos - each a loop over the same per-row callbacks.
+// All UI logic lives here behind the static scanAndShowUi() entry point - MainWindow only supplies the callbacks
+// that actually touch the Catalog/disk.
 // ============================================================================
 
 class IntegrityCheckDialog final : public QDialog
