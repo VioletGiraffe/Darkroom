@@ -69,6 +69,11 @@ public:
 	// (only its permanent preview frames exist so far) - see Catalog::isSplitIntoFrames.
 	void setSplitPending(bool pending);
 
+	// Shows a small bottom-right overlay - a play triangle followed by the video's duration (M:SS, or H:MM:SS
+	// past an hour) - marking the card as a video. A non-positive ms hides it: a photo, or a video whose
+	// duration isn't known yet (see Catalog::durationMsForMediaItem).
+	void setDuration(qint64 durationMs);
+
 	void setOnMiddleButtonClick(std::function<void()> onClick);
 
 	// See ThumbnailWidget::setOnMouseWheelCallback — Ctrl+wheel over the card delegates the zoom policy here.
@@ -88,6 +93,9 @@ private:
 	// Keeps the badge pinned to the thumbnail's top-right corner across resizes (unlike the top-left label
 	// dots, its position depends on the thumbnail's width).
 	void repositionSplitPendingBadge();
+	// Pins the duration overlay to the thumbnail's bottom-right corner across resizes (depends on both the
+	// thumbnail's size and the overlay's own, which varies with the duration text).
+	void repositionDurationBadge();
 
 private:
 	ThumbnailWidget*             m_thumb = nullptr;
@@ -96,6 +104,7 @@ private:
 	QLabel*                      m_name = nullptr;       // elided, right-aligned item name in the footer
 	QWidget*                     m_labelDots = nullptr;  // colored-dot strip (LabelDotStrip), child of m_footer
 	QWidget*                     m_splitPendingBadge = nullptr;  // top-right "not fully split" badge, child of m_thumb
+	QWidget*                     m_durationBadge = nullptr;      // bottom-right play-triangle + duration overlay, child of m_thumb (shown for videos with a known duration)
 	MediaId                      m_mediaId;
 	std::function<void()>               m_onMiddleButtonClick;
 	std::function<void()>               m_onDoubleClick;

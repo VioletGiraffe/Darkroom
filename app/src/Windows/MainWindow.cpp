@@ -657,6 +657,7 @@ void MainWindow::refreshMediaGrid()
 		}
 		card->setOnMouseWheelCallback([this](int steps) { zoomCards(steps); });
 		card->setSplitPending(!catalog.isSplitIntoFrames(id));
+		card->setDuration(catalog.durationMsForMediaItem(id));  // shows the duration pill on videos; photos / not-yet-probed videos return -1 -> no pill
 
 		// A label dragged from the sidebar onto this card is added to it (or to the whole selection if this card
 		// is part of it). Mirrors the context-menu "Labels" add path; drag only ever adds, never removes.

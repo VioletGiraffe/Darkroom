@@ -142,9 +142,9 @@ private:
 	// Extracts temp preview frames for each path and adds it to the staged grid.
 	void stageMediaItems(const QStringList& paths);
 	// Builds and wires one staged card for the given identity/file (the caller inserts it into the grid). Per-type
-	// differences (canvas size, preview images) are derived from the path here. Shared by stageMediaItems and
-	// renameStagedItem.
-	[[nodiscard]] MediaItemWidget* buildStagedCard(const MediaId& id, const QString& path, const QString& tempPreviewDir);
+	// differences (canvas size, preview images) are derived from the path here; durationMs is passed in since it
+	// isn't derivable from the path (it's probed during staging). Shared by stageMediaItems and renameStagedItem.
+	[[nodiscard]] MediaItemWidget* buildStagedCard(const MediaId& id, const QString& path, const QString& tempPreviewDir, qint64 durationMs);
 	// Deletes a staged entry's temp preview dir and removes its card; used by "Remove from staging" and
 	// once an entry has been successfully imported by runImport().
 	void unstage(const MediaId& id);

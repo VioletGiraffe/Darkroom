@@ -816,7 +816,7 @@ void QuickImportDialog::addToStaging(const QStringList& paths)
 	QMetaObject::invokeMethod(this, [this, paths] { stageMediaItems(paths); }, Qt::QueuedConnection);
 }
 
-MediaItemWidget* QuickImportDialog::buildStagedCard(const MediaId& id, const QString& path, const QString& tempPreviewDir)
+MediaItemWidget* QuickImportDialog::buildStagedCard(const MediaId& id, const QString& path, const QString& tempPreviewDir, qint64 durationMs)
 {
 	// Card thumbnail canvas mirrors the main library grid: a photo is square and decodes its file directly; a video
 	// is a horizontal strip sized to tile with `frameCount` photo cards (so mixed cards line up on one column grid),
@@ -858,6 +858,9 @@ MediaItemWidget* QuickImportDialog::buildStagedCard(const MediaId& id, const QSt
 			updateCardLabelDots(target);
 		}
 	});
+
+	// A video with a known length shows the duration pill; a photo (or a not-yet-probed video) passes -1 -> no pill.
+	card->setDuration(durationMs);
 
 	return card;
 }
@@ -955,7 +958,7 @@ void QuickImportDialog::stageMediaItems(const QStringList& paths)
 	// synchronously from within this function.
 	const auto stageCard = [this, &labelIdByPath](const QString& path, const QString& tempPreviewDir, qint64 durationMs = -1) {
 		const MediaId id = MediaId::fromFile(path);
-		auto* card = buildStagedCard(id, path, tempPreviewDir);
+		auto* card = buildStagedCard(id, path, tempPreviewDir, durationMs);
 
 		auto* item = new QListWidgetItem();
 		item->setSizeHint(card->sizeHint());
@@ -1310,7 +1313,7 @@ void QuickImportDialog::renameStagedItem(const MediaId& id)
 	// card's callbacks bind to newId, preserving the "staged key == current file's MediaId" invariant runImport relies on.
 	StagedEntry renamed = entry;
 	renamed.path = newPath;
-	auto* card = buildStagedCard(newId, newPath, renamed.tempPreviewDir);
+	auto* card = buildStagedCard(newId, newPath, renamed.tempPreviewDir, renamed.durationMs);
 	m_stagedGrid->setItemWidget(renamed.item, card);   // deletes the previous card
 	m_staged.remove(id);
 	m_staged.insert(newId, renamed);

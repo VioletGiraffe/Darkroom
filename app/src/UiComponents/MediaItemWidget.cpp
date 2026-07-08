@@ -9,6 +9,7 @@
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QFont>
+#include <QFontMetrics>
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -16,6 +17,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPointer>
+#include <QPolygonF>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QStyleHints>
@@ -145,6 +147,87 @@ private:
 	static constexpr int PAD = 3;   // backdrop padding around the glyph
 };
 
+// Compact video-duration text: M:SS under an hour, H:MM:SS at or past it, no leading zero on the leading
+// unit (1:34, 0:08, 1:02:17). The sub-second tail is truncated, matching how media players show total length.
+QString formatDuration(qint64 ms)
+{
+	const qint64 totalSeconds = ms / 1000;
+	const qint64 h = totalSeconds / 3600;
+	const qint64 m = (totalSeconds / 60) % 60;
+	const qint64 s = totalSeconds % 60;
+	return h > 0 ? QStringLiteral("%1:%2:%3").arg(h).arg(m, 2, 10, QChar('0')).arg(s, 2, 10, QChar('0'))
+	             : QStringLiteral("%1:%2").arg(m).arg(s, 2, 10, QChar('0'));
+}
+
+// A mouse-transparent overlay pinned to the thumbnail's bottom-right corner: a filled play triangle then the
+// duration text, on a translucent dark pill. The dark backdrop keeps the white content legible over any frame
+// (bright or dark), so it stays dark in both themes. The triangle is drawn rather than a glyph so it sizes and
+// vertically centres with the digits regardless of the font. setText resizes the pill to hug its content;
+// MediaItemWidget repositions it after.
+class DurationBadge final : public QWidget {
+public:
+	explicit DurationBadge(QWidget* parent) : QWidget(parent)
+	{
+		setAttribute(Qt::WA_TransparentForMouseEvents);
+		QFont f = font();
+		f.setPointSize(8);
+		setFont(f);
+	}
+
+	void setText(const QString& text)
+	{
+		if (m_text == text)
+			return;
+		m_text = text;
+		resize(sizeHint());   // hug the content; the owner pins the corner
+		update();
+	}
+
+	[[nodiscard]] QSize sizeHint() const override
+	{
+		const QFontMetrics fm(font());
+		return { PAD_H * 2 + triangleWidth(fm) + GAP + fm.horizontalAdvance(m_text), fm.height() + PAD_V * 2 };
+	}
+
+protected:
+	void paintEvent(QPaintEvent*) override
+	{
+		QPainter p{ this };
+		p.setRenderHint(QPainter::Antialiasing);
+
+		p.setPen(Qt::NoPen);
+		p.setBrush(QColor(0, 0, 0, 184));   // option B: ~0.72-opacity dark backdrop
+		p.drawRoundedRect(rect(), RADIUS, RADIUS);
+
+		const QColor fg(255, 255, 255, 245);
+		const QFontMetrics fm(font());
+		const double cy = height() / 2.0;
+		const int triH = triangleHeight(fm);
+		const int triW = triangleWidth(fm);
+
+		QPolygonF triangle;   // right-pointing play symbol, vertically centred
+		triangle << QPointF(PAD_H, cy - triH / 2.0) << QPointF(PAD_H, cy + triH / 2.0) << QPointF(PAD_H + triW, cy);
+		p.setBrush(fg);
+		p.drawPolygon(triangle);
+
+		const int textX = PAD_H + triW + GAP;
+		p.setPen(fg);
+		p.drawText(QRect(textX, 0, width() - textX - PAD_H, height()), Qt::AlignVCenter | Qt::AlignLeft, m_text);
+	}
+
+private:
+	static constexpr int PAD_H = 6;   // horizontal padding inside the pill
+	static constexpr int PAD_V = 3;   // vertical padding inside the pill
+	static constexpr int GAP = 4;     // triangle-to-text gap
+	static constexpr int RADIUS = 4;  // pill corner radius (option B)
+
+	// Triangle sized off the font so it tracks the digits; kept in one place so sizeHint and paint agree.
+	static int triangleHeight(const QFontMetrics& fm) { return qRound(fm.ascent() * 0.62); }
+	static int triangleWidth(const QFontMetrics& fm)  { return qRound(triangleHeight(fm) * 0.85); }
+
+	QString m_text;
+};
+
 }  // namespace
 
 MediaItemWidget::MediaItemWidget(
@@ -183,6 +266,10 @@ MediaItemWidget::MediaItemWidget(
 	// "Not fully split" badge in the thumbnail's top-right corner. Hidden until setSplitPending(true).
 	m_splitPendingBadge = new SplitPendingBadge(m_thumb);
 	m_splitPendingBadge->hide();
+
+	// Duration overlay in the thumbnail's bottom-right corner. Hidden until setDuration() is given a video's length.
+	m_durationBadge = new DurationBadge(m_thumb);
+	m_durationBadge->hide();
 
 	if (m_onContextMenu)
 	{
@@ -273,6 +360,25 @@ void MediaItemWidget::repositionSplitPendingBadge()
 	m_splitPendingBadge->move(m_thumb->width() - m_splitPendingBadge->width() - MARGIN, MARGIN);
 }
 
+void MediaItemWidget::setDuration(qint64 durationMs)
+{
+	const bool show = durationMs > 0;
+	m_durationBadge->setVisible(show);
+	if (!show)
+		return;
+
+	static_cast<DurationBadge*>(m_durationBadge)->setText(formatDuration(durationMs));
+	repositionDurationBadge();
+	m_durationBadge->raise();
+}
+
+void MediaItemWidget::repositionDurationBadge()
+{
+	static constexpr int MARGIN = 4;
+	m_durationBadge->move(m_thumb->width() - m_durationBadge->width() - MARGIN,
+	                      m_thumb->height() - m_durationBadge->height() - MARGIN);
+}
+
 void MediaItemWidget::setOnMiddleButtonClick(std::function<void()> onClick)
 {
 	m_onMiddleButtonClick = std::move(onClick);
@@ -354,9 +460,14 @@ bool MediaItemWidget::eventFilter(QObject* watched, QEvent* event)
 			return true; // This is middle mouse button - OK to consume, doesn't interfere with context menu or dbl click
 		}
 	}
-	else if (event->type() == QEvent::Resize && m_splitPendingBadge->isVisible())
+	else if (event->type() == QEvent::Resize || event->type() == QEvent::Show)
 	{
+		// Pin both corner overlays whenever the thumbnail gains real geometry. Unconditional, and on Show as
+		// well as Resize: with a fixed size hint the thumbnail's only resize (0 -> final) can arrive while the
+		// card is still hidden during grid layout, and no further resize follows on show - so a visibility- or
+		// resize-only handler would leave a badge stuck at its pre-size position. Moving a hidden badge is a no-op.
 		repositionSplitPendingBadge();
+		repositionDurationBadge();
 	}
 
 	return QWidget::eventFilter(watched, event);
