@@ -297,9 +297,9 @@ above doesn't carry the reasoning behind forks that were considered and rejected
 
 Tools menu → "Check catalog integrity..." (`MainWindow::checkCatalogIntegrity`) reconciles the catalog
 against disk on demand — the catalog model is otherwise never re-derived from disk, so this runs only on
-explicit user request, never as part of the normal refresh path. It covers **videos and photos**. The one
-piece still deferred is discovering an *untracked* file under `<root>/Photos/<label>` (the untracked walk
-skips the `Photos` tree), so a stray photo file that no catalog entry claims isn't surfaced yet.
+explicit user request, never as part of the normal refresh path. It covers **videos and photos** in both
+directions: broken tracked entries, and on-disk content that no catalog entry claims — a whole video frame
+folder, or a stray image file under `<root>/Photos/<label>`.
 
 The read-only scan and its report types live in a dedicated module, `CatalogIntegrity`
 (`app/src/Core/CatalogIntegrity.{h,cpp}`), reasoning purely over `Catalog`'s public API plus the on-disk
@@ -309,9 +309,12 @@ photo's owned/referenced × source presence) and the verdicts it yields — is d
 banner comment atop `CatalogIntegrity::scan`, kept next to the code so the two can't drift.** This section
 stays conceptual and does not restate it.
 
-The scan reports three kinds of drift, each with its own resolution:
+The scan reports four kinds of drift, each with its own resolution:
 - **Untracked folder** — a non-empty frame folder on disk that no catalog entry claims → the user browses to
   its source video to register it.
+- **Untracked photo** — an image file under `<root>/Photos/<label>` that no entry claims as its source → the
+  user adds it to the catalog in one click (adopted in place as an owned photo under that label) or skips it.
+  No browse step: the file is self-contained and already sits in the library tree.
 - **Broken video entry** — a tracked video whose on-disk product (preview frames and/or real frames) no
   longer matches what the catalog records → resolved by re-import, preview regeneration, marking it fully
   split, or removal, depending on which verdicts hold (the banner maps verdict → available resolution).

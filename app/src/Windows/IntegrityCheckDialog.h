@@ -9,11 +9,12 @@
 #include <functional>
 
 // ============================================================================
-// IntegrityCheckDialog - shows what CatalogIntegrity::scan found (untracked frame folders, broken video
-// entries, and photos whose source file is missing) and lets the user resolve each one: register an untracked
-// folder against its source; per broken video, re-import / regenerate preview / mark-fully-split / remove; per
-// missing photo, locate the moved file (referenced only) or remove. All UI logic lives here behind the static
-// scanAndShowUi() entry point - MainWindow only supplies the callbacks that actually touch the Catalog/disk.
+// IntegrityCheckDialog - shows what CatalogIntegrity::scan found (untracked frame folders, untracked photo
+// files, broken video entries, and photos whose source file is missing) and lets the user resolve each one:
+// register an untracked folder against its source; add an untracked photo to the catalog; per broken video,
+// re-import / regenerate preview / mark-fully-split / remove; per missing photo, locate the moved file
+// (referenced only) or remove. All UI logic lives here behind the static scanAndShowUi() entry point -
+// MainWindow only supplies the callbacks that actually touch the Catalog/disk.
 // ============================================================================
 
 class IntegrityCheckDialog final : public QDialog
@@ -24,6 +25,9 @@ public:
 		// Attempts to register an untracked folder at the given source path; returns whether it succeeded
 		// (Catalog::addMediaItem refuses on an id clash with a different folder).
 		std::function<bool(const QString& folderPath, const QString& sourcePath)> registerRequested;
+		// Adopts an untracked image file (already sitting in <root>/Photos/<label>/) as an owned photo under that
+		// label; returns whether it succeeded (refused on a name+size clash with an already-tracked item).
+		std::function<bool(const QString& filePath)> adoptPhotoRequested;
 		// Re-extracts a video's frames from its (present) source back into its folder (also regenerating the
 		// preview); returns whether frames actually exist there afterwards. The GHOST recovery.
 		std::function<bool(const MediaId& id)> reimportRequested;

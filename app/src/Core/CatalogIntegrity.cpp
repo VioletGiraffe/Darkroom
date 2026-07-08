@@ -9,7 +9,8 @@
 // --- Integrity check -------------------------------------------------------------------------------------
 //
 // Compares the catalog model against what's on disk. Two directions: (A) per entry - is this entry's backing
-// intact? (grids below); (B) per folder - on-disk content under no entry? (the "untracked" walk lower down).
+// intact? (grids below); (B) on-disk content no entry claims - a whole video frame folder, or a stray image
+// file under Photos/ - surfaced by the "untracked" walk lower down.
 //
 // (A) VIDEO  <folder> = frame folder. Cell = verdict; columns are what the folder holds, rows the split flag.
 //            preview/ is the card's ONLY render source (both rows); real frames are the deliverable, due once split.
@@ -37,8 +38,8 @@
 //
 // Status: all VIDEO verdicts above are implemented (each non-healthy video emits one MediaIssue carrying the
 // flags that hold). PHOTO entries emit a PhotoIssue when the source file is missing (owned -> LOST, referenced
-// -> GONE). Still deferred: (B) untracked covers video frame folders only - an unclaimed file under
-// Photos/<label> isn't surfaced yet.
+// -> GONE). (B) untracked covers both media kinds: a video frame folder no entry claims (UntrackedFolder), and
+// an image file under Photos/<label> that no entry claims as its source (UntrackedPhoto).
 // ---------------------------------------------------------------------------------------------------------
 
 namespace CatalogIntegrity {
@@ -48,13 +49,17 @@ IntegrityReport scan()
 	Catalog& catalog = Catalog::instance();
 	IntegrityReport report;
 
-	// Phases 1 + 2 in one pass over the model: record a per-entry issue for anything non-healthy, and collect
-	// every entry's folder (all types) to exclude from the untracked walk below. Folders are keyed by
-	// pathComparisonKey so one whose on-disk case differs from its stored case still matches.
+	// Phases 1 + 2 in one pass over the model: record a per-entry issue for anything non-healthy, and collect the
+	// disk facts the untracked walk needs - every entry's folder (to skip claimed video folders) and every entry's
+	// source file (to skip claimed photo files). Both keyed by pathComparisonKey so a case difference between the
+	// stored and on-disk path still matches.
 	QSet<QString> knownFolders;
+	QSet<QString> trackedSources;
 	for (const auto& [id, entry] : catalog.mediaItems().asKeyValueRange())
 	{
 		knownFolders.insert(pathComparisonKey(entry.folder));
+		if (!entry.sourcePath.isEmpty())
+			trackedSources.insert(pathComparisonKey(entry.sourcePath));
 
 		if (entry.type == Catalog::MediaType::Photo)
 		{
@@ -79,10 +84,18 @@ IntegrityReport scan()
 			report.issues.push_back(issue);
 	}
 
-	// Untracked - every non-empty frame folder on disk that no entry claims.
+	// Untracked - on-disk content no entry claims. forEachFolder yields the second level: for a normal collection
+	// that's a video frame folder; for the reserved Photos collection it's a <label> dir whose untracked units are
+	// the image FILES inside (owned photos), not the folder itself.
 	forEachFolder(rootFolder(), [&](const QString& collection, const QString& folderPath) {
 		if (collection.compare(PHOTOS_DIR_NAME, Qt::CaseInsensitive) == 0)
-			return;  // <root>/Photos holds owned photo files (one dir per label), not video frame folders
+		{
+			const QString labelName = QFileInfo(folderPath).fileName();
+			for (const QFileInfo& file : QDir(folderPath).entryInfoList(IMAGE_FILE_FILTERS, QDir::Files))
+				if (!trackedSources.contains(pathComparisonKey(file.absoluteFilePath())))
+					report.untrackedPhotos.push_back({ file.absoluteFilePath(), labelName });
+			return;
+		}
 		if (knownFolders.contains(pathComparisonKey(folderPath)))
 			return;
 		if (QDir(folderPath).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty())

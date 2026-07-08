@@ -1703,6 +1703,16 @@ void MainWindow::checkCatalogIntegrity()
 				refreshLibraryView();
 			return ok;
 		},
+		.adoptPhotoRequested = [this](const QString& filePath) {
+			// The untracked image already lives in <root>/Photos/<label>/, so adopt it in place as an owned photo
+			// under that label (its parent dir). addPhoto ensures the label exists and refuses a name+size clash.
+			Catalog& catalog = Catalog::instance();
+			const QString labelDir = QFileInfo(filePath).absolutePath();
+			const bool ok = catalog.addPhoto(MediaId::fromFile(filePath), filePath, labelDir, /*referenced=*/false);
+			if (ok)
+				refreshLibraryView();
+			return ok;
+		},
 		.reimportRequested = [this](const MediaId& id) {
 			// Same re-extraction path reExportAllVideos uses for any catalog video, just for this one: clear the
 			// folder, re-run ffmpeg (which also regenerates the preview), and report whether frames actually landed.

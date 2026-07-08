@@ -168,6 +168,31 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 		}
 	}
 
+	if (!report.untrackedPhotos.empty())
+	{
+		contentLayout->addWidget(new QLabel(tr("<b>Untracked photos</b> - on disk under Photos, not in the catalog"), content));
+		for (const CatalogIntegrity::UntrackedPhoto& p : report.untrackedPhotos)
+		{
+			const auto [row, statusLabel] = addRow(QFileInfo(p.filePath).fileName() + "<br>" + tr("label: %1").arg(p.labelName));
+			QHBoxLayout* rowLayout = static_cast<QHBoxLayout*>(row->layout());
+
+			QPushButton* addButton  = new QPushButton(tr("Add to catalog"), row);
+			QPushButton* skipButton = new QPushButton(tr("Skip"), row);
+			rowLayout->addWidget(addButton);
+			rowLayout->addWidget(skipButton);
+
+			const QString filePath = p.filePath;
+			const std::vector<QPushButton*> rowButtons{ addButton, skipButton };
+
+			// The file already lives in its label's Photos dir, so adopting it is a one-click register as an owned photo.
+			wireAction(addButton, statusLabel, rowButtons, tr("Added to catalog."),
+				tr("Could not add - a file with the same name and size is already tracked elsewhere."),
+				[this, filePath] { return m_callbacks.adoptPhotoRequested(filePath); });
+
+			wireSkip(skipButton, statusLabel, rowButtons);
+		}
+	}
+
 	if (!report.issues.empty())
 	{
 		contentLayout->addWidget(new QLabel(tr("<b>Problems</b> - tracked videos whose files don't match the catalog"), content));

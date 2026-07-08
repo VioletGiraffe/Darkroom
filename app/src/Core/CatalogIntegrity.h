@@ -19,6 +19,15 @@ struct UntrackedFolder
 	QString folderPath;
 };
 
+// An image file in the owned-photos tree (<root>/Photos/<label>/) that no catalog entry claims as its source -
+// an orphan. The user adopts it (registers it as an owned photo under <label>) or leaves it. labelName is the
+// <label> subfolder it sits in, i.e. the label it would join on adoption.
+struct UntrackedPhoto
+{
+	QString filePath;
+	QString labelName;
+};
+
 // A tracked video whose on-disk backing is not fully intact, in any combination - the grid's verdicts are
 // orthogonal (see scan()'s banner), so several can hold on one entry. Carries the raw disk facts; the
 // predicates name the verdicts the dialog renders and resolves. A healthy video -> no issue.
@@ -53,9 +62,10 @@ struct PhotoIssue
 struct IntegrityReport
 {
 	std::vector<UntrackedFolder> untracked;
+	std::vector<UntrackedPhoto>  untrackedPhotos;
 	std::vector<MediaIssue>      issues;
 	std::vector<PhotoIssue>      photoIssues;
-	[[nodiscard]] bool isEmpty() const { return untracked.empty() && issues.empty() && photoIssues.empty(); }
+	[[nodiscard]] bool isEmpty() const { return untracked.empty() && untrackedPhotos.empty() && issues.empty() && photoIssues.empty(); }
 };
 
 // Walks the catalog model + disk once (only ever on explicit user request, never part of the normal refresh
