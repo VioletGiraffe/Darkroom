@@ -117,6 +117,12 @@ public:
 	// source lives inside the library itself). Empty if none is found.
 	[[nodiscard]] QString anySourceDir() const;
 
+	// Source path of a tracked photo whose file is byte-identical to photoPath (the same content re-encountered
+	// under a different name), or empty if none. Size-gated via the MediaId's stored size, so only equal-size
+	// photos are byte-compared - keeping the comparison rare. Reads file bytes, so unlike the model-only queries
+	// it touches the disk (as anySourceDir does).
+	[[nodiscard]] QString findPhotoBySameContent(const QString& photoPath) const;
+
 	// Per-item membership. An invalid id (a missing/unreadable source file) can't be labeled, so these no-op
 	// on one. addLabel only ever writes the stored id list. removeLabel is metadata-only too,
 	// EXCEPT when labelId is the label that happens to name the item's storage location: then it relocates

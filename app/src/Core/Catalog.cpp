@@ -360,6 +360,19 @@ QString Catalog::anySourceDir() const
 	return {};
 }
 
+QString Catalog::findPhotoBySameContent(const QString& photoPath) const
+{
+	const qint64 photoSize = QFileInfo(photoPath).size();
+	for (auto it = _mediaItems.cbegin(); it != _mediaItems.cend(); ++it)
+	{
+		if (it->type != MediaType::Photo || it.key().size() != photoSize)
+			continue;
+		if (filesAreIdentical(photoPath, it->sourcePath))
+			return it->sourcePath;
+	}
+	return {};
+}
+
 // --- Per-item membership (MediaId-anchored) -----------------------------------------------------------
 
 void Catalog::addLabel(const MediaId& id, LabelId labelId)

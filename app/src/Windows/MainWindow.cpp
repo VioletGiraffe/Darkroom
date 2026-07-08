@@ -1608,18 +1608,7 @@ void MainWindow::importToCollections(const QStringList& initialStaging)
 			return processPhotoBatch(labelIdFromString(labelId), photoPaths, mode);
 		},
 		.findAlreadyImportedDuplicatePhoto = [](const QString& photoPath) -> QString {
-			// Byte-identical content already tracked as a photo, matched by size regardless of name - this is
-			// what catches renamed duplicates. The size gate keeps the byte comparison rare.
-			Catalog& catalog = Catalog::instance();
-			const qint64 photoSize = QFileInfo(photoPath).size();
-			for (const auto& [id, entry] : catalog.mediaItems().asKeyValueRange())
-			{
-				if (entry.type != Catalog::MediaType::Photo || id.size() != photoSize)
-					continue;
-				if (filesAreIdentical(photoPath, entry.sourcePath))
-					return entry.sourcePath;
-			}
-			return {};
+			return Catalog::instance().findPhotoBySameContent(photoPath);
 		},
 		.createCollectionRequested = [this](const QString& name, const QString& color) -> QString {
 			const LabelId id = createCollection(name, color, /*refreshList*/ false);
