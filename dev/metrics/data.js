@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783506152278,
+  "lastUpdate": 1783517765597,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -1743,6 +1743,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 275,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 21,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 25,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "077e53508e85e6b8df1ed387cefc8f1bd5991c11",
+          "message": "New icon + tooltip for \"Video frames available\"",
+          "timestamp": "2026-07-08T16:32:28+03:00",
+          "tree_id": "e181a8878e6ca29abd806e274544370d36ce0dc2",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/077e53508e85e6b8df1ed387cefc8f1bd5991c11"
+        },
+        "date": 1783517763112,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 7939,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 3343,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 864,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 506,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 275.5,
             "unit": "KB"
           },
           {
