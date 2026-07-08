@@ -196,7 +196,7 @@ protected:
 		p.setRenderHint(QPainter::Antialiasing);
 
 		p.setPen(Qt::NoPen);
-		p.setBrush(QColor(0, 0, 0, 184));   // option B: ~0.72-opacity dark backdrop
+		p.setBrush(QColor(0, 0, 0, 128));   // option A ("subtle"): ~0.5-opacity dark backdrop
 		p.drawRoundedRect(rect(), RADIUS, RADIUS);
 
 		const QColor fg(255, 255, 255, 245);
@@ -219,7 +219,7 @@ private:
 	static constexpr int PAD_H = 6;   // horizontal padding inside the pill
 	static constexpr int PAD_V = 3;   // vertical padding inside the pill
 	static constexpr int GAP = 4;     // triangle-to-text gap
-	static constexpr int RADIUS = 4;  // pill corner radius (option B)
+	static constexpr int RADIUS = 5;  // pill corner radius (option A)
 
 	// Triangle sized off the font so it tracks the digits; kept in one place so sizeHint and paint agree.
 	static int triangleHeight(const QFontMetrics& fm) { return qRound(fm.ascent() * 0.62); }
