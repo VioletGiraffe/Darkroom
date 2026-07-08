@@ -125,8 +125,11 @@ private:
 	void updateEditActions();
 
 	void openSettings();
-	void renameMediaItemInteractive(const MediaId& id);
-	void renameMediaItem(const MediaId& oldId, const QString& newFolderPath);
+	void renameItemInteractive(const MediaId& id);   // dispatches to the video- or photo-specific rename below
+	void renameVideoInteractive(const MediaId& id);
+	void renameVideo(const MediaId& oldId, const QString& newFolderPath);
+	void renamePhotoInteractive(const MediaId& id);
+	void renamePhoto(const MediaId& oldId, const QString& newSourcePath);
 	void deleteFolderRecursively(const QString& folderPath);
 
 private:

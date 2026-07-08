@@ -225,7 +225,7 @@ list's background.
 
 ## Renaming a media item
 
-`renameMediaItem(oldId, newFolderPath)` is the one place a video's frame folder moves on disk outside the
+`renameVideo(oldId, newFolderPath)` is the one place a video's frame folder moves on disk outside the
 label-mutation paths in `Catalog` (which handle their own folder moves internally — see
 `renameLabel`/`relocateFolderOffLabel` in [catalog-and-labels.md](catalog-and-labels.md)):
 
@@ -240,12 +240,18 @@ label-mutation paths in `Catalog` (which handle their own folder moves internall
    (only the frame folder moved by itself), `newId == oldId` and this is just a folder/path update.
    `applyRename` refuses (returns false) when the new id collides with another tracked item — the
    interactive pre-checks only catch a file/folder collision in the *same* directory, not a name+size match
-   elsewhere in the library — and `renameMediaItem` then renames the file and folder back, so the refusal leaves
+   elsewhere in the library — and `renameVideo` then renames the file and folder back, so the refusal leaves
    disk and catalog exactly as they were.
 4. `refreshLibraryView()` + updates `FrameViewerWindow` if it's showing the renamed folder.
 
-`renameMediaItemInteractive(id)` is the UI-prompt wrapper (validate chars, check collisions, confirm) →
-`renameMediaItem(...)`, reached from the card's context menu ("Rename media file"). **Videos only** — the
-menu entry is hidden on photo cards (the flow derives video-shaped paths, and an owned photo's
-`folderForMediaItem` is the shared `Photos/<label>` dir, which would pass the folder-exists check);
-enforced by an assert at the top.
+`renameVideoInteractive(id)` is the video UI-prompt wrapper (validate chars, check collisions, confirm) →
+`renameVideo(...)`; an assert enforces it is only reached for videos. Both the Edit-menu **Rename** action and
+the card context menu go through a `renameItemInteractive(id)` dispatcher that sends videos here and photos to
+`renamePhotoInteractive`.
+
+Photos rename differently because a photo *is* its file (no frame folder): `renamePhotoInteractive` →
+`renamePhoto` rename only the file's base name in place, keeping its directory (an owned photo's shared
+`Photos/<label>` dir, or a referenced photo's external folder — the referenced file is renamed in place) and
+extension, then re-key identity through the same `Catalog::applyRename`. A missing source file is refused (a
+photo with no file has nothing to rename). The context-menu label is "Rename photo" for photos, "Rename media
+file" for videos.

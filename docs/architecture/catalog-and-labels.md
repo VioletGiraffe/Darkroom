@@ -144,8 +144,8 @@ that case stays clean.
   source file kept its name but the frame folder moved by itself). Returns false (no-op) when `newId` already
   names a *different* tracked item — the same name+size collision guard as `addMediaItem` — so the caller can
   undo its disk renames instead of silently overwriting that entry. The caller
-  (`MainWindow::renameMediaItem`, see [main-window.md](main-window.md)) does the actual file/folder renames on
-  disk; this just updates the model and the persisted record to match.
+  (`MainWindow::renameVideo` for videos, `renamePhoto` for photos, see [main-window.md](main-window.md)) does
+  the actual file/folder renames on disk; this just updates the model and the persisted record to match.
 
 ### Batched writes (`Catalog::BatchScope`)
 

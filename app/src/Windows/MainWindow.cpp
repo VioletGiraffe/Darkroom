@@ -81,6 +81,17 @@ public:
 		option->icon = QIcon();
 	}
 };
+
+// Rejects characters illegal in Windows file/folder names. Returns the first offending character, or a null
+// QChar (isNull()) for a clean name. Shared by the video and photo rename flows.
+inline QChar invalidFilenameChar(const QString& name)
+{
+	static const QString invalidChars = R"(\/:*?"<>|)";
+	for (const QChar c : name)
+		if (invalidChars.contains(c))
+			return c;
+	return {};
+}
 }
 
 static MainWindow* s_instance = nullptr;
@@ -961,10 +972,7 @@ void MainWindow::renameSelectedItemInteractive()
 	const auto selected = m_mediaGrid->selectedItems();
 	if (selected.size() != 1)
 		return;
-	const MediaId id = static_cast<const GridItem*>(selected.front())->mediaId;
-	if (Catalog::instance().mediaType(id) == Catalog::MediaType::Photo)
-		return;
-	renameMediaItemInteractive(id);
+	renameItemInteractive(static_cast<const GridItem*>(selected.front())->mediaId);
 }
 
 void MainWindow::updateEditActions()
@@ -974,13 +982,8 @@ void MainWindow::updateEditActions()
 	m_deleteAction->setEnabled(hasSelection);
 	m_removeFromLibraryAction->setEnabled(hasSelection);
 
-	bool canRename = false;
-	if (selected.size() == 1)
-	{
-		const MediaId id = static_cast<const GridItem*>(selected.front())->mediaId;
-		canRename = Catalog::instance().mediaType(id) != Catalog::MediaType::Photo;
-	}
-	m_renameAction->setEnabled(canRename);
+	// Both videos and photos can be renamed, so the action only needs exactly one selected item.
+	m_renameAction->setEnabled(selected.size() == 1);
 }
 
 void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globalPos)
@@ -1072,15 +1075,11 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 		if (!sourcePath.isEmpty())
 			QApplication::clipboard()->setText(QDir::toNativeSeparators(sourcePath));
 	});
-	// Rename renames the frame folder + source file as one unit - video-shaped paths, no photo support (v1).
-	if (!isPhoto)
-	{
-		auto* a = menu.addAction(tr("Rename media file"), [this, id] {
-			renameMediaItemInteractive(id);
-		});
-		a->setShortcut(m_renameAction->shortcut());
-		a->setShortcutContext(Qt::WidgetShortcut);
-	}
+	auto* renameEntry = menu.addAction(isPhoto ? tr("Rename photo") : tr("Rename media file"), [this, id] {
+		renameItemInteractive(id);
+	});
+	renameEntry->setShortcut(m_renameAction->shortcut());
+	renameEntry->setShortcutContext(Qt::WidgetShortcut);
 	menu.addSeparator();
 
 	const bool inBest = isInBest(id);
@@ -1776,7 +1775,7 @@ void MainWindow::toggleBestFolder(const MediaId& id)
 		QMetaObject::invokeMethod(this, &MainWindow::resortMediaGrid, Qt::QueuedConnection);
 }
 
-void MainWindow::renameMediaItemInteractive(const MediaId& id)
+void MainWindow::renameVideoInteractive(const MediaId& id)
 {
 	// Videos only - the menu entry is hidden for photos. The rename below derives video-shaped paths; on an
 	// owned photo, folderForMediaItem is the SHARED Photos/<label> dir and would pass the exists-check.
@@ -1803,15 +1802,10 @@ void MainWindow::renameMediaItemInteractive(const MediaId& id)
 	if (newName.isEmpty() || newName == oldName)
 		return;
 
-	// Reject characters that are illegal in Windows file/folder names
-	const QString invalidChars = R"(\/:*?"<>|)";
-	for (const QChar c : newName)
+	if (const QChar bad = invalidFilenameChar(newName); !bad.isNull())
 	{
-		if (invalidChars.contains(c))
-		{
-			QMessageBox::warning(this, tr("Rename media file"), tr("Name contains an invalid character: '%1'").arg(c));
-			return;
-		}
+		QMessageBox::warning(this, tr("Rename media file"), tr("Name contains an invalid character: '%1'").arg(bad));
+		return;
 	}
 
 	// Make sure the destination folder does not already exist
@@ -1857,10 +1851,10 @@ void MainWindow::renameMediaItemInteractive(const MediaId& id)
 		QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes) != QMessageBox::Yes)
 		return;
 
-	renameMediaItem(id, newFolderPath);
+	renameVideo(id, newFolderPath);
 }
 
-void MainWindow::renameMediaItem(const MediaId& oldId, const QString& newFolderPath)
+void MainWindow::renameVideo(const MediaId& oldId, const QString& newFolderPath)
 {
 	const QString dialogTitle = tr("Rename media file");
 	Catalog& catalog = Catalog::instance();
@@ -1915,6 +1909,102 @@ void MainWindow::renameMediaItem(const MediaId& oldId, const QString& newFolderP
 	refreshLibraryView();
 	if (m_frameViewer->currentFolder() == oldFolderPath && m_frameViewer->isVisible())
 		m_frameViewer->showForFolder(newFolderPath);
+}
+
+void MainWindow::renameItemInteractive(const MediaId& id)
+{
+	if (Catalog::instance().mediaType(id) == Catalog::MediaType::Photo)
+		renamePhotoInteractive(id);
+	else
+		renameVideoInteractive(id);
+}
+
+void MainWindow::renamePhotoInteractive(const MediaId& id)
+{
+	// A photo has no frame folder; its file IS the item, and its identity is that file's name + size. Renaming
+	// here means renaming just the file's base name in place (owned: inside Photos/<label>; referenced: in the
+	// user's own folder), keeping the extension - never renaming the folder the way the video path does.
+	Catalog& catalog = Catalog::instance();
+	assert(catalog.mediaType(id) == Catalog::MediaType::Photo);
+
+	const QString title = tr("Rename photo");
+	const QString oldSourcePath = catalog.sourcePathForMediaItem(id);
+
+	// The file is the whole item - if it is gone (owned file lost, or a referenced file moved/unmounted) there is
+	// nothing to rename, so refuse rather than point a stored path at a name that exists nowhere.
+	if (oldSourcePath.isEmpty() || !QFile::exists(oldSourcePath))
+	{
+		QMessageBox::warning(this, title, tr("The photo file no longer exists, so it cannot be renamed:\n%1").arg(oldSourcePath));
+		return;
+	}
+
+	const QFileInfo oldInfo{ oldSourcePath };
+	const QString oldBaseName = oldInfo.completeBaseName();  // the name shown on the card
+	const QString suffix      = oldInfo.suffix();
+
+	const QString newBaseName = QInputDialog::getText(this, title, tr("New name:"), QLineEdit::Normal, oldBaseName).trimmed();
+	if (newBaseName.isEmpty() || newBaseName == oldBaseName)
+		return;
+
+	if (const QChar bad = invalidFilenameChar(newBaseName); !bad.isNull())
+	{
+		QMessageBox::warning(this, title, tr("Name contains an invalid character: '%1'").arg(bad));
+		return;
+	}
+
+	const QString newFileName   = suffix.isEmpty() ? newBaseName : newBaseName + "." + suffix;
+	const QString newSourcePath = oldInfo.absolutePath() + "/" + newFileName;
+
+	// Refuse to clobber a different file already at the destination. A pure case change reuses the same file on a
+	// case-insensitive filesystem, so it is allowed through.
+	if (newSourcePath.compare(oldSourcePath, Qt::CaseInsensitive) != 0 && QFile::exists(newSourcePath))
+	{
+		QMessageBox::warning(this, title, tr("A file with that name already exists:\n%1").arg(newSourcePath));
+		return;
+	}
+
+	QString message = tr("Rename “%1” to “%2”?\n\n").arg(oldInfo.fileName(), newFileName);
+	message += catalog.isReferenced(id)
+		? tr("• This photo is referenced in place - its file below, outside the library, will be renamed:\n  %1\n  → %2").arg(oldSourcePath, newSourcePath)
+		: tr("• File:\n  %1\n  → %2").arg(oldSourcePath, newSourcePath);
+	if (isInBest(id))
+		message += tr("\n\n• Best collection reference will be updated.");
+
+	if (QMessageBox::question(this, title, message, QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes) != QMessageBox::Yes)
+		return;
+
+	renamePhoto(id, newSourcePath);
+}
+
+void MainWindow::renamePhoto(const MediaId& oldId, const QString& newSourcePath)
+{
+	const QString title = tr("Rename photo");
+	Catalog& catalog = Catalog::instance();
+	const QString oldSourcePath = catalog.sourcePathForMediaItem(oldId);
+	const QString folderAbs     = catalog.folderForMediaItem(oldId);  // unchanged by the rename: Photos/<label> (owned) or empty (referenced)
+
+	// Renaming the file is the entire on-disk rename for a photo. It changes the base name and thus the MediaId
+	// (identity = name + size), so the catalog must re-key onto the new id.
+	if (!QFile::rename(oldSourcePath, newSourcePath))
+	{
+		QMessageBox::critical(this, title, tr("Failed to rename the file:\n%1\n→ %2").arg(oldSourcePath, newSourcePath));
+		return;
+	}
+
+	const MediaId newId = MediaId::fromFile(newSourcePath);
+
+	// Carry the metadata record (labels incl. Best) to the new identity, keeping the storage folder as-is. Refused
+	// when the new name + size already belongs to a different tracked item - undo the on-disk rename so disk and
+	// catalog stay in sync.
+	if (!catalog.applyRename(oldId, newId, newSourcePath, folderAbs))
+	{
+		QFile::rename(newSourcePath, oldSourcePath);
+		QMessageBox::critical(this, title,
+			tr("An item with the same name and file size is already tracked in the library:\n%1").arg(newSourcePath));
+		return;
+	}
+
+	refreshLibraryView();
 }
 
 void MainWindow::deleteFolderRecursively(const QString& folderPath)
