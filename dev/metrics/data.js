@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783530909566,
+  "lastUpdate": 1783532842390,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -2029,6 +2029,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 25,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "29f9415c442f81cbd2680f513e0aaec65bc52b5e",
+          "message": "FindUntrackedFilesDialog eliminated, untracked files go directly to ImportDialog",
+          "timestamp": "2026-07-08T20:44:31+03:00",
+          "tree_id": "13a26c65da87b140e3d524b4a0cf40bd4b1a9749",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/29f9415c442f81cbd2680f513e0aaec65bc52b5e"
+        },
+        "date": 1783532840263,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 7844,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 3343,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 866.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 509.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 274.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 20.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 25.5,
             "unit": "KB"
           },
           {
