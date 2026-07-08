@@ -5,6 +5,7 @@
 #include "Windows/VideoPlayerWindow.h"
 
 #include <QColor>
+#include <QDesktopServices>
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
@@ -19,6 +20,7 @@
 #include <QPushButton>
 #include <QSet>
 #include <QSettings>
+#include <QUrl>
 #include <QVBoxLayout>
 
 namespace {
@@ -38,9 +40,9 @@ QString normalizePath(const QString& path)
 
 QStringList FindUntrackedFilesDialog::scanAndShowUi(const QString& rootFolder, QWidget* parent)
 {
-	// A video is "tracked" iff the catalog records it as some item's source path. Also remember one tracked
-	// video's path - its folder is a more useful default starting point for the picker below than rootFolder
-	// itself, which holds the organized collections rather than wherever the raw source footage actually lives.
+	// A media item is "tracked" iff the catalog records it as some item's source path. Also remember one tracked
+	// item's path - its folder is a more useful default starting point for the picker below than rootFolder
+	// itself, which holds the organized collections rather than wherever the raw source files actually live.
 	QSet<QString> tracked;
 	Catalog& catalog = Catalog::instance();
 	for (const MediaId& id : catalog.allMediaItems())
@@ -53,7 +55,7 @@ QStringList FindUntrackedFilesDialog::scanAndShowUi(const QString& rootFolder, Q
 	QSettings settings;
 	const QString defaultStartDir = tracked.empty() ? rootFolder : QFileInfo(*tracked.begin()).absolutePath();
 	const QString startDir = settings.value(LAST_FOLDER_KEY, defaultStartDir).toString();
-	const QString dir = QFileDialog::getExistingDirectory(parent, tr("Scan folder for untracked videos"), startDir);
+	const QString dir = QFileDialog::getExistingDirectory(parent, tr("Scan folder for untracked media"), startDir);
 	if (dir.isEmpty())
 		return {};
 
@@ -65,7 +67,7 @@ QStringList FindUntrackedFilesDialog::scanAndShowUi(const QString& rootFolder, Q
 	while (it.hasNext())
 	{
 		const QString path = it.next();
-		if (!isSupportedVideoFile(path))
+		if (!isSupportedVideoFile(path) && !isSupportedImageFile(path))
 			continue;
 
 		if (!tracked.contains(normalizePath(path)))
@@ -76,7 +78,7 @@ QStringList FindUntrackedFilesDialog::scanAndShowUi(const QString& rootFolder, Q
 
 	if (untracked.isEmpty())
 	{
-		QMessageBox::information(parent, tr("Scan complete"), tr("No untracked video files were found under:\n%1").arg(QDir::toNativeSeparators(dir)));
+		QMessageBox::information(parent, tr("Scan complete"), tr("No untracked media files were found under:\n%1").arg(QDir::toNativeSeparators(dir)));
 		return {};
 	}
 
@@ -94,7 +96,7 @@ FindUntrackedFilesDialog::FindUntrackedFilesDialog(const QStringList& untrackedF
 	QVBoxLayout* layout = new QVBoxLayout(this);
 
 	QLabel* instructions = new QLabel(
-		tr("Found %1 untracked video file(s) - not part of any collection yet. Double-click to "
+		tr("Found %1 untracked media file(s) - not part of any collection yet. Double-click to "
 		   "preview; select files and send them to Import staging. Tracked files found: %2").arg(untrackedFiles.size()).arg(trackedCount), this);
 	instructions->setWordWrap(true);
 	instructions->setStyleSheet(QStringLiteral("color: %1;").arg(Theme::current().InstructionText));
@@ -132,7 +134,13 @@ FindUntrackedFilesDialog::FindUntrackedFilesDialog(const QStringList& untrackedF
 		const QString path = item->data(Qt::UserRole).toString();
 		if (!QFile::exists(path))
 		{
-			QMessageBox::warning(this, tr("Error"), tr("Video file not found at:\n%1").arg(path));
+			QMessageBox::warning(this, tr("Error"), tr("File not found at:\n%1").arg(path));
+			return;
+		}
+
+		if (isSupportedImageFile(path))
+		{
+			QDesktopServices::openUrl(QUrl::fromLocalFile(path));  // a photo opens in the system image viewer
 			return;
 		}
 

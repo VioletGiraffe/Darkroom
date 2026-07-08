@@ -8,11 +8,11 @@ class QPushButton;
 
 // ============================================================================
 // FindUntrackedFilesDialog - lets the user pick a folder, scans it recursively
-// for supported video files that aren't "tracked" (i.e. not recorded as the
-// source of any collection's frame folder), and lists the untracked ones.
-// Double-clicking a row previews it in the built-in player; the user can
-// multi-select rows and send them to the Import staging area via "Send
-// selected to staging", which closes this dialog.
+// for supported media files (videos and photos) that aren't "tracked" (i.e. not
+// recorded as any catalog item's source), and lists the untracked ones.
+// Double-clicking a row previews it (videos in the built-in player, photos in
+// the system image viewer); the user can multi-select rows and send them to the
+// Import staging area via "Send selected to staging", which closes this dialog.
 //
 // All of the scan/folder-picking logic lives here, behind the static scanAndShowUi()
 // entry point - callers (MainWindow) just get back the files to stage.
@@ -22,7 +22,7 @@ class FindUntrackedFilesDialog final : public QDialog
 {
 public:
 	// Picks a folder to scan (persisting the choice for next time), scans it for
-	// untracked videos, and shows this dialog if any were found. Returns the
+	// untracked media, and shows this dialog if any were found. Returns the
 	// files the user chose to send to staging, or an empty list if the user
 	// cancelled the folder picker, nothing untracked was found, or the dialog
 	// was closed without sending anything.
