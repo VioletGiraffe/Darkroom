@@ -23,6 +23,7 @@ namespace
 	constexpr QStringView kSplitIntoFramesField = u"splitIntoFrames";
 	constexpr QStringView kTypeField            = u"type";             // kPhotoTypeValue for photos; absent = video, so pre-photos records need no migration
 	constexpr QStringView kReferencedField      = u"referenced";       // bool; photos only
+	constexpr QStringView kDurationMsField      = u"durationMs";       // video source length in ms; absent = unknown (pre-existing record / photo)
 	constexpr QStringView kPhotoTypeValue       = u"photo";
 }
 
@@ -271,6 +272,7 @@ void Catalog::rebuildIndex()
 		e.type            = isPhoto ? MediaType::Photo : MediaType::Video;
 		e.referenced      = store.get(id, kReferencedField).toBool(false);
 		e.splitIntoFrames = store.get(id, kSplitIntoFramesField).toBool(true);  // absent -> pre-existing, already split
+		e.durationMs      = store.get(id, kDurationMsField).toInteger(-1);      // absent -> unknown (pre-existing record / photo)
 		e.labelIds        = computeLabelIds(id, e);
 		_mediaItems.insert(id, e);
 	}
@@ -345,6 +347,11 @@ bool Catalog::isReferenced(const MediaId& id) const
 	return _mediaItems.value(id).referenced;
 }
 
+qint64 Catalog::durationMsForMediaItem(const MediaId& id) const
+{
+	return _mediaItems.value(id).durationMs;   // default-constructed Entry for an unknown id -> -1
+}
+
 QString Catalog::anySourceDir() const
 {
 	for (auto it = _mediaItems.cbegin(); it != _mediaItems.cend(); ++it)
@@ -413,7 +420,7 @@ void Catalog::removeLabel(const MediaId& id, LabelId labelId)
 
 // --- Media item lifecycle ------------------------------------------------------------------------------
 
-bool Catalog::addMediaItem(const MediaId& id, const QString& sourcePath, const QString& folderAbs, bool splitIntoFrames)
+bool Catalog::addMediaItem(const MediaId& id, const QString& sourcePath, const QString& folderAbs, bool splitIntoFrames, qint64 durationMs)
 {
 	if (!id.isValid())
 	{
@@ -433,10 +440,17 @@ bool Catalog::addMediaItem(const MediaId& id, const QString& sourcePath, const Q
 		return false;
 	}
 
+	// An unknown incoming duration (-1) must not erase a duration recorded earlier: on a re-registration
+	// (re-export / on-demand split) carry the existing entry's value forward.
+	const qint64 effectiveDurationMs = durationMs > 0 ? durationMs
+		: (existing != _mediaItems.constEnd() ? existing->durationMs : -1);
+
 	MetadataStore::Writer writer = MetadataStore::instance().beginBatch();  // one atomic disk write for the whole record update
 	writer.set(id, kSourcePathField, sourcePath);
 	writer.set(id, kFolderField, relativeFolder(folderAbs));
 	writer.set(id, kSplitIntoFramesField, splitIntoFrames);
+	if (effectiveDurationMs > 0)
+		writer.set(id, kDurationMsField, effectiveDurationMs);
 
 	if (ensureFolderLabelExists(collectionNameOf(folderAbs)))
 		saveRegistry();
@@ -445,6 +459,7 @@ bool Catalog::addMediaItem(const MediaId& id, const QString& sourcePath, const Q
 	e.folder          = folderAbs;
 	e.sourcePath      = sourcePath;
 	e.splitIntoFrames = splitIntoFrames;
+	e.durationMs      = effectiveDurationMs;
 	e.labelIds        = computeLabelIds(id, e);
 	_mediaItems.insert(id, e);
 	return true;
@@ -530,6 +545,16 @@ void Catalog::markSplitComplete(const MediaId& id)
 	MetadataStore::Writer writer = MetadataStore::instance().beginBatch();
 	writer.set(id, kSplitIntoFramesField, true);
 	it->splitIntoFrames = true;
+}
+
+void Catalog::setDurationMs(const MediaId& id, qint64 durationMs)
+{
+	const auto it = _mediaItems.find(id);
+	if (it == _mediaItems.end() || durationMs <= 0 || it->durationMs == durationMs)
+		return;  // unknown id, nothing to record, or already stored - nothing to persist
+
+	MetadataStore::instance().beginBatch().set(id, kDurationMsField, durationMs);
+	it->durationMs = durationMs;
 }
 
 bool Catalog::hasOtherOrdinaryLabel(const MediaId& id, LabelId excludedLabelId) const

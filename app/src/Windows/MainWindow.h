@@ -89,7 +89,10 @@ private:
 	// marks it fully split), else re-extracts from its source video. Returns whether a preview exists afterwards.
 	[[nodiscard]] bool regeneratePreviewFor(const MediaId& id);
 	void reExportAllVideos();
-	void processBatch(QStringList videoPaths, const QString& collectionPath, const QHash<MediaId, QString>& stagedPreviewDirs);
+	// stagedPreviewDirs / stagedDurations map each staged video's MediaId to, respectively, the temp dir whose
+	// preview/ holds its already-extracted frames (reused by copy - see Import::importVideo) and the duration
+	// Quick Import already probed for it; a video absent from a map is handled fresh (re-extracted / re-probed).
+	void processBatch(QStringList videoPaths, const QString& collectionPath, const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations);
 	// The photo counterpart to processBatch: imports each photo under the label via Import::importPhoto,
 	// reports errors, applies a referenced photo's initial label (it has no storage folder to derive it
 	// from), and refreshes the view. Returns one result per path, in order - Quick Import's bookkeeping

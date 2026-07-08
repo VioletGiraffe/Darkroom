@@ -69,9 +69,10 @@ public:
 		// Adds the given video files to the named collection. stagedPreviewDirs maps each staged video's MediaId
 		// to the temp dir whose preview/ holds the frames already extracted for its staging card, so import
 		// can reuse them by copy instead of re-running ffmpeg (see Import::importVideo); a video absent
-		// from the map, or whose staged frames are gone, is extracted fresh.
+		// from the map, or whose staged frames are gone, is extracted fresh. stagedDurations likewise carries
+		// the duration already probed for each video during staging, so import records it without re-probing.
 		std::function<void(const QString& collectionName, const QStringList& videoPaths,
-			const QHash<MediaId, QString>& stagedPreviewDirs)> addMediaItemsRequested;
+			const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations)> addMediaItemsRequested;
 		// Imports the given photos under the label (owned modes copy/move each file into the label's photo
 		// dir, Reference tracks them in place - see Import::importPhoto). Returns one result per path, in
 		// order; the host reports Error results itself, so the dialog only branches on the status (an
@@ -199,6 +200,7 @@ private:
 	{
 		QString path;
 		QString tempPreviewDir;      // a video's temp N-frame preview, deleted on unstage/dialog close; empty for a photo (its card decodes the file directly)
+		qint64 durationMs = -1;      // a video's source length in ms, probed during staging; -1 for a photo / an unprobed video. Carried into the Catalog at import
 		bool pendingBest = false;
 		QStringList pendingLabelIds;
 		QListWidgetItem* item = nullptr;  // the grid item carrying this entry's MediaItemWidget card

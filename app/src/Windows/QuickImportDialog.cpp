@@ -953,7 +953,7 @@ void QuickImportDialog::stageMediaItems(const QStringList& paths)
 	// Builds one staged card + entry and inserts it into the grid; the per-type differences (canvas size, preview
 	// images) live in buildStagedCard. labelIdByPath is captured by reference - stageCard is only ever called
 	// synchronously from within this function.
-	const auto stageCard = [this, &labelIdByPath](const QString& path, const QString& tempPreviewDir) {
+	const auto stageCard = [this, &labelIdByPath](const QString& path, const QString& tempPreviewDir, qint64 durationMs = -1) {
 		const MediaId id = MediaId::fromFile(path);
 		auto* card = buildStagedCard(id, path, tempPreviewDir);
 
@@ -962,7 +962,7 @@ void QuickImportDialog::stageMediaItems(const QStringList& paths)
 		m_stagedGrid->addItem(item);
 		m_stagedGrid->setItemWidget(item, card);
 
-		m_staged.insert(id, StagedEntry{ path, tempPreviewDir, /*pendingBest*/ false, /*pendingLabelIds*/ {}, item });
+		m_staged.insert(id, StagedEntry{ path, tempPreviewDir, durationMs, /*pendingBest*/ false, /*pendingLabelIds*/ {}, item });
 
 		// Pre-assign the folder-derived label (the first/destination label), if this file came from a dropped folder.
 		if (const QString labelId = labelIdByPath.value(path); !labelId.isEmpty())
@@ -995,15 +995,16 @@ void QuickImportDialog::stageMediaItems(const QStringList& paths)
 	QApplication::processEvents();  // paint the dialog before the batch blocks this thread
 
 	// Extract previews for several videos concurrently - each ffmpeg is its own OS process. Half the cores
-	// leaves headroom for ffmpeg's own internal threading and for the UI.
-	Ffmpeg::generatePreviewFrames(jobs, frameCount, qMax(1, QThread::idealThreadCount() / 3),
+	// leaves headroom for ffmpeg's own internal threading and for the UI. Each result carries the duration the
+	// probe read, stashed on the staged entry so import records it without probing the same file again.
+	const std::vector<Ffmpeg::PreviewResult> results = Ffmpeg::generatePreviewFrames(jobs, frameCount, qMax(1, QThread::idealThreadCount() / 3),
 		[&](int done, int total) {
 			progressBox.setText(tr("Generating preview %1/%2...").arg(done).arg(total));
 			QApplication::processEvents();
 		});
 
-	for (const Ffmpeg::PreviewJob& job : jobs)
-		stageCard(job.videoFilePath, job.destinationFolder);
+	for (size_t i = 0; i < jobs.size(); ++i)
+		stageCard(jobs[i].videoFilePath, jobs[i].destinationFolder, results[i].durationMs);
 }
 
 void QuickImportDialog::unstage(const MediaId& id)
@@ -1467,17 +1468,20 @@ void QuickImportDialog::runImport()
 
 		QStringList paths;
 		QHash<MediaId, QString> stagedPreviewDirs;  // by id: survives relocation rewriting the paths below
+		QHash<MediaId, qint64> stagedDurations;     // likewise by id: the duration probed while staging each video
 		paths.reserve(videoIds.size());
 		stagedPreviewDirs.reserve(videoIds.size());
+		stagedDurations.reserve(videoIds.size());
 		for (const MediaId& id : videoIds)
 		{
 			const StagedEntry entry = m_staged.value(id);
 			paths << entry.path;
 			stagedPreviewDirs.insert(id, entry.tempPreviewDir);
+			stagedDurations.insert(id, entry.durationMs);
 		}
 
 		const BatchRelocation relocated = relocateIfNeeded(this, paths, relocateMode, m_relocateFolderEdit->text());
-		m_callbacks.addMediaItemsRequested(option->displayName, relocated.toImport, stagedPreviewDirs);
+		m_callbacks.addMediaItemsRequested(option->displayName, relocated.toImport, stagedPreviewDirs, stagedDurations);
 
 		for (const MediaId& id : videoIds)
 		{

@@ -573,8 +573,9 @@ bool MainWindow::regeneratePreviewFor(const MediaId& id)
 	if (!QFile::exists(source))
 		return false;
 
-	Ffmpeg::generatePreviewFrames(source, Catalog::previewDirFor(folder), frameCount);
-	return !QDir(Catalog::previewDirFor(folder)).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty();
+	const Ffmpeg::PreviewResult result = Ffmpeg::generatePreviewFrames(source, Catalog::previewDirFor(folder), frameCount);
+	catalog.setDurationMs(id, result.durationMs);  // backfill: an item imported before durations were recorded gets one here (no-op if the probe failed)
+	return result.ok();
 }
 
 void MainWindow::refreshMediaGrid()
@@ -1177,7 +1178,10 @@ void MainWindow::resplitVideoIntoFrames(const QString& videoFilePath, const QStr
 		// Not preserving an old preview (re-export/reimport want a fresh one) - regenerate it now, but only
 		// if the full split actually produced real frames; a failed split already wiped outputFolder via
 		// splitVideoIntoFrames's own cleanup, and a preview over no real content would be misleading.
-		Ffmpeg::generatePreviewFrames(videoFilePath, Catalog::previewDirFor(outputFolder), m_previewFrameCountCombo->currentData().toInt());
+		const Ffmpeg::PreviewResult result = Ffmpeg::generatePreviewFrames(videoFilePath, Catalog::previewDirFor(outputFolder), m_previewFrameCountCombo->currentData().toInt());
+		// splitVideoIntoFrames just (re-)registered this item; record the duration its probe produced, so a
+		// re-export of a video imported before durations were recorded backfills one (no-op if the probe failed).
+		Catalog::instance().setDurationMs(MediaId::fromFile(videoFilePath), result.durationMs);
 	}
 }
 
@@ -1298,7 +1302,7 @@ void MainWindow::splitVideoIntoFrames(const QString& videoFilePath, const QStrin
 	}
 }
 
-void MainWindow::processBatch(QStringList videoPaths, const QString& collectionPath, const QHash<MediaId, QString>& stagedPreviewDirs)
+void MainWindow::processBatch(QStringList videoPaths, const QString& collectionPath, const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations)
 {
 	if (videoPaths.empty())
 		return;
@@ -1333,14 +1337,16 @@ void MainWindow::processBatch(QStringList videoPaths, const QString& collectionP
 	});
 
 	size_t i = 0;
-	const auto processFilesRange = [&i, &progressBox, this, &collectionPath, &stagedPreviewDirs, totalSize = videoPaths.size()](const auto& begin, const auto& end, bool overwriteExisting = false) {
+	const auto processFilesRange = [&i, &progressBox, this, &collectionPath, &stagedPreviewDirs, &stagedDurations, totalSize = videoPaths.size()](const auto& begin, const auto& end, bool overwriteExisting = false) {
 		for (const QString& videoPath : std::ranges::subrange(begin, end))
 		{
 			progressBox.setText(tr("Adding video %1/%2...").arg(++i).arg(totalSize));
 			QApplication::processEvents();
-			// Staged frames are keyed by the stable MediaId (re-derived here from the possibly-relocated path).
-			const QString stagedPreviewDir = stagedPreviewDirs.value(MediaId::fromFile(videoPath));
-			Import::Result result = Import::importVideo(videoPath, collectionPath, stagedPreviewDir, overwriteExisting);
+			// Staged frames and the staged duration are keyed by the stable MediaId (re-derived here from the possibly-relocated path).
+			const MediaId id = MediaId::fromFile(videoPath);
+			const QString stagedPreviewDir = stagedPreviewDirs.value(id);
+			const qint64 stagedDurationMs = stagedDurations.value(id, -1);
+			Import::Result result = Import::importVideo(videoPath, collectionPath, stagedPreviewDir, overwriteExisting, stagedDurationMs);
 			if (result.status == Import::Status::FolderConflict)
 			{
 				// Reached via the "decide one by one" batch choice below (or when two videos in one batch
@@ -1351,7 +1357,7 @@ void MainWindow::processBatch(QStringList videoPaths, const QString& collectionP
 						tr("Folder already exists:\n%1\n\nOverwrite?").arg(outputFolder),
 						QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes)
 					continue;
-				result = Import::importVideo(videoPath, collectionPath, stagedPreviewDir, /*overwriteExisting=*/true);
+				result = Import::importVideo(videoPath, collectionPath, stagedPreviewDir, /*overwriteExisting=*/true, stagedDurationMs);
 			}
 			if (result.status == Import::Status::Error)
 				QMessageBox::critical(this, tr("Error"), result.errorMessage);
@@ -1585,8 +1591,8 @@ void MainWindow::quickImportToCollections(const QStringList& initialStaging)
 			return options;
 		},
 		.addMediaItemsRequested = [this](const QString& collectionName, const QStringList& videoPaths,
-				const QHash<MediaId, QString>& stagedPreviewDirs) {
-			processBatch(videoPaths, rootFolder() + "/" + collectionName, stagedPreviewDirs);
+				const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations) {
+			processBatch(videoPaths, rootFolder() + "/" + collectionName, stagedPreviewDirs, stagedDurations);
 		},
 		.importPhotosRequested = [this](const QString& labelId, const QStringList& photoPaths, Import::PhotoImportMode mode) {
 			return processPhotoBatch(labelIdFromString(labelId), photoPaths, mode);

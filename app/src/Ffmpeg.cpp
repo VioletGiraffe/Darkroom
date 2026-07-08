@@ -121,12 +121,13 @@ QStringList buildExtractionArguments(const QString& videoFilePath, const QString
 
 namespace Ffmpeg {
 
-void generatePreviewFrames(const std::vector<PreviewJob>& jobs, int frameCount, int maxConcurrentProcesses,
+std::vector<PreviewResult> generatePreviewFrames(const std::vector<PreviewJob>& jobs, int frameCount, int maxConcurrentProcesses,
 	const std::function<void(int, int)>& onProgress)
 {
 	const int total = static_cast<int>(jobs.size());
+	std::vector<PreviewResult> results(total);   // one per job, jobs order; default { Ok, -1 } refined below
 	if (total == 0)
-		return;
+		return results;
 
 	const int concurrency = qMax(1, maxConcurrentProcesses);
 
@@ -134,29 +135,41 @@ void generatePreviewFrames(const std::vector<PreviewJob>& jobs, int frameCount, 
 	const auto reportOneCompleted = [&] { ++completed; if (onProgress) onProgress(completed, total); };
 
 	// Pass 1: probe each job's duration and build its extraction arguments, up to `concurrency` probes at
-	// once. A job whose destination folder can't be created or whose duration can't be probed (a corrupt file
-	// typically fails here first) gets no arguments and is counted done now, so it never enters pass 2 and
-	// the extraction windows there stay packed with only good jobs.
+	// once. A job whose destination folder can't be created (FolderCreateFailed) or whose duration can't be
+	// probed (ProbeFailed - a corrupt file typically fails here first) gets no arguments and is counted done
+	// now, so it never enters pass 2 and the extraction windows there stay packed with only good jobs.
 	std::vector<bool> probeStarted(total, false);
 	std::vector<QStringList> extractionArguments(total);
 	runInProcessWindows(total, concurrency,
 		[&](int i, QProcess& probe) {
 			if (!QDir{}.mkpath(jobs[i].destinationFolder))
-				return;  // leaves probeStarted[i] false -> treated as a skip in finish
+				return;  // leaves probeStarted[i] false -> FolderCreateFailed in finish
 			startDurationProbe(probe, jobs[i].videoFilePath);
 			probeStarted[i] = true;
 		},
 		[&](int i, QProcess& probe) {
-			const qint64 durationMs = probeStarted[i] ? parseProbedDurationMs(probe) : -1;
+			if (!probeStarted[i])
+			{
+				results[i].status = PreviewResult::Status::FolderCreateFailed;
+				reportOneCompleted();
+				return;
+			}
+			const qint64 durationMs = parseProbedDurationMs(probe);
 			if (durationMs <= 0)
+			{
+				results[i].status = PreviewResult::Status::ProbeFailed;
 				reportOneCompleted();  // best-effort: leave this job's destination empty rather than guessing seek points
+			}
 			else
+			{
+				results[i].durationMs = durationMs;  // status stays Ok unless pass 2 downgrades it to ExtractionFailed
 				extractionArguments[i] = buildExtractionArguments(jobs[i].videoFilePath, jobs[i].destinationFolder,
 					pickEvenlySpacedTimestampsMs(durationMs, frameCount));
+			}
 		});
 
-	// Pass 2: run the extractions for the jobs that probed successfully, again up to `concurrency` at once.
-	// Whatever frames each invocation writes stay in its destinationFolder; no failure is surfaced (see header).
+	// Pass 2: run the extractions for the jobs that probed successfully, again up to `concurrency` at once. A
+	// non-zero exit (or a kill on timeout) marks the job ExtractionFailed but leaves its probed duration intact.
 	std::vector<int> jobsToExtract;
 	jobsToExtract.reserve(total);
 	for (int i = 0; i < total; ++i)
@@ -167,16 +180,24 @@ void generatePreviewFrames(const std::vector<PreviewJob>& jobs, int frameCount, 
 		[&](int k, QProcess& extract) {
 			extract.start(ffmpegPath(), extractionArguments[jobsToExtract[k]]);
 		},
-		[&](int /*k*/, QProcess& extract) {
+		[&](int k, QProcess& extract) {
+			bool extracted = false;
 			if (extract.waitForStarted())
+			{
 				waitForFinishedOrKill(extract, 60000);
+				extracted = extract.exitStatus() == QProcess::NormalExit && extract.exitCode() == 0;
+			}
+			if (!extracted)
+				results[jobsToExtract[k]].status = PreviewResult::Status::ExtractionFailed;
 			reportOneCompleted();
 		});
+
+	return results;
 }
 
-void generatePreviewFrames(const QString& videoFilePath, const QString& destinationFolder, int frameCount)
+PreviewResult generatePreviewFrames(const QString& videoFilePath, const QString& destinationFolder, int frameCount)
 {
-	generatePreviewFrames({ PreviewJob{ videoFilePath, destinationFolder } }, frameCount, /*maxConcurrentProcesses*/ 1);
+	return generatePreviewFrames({ PreviewJob{ videoFilePath, destinationFolder } }, frameCount, /*maxConcurrentProcesses*/ 1).front();
 }
 
 } // namespace Ffmpeg

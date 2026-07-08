@@ -28,7 +28,7 @@ static bool copyPreviewFrames(const QString& srcPreviewDir, const QString& dstPr
 	return copiedAny;
 }
 
-Import::Result Import::importVideo(const QString& videoPath, const QString& collectionPath, const QString& stagedPreviewDir, bool overwriteExisting)
+Import::Result Import::importVideo(const QString& videoPath, const QString& collectionPath, const QString& stagedPreviewDir, bool overwriteExisting, qint64 stagedDurationMs)
 {
 	QFileInfo videoInfo(videoPath);
 	if (!videoInfo.exists())
@@ -57,13 +57,14 @@ Import::Result Import::importVideo(const QString& videoPath, const QString& coll
 	// extracted exactly these for its staging card, so reuse them by copy; fall back to a fresh ffmpeg pass only
 	// when there's nothing staged to reuse (not reached via Quick Import, or staging's probe produced no frames).
 	// The staged scratch dir holds those frames directly; the frame folder nests its own under preview/.
+	qint64 durationMs = stagedDurationMs;   // reuse the duration staging already probed; superseded below if we extract fresh
 	if (stagedPreviewDir.isEmpty() || !copyPreviewFrames(stagedPreviewDir, Catalog::previewDirFor(outputFolder)))
 	{
 		const int previewFrameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
-		Ffmpeg::generatePreviewFrames(videoPath, Catalog::previewDirFor(outputFolder), previewFrameCount);
+		durationMs = Ffmpeg::generatePreviewFrames(videoPath, Catalog::previewDirFor(outputFolder), previewFrameCount).durationMs;
 	}
 
-	if (!Catalog::instance().addMediaItem(MediaId::fromFile(videoPath), videoPath, outputFolder, /*splitIntoFrames=*/false))
+	if (!Catalog::instance().addMediaItem(MediaId::fromFile(videoPath), videoPath, outputFolder, /*splitIntoFrames=*/false, durationMs))
 	{
 		QString message = QObject::tr("An item with the same name and file size is already tracked in a different collection:\n%1").arg(videoPath);
 		if (!QDir(outputFolder).removeRecursively())

@@ -91,6 +91,10 @@ public:
 	// True for a photo tracked in place (catalog-only): label operations never move its file, deleting it
 	// never touches the file, and it has no storage folder - all its labels are stored ids. Unknown id / video -> false.
 	[[nodiscard]] bool isReferenced(const MediaId& id) const;
+	// The video's source duration in ms, probed once at import (see Ffmpeg::generatePreviewFrames). -1 when
+	// unknown: an unknown id, a photo, or a video imported before durations were recorded (backfilled lazily
+	// on the next preview regeneration / re-export - see setDurationMs).
+	[[nodiscard]] qint64 durationMsForMediaItem(const MediaId& id) const;
 	// Directory of the first video whose source file is currently present, in iteration order (a sensible
 	// default destination for relocating newly added source files; photos are skipped - an owned photo's
 	// source lives inside the library itself). Empty if none is found.
@@ -132,7 +136,9 @@ public:
 	// split flipping splitIntoFrames to true) is not a collision and returns true, updating the entry's fields.
 	// removeMediaItem drops an item from the catalog entirely (delete-all), so it doesn't linger as a ghost now
 	// that the catalog - not the disk walk - is the authoritative set.
-	bool addMediaItem(const MediaId& id, const QString& sourcePath, const QString& folderAbs, bool splitIntoFrames);
+	// durationMs (source length in ms, from the import-time probe) is stored when > 0; pass -1 when unknown to
+	// leave any previously stored duration untouched (a re-registration doesn't erase it).
+	bool addMediaItem(const MediaId& id, const QString& sourcePath, const QString& folderAbs, bool splitIntoFrames, qint64 durationMs = -1);
 	// addPhoto is addMediaItem's photo counterpart, same collision rule. labelDirAbs is the <root>/Photos/<label>
 	// dir the (owned) photo's file sits in, empty for a referenced photo - which is registered with no labels
 	// at all, so the caller must follow up with addLabel for the initial label (an owned photo derives its
@@ -145,6 +151,10 @@ public:
 	// Returns false (no-op) if newId already names a different tracked item - a name+size collision, the same
 	// guard as addMediaItem - so the caller can undo its on-disk renames instead of clobbering that entry.
 	bool applyRename(const MediaId& oldId, const MediaId& newId, const QString& newSourcePath, const QString& newFolderAbs);
+	// Backfills a video's source duration (ms) onto an already-registered item - for the paths that probe it
+	// after registration (preview regeneration / re-export), unlike import which passes it to addMediaItem
+	// directly. No-op on an unknown id, a non-positive duration, or one already equal to the stored value.
+	void setDurationMs(const MediaId& id, qint64 durationMs);
 
 	// Registry mutations (the label objects themselves). renameLabel validates newDisplayName is unique, renames
 	// the matching on-disk folders if they exist (the collection folder and the <root>/Photos/<label> dir),
@@ -214,6 +224,7 @@ private:
 		QString       sourcePath;     // absolute; may point at a missing/unmounted file. An owned photo's file lives inside its folder
 		QList<LabelId> labelIds;      // derived storage-label id (first when known) + stored extra ids
 		bool        splitIntoFrames = true;  // false = only preview frames exist yet; see isSplitIntoFrames. Video-only; photos keep the default
+		qint64      durationMs = -1;         // video source length in ms; -1 = unknown (not probed yet / photo). See durationMsForMediaItem
 		MediaType   type = MediaType::Video;
 		bool        referenced = false;      // photos only; see isReferenced
 	};
