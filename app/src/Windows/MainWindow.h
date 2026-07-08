@@ -96,7 +96,7 @@ private:
 	// The photo counterpart to processBatch: imports each photo under the label via Import::importPhoto,
 	// reports errors, applies a referenced photo's initial label (it has no storage folder to derive it
 	// from), and refreshes the view. Returns one result per path, in order - Quick Import's bookkeeping
-	// branches on them (see QuickImportDialog::Callbacks::importPhotosRequested).
+	// branches on them (see ImportDialog::Callbacks::importPhotosRequested).
 	std::vector<Import::PhotoResult> processPhotoBatch(LabelId labelId, const QStringList& photoPaths, Import::PhotoImportMode mode);
 	// Creates the collection folder + its label; returns the created-or-existing label's id, None if refused.
 	LabelId createCollection(const QString& name, const QString& color = {}, bool refreshList = true);
@@ -107,7 +107,7 @@ private:
 	void setLabelColorInteractive(LabelId labelId);
 	void deleteLabelInteractive(LabelId labelId);
 	// Opens the Quick Import dialog; initialStaging pre-fills the staging area (used by scanForUntrackedFiles).
-	void quickImportToCollections(const QStringList& initialStaging = {});
+	void importToCollections(const QStringList& initialStaging = {});
 	// Tools menu: recursively scans a chosen folder for supported videos not yet tracked by any collection.
 	void scanForUntrackedFiles();
 	// Tools menu: scans the catalog against disk for drift (untracked frame folders and broken video

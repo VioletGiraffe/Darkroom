@@ -220,7 +220,7 @@ The full mutation model is wired into the UI:
 - **Per-card assignment**: context-menu **Labels** checklist (add/remove) and drag-a-sidebar-label-onto-a-card
   (add-only); see [main-window.md](main-window.md) and [media-widgets.md](media-widgets.md).
 - **Sidebar label management**: right-click → rename/set color/delete; see [main-window.md](main-window.md).
-- **Import**: `QuickImportDialog`'s label-list panel (drag-a-label-onto-a-staged-card) and per-card Labels
+- **Import**: `ImportDialog`'s label-list panel (drag-a-label-onto-a-staged-card) and per-card Labels
   checklist, mirroring the main grid's own two assignment paths above; see [import.md](import.md).
 
 ---

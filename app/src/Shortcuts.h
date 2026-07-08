@@ -6,8 +6,8 @@
 // a QKeySequence at the point of use, so nothing constructs a QKeySequence during static initialization.
 struct Shortcuts
 {
-	static constexpr const char* CreateLabel    = "Ctrl+L";        // LabelSidebar + QuickImportDialog "Create label"
-	static constexpr const char* RemoveFromList = "Delete";        // MainWindow "Remove from library" / QuickImport "Remove from staging"
-	static constexpr const char* DeleteFile     = "Shift+Delete";  // MainWindow "Delete" / QuickImport "Delete source file(s)"
-	static constexpr const char* Rename         = "F2";            // MainWindow "Rename" / QuickImport "Rename..."
+	static constexpr const char* CreateLabel    = "Ctrl+L";        // LabelSidebar + ImportDialog "Create label"
+	static constexpr const char* RemoveFromList = "Delete";        // MainWindow "Remove from library" / ImportDialog "Remove from staging"
+	static constexpr const char* DeleteFile     = "Shift+Delete";  // MainWindow "Delete" / ImportDialog "Delete source file(s)"
+	static constexpr const char* Rename         = "F2";            // MainWindow "Rename" / ImportDialog "Rename..."
 };

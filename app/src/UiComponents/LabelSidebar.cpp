@@ -234,7 +234,7 @@ LabelSidebar::LabelSidebar(QWidget* parent) : QWidget(parent)
 	auto* btnCreateLabel = new QPushButton(tr("Create label"));
 	btnCreateLabel->setObjectName("addLabelButton");
 	btnCreateLabel->setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_plus.svg"), &Theme::ThemeColors::TextPrimary));
-	// Ctrl+L is mirrored on QuickImportDialog's Create-label button; keep the two in sync. The tooltip surfaces the
+	// Ctrl+L is mirrored on ImportDialog's Create-label button; keep the two in sync. The tooltip surfaces the
 	// shortcut (derived from it, so there's a single source of truth) since a button doesn't advertise one otherwise.
 	btnCreateLabel->setShortcut(QKeySequence(Shortcuts::CreateLabel));
 	btnCreateLabel->setToolTip(tr("Create a new label (%1)").arg(btnCreateLabel->shortcut().toString(QKeySequence::NativeText)));

@@ -12,7 +12,7 @@ namespace Settings {
 	constexpr const char* PlaybackSpeed = "VideoPlayer/PlaybackSpeed";
 	constexpr const char* PauseOnSeek  = "VideoPlayer/PauseOnSeek";
 	constexpr const char* ColorScheme  = "settings/colorScheme";
-	// Shared (not just MainWindow's) since QuickImportDialog's staged cards mirror it too.
+	// Shared (not just MainWindow's) since ImportDialog's staged cards mirror it too.
 	constexpr const char* PreviewFrameCount = "mainWindow/previewFrameCount";
 }
 

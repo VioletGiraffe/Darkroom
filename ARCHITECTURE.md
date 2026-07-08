@@ -101,13 +101,13 @@ The `Settings.h`/`QSettings` key pattern, `SettingsDialog`, the `Theme` dark/lig
 app-wide `Accent`/`AccentBg` tokens), and the central `Style` stylesheet + custom-widget approach (e.g.
 `SegmentedToggle`) that gives the app its non-stock look.
 
-### [Import: the Import module, ffmpeg, Utils, QuickImportDialog](docs/architecture/import.md)
+### [Import: the Import module, ffmpeg, Utils, ImportDialog](docs/architecture/import.md)
 `Import::importVideo` and `Import::importPhoto` — the per-item import workers (`MainWindow::processBatch` /
 `processPhotoBatch` remain the batch coordinators over them; photos land in `<root>/Photos/<label>/` or are
 referenced in place, with collision auto-rename), the `ffmpeg` invocation (`Ffmpeg::generatePreviewFrames` —
-a batch/concurrent preview extractor that `QuickImportDialog`'s staging runs across several videos at once,
+a batch/concurrent preview extractor that `ImportDialog`'s staging runs across several videos at once,
 whose frames import then reuses by copy instead of re-extracting), `Utils.h`'s grab-bag of free functions,
-and `QuickImportDialog` itself: a staging grid + label-list panel mirroring the main window's own label
+and `ImportDialog` itself: a staging grid + label-list panel mirroring the main window's own label
 model, duplicate detection at staging and relocation, and the "Import" command that imports every labeled
 card in one step.
 

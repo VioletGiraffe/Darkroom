@@ -9,7 +9,7 @@
 #include "Windows/IntegrityCheckDialog.h"
 #include "UiComponents/LabelSidebar.h"
 #include "UiComponents/LabelVisuals.h"
-#include "Windows/QuickImportDialog.h"
+#include "Windows/ImportDialog.h"
 #include "UiComponents/SegmentedToggle.h"
 #include "Windows/SettingsDialog.h"
 #include "UiComponents/SortControl.h"
@@ -95,7 +95,7 @@ static constexpr int MAX_CARD_IMAGE_HEIGHT = 360;
 static constexpr int CARD_IMAGE_HEIGHT_STEP = 20;
 
 // Preview frames per card. User-selectable (1–10) via the header combobox. The settings key/default live in
-// Settings.h (Settings::PreviewFrameCount) since QuickImportDialog's staged cards mirror this choice too.
+// Settings.h (Settings::PreviewFrameCount) since ImportDialog's staged cards mirror this choice too.
 static constexpr int MIN_PREVIEW_FRAME_COUNT = 1;
 static constexpr int MAX_PREVIEW_FRAME_COUNT = 10;
 
@@ -300,7 +300,7 @@ void MainWindow::setupMainMenu()
 	updateEditActions();
 
 	QMenu* toolsMenu = new QMenu(tr("Tools"), menuBar);
-	toolsMenu->addAction(tr("Quick import to collections..."), QKeySequence("Ctrl+Shift+A"), this, [this] { quickImportToCollections(); });
+	toolsMenu->addAction(tr("Import to collections..."), QKeySequence("Ctrl+Shift+A"), this, [this] { importToCollections(); });
 	toolsMenu->addAction(tr("Scan for untracked files..."), this, &MainWindow::scanForUntrackedFiles);
 	toolsMenu->addAction(tr("Check catalog integrity..."), this, &MainWindow::checkCatalogIntegrity);
 	toolsMenu->addSeparator();
@@ -407,7 +407,7 @@ void MainWindow::dropEvent(QDropEvent* event)
 	// user picks the destination label(s). Deferred so the drop source application is released promptly
 	// instead of being held in the drag state until processing finishes.
 	QMetaObject::invokeMethod(this, [this, paths = std::move(paths)] {
-		quickImportToCollections(paths);
+		importToCollections(paths);
 	}, Qt::QueuedConnection);
 }
 
@@ -729,7 +729,7 @@ void MainWindow::refreshMediaGrid()
 	// state, not something inferred from this rebuild's filters; every other empty case (label/type filter
 	// here, or the name filter hiding every card later) is the filters matching nothing.
 	m_mediaGrid->setEmptyMessage(catalog.mediaItemCount() == 0
-		? tr("The library is empty.\nDrop media files here, or use Tools > Quick import to collections.")
+		? tr("The library is empty.\nDrop media files here, or use Tools > Import to collections.")
 		: tr("No items match the current filters."));
 
 	pendingAttach.reserve(mediaItems.size());
@@ -1587,16 +1587,16 @@ void MainWindow::deleteLabelInteractive(LabelId labelId)
 	refreshLibraryView();
 }
 
-void MainWindow::quickImportToCollections(const QStringList& initialStaging)
+void MainWindow::importToCollections(const QStringList& initialStaging)
 {
-	QuickImportDialog::Callbacks callbacks{
+	ImportDialog::Callbacks callbacks{
 		// Every ordinary label is a candidate destination folder for the dialog's label list - single
 		// source of truth (the Catalog model), not a disk listing, so the dialog also gets each label's color.
 		.getLabelOptions = [] {
-			std::vector<QuickImportDialog::LabelOption> options;
+			std::vector<ImportDialog::LabelOption> options;
 			for (const Catalog::Label& label : Catalog::instance().allLabels())
 				if (!label.isVirtual())
-					options.push_back(QuickImportDialog::LabelOption{ toString(label.id), label.displayName, label.color });  // dialog carries ids as strings
+					options.push_back(ImportDialog::LabelOption{ toString(label.id), label.displayName, label.color });  // dialog carries ids as strings
 			return options;
 		},
 		.addMediaItemsRequested = [this](const QString& collectionName, const QStringList& videoPaths,
@@ -1642,10 +1642,10 @@ void MainWindow::quickImportToCollections(const QStringList& initialStaging)
 				if (Catalog::instance().containsMediaItem(mediaId))
 					Catalog::instance().addLabel(mediaId, Catalog::BestLabelId);
 		},
-		.assignExtraLabelsRequested = [](const std::vector<QuickImportDialog::ExtraLabelAssignment>& assignments) {
+		.assignExtraLabelsRequested = [](const std::vector<ImportDialog::ExtraLabelAssignment>& assignments) {
 			// Mirrors markBestRequested above, same "tracked" guard.
 			Catalog::BatchScope batch;  // one store write for the whole flush instead of one per assignment
-			for (const QuickImportDialog::ExtraLabelAssignment& assignment : assignments)
+			for (const ImportDialog::ExtraLabelAssignment& assignment : assignments)
 			{
 				if (!Catalog::instance().containsMediaItem(assignment.mediaId))
 					continue;
@@ -1656,7 +1656,7 @@ void MainWindow::quickImportToCollections(const QStringList& initialStaging)
 		.viewChanged = [this] { refreshLibraryView(); }
 	};
 
-	QuickImportDialog dialog(std::move(callbacks), Catalog::instance().anySourceDir(), this);
+	ImportDialog dialog(std::move(callbacks), Catalog::instance().anySourceDir(), this);
 	if (!initialStaging.isEmpty())
 		dialog.addToStaging(initialStaging);
 	dialog.exec();   // each "Import" inside the dialog already applies its batch synchronously via the callbacks above
@@ -1671,7 +1671,7 @@ void MainWindow::scanForUntrackedFiles()
 {
 	const QStringList untrackedFiles = FindUntrackedFilesDialog::scanAndShowUi(rootFolder(), this);
 	if (!untrackedFiles.isEmpty())
-		quickImportToCollections(untrackedFiles);
+		importToCollections(untrackedFiles);
 }
 
 void MainWindow::checkCatalogIntegrity()

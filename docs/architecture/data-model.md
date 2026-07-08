@@ -50,7 +50,7 @@ Stable identity for a media item's **source file** = its file name (matched case
   (see [catalog-and-labels.md](catalog-and-labels.md)), which explicitly re-keys the metadata record.
 - A `key()` collision (same name + same size) is, in practice, a genuine duplicate. Two independent layers
   catch it: `Catalog::addMediaItem` refuses to register an item whose id already names a *different* folder (see
-  [catalog-and-labels.md](catalog-and-labels.md)), and `QuickImportDialog`'s file-relocation step separately
+  [catalog-and-labels.md](catalog-and-labels.md)), and `ImportDialog`'s file-relocation step separately
   detects a byte-identical duplicate at the destination path (see [import.md](import.md)).
 
 ## `LabelId` (`src/Core/LabelId.h`)
@@ -69,7 +69,7 @@ Stable identity for a **label** — a 64-bit value (`enum class LabelId : uint64
   (It is also just a compact integer.)
 - **Serialization crosses two forms** (see `LabelId.h`): a **JSON number** in `labels.json` and in each item's
   `"labels"` array; a native **`quint64`** in `QSettings` (the saved filter); and its **decimal-string** form
-  (`toString` / `labelIdFromString`) only at the string-based UI seam — `QuickImportDialog` carries ids as
+  (`toString` / `labelIdFromString`) only at the string-based UI seam — `ImportDialog` carries ids as
   strings so it can namespace not-yet-created labels as `"new:<n>"` (see [import.md](import.md)), and the
   `LabelSidebar`↔`MainWindow` drag payload is a string too. `MainWindow`'s dialog callbacks are where the two
   forms convert.

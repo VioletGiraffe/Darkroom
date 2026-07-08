@@ -1,4 +1,4 @@
-#include "Windows/QuickImportDialog.h"
+#include "Windows/ImportDialog.h"
 #include "Ffmpeg.h"
 #include "UiComponents/ContentWidthListWidget.h"
 #include "UiComponents/LabelMimeType.h"
@@ -81,7 +81,7 @@ QIcon colorDotIcon(const QColor& color)
 // A fresh, unique scratch directory for one staged video's temp preview frames.
 QString uniqueTempPreviewDir()
 {
-	return QDir::tempPath() + "/darkroom_quickimport/" + QUuid::createUuid().toString(QUuid::Id128);
+	return QDir::tempPath() + "/darkroom_import/" + QUuid::createUuid().toString(QUuid::Id128);
 }
 
 // One staged file plus the label its origin folder implies. labelName is the path from the dropped folder's
@@ -174,7 +174,7 @@ public:
 		setWindowTitle(isDuplicate ? tr("Duplicate File Found") : tr("File Already Exists"));
 
 		// WindowModal (not the exec()-default ApplicationModal) blocks only this
-		// dialog's parent (QuickImportDialog) and up - it deliberately leaves sibling
+		// dialog's parent (ImportDialog) and up - it deliberately leaves sibling
 		// top-level windows, such as the VideoPlayerWindow opened by the Play
 		// buttons below, interactive.
 		setWindowModality(Qt::WindowModal);
@@ -192,7 +192,7 @@ public:
 
 		if (!isDuplicate)
 		{
-			// Play buttons open a preview parented to the outer QuickImportDialog
+			// Play buttons open a preview parented to the outer ImportDialog
 			// (this dialog's parent), not to this dialog - this dialog is
 			// destroyed as soon as Overwrite/Skip is clicked, which would
 			// otherwise kill an in-progress preview along with it.
@@ -361,11 +361,11 @@ struct BatchRelocation
 
 } // namespace
 
-QuickImportDialog::QuickImportDialog(Callbacks callbacks, const QString& suggestedRelocateFolder, QWidget* parent)
+ImportDialog::ImportDialog(Callbacks callbacks, const QString& suggestedRelocateFolder, QWidget* parent)
 	: QDialog(parent)
 	, m_callbacks(std::move(callbacks))
 {
-	setWindowTitle(tr("Quick Import"));
+	setWindowTitle(tr("Import"));
 	// Opens maximized and acts as a full workspace window: give it real min/max caption buttons (a QDialog has
 	// none by default) and no "?" context-help button.
 	setWindowFlags((windowFlags() | Qt::WindowMinMaxButtonsHint) & ~Qt::WindowContextHelpButtonHint);
@@ -381,11 +381,11 @@ QuickImportDialog::QuickImportDialog(Callbacks callbacks, const QString& suggest
 	m_relocateModeCombo->addItem(tr("Leave source file in place (photos: reference, never touched)"), int(RelocateMode::LeaveInPlace));
 	m_relocateModeCombo->addItem(tr("Copy source file to:"), int(RelocateMode::Copy));
 	m_relocateModeCombo->addItem(tr("Move source file to:"), int(RelocateMode::Move));
-	const int savedRelocateMode = relocateSettings.value("quickImportDialog/relocateMode", int(RelocateMode::LeaveInPlace)).toInt();
+	const int savedRelocateMode = relocateSettings.value("importDialog/relocateMode", int(RelocateMode::LeaveInPlace)).toInt();
 	m_relocateModeCombo->setCurrentIndex(qMax(0, m_relocateModeCombo->findData(savedRelocateMode)));
 
 	// Persisted choice wins; the caller's suggestion only seeds the field on first use.
-	QString relocateFolder = relocateSettings.value("quickImportDialog/relocateFolder").toString();
+	QString relocateFolder = relocateSettings.value("importDialog/relocateFolder").toString();
 	if (relocateFolder.isEmpty())
 		relocateFolder = suggestedRelocateFolder;
 	m_relocateFolderEdit = new QLineEdit(relocateFolder, this);
@@ -433,7 +433,7 @@ QuickImportDialog::QuickImportDialog(Callbacks callbacks, const QString& suggest
 		.arg(Theme::current().BackgroundSecondary).arg(Theme::ControlRadius));
 	m_labelList->viewport()->installEventFilter(this);  // drives the row-drag gesture (see eventFilter)
 	m_labelList->setContextMenuPolicy(Qt::CustomContextMenu);  // right-click a row to edit a provisional label
-	connect(m_labelList, &QListWidget::customContextMenuRequested, this, &QuickImportDialog::showLabelListContextMenu);
+	connect(m_labelList, &QListWidget::customContextMenuRequested, this, &ImportDialog::showLabelListContextMenu);
 	labelPaneLayout->addWidget(m_labelList, 1);
 
 	QPushButton* addLabelButton = new QPushButton(tr("Create label"));
@@ -517,7 +517,7 @@ QuickImportDialog::QuickImportDialog(Callbacks callbacks, const QString& suggest
 	QHBoxLayout* footer = new QHBoxLayout;
 	footer->addStretch(1);
 	QPushButton* importButton = new QPushButton(tr("Import"), this);
-	connect(importButton, &QPushButton::clicked, this, &QuickImportDialog::runImport);
+	connect(importButton, &QPushButton::clicked, this, &ImportDialog::runImport);
 	footer->addWidget(importButton);
 	outerLayout->addLayout(footer);
 
@@ -525,22 +525,22 @@ QuickImportDialog::QuickImportDialog(Callbacks callbacks, const QString& suggest
 
 	// Restore persisted window geometry; with nothing stored yet (first run) open maximized - this is a full
 	// workspace - letting the saved geometry rule on every run thereafter.
-	if (!restoreWindowGeometry(this, "quickImportDialog"))
+	if (!restoreWindowGeometry(this, "importDialog"))
 	{
 		resize(1200, 800);  // the size the dialog falls back to when un-maximized
 		setWindowState(Qt::WindowMaximized);
 	}
-	const QByteArray splitterState = QSettings{}.value("quickImportDialog/splitter").toByteArray();
+	const QByteArray splitterState = QSettings{}.value("importDialog/splitter").toByteArray();
 	if (!splitterState.isEmpty())
 		m_splitter->restoreState(splitterState);
 }
 
-QuickImportDialog::~QuickImportDialog()
+ImportDialog::~ImportDialog()
 {
-	saveWindowGeometry(this, "quickImportDialog");
-	QSettings{}.setValue("quickImportDialog/splitter", m_splitter->saveState());
-	QSettings{}.setValue("quickImportDialog/relocateMode", m_relocateModeCombo->currentData().toInt());
-	QSettings{}.setValue("quickImportDialog/relocateFolder", m_relocateFolderEdit->text());
+	saveWindowGeometry(this, "importDialog");
+	QSettings{}.setValue("importDialog/splitter", m_splitter->saveState());
+	QSettings{}.setValue("importDialog/relocateMode", m_relocateModeCombo->currentData().toInt());
+	QSettings{}.setValue("importDialog/relocateFolder", m_relocateFolderEdit->text());
 
 	// Best-effort: clean up whatever's still staged when the dialog closes (anything already unstaged or
 	// successfully added already removed its own temp dir). The isEmpty guard is load-bearing: staged photos
@@ -550,7 +550,7 @@ QuickImportDialog::~QuickImportDialog()
 			QDir(entry.tempPreviewDir).removeRecursively();
 }
 
-void QuickImportDialog::dragEnterEvent(QDragEnterEvent* event)
+void ImportDialog::dragEnterEvent(QDragEnterEvent* event)
 {
 	if (event->mimeData()->hasUrls())
 	{
@@ -566,7 +566,7 @@ void QuickImportDialog::dragEnterEvent(QDragEnterEvent* event)
 	}
 }
 
-void QuickImportDialog::dropEvent(QDropEvent* event)
+void ImportDialog::dropEvent(QDropEvent* event)
 {
 	// Files and folders both accepted; stageMediaItems expands any folder into the supported files under it.
 	QStringList paths;
@@ -586,7 +586,7 @@ void QuickImportDialog::dropEvent(QDropEvent* event)
 	}
 }
 
-bool QuickImportDialog::eventFilter(QObject* watched, QEvent* event)
+bool ImportDialog::eventFilter(QObject* watched, QEvent* event)
 {
 	if (watched != m_labelList->viewport())
 		return QDialog::eventFilter(watched, event);
@@ -632,7 +632,7 @@ bool QuickImportDialog::eventFilter(QObject* watched, QEvent* event)
 	return QDialog::eventFilter(watched, event);
 }
 
-void QuickImportDialog::refreshLabelList()
+void ImportDialog::refreshLabelList()
 {
 	// The list is this session's provisional labels (folder-derived or manually added) followed by the Catalog's
 	// real ones. Provisionals lead so they're easy to review/rename before Import materializes them.
@@ -661,7 +661,7 @@ void QuickImportDialog::refreshLabelList()
 	m_labelList->updateGeometry();
 }
 
-const QuickImportDialog::LabelOption* QuickImportDialog::findLabelOption(const QString& id) const
+const ImportDialog::LabelOption* ImportDialog::findLabelOption(const QString& id) const
 {
 	for (const LabelOption& option : m_labelOptions)
 		if (option.id == id)
@@ -669,12 +669,12 @@ const QuickImportDialog::LabelOption* QuickImportDialog::findLabelOption(const Q
 	return nullptr;
 }
 
-bool QuickImportDialog::isProvisionalId(const QString& id)
+bool ImportDialog::isProvisionalId(const QString& id)
 {
 	return id.startsWith(QLatin1String("new:"));
 }
 
-QString QuickImportDialog::findLabelIdByName(const QString& name, const QString& excludeId) const
+QString ImportDialog::findLabelIdByName(const QString& name, const QString& excludeId) const
 {
 	// Case-insensitive to match the (Windows) filesystem and Catalog's own label-name uniqueness rule.
 	for (const LabelOption& option : m_labelOptions)
@@ -683,7 +683,7 @@ QString QuickImportDialog::findLabelIdByName(const QString& name, const QString&
 	return {};
 }
 
-QString QuickImportDialog::addProvisionalLabel(const QString& name)
+QString ImportDialog::addProvisionalLabel(const QString& name)
 {
 	LabelOption option;
 	option.id = QStringLiteral("new:%1").arg(m_provisionalSeq++);
@@ -695,7 +695,7 @@ QString QuickImportDialog::addProvisionalLabel(const QString& name)
 	return option.id;
 }
 
-QString QuickImportDialog::ensureLabelForFolderName(const QString& name)
+QString ImportDialog::ensureLabelForFolderName(const QString& name)
 {
 	if (name.isEmpty())
 		return {};
@@ -705,7 +705,7 @@ QString QuickImportDialog::ensureLabelForFolderName(const QString& name)
 	return existing.isEmpty() ? addProvisionalLabel(name) : existing;
 }
 
-void QuickImportDialog::showLabelListContextMenu(const QPoint& pos)
+void ImportDialog::showLabelListContextMenu(const QPoint& pos)
 {
 	QListWidgetItem* item = m_labelList->itemAt(pos);
 	if (!item)
@@ -732,7 +732,7 @@ void QuickImportDialog::showLabelListContextMenu(const QPoint& pos)
 	menu.exec(m_labelList->viewport()->mapToGlobal(pos));
 }
 
-void QuickImportDialog::renameProvisionalLabel(const QString& provisionalId)
+void ImportDialog::renameProvisionalLabel(const QString& provisionalId)
 {
 	const auto option = std::find_if(m_provisionalLabels.begin(), m_provisionalLabels.end(),
 		[&](const LabelOption& o) { return o.id == provisionalId; });
@@ -758,7 +758,7 @@ void QuickImportDialog::renameProvisionalLabel(const QString& provisionalId)
 	updateAllCardLabelDots();  // a card's dot tooltip is built from label names
 }
 
-void QuickImportDialog::setProvisionalLabelColor(const QString& provisionalId)
+void ImportDialog::setProvisionalLabelColor(const QString& provisionalId)
 {
 	const auto option = std::find_if(m_provisionalLabels.begin(), m_provisionalLabels.end(),
 		[&](const LabelOption& o) { return o.id == provisionalId; });
@@ -775,7 +775,7 @@ void QuickImportDialog::setProvisionalLabelColor(const QString& provisionalId)
 	updateAllCardLabelDots();
 }
 
-void QuickImportDialog::deleteProvisionalLabel(const QString& provisionalId)
+void ImportDialog::deleteProvisionalLabel(const QString& provisionalId)
 {
 	// Strip the label from every staged card that carried it, then drop it from the list.
 	for (auto it = m_staged.begin(); it != m_staged.end(); ++it)
@@ -787,7 +787,7 @@ void QuickImportDialog::deleteProvisionalLabel(const QString& provisionalId)
 	refreshLabelList();
 }
 
-void QuickImportDialog::mergeProvisionalInto(const QString& provisionalId, const QString& targetId)
+void ImportDialog::mergeProvisionalInto(const QString& provisionalId, const QString& targetId)
 {
 	// Point every staged pick at the target and drop the now-merged provisional. Pre-import this is purely local -
 	// nothing in the Catalog changes; it's a rewrite of the staged cards' pending assignments (the first id still
@@ -812,19 +812,19 @@ void QuickImportDialog::mergeProvisionalInto(const QString& provisionalId, const
 	refreshLabelList();
 }
 
-void QuickImportDialog::updateAllCardLabelDots()
+void ImportDialog::updateAllCardLabelDots()
 {
 	for (auto it = m_staged.constBegin(); it != m_staged.constEnd(); ++it)
 		updateCardLabelDots(it.key());
 }
 
-void QuickImportDialog::addToStaging(const QStringList& paths)
+void ImportDialog::addToStaging(const QStringList& paths)
 {
 	// Deferred so the dialog can paint before stageMediaItems() blocks on ffmpeg preview extraction.
 	QMetaObject::invokeMethod(this, [this, paths] { stageMediaItems(paths); }, Qt::QueuedConnection);
 }
 
-MediaItemWidget* QuickImportDialog::buildStagedCard(const MediaId& id, const QString& path, const QString& tempPreviewDir, qint64 durationMs)
+MediaItemWidget* ImportDialog::buildStagedCard(const MediaId& id, const QString& path, const QString& tempPreviewDir, qint64 durationMs)
 {
 	// Card thumbnail canvas mirrors the main library grid: a photo is square and decodes its file directly; a video
 	// is a horizontal strip sized to tile with `frameCount` photo cards (so mixed cards line up on one column grid),
@@ -874,7 +874,7 @@ MediaItemWidget* QuickImportDialog::buildStagedCard(const MediaId& id, const QSt
 	return card;
 }
 
-void QuickImportDialog::stageMediaItems(const QStringList& paths)
+void ImportDialog::stageMediaItems(const QStringList& paths)
 {
 	// A dropped folder contributes every supported file under it (recursive, flattened), each tagged with the
 	// label its origin folder implies; plain files pass through unlabeled. Doing it here means folder-drop and its
@@ -1019,7 +1019,7 @@ void QuickImportDialog::stageMediaItems(const QStringList& paths)
 		stageCard(jobs[i].videoFilePath, jobs[i].destinationFolder, results[i].durationMs);
 }
 
-void QuickImportDialog::unstage(const MediaId& id)
+void ImportDialog::unstage(const MediaId& id)
 {
 	auto it = m_staged.find(id);
 	if (it == m_staged.end())
@@ -1031,7 +1031,7 @@ void QuickImportDialog::unstage(const MediaId& id)
 	m_staged.erase(it);
 }
 
-void QuickImportDialog::updateCardLabelDots(const MediaId& id)
+void ImportDialog::updateCardLabelDots(const MediaId& id)
 {
 	const auto it = m_staged.constFind(id);
 	if (it == m_staged.constEnd())
@@ -1052,7 +1052,7 @@ void QuickImportDialog::updateCardLabelDots(const MediaId& id)
 	card->setLabelDots(colors, names.join(", "));
 }
 
-std::vector<MediaId> QuickImportDialog::stagedSelection(const MediaId& id) const
+std::vector<MediaId> ImportDialog::stagedSelection(const MediaId& id) const
 {
 	const QList<QListWidgetItem*> selected = m_stagedGrid->selectedItems();
 	if (selected.size() <= 1 || !selected.contains(m_staged.value(id).item))
@@ -1065,7 +1065,7 @@ std::vector<MediaId> QuickImportDialog::stagedSelection(const MediaId& id) const
 	return targets;
 }
 
-void QuickImportDialog::showStagedCardContextMenu(const MediaId& id, const QPoint& globalPos)
+void ImportDialog::showStagedCardContextMenu(const MediaId& id, const QPoint& globalPos)
 {
 	if (!m_staged.contains(id))
 		return;
@@ -1165,7 +1165,7 @@ void QuickImportDialog::showStagedCardContextMenu(const MediaId& id, const QPoin
 	menu.exec(globalPos);
 }
 
-std::vector<MediaId> QuickImportDialog::selectedStagedIds() const
+std::vector<MediaId> ImportDialog::selectedStagedIds() const
 {
 	const QList<QListWidgetItem*> selected = m_stagedGrid->selectedItems();
 	std::vector<MediaId> ids;
@@ -1175,7 +1175,7 @@ std::vector<MediaId> QuickImportDialog::selectedStagedIds() const
 	return ids;
 }
 
-void QuickImportDialog::previewStagedItem(const MediaId& id)
+void ImportDialog::previewStagedItem(const MediaId& id)
 {
 	const auto it = m_staged.constFind(id);
 	if (it == m_staged.constEnd())
@@ -1186,7 +1186,7 @@ void QuickImportDialog::previewStagedItem(const MediaId& id)
 		playVideo(it->path, this);
 }
 
-void QuickImportDialog::locateStagedSourceFile(const MediaId& id)
+void ImportDialog::locateStagedSourceFile(const MediaId& id)
 {
 	const auto it = m_staged.constFind(id);
 	if (it == m_staged.constEnd())
@@ -1197,14 +1197,14 @@ void QuickImportDialog::locateStagedSourceFile(const MediaId& id)
 		openInExplorer(it->path);
 }
 
-void QuickImportDialog::copyStagedSourcePath(const MediaId& id)
+void ImportDialog::copyStagedSourcePath(const MediaId& id)
 {
 	const auto it = m_staged.constFind(id);
 	if (it != m_staged.constEnd())
 		QApplication::clipboard()->setText(QDir::toNativeSeparators(it->path));
 }
 
-void QuickImportDialog::compareStagedPhotos(const std::vector<MediaId>& photoIds)
+void ImportDialog::compareStagedPhotos(const std::vector<MediaId>& photoIds)
 {
 	QStringList paths;
 	paths.reserve(static_cast<int>(photoIds.size()));
@@ -1224,7 +1224,7 @@ void QuickImportDialog::compareStagedPhotos(const std::vector<MediaId>& photoIds
 	w->show();
 }
 
-void QuickImportDialog::setBestForStagedSelection(const std::vector<MediaId>& ids, bool inBest)
+void ImportDialog::setBestForStagedSelection(const std::vector<MediaId>& ids, bool inBest)
 {
 	for (const MediaId& id : ids)
 	{
@@ -1236,13 +1236,13 @@ void QuickImportDialog::setBestForStagedSelection(const std::vector<MediaId>& id
 	}
 }
 
-void QuickImportDialog::removeStagedItems(const std::vector<MediaId>& ids)
+void ImportDialog::removeStagedItems(const std::vector<MediaId>& ids)
 {
 	for (const MediaId& id : ids)
 		unstage(id);
 }
 
-void QuickImportDialog::deleteStagedSourceFiles(const std::vector<MediaId>& ids)
+void ImportDialog::deleteStagedSourceFiles(const std::vector<MediaId>& ids)
 {
 	if (ids.empty())
 		return;
@@ -1272,7 +1272,7 @@ void QuickImportDialog::deleteStagedSourceFiles(const std::vector<MediaId>& ids)
 			tr("These files could not be deleted:\n\n%1").arg(failed.join("\n")));
 }
 
-void QuickImportDialog::renameStagedItem(const MediaId& id)
+void ImportDialog::renameStagedItem(const MediaId& id)
 {
 	const auto it = m_staged.constFind(id);
 	if (it == m_staged.constEnd())
@@ -1332,7 +1332,7 @@ void QuickImportDialog::renameStagedItem(const MediaId& id)
 	updateCardLabelDots(newId);
 }
 
-void QuickImportDialog::materializeUsedProvisionalLabels()
+void ImportDialog::materializeUsedProvisionalLabels()
 {
 	// Provisional labels reach the Catalog only here, at Import: create each one a staged item actually carries and
 	// map its provisional id to the real one. A provisional whose name already matched a real label was reused
@@ -1384,7 +1384,7 @@ void QuickImportDialog::materializeUsedProvisionalLabels()
 			tr("Some labels could not be created (the name may be reserved or invalid); the affected items were left unlabeled and remain staged."));
 }
 
-void QuickImportDialog::runImport()
+void ImportDialog::runImport()
 {
 	materializeUsedProvisionalLabels();
 

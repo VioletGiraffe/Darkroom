@@ -1,4 +1,4 @@
-# Import: the Import module, ffmpeg, Utils, QuickImportDialog
+# Import: the Import module, ffmpeg, Utils, ImportDialog
 
 [← Back to architecture index](../../ARCHITECTURE.md)
 
@@ -67,7 +67,7 @@ permanent preview frames into `outputFolder/preview/`, then registers the video 
 the expensive full extraction only happens later via `ensureFramesSplit`. `processBatch`'s progress text reads "Adding video X/Y...", since no
 full extraction happens here.
 
-Those preview frames are normally *reused, not re-extracted*: `QuickImportDialog` already ran ffmpeg to build
+Those preview frames are normally *reused, not re-extracted*: `ImportDialog` already ran ffmpeg to build
 each staged card's preview (see "Staging area" below), so import is handed each video's staging temp dir —
 keyed by the stable `MediaId` so it survives relocation moving the file — and copies those frames into
 `outputFolder/preview/`. A fresh extraction runs only as a fallback, when nothing staged is available. The **duration** Quick Import
@@ -144,7 +144,7 @@ byte-for-byte file comparison), `IMAGE_FILE_FILTERS`, `forEachFolder(root, cb)` 
 
 ---
 
-## `QuickImportDialog` (`src/Windows/QuickImportDialog.h/.cpp`)
+## `ImportDialog` (`src/Windows/ImportDialog.h/.cpp`)
 
 Import dialog: copy/move source files into a collection.
 
@@ -160,7 +160,7 @@ Four independent layers, at different points and catching different things:
   a re-drop of the same file, skipped silently; different content is refused with a warning naming both
   paths. Accepting both is not an option: `m_staged` is keyed by id, and the catalog tracks at most one
   item per id anyway, so the second file would have silently overwritten the first's staging entry.
-- **File-content duplicate at the relocation destination** (`QuickImportDialog`, this section): on a same-name
+- **File-content duplicate at the relocation destination** (`ImportDialog`, this section): on a same-name
   destination collision, `performRelocation` treats it as a duplicate when the `MediaId`s match (name+size,
   see [data-model.md](data-model.md)) **and** a full byte comparison (`Utils.h::filesAreIdentical`) confirms
   identical content — so the rare same-name/same-size/different-content case is still classified as "files
@@ -290,9 +290,9 @@ applied). `MediaId::name()` still gives the original filename for string-only ne
 `<collection>/<baseName>` without touching disk) — see [data-model.md](data-model.md).
 
 `LabelOption` (the label-list row payload, and the type `findLabelOption()` looks up) is nested directly
-inside `QuickImportDialog`, not inside its `Callbacks` namespace — a qualified reference like
+inside `ImportDialog`, not inside its `Callbacks` namespace — a qualified reference like
 `Callbacks::LabelOption` will fail to compile (qualified lookup doesn't search the enclosing class); use the
-unqualified `LabelOption` from inside `QuickImportDialog`'s own member functions.
+unqualified `LabelOption` from inside `ImportDialog`'s own member functions.
 
 ---
 

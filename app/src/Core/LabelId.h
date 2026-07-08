@@ -15,7 +15,7 @@
 //   - QSettings (the sidebar's saved filter): the native quint64 (toUInt64 / labelIdFromUInt64).
 //   - QVariant item-data roles (LabelSidebar rows): stored/read directly via QVariant::fromValue / value<LabelId>().
 //
-// The string-based UI layer (the QuickImportDialog staging list) carries ids in their decimal-string form and
+// The string-based UI layer (the ImportDialog staging list) carries ids in their decimal-string form and
 // layers its own namespacing over that string space - the provisional "new:<n>" placeholders for not-yet-created
 // labels. Those are never a LabelId until Import materializes them in the Catalog.
 enum class LabelId : uint64_t

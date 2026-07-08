@@ -20,7 +20,7 @@ class QWidget;
 class MediaItemWidget;
 
 // ============================================================================
-// QuickImportDialog - stage new video and photo files, label them, then import everything labeled in one
+// ImportDialog - stage new video and photo files, label them, then import everything labeled in one
 // "Import" step.
 //
 // Mirrors the main window's own label model: a small label-list panel (like LabelSidebar, minus
@@ -40,7 +40,7 @@ class MediaItemWidget;
 // onto the dialog to stage them (a folder is scanned recursively for the supported files under it).
 // ============================================================================
 
-class QuickImportDialog final : public QDialog
+class ImportDialog final : public QDialog
 {
 public:
 	// An ordinary (non-virtual) label, for the label-list panel.
@@ -120,8 +120,8 @@ public:
 
 	// suggestedRelocateFolder pre-fills the relocation destination on first use (when
 	// nothing's been persisted yet); see "Source file relocation row" in the .cpp.
-	QuickImportDialog(Callbacks callbacks, const QString& suggestedRelocateFolder, QWidget* parent = nullptr);
-	~QuickImportDialog() override;
+	ImportDialog(Callbacks callbacks, const QString& suggestedRelocateFolder, QWidget* parent = nullptr);
+	~ImportDialog() override;
 
 	// Pre-populates the staging area with the given files and/or folders (a folder is scanned recursively for
 	// the supported media under it). Used when handing paths over from the main window's drop or the "Scan for
@@ -174,7 +174,7 @@ private:
 	[[nodiscard]] const LabelOption* findLabelOption(const QString& id) const;
 
 	// --- Provisional labels (folder-derived or "Create label"); all mutate m_provisionalLabels and re-render via
-	// refreshLabelList. See QuickImportDialog.cpp for the model. ---------------------------------------------------
+	// refreshLabelList. See ImportDialog.cpp for the model. ---------------------------------------------------
 	[[nodiscard]] static bool isProvisionalId(const QString& id);
 	// The id of the label whose display name matches (case-insensitive), skipping excludeId; empty if none.
 	[[nodiscard]] QString findLabelIdByName(const QString& name, const QString& excludeId) const;
@@ -219,7 +219,7 @@ private:
 	DragGestureHelper m_labelDragHelper;
 	QListWidgetItem*  m_labelPressedItem = nullptr;
 
-	// Source-file relocation controls - see "performRelocation" in QuickImportDialog.cpp.
+	// Source-file relocation controls - see "performRelocation" in ImportDialog.cpp.
 	QComboBox* m_relocateModeCombo = nullptr;
 	QLineEdit* m_relocateFolderEdit = nullptr;
 	QSplitter* m_splitter = nullptr;
