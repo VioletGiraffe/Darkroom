@@ -7,6 +7,7 @@
 #include <QDialog>
 
 #include <functional>
+#include <memory>
 
 // ============================================================================
 // IntegrityCheckDialog - shows what CatalogIntegrity::scan found (untracked frame folders, untracked photo
@@ -16,9 +17,12 @@
 // (referenced only) or remove. Each section that admits a uniform batch also carries a blanket action over its
 // rows - add all untracked photos; re-import / regenerate / remove all broken videos; locate (search a folder
 // recursively and relink by identity) / remove all missing photos - each a loop over the same per-row callbacks.
-// All UI logic lives here behind the static scanAndShowUi() entry point - MainWindow only supplies the callbacks
-// that actually touch the Catalog/disk.
+// All UI logic lives behind the static scanAndShowUi() entry point - the dialog frame here, the sections' rows
+// and handlers in IntegrityCheckSections.h - MainWindow only supplies the callbacks that actually touch the
+// Catalog/disk.
 // ============================================================================
+
+class IntegrityCheckSections;
 
 class IntegrityCheckDialog final : public QDialog
 {
@@ -55,4 +59,6 @@ private:
 	~IntegrityCheckDialog() override;
 
 	Callbacks m_callbacks;
+	// Owns the section rows' shared state, so it must live as long as the dialog's buttons - see IntegrityCheckSections.h.
+	std::unique_ptr<IntegrityCheckSections> m_sections;
 };
