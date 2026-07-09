@@ -331,6 +331,11 @@ void VideoPlayerWindow::closeAll()
 	}
 }
 
+void VideoPlayerWindow::showForFile(const QString& videoPath, QWidget* parent)
+{
+	(new VideoPlayerWindow(videoPath, MediaId::fromFile(videoPath), parent))->show();
+}
+
 void VideoPlayerWindow::resizeAndMoveWindow()
 {
 	QSize s = _videoWidget->videoSink()->videoSize();

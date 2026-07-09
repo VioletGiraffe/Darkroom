@@ -188,7 +188,7 @@ private:
 	DragGestureHelper m_labelDragHelper;
 	QListWidgetItem*  m_labelPressedItem = nullptr;
 
-	// Source-file relocation controls - see "performRelocation" in ImportDialog.cpp.
+	// Source-file relocation controls - the machinery lives in SourceRelocation.h (see runImport for the use).
 	QComboBox* m_relocateModeCombo = nullptr;
 	QLineEdit* m_relocateFolderEdit = nullptr;
 	QSplitter* m_splitter = nullptr;

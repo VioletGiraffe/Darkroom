@@ -7,6 +7,7 @@
 #include "UiComponents/LabelVisuals.h"
 #include "Settings.h"
 #include "Shortcuts.h"
+#include "Windows/SourceRelocation.h"
 #include "Theme/Icons.h"
 #include "Theme/Theme.h"
 #include "Utils.h"
@@ -127,34 +128,7 @@ QList<StagedFile> flattenToSupportedMediaFiles(const QStringList& paths)
 	return files;
 }
 
-// ============================================================================
-// Source video relocation - optionally copy/move the dropped source video
-// file into a chosen folder when it's added to a collection, and import from
-// the new location instead of the original.
-// ============================================================================
-
-enum class RelocateMode { LeaveInPlace, Copy, Move };
-
-// Performs the actual copy/move; on failure, warns and falls back to leaving
-// the file at srcPath so the caller can still import it from there.
-[[nodiscard]] QString copyOrMove(QWidget* dialogParent, const QString& srcPath, const QString& destPath, bool isMove)
-{
-	const bool ok = isMove ? QFile::rename(srcPath, destPath) : QFile::copy(srcPath, destPath);
-	if (!ok)
-	{
-		QMessageBox::warning(dialogParent, QObject::tr("Error"), QObject::tr("Failed to %1:\n%2\nto:\n%3")
-			.arg(isMove ? QObject::tr("move") : QObject::tr("copy"), srcPath, destPath));
-		return srcPath;
-	}
-	return destPath;
-}
-
-// Opens a VideoPlayerWindow for the file, parented to the given widget
-void playVideo(const QString& path, QWidget* parent)
-{
-	auto* player = new VideoPlayerWindow(path, MediaId::fromFile(path), parent);
-	player->show();
-}
+using RelocateMode = SourceRelocation::Mode;
 
 // True iff the item is tracked by the Catalog at the exact frame folder this import derives for it
 // (Import::importVideo's outputFolder). Checked right after a video batch import to tell a successfully-added
@@ -165,211 +139,6 @@ void playVideo(const QString& path, QWidget* parent)
 {
 	const QString expectedFolder = rootFolder() + "/" + collectionName + "/" + QFileInfo(id.name()).completeBaseName();
 	return QString::compare(Catalog::instance().folderForMediaItem(id), expectedFolder, Qt::CaseInsensitive) == 0;
-}
-
-// ============================================================================
-// FileCollisionDialog - shown when the relocation destination already has a
-// file with the same name as the one being added.
-//
-// Not a plain QMessageBox because the "files differ" case offers Play buttons
-// that must NOT close the dialog (they let the user preview both files before
-// deciding), alongside the decision buttons that do.
-// ============================================================================
-
-class FileCollisionDialog final : public QDialog
-{
-public:
-	enum class Result { Overwrite, Skip, SkipAndDelete, Cancel };
-
-	FileCollisionDialog(const QString& stagedPath, const QString& destPath, bool isDuplicate, QWidget* parent)
-		: QDialog(parent)
-	{
-		setWindowTitle(isDuplicate ? tr("Duplicate File Found") : tr("File Already Exists"));
-
-		// WindowModal (not the exec()-default ApplicationModal) blocks only this
-		// dialog's parent (ImportDialog) and up - it deliberately leaves sibling
-		// top-level windows, such as the VideoPlayerWindow opened by the Play
-		// buttons below, interactive.
-		setWindowModality(Qt::WindowModal);
-
-		QVBoxLayout* layout = new QVBoxLayout(this);
-
-		QLabel* message = new QLabel(isDuplicate
-			? tr("An identical file is already at the destination:\n\n%1\n\nIt won't be imported again. You can optionally delete the redundant staged copy:\n\n%2").arg(destPath, stagedPath)
-			: tr("A different file with the same name already exists at the destination:\n\n%1\n\nOverwrite it with the staged file, skip importing this one, or cancel to leave it staged and decide later:\n\n%2").arg(destPath, stagedPath),
-			this);
-		message->setWordWrap(true);
-		layout->addWidget(message);
-
-		QHBoxLayout* buttonRow = new QHBoxLayout;
-
-		if (!isDuplicate)
-		{
-			// Play buttons open a preview parented to the outer ImportDialog
-			// (this dialog's parent), not to this dialog - this dialog is
-			// destroyed as soon as Overwrite/Skip is clicked, which would
-			// otherwise kill an in-progress preview along with it.
-			QWidget* previewParent = parent;
-
-			QPushButton* playStaged = new QPushButton(tr("Play Staged File"), this);
-			connect(playStaged, &QPushButton::clicked, this, [previewParent, stagedPath] { playVideo(stagedPath, previewParent); });
-			buttonRow->addWidget(playStaged);
-
-			QPushButton* playExisting = new QPushButton(tr("Play Existing File"), this);
-			connect(playExisting, &QPushButton::clicked, this, [previewParent, destPath] { playVideo(destPath, previewParent); });
-			buttonRow->addWidget(playExisting);
-		}
-
-		buttonRow->addStretch(1);
-
-		if (isDuplicate)
-		{
-			QPushButton* skip = new QPushButton(tr("Skip"), this);
-			connect(skip, &QPushButton::clicked, this, [this] { m_result = Result::Skip; accept(); });
-			buttonRow->addWidget(skip);
-
-			QPushButton* skipDelete = new QPushButton(tr("Skip and Delete Duplicate"), this);
-			connect(skipDelete, &QPushButton::clicked, this, [this] { m_result = Result::SkipAndDelete; accept(); });
-			buttonRow->addWidget(skipDelete);
-		}
-		else
-		{
-			QPushButton* overwrite = new QPushButton(tr("Overwrite"), this);
-			connect(overwrite, &QPushButton::clicked, this, [this] { m_result = Result::Overwrite; accept(); });
-			buttonRow->addWidget(overwrite);
-
-			QPushButton* skip = new QPushButton(tr("Skip"), this);
-			connect(skip, &QPushButton::clicked, this, [this] { m_result = Result::Skip; accept(); });
-			buttonRow->addWidget(skip);
-
-			// Defer: import nothing, touch no file, and leave the entry staged so
-			// the user can deal with the name clash later.
-			QPushButton* cancel = new QPushButton(tr("Cancel"), this);
-			connect(cancel, &QPushButton::clicked, this, [this] { m_result = Result::Cancel; accept(); });
-			buttonRow->addWidget(cancel);
-		}
-
-		layout->addLayout(buttonRow);
-	}
-
-	[[nodiscard]] Result result() const { return m_result; }
-
-private:
-	// Cancel is the default so dismissing the dialog (Escape / window close) defers
-	// rather than taking any action - the safe no-op for either flavor.
-	Result m_result = Result::Cancel;
-};
-
-// Outcome of relocating one file. importPath empty => don't import it; of those, keepStaged true => the
-// user deferred (Cancel), so leave it staged for a later retry, while keepStaged false => the collision was
-// resolved as "don't import" (Skip / Skip and Delete), so the entry should be cleared from staging.
-struct RelocationOutcome
-{
-	QString importPath;
-	bool keepStaged = false;
-};
-
-// Resolves relocation (including any naming collision) for a single file.
-// On a collision "Skip"/"Skip and Delete" the destination is treated as the
-// already-catalogued copy and this item is not imported; "Cancel" additionally
-// keeps it staged. File-operation *failures* fall back to importing from the
-// original path, so an I/O error never silently drops a file the user wanted.
-[[nodiscard]] RelocationOutcome performRelocation(QWidget* dialogParent, const QString& path, RelocateMode mode, const QString& destFolder)
-{
-	const QString destPath = destFolder + "/" + QFileInfo(path).fileName();
-	const bool isMove = (mode == RelocateMode::Move);
-
-	// Already at the destination - e.g. a retry after an earlier Copy/Move whose import was declined (the
-	// staged entry follows the file, see runImport) - so there is nothing to relocate and, critically, no
-	// "collision": without this the file would be compared against itself and offered up as a duplicate.
-	if (QFileInfo(path) == QFileInfo(destPath))
-		return { path, false };
-
-	if (!QFile::exists(destPath))
-		return { copyOrMove(dialogParent, path, destPath, isMove), false };
-
-	// A name+size match (MediaId) is the cheap first gate; on that collision a full byte comparison confirms
-	// a genuine duplicate, so the astronomically-rare same-name/same-size/different-content case is still
-	// classified as "files differ". The && short-circuits the byte read when the MediaIds (sizes) differ.
-	const bool isDuplicate = (MediaId::fromFile(path) == MediaId::fromFile(destPath)) && filesAreIdentical(path, destPath);
-	FileCollisionDialog collisionDialog(path, destPath, isDuplicate, dialogParent);
-	collisionDialog.exec();
-
-	switch (collisionDialog.result())
-	{
-	case FileCollisionDialog::Result::Overwrite:
-		if (!QFile::remove(destPath))
-		{
-			QMessageBox::warning(dialogParent, QObject::tr("Error"), QObject::tr("Failed to overwrite existing file:\n%1").arg(destPath));
-			return { path, false }; // I/O failure - fall back to importing from the original
-		}
-		return { copyOrMove(dialogParent, path, destPath, isMove), false };
-
-	case FileCollisionDialog::Result::SkipAndDelete:
-		if (!QFile::remove(path))
-			QMessageBox::warning(dialogParent, QObject::tr("Error"), QObject::tr("Failed to delete duplicate file:\n%1").arg(path));
-		return { {}, false }; // not imported, removed from staging
-
-	case FileCollisionDialog::Result::Skip:
-		return { {}, false }; // not imported, removed from staging
-
-	case FileCollisionDialog::Result::Cancel:
-		break;
-	}
-
-	return { {}, true }; // deferred - not imported, kept staged
-}
-
-// Result of relocating a whole drop batch, reported per original path so the caller can update its staging
-// state. toImport is what to hand to import. Each original path additionally lands in at most one of:
-// keepStaged (the user deferred via Cancel - leave the entry staged untouched), skipped (collision resolved
-// as "don't import" via Skip / Skip and Delete - clear the entry from staging), or relocatedTo (the file was
-// actually copied/moved - point the staged entry at the new location, so a retry after a failed/declined
-// import starts from where the file really is; a Move deletes the original).
-struct BatchRelocation
-{
-	QStringList toImport;
-	QStringList keepStaged;
-	QStringList skipped;
-	QHash<QString, QString> relocatedTo;
-};
-
-// Batch entry point - no-op when relocation is disabled. Validates the
-// destination folder once per batch (rather than once per file) to avoid
-// repeating the same warning for every dropped file.
-[[nodiscard]] BatchRelocation relocateIfNeeded(QWidget* dialogParent, const QStringList& paths, RelocateMode mode, const QString& destFolder)
-{
-	if (mode == RelocateMode::LeaveInPlace)
-		return { paths, {} };
-
-	if (destFolder.isEmpty())
-	{
-		QMessageBox::warning(dialogParent, QObject::tr("Error"), QObject::tr("No destination folder is set for relocating source files - they will be left in their original location."));
-		return { paths, {} };
-	}
-	if (!QDir{}.mkpath(destFolder))
-	{
-		QMessageBox::warning(dialogParent, QObject::tr("Error"), QObject::tr("Could not create or access destination folder:\n%1").arg(destFolder));
-		return { paths, {} };
-	}
-
-	BatchRelocation result;
-	result.toImport.reserve(paths.size());
-	for (const QString& path : paths)
-	{
-		const RelocationOutcome outcome = performRelocation(dialogParent, path, mode, destFolder);
-		if (!outcome.importPath.isEmpty())
-		{
-			result.toImport.append(outcome.importPath);
-			if (outcome.importPath != path)
-				result.relocatedTo.insert(path, outcome.importPath);
-		}
-		else if (outcome.keepStaged)
-			result.keepStaged.append(path);
-		else
-			result.skipped.append(path);
-	}
-	return result;
 }
 
 } // namespace
@@ -891,7 +660,7 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 	// Dedup by MediaId, both against already-staged entries and within this batch (m_staged is keyed by id,
 	// so accepting a second same-id file would silently overwrite the first entry, orphaning its card and
 	// leaking its temp dir). The id match (name+size) is the cheap gate; a byte comparison then classifies
-	// it, mirroring performRelocation's gate-then-verify shape: identical content is a plain duplicate,
+	// it, mirroring SourceRelocation's gate-then-verify shape: identical content is a plain duplicate,
 	// skipped silently, while different content is a genuine collision the user must know about - the
 	// catalog tracks at most one item per id, so the file can't be staged alongside its twin.
 	QHash<MediaId, QString> stagedPathById;
@@ -1176,7 +945,7 @@ void ImportDialog::previewStagedItem(const MediaId& id)
 	if (isSupportedImageFile(it->path))
 		QDesktopServices::openUrl(QUrl::fromLocalFile(it->path));  // a photo opens in the system image viewer
 	else
-		playVideo(it->path, this);
+		VideoPlayerWindow::showForFile(it->path, this);
 }
 
 void ImportDialog::locateStagedSourceFile(const MediaId& id)
@@ -1481,7 +1250,7 @@ void ImportDialog::runImport()
 			stagedDurations.insert(id, entry.durationMs);
 		}
 
-		const BatchRelocation relocated = relocateIfNeeded(this, paths, relocateMode, m_relocateFolderEdit->text());
+		const SourceRelocation::BatchResult relocated = SourceRelocation::relocateIfNeeded(this, paths, relocateMode, m_relocateFolderEdit->text());
 		m_callbacks.addMediaItemsRequested(option->displayName, relocated.toImport, stagedPreviewDirs, stagedDurations);
 
 		for (const MediaId& id : videoIds)
