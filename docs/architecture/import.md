@@ -55,7 +55,7 @@ regenerating-in-place there; it just goes through the normal import flow from sc
 `Import::importVideo` (`src/Import.h/.cpp`, a free-function module in the same style as `Ffmpeg`) is the
 per-item import worker. It is deliberately UI-free — it never prompts or pops a message box; every outcome
 comes back as an `Import::Result` (`Success` / `FolderConflict` / `Error` with a user-presentable message).
-`MainWindow::processBatch` stays the batch coordinator on top of it and owns all the import UI: the app-wide
+`MainWindow::importVideoBatch` stays the batch coordinator on top of it and owns all the import UI: the app-wide
 `m_isProcessing` lock shared with `reExportAllVideos`, the progress modal, the folder-conflict
 partition/prompt (a `FolderConflict` result — the output folder exists and overwrite wasn't granted, nothing
 touched — is resolved by asking the user about that one item and retrying the call with
@@ -67,7 +67,7 @@ It does not extract the full frame set. It creates the output folder, puts a few
 permanent preview frames into `outputFolder/preview/`, then registers the video via `Catalog::addMediaItem(...,
 /*splitIntoFrames=*/false)` immediately — the video appears in the grid right away with no badge yet (the green
 "frames extracted" marker appears only once the full set exists; see [media-widgets.md](media-widgets.md)), and
-the expensive full extraction only happens later via `ensureFramesSplit`. `processBatch`'s progress text reads "Adding video X/Y...", since no
+the expensive full extraction only happens later via `ensureFramesSplit`. `importVideoBatch`'s progress text reads "Adding video X/Y...", since no
 full extraction happens here.
 
 Those preview frames are normally *reused, not re-extracted*: `ImportDialog` already ran ffmpeg to build
@@ -83,7 +83,7 @@ other import failure.
 
 `Import::importPhoto(photoPath, labelDisplayName, mode)` is the photo counterpart to `importVideo` — equally
 UI-free, returning an `Import::PhotoResult` (`Success` / `IdCollision` / `Error` + message + the
-**`registeredId`** actually registered). `MainWindow::processPhotoBatch` is its coordinator (batch scope,
+**`registeredId`** actually registered). `MainWindow::importPhotoBatch` is its coordinator (batch scope,
 error boxes, view refresh), driven from the Import dialog via the `importPhotosRequested` callback. The
 `PhotoImportMode` comes from the Import dialog's existing relocation combo, which doubles as the photo import
 mode: **Copy/Move** land the file in `<root>/Photos/<label>/` (created lazily), **"leave in place" means
@@ -99,7 +99,7 @@ Reference** — the file is tracked where it is and the catalog entry is marked 
 - **Reference import collision**: a referenced photo has no owned copy to rename, so an id already tracked
   as a different item is refused with `IdCollision`; the Import dialog then offers the escape hatch — "import an
   owned copy instead?" — which routes the file through the Copy path where the auto-rename works.
-- **A referenced photo's first label** is applied by `processPhotoBatch` via `Catalog::addLabel` right after
+- **A referenced photo's first label** is applied by `importPhotoBatch` via `Catalog::addLabel` right after
   registration (it has no storage folder to derive a label from); an owned photo's first label derives from
   the `Photos/<label>` dir it landed in, exactly like a video's collection folder.
 
@@ -151,11 +151,22 @@ byte-for-byte file comparison), `IMAGE_FILE_FILTERS`, `forEachFolder(root, cb)` 
 
 Import dialog: copy/move source files into a collection.
 
+`ImportDialog` reads the `Catalog` directly for lookups (label options, photo-content duplicates, the
+id-tracking check, random label colors) and calls back into its host (`MainWindow`) only for host-owned
+actions it can't do itself. That is the whole `Callbacks` struct now — four members:
+`addMediaItemsRequested` / `importPhotosRequested` (the import workers, which own the app-wide busy lock and
+the progress modal), `createCollectionRequested` (shared with the sidebar's create-label flow), and
+`viewChanged` (the host repaint). The Best/extra-label flush and the tracked-in-collection check that used to
+be callbacks are done in-dialog now (below). Source-file relocation — copy/move into a chosen folder, with
+the interactive same-name collision dialog — lives in its own **`SourceRelocation`** module
+(`src/Windows/SourceRelocation.h/.cpp`), entry point `SourceRelocation::relocateIfNeeded`; `FileCollisionDialog`
+and `performRelocation` are internal to it.
+
 ### Duplicate detection
 
 Four independent layers, at different points and catching different things:
-- **Photo content duplicate at staging** (`findAlreadyImportedDuplicatePhoto`, a `MainWindow` callback): a
-  dropped photo is byte-compared against every already-imported photo of the same byte size, *regardless of
+- **Photo content duplicate at staging** (`stageMediaItems` → `Catalog::findPhotoBySameContent`, a direct
+  Catalog call): a dropped photo is byte-compared against every already-imported photo of the same byte size, *regardless of
   name* — this is what catches renamed duplicates. A hit is reported and not staged at all. Videos have no
   equivalent (their identity checks below are name+size-gated); photo-only by design.
 - **Same-identity file at staging** (`stageMediaItems()`): a dropped file whose `MediaId` matches an
@@ -163,7 +174,7 @@ Four independent layers, at different points and catching different things:
   a re-drop of the same file, skipped silently; different content is refused with a warning naming both
   paths. Accepting both is not an option: `m_staged` is keyed by id, and the catalog tracks at most one
   item per id anyway, so the second file would have silently overwritten the first's staging entry.
-- **File-content duplicate at the relocation destination** (`ImportDialog`, this section): on a same-name
+- **File-content duplicate at the relocation destination** (the `SourceRelocation` module, above): on a same-name
   destination collision, `performRelocation` treats it as a duplicate when the `MediaId`s match (name+size,
   see [data-model.md](data-model.md)) **and** a full byte comparison (`Utils.h::filesAreIdentical`) confirms
   identical content — so the rare same-name/same-size/different-content case is still classified as "files
@@ -203,17 +214,18 @@ re-running ffmpeg (the import-side reuse in "Import: preview frames only" above)
 ### Label assignment: drag-from-list or per-card checklist, no "destination" UI
 
 The label-list panel (`refreshLabelList`) is this session's **provisional** labels followed by the Catalog's
-real ones: `Callbacks::getLabelOptions()` supplies every non-virtual `Catalog::allLabels()` entry (with color),
+real ones: `refreshLabelList` reads every non-virtual `Catalog::allLabels()` entry (with color) directly,
 and `m_provisionalLabels` holds those minted in-dialog — folder-derived (above) or via **Create label** — cached
 together as `m_labelOptions`. A provisional label carries a synthetic id (`"new:<n>"`, tested by
-`isProvisionalId`), a swatch from `Callbacks::generateLabelColor()` (the Catalog's own `randomLabelColor`), and
+`isProvisionalId`), a swatch from `Catalog::randomLabelColor()` called directly, and
 renders italic with a `(new)` suffix. It exists **only in the dialog** until Import; right-clicking a provisional
 row offers **Rename** / **Set color** / **Delete** (all local mutations that re-render via `refreshLabelList`),
 where a rename onto an existing name (real or provisional) offers to *merge* into it — `mergeProvisionalInto`
 rewrites the staged cards' picks and drops the source, purely locally. Right-clicking a *real* row offers only
 **Rename**, which explains that real labels are edited in the main window, not here. Name matching everywhere is
 case-insensitive, matching the Catalog/filesystem rule. The panel supports the same drag-a-row-out gesture as
-`LabelSidebar` (`DragGestureHelper` + `LabelMimeType`, mirrored line-for-line). Dragging a label onto a
+`LabelSidebar`, both built on the shared `ListRowDragFilter` (`src/UiComponents/DragGestureHelper.h/.cpp`)
+with a per-list MIME-data factory — a factory that returns null vetoes an undraggable row. Dragging a label onto a
 staged card — or onto a multi-selection containing it, same effective-selection shape as the main grid's
 own card drop — appends the label id to that card's `pendingLabelIds` (no-op if already present) and
 re-renders its label dots. Right-clicking a card opens a context menu mirroring the main grid's, adapted for untracked items: Compare
@@ -244,37 +256,37 @@ just an ordinary additional tag, applied the same way Best is.
 1. Groups every staged entry with a non-empty `pendingLabelIds` by its first id; entries with no label are
    skipped entirely, left staged. Each group is then split by type — photos and videos take different apply
    paths.
-2. **Photos in the group** go through `importPhotosRequested` (→ `MainWindow::processPhotoBatch` →
+2. **Photos in the group** (`importPhotoGroup`) go through `importPhotosRequested` (→ `MainWindow::importPhotoBatch` →
    `Import::importPhoto`, see "Photo import" above), with the relocation combo mapped to the
    `PhotoImportMode` (leave-in-place = Reference). An `IdCollision` result (Reference mode's unresolvable
    name+size clash) pops the "import an owned copy instead?" escape hatch, retrying that one path through
    the Copy mode. A success unstages the entry; Best/extra-label bookkeeping records the result's
    `registeredId` (an owned-import auto-rename gives the copy a new identity - the staged id no longer names
    anything). Anything else stays staged with its labels intact.
-3. **Videos in the group**: resolves the label's display name, relocates the group's source files if
-   relocation is enabled (`performRelocation`/`FileCollisionDialog`, "Duplicate detection" above, unchanged),
-   then calls `addMediaItemsRequested` — the `processBatch`/`Import::importVideo` apply path (also where a
+3. **Videos in the group** (`importVideoGroup`): resolves the label's display name, relocates the group's source files if
+   relocation is enabled (`SourceRelocation::relocateIfNeeded`, "Duplicate detection" above and the module intro),
+   then calls `addMediaItemsRequested` — the `importVideoBatch`/`Import::importVideo` apply path (also where a
    file dropped on the main window ends up, since a drop just opens this dialog pre-staged). It passes along
    each video's staging temp dir so import can reuse the already-extracted preview frames (see "Import:
    preview frames only" above). Per video: deferred relocation (`Cancel`) or
-   `isMediaItemTrackedInCollection(id, collection)` coming back false leaves it staged, labels intact, to
+   `isTrackedInCollection(id, collection)` (a local free function) coming back false leaves it staged, labels intact, to
    retry later. That check compares the item's tracked frame folder against the one this import derives
    (`<collection>/<source base name>`), not just "tracked at all" — so both an import that was
    declined/failed *and* a name+size collision with an item tracked elsewhere (import refuses those, see
    "Duplicate detection" above) are correctly left staged rather than misread as successes. The staged path
    is first updated to the relocated location when the file was actually copied/moved, so that retry starts
-   from where the file really is (a Move deleted the original; `performRelocation` also short-circuits when
+   from where the file really is (a Move deleted the original; `SourceRelocation` also short-circuits when
    the file is already at the destination, so a retry never "collides" with itself). A collision resolved as
    Skip / "Skip and Delete" unstages the entry without importing (the destination copy stands in for it).
-4. Once every group is processed, `markBestRequested`/`assignExtraLabelsRequested` are each called once with
-   the accumulated successes (`bestItems`, `ExtraLabelAssignment{mediaId, labelIds}`) — `MainWindow` calls
-   `Catalog::addLabel` for each, guarded by `Catalog::containsMediaItem` (items only reach these lists after
-   a confirmed import; the old per-collection frame-folder-exists guard was video-shaped and meaningless for
-   photos), each wrapped in its own `Catalog::BatchScope` (see
-   [catalog-and-labels.md](catalog-and-labels.md)) so a multi-item Import session writes the store once per
-   callback rather than once per item. Every successfully-imported (or skip-resolved) entry is then unstaged.
+4. Both group importers accumulate into one `ImportOutcome` (`succeededIds` / `skippedIds` / `bestItems` /
+   `extraLabelAssignments`). Once every group is processed, `runImport` flushes it directly to the Catalog —
+   `Catalog::addLabel` for each Best flag and extra-label pick, guarded by `Catalog::containsMediaItem` (items
+   only reach these lists after a confirmed import; the old per-collection frame-folder-exists guard was
+   video-shaped and meaningless for photos), the whole flush wrapped in one `Catalog::BatchScope` (see
+   [catalog-and-labels.md](catalog-and-labels.md)) so a multi-item Import session writes the store once. Every
+   successfully-imported (or skip-resolved) entry is then unstaged.
 5. If anything succeeded, `viewChanged()` fires once (`MainWindow` wires it to `refreshLibraryView()`):
-   `addMediaItemsRequested` → `processBatch` already refreshes mid-Import as each group lands, but only with
+   `addMediaItemsRequested` → `importVideoBatch` already refreshes mid-Import as each group lands, but only with
    folder labels — the Best/extra-label flush in step 4 runs *after* that, with no refresh of its own. Since
    the dialog stays open after an Import, that gap would otherwise be visible until the dialog closes.
 
@@ -284,7 +296,7 @@ dirs, a purely local resource the caller never depends on seeing.
 
 ### Why `MediaId`, not path, addresses an item once it's mid-Import
 
-`isMediaItemTrackedInCollection`, `markBestRequested`, and `ExtraLabelAssignment` all take a `MediaId`, captured once at
+`isTrackedInCollection`, the accumulated `bestItems`, and `ExtraLabelAssignment` all take a `MediaId`, captured once at
 stage time, rather than the staged path. `MediaId::fromFile(path)` stats the file for its size — if
 relocation mode is **Move**, the source has already been deleted from that path by the time step 3/4 above
 run, so re-deriving the id from the path there would return an invalid id matching nothing (the bug this

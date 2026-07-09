@@ -113,8 +113,9 @@ Two paths, both add-only (except the context-menu checklist, which also removes)
 `effectiveSelection`:
 - **Context-menu Labels checklist** — see `showMediaItemContextMenu` above.
 - **Dragging a label row from `LabelSidebar` onto a card.** The sidebar is the drag source — its list
-  viewport is event-filtered to start a `DragGestureHelper` drag for ordinary label rows only (not "All" or
-  the virtual `Best`), carrying the label id as `LabelMimeType` (`src/UiComponents/LabelMimeType.h`); the card is the
+  viewport carries a `ListRowDragFilter` (the shared list-row drag gesture in `DragGestureHelper.h/.cpp`) whose
+  MIME factory drags ordinary label rows only (returning null for "All" and the virtual `Best`), carrying the
+  label id as `LabelMimeType` (`src/UiComponents/LabelMimeType.h`); the card is the
   drop target (see [media-widgets.md](media-widgets.md)). `addCard` wires each card's `setOnLabelDropped`
   to add the label across the effective selection, **deferred via a queued `invokeMethod`** so the grid
   rebuild doesn't delete the card mid-drop (the rebuild happens inside the handler, which runs from the
@@ -225,7 +226,15 @@ list's background.
 
 ## Renaming a media item
 
-`renameVideo(oldId, newFolderPath)` is the one place a video's frame folder moves on disk outside the
+The interactive rename flows live in their own **`MediaRename`** module (`src/Windows/MediaRename.h/.cpp`) —
+free functions with a single public entry, `MediaRename::renameItemInteractive(id, dialogParent)`, which
+dispatches by media type and returns a `MediaRename::Result { renamed, oldFolderPath, newFolderPath }`.
+`MainWindow::renameItemInteractive` is a thin wrapper over it: on success it does the host-side UI fixups the
+module deliberately leaves out — `refreshLibraryView()` and, when the frame viewer was showing the renamed
+video's `oldFolderPath`, repointing it to `newFolderPath`. Both the Edit-menu **Rename** action and the card
+context menu go through that wrapper.
+
+Internally, `renameVideo(oldId, newFolderPath)` is the one place a video's frame folder moves on disk outside the
 label-mutation paths in `Catalog` (which handle their own folder moves internally — see
 `renameLabel`/`relocateFolderOffLabel` in [catalog-and-labels.md](catalog-and-labels.md)):
 
@@ -242,12 +251,12 @@ label-mutation paths in `Catalog` (which handle their own folder moves internall
    interactive pre-checks only catch a file/folder collision in the *same* directory, not a name+size match
    elsewhere in the library — and `renameVideo` then renames the file and folder back, so the refusal leaves
    disk and catalog exactly as they were.
-4. `refreshLibraryView()` + updates `FrameViewerWindow` if it's showing the renamed folder.
+4. Returns success with the old/new folder paths in its `Result`; the `refreshLibraryView()` and
+   `FrameViewerWindow` repoint happen in `MainWindow`'s wrapper (above), not in the module.
 
 `renameVideoInteractive(id)` is the video UI-prompt wrapper (validate chars, check collisions, confirm) →
-`renameVideo(...)`; an assert enforces it is only reached for videos. Both the Edit-menu **Rename** action and
-the card context menu go through a `renameItemInteractive(id)` dispatcher that sends videos here and photos to
-`renamePhotoInteractive`.
+`renameVideo(...)`; an assert enforces it is only reached for videos. The module's `renameItemInteractive`
+dispatcher sends videos here and photos to `renamePhotoInteractive`.
 
 Photos rename differently because a photo *is* its file (no frame folder): `renamePhotoInteractive` →
 `renamePhoto` rename only the file's base name in place, keeping its directory (an owned photo's shared

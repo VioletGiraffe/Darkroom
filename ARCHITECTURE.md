@@ -102,8 +102,8 @@ app-wide `Accent`/`AccentBg` tokens), and the central `Style` stylesheet + custo
 `SegmentedToggle`) that gives the app its non-stock look.
 
 ### [Import: the Import module, ffmpeg, Utils, ImportDialog](docs/architecture/import.md)
-`Import::importVideo` and `Import::importPhoto` — the per-item import workers (`MainWindow::processBatch` /
-`processPhotoBatch` remain the batch coordinators over them; photos land in `<root>/Photos/<label>/` or are
+`Import::importVideo` and `Import::importPhoto` — the per-item import workers (`MainWindow::importVideoBatch` /
+`importPhotoBatch` remain the batch coordinators over them; photos land in `<root>/Photos/<label>/` or are
 referenced in place, with collision auto-rename), the `ffmpeg` invocation (`Ffmpeg::generatePreviewFrames` —
 a batch/concurrent preview extractor that `ImportDialog`'s staging runs across several videos at once,
 whose frames import then reuses by copy instead of re-extracting), `Utils.h`'s grab-bag of free functions,
@@ -116,7 +116,7 @@ card in one step.
 ## Improvement backlog
 
 **Open:**
-- *Batch ffmpeg failures*: `processBatch` pops one modal `QMessageBox` per failure inside the loop, blocking
+- *Batch ffmpeg failures*: `importVideoBatch` pops one modal `QMessageBox` per failure inside the loop, blocking
   the batch. Collect failures, show one summary at the end.
 - *Label-reference validation*: `CatalogIntegrity::scan` checks catalog-vs-disk but not label integrity — an
   item whose stored `"labels"` id matches no registry label is neither flagged nor fixable. Add a "dangling

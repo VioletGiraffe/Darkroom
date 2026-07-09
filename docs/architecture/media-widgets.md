@@ -185,9 +185,16 @@ way to acquire one — composite thumbnails are never drag sources. So `MediaIte
 ## `DragGestureHelper` (`src/UiComponents/DragGestureHelper.h/.cpp`)
 
 Tiny reusable helper: records the press, then starts a `QDrag` once the pointer moves past the drag threshold,
-given a MIME-data factory and a drop action. The drag image is a supplied pixmap or, by default, a size-capped
-grab of the widget. Callers: `ThumbnailWidget` (single-frame thumbnails' default file drag, grabs itself) and
-`LabelSidebar` (label-assign drag, passes a grab of just the dragged row — see [main-window.md](main-window.md)).
+given a MIME-data factory (which may return null to veto the drag) and a drop action. The drag image is a
+supplied pixmap or, by default, a size-capped grab of the widget. `ThumbnailWidget` uses it directly
+(single-frame thumbnails' default file drag, grabs itself).
+
+The same file also provides **`ListRowDragFilter`**, which packages the *complete* drag-out gesture for a
+`QListWidget`'s rows as a self-installing event filter (the press/move/release state machine plus the
+row-pixmap grab, built on `DragGestureHelper`), parameterized by one `QListWidgetItem → QMimeData*` factory
+(returning null means that row doesn't drag). `LabelSidebar` and `ImportDialog`'s label panel both use it for
+their label-assign drags — each just supplies its own factory — so neither hand-rolls the gesture (see
+[main-window.md](main-window.md)).
 
 ## Card preview sizing & zoom (Ctrl+wheel)
 
