@@ -1,6 +1,7 @@
 #include "Windows/MediaRename.h"
 #include "Core/Catalog.h"
 #include "Utils.h"
+#include "assert/advanced_assert.h"
 
 #include <QDir>
 #include <QFile>
@@ -8,8 +9,6 @@
 #include <QInputDialog>
 #include <QLineEdit>
 #include <QMessageBox>
-
-#include <assert.h>
 
 namespace {
 
@@ -73,7 +72,7 @@ Result renameVideoInteractive(const MediaId& id, QWidget* parent)
 {
 	// Videos only - the dispatcher routes photos elsewhere. The rename below derives video-shaped paths; on an
 	// owned photo, folderForMediaItem is the SHARED Photos/<label> dir and would pass the exists-check.
-	assert(Catalog::instance().mediaType(id) == Catalog::MediaType::Video);
+	assert_r(Catalog::instance().mediaType(id) == Catalog::MediaType::Video);
 
 	const QString originalFolderPath = Catalog::instance().folderForMediaItem(id);
 
@@ -185,7 +184,7 @@ Result renamePhotoInteractive(const MediaId& id, QWidget* parent)
 	// here means renaming just the file's base name in place (owned: inside Photos/<label>; referenced: in the
 	// user's own folder), keeping the extension - never renaming the folder the way the video path does.
 	Catalog& catalog = Catalog::instance();
-	assert(catalog.mediaType(id) == Catalog::MediaType::Photo);
+	assert_r(catalog.mediaType(id) == Catalog::MediaType::Photo);
 
 	const QString title = QObject::tr("Rename photo");
 	const QString oldSourcePath = catalog.sourcePathForMediaItem(id);

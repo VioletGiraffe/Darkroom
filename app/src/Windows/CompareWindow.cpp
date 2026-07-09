@@ -1,6 +1,7 @@
 #include "Windows/CompareWindow.h"
 #include "UiComponents/ThumbnailWidget.h"
 #include "Utils.h"
+#include "assert/advanced_assert.h"
 
 #include <QDir>
 #include <QFileInfo>
@@ -10,8 +11,6 @@
 #include <QShortcut>
 #include <QTimer>
 #include <QVBoxLayout>
-
-#include <assert.h>
 
 static constexpr int COMPARE_CELL_HEIGHT = 500;
 static constexpr int DEBOUNCE_MS = 50;
@@ -103,7 +102,7 @@ void CompareWindow::loadCurrentFrame()
 	QStringList paths;
 	paths.reserve(m_folderFrames.size());
 
-	assert(m_thumbnailWidgets.size() == m_folderFrames.size());
+	assert_r(m_thumbnailWidgets.size() == m_folderFrames.size());
 
 	for (size_t i = 0; i < m_thumbnailWidgets.size(); ++i)
 	{
