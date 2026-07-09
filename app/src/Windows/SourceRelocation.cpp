@@ -76,11 +76,11 @@ public:
 			QWidget* previewParent = parent;
 
 			QPushButton* playStaged = new QPushButton(tr("Play Staged File"), this);
-			connect(playStaged, &QPushButton::clicked, this, [previewParent, stagedPath] { VideoPlayerWindow::showForFile(stagedPath, previewParent); });
+			connect(playStaged, &QPushButton::clicked, this, [previewParent, stagedPath] { VideoPlayerWindow::createPlayerWindow(stagedPath, previewParent); });
 			buttonRow->addWidget(playStaged);
 
 			QPushButton* playExisting = new QPushButton(tr("Play Existing File"), this);
-			connect(playExisting, &QPushButton::clicked, this, [previewParent, destPath] { VideoPlayerWindow::showForFile(destPath, previewParent); });
+			connect(playExisting, &QPushButton::clicked, this, [previewParent, destPath] { VideoPlayerWindow::createPlayerWindow(destPath, previewParent); });
 			buttonRow->addWidget(playExisting);
 		}
 

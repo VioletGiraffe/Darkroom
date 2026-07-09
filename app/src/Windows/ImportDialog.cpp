@@ -911,7 +911,7 @@ void ImportDialog::previewStagedItem(const MediaId& id)
 	if (isSupportedImageFile(it->path))
 		QDesktopServices::openUrl(QUrl::fromLocalFile(it->path));  // a photo opens in the system image viewer
 	else
-		VideoPlayerWindow::showForFile(it->path, this);
+		VideoPlayerWindow::createPlayerWindow(it->path, this);
 }
 
 void ImportDialog::locateStagedSourceFile(const MediaId& id)

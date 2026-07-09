@@ -18,12 +18,10 @@ public:
 	~VideoPlayerWindow() override;
 
 	static void restartAll();
-
 	static void closeAll();
 
-	// Convenience: opens a self-managing player window for the file as an ad-hoc playback (the MediaId is
-	// derived from the file, so an untracked/staged video works too).
-	static void showForFile(const QString& videoPath, QWidget* parent);
+	// Convenience: opens a self-managing player window for the file as an ad-hoc playback (the MediaId is derived from the file, so an untracked/staged video works too)
+	static void createPlayerWindow(const QString& videoPath, QWidget* parent);
 
 private:
 	void resizeAndMoveWindow();
