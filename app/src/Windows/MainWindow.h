@@ -2,7 +2,7 @@
 
 #include "Core/LabelId.h"
 #include "Core/MediaId.h"
-#include "Import.h"  // Import::PhotoImportMode / PhotoResult (processPhotoBatch's interface)
+#include "Import.h"  // Import::PhotoImportMode / PhotoResult (importPhotoBatch's interface)
 
 #include <QHash>
 #include <QMainWindow>
@@ -100,12 +100,12 @@ private:
 	// stagedPreviewDirs / stagedDurations map each staged video's MediaId to, respectively, the temp dir whose
 	// preview/ holds its already-extracted frames (reused by copy - see Import::importVideo) and the duration
 	// the Import dialog already probed for it; a video absent from a map is handled fresh (re-extracted / re-probed).
-	void processBatch(QStringList videoPaths, const QString& collectionPath, const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations);
-	// The photo counterpart to processBatch: imports each photo under the label via Import::importPhoto,
+	void importVideoBatch(QStringList videoPaths, const QString& collectionPath, const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations);
+	// The photo counterpart to importVideoBatch: imports each photo under the label via Import::importPhoto,
 	// reports errors, applies a referenced photo's initial label (it has no storage folder to derive it
 	// from), and refreshes the view. Returns one result per path, in order - the Import dialog's bookkeeping
 	// branches on them (see ImportDialog::Callbacks::importPhotosRequested).
-	std::vector<Import::PhotoResult> processPhotoBatch(LabelId labelId, const QStringList& photoPaths, Import::PhotoImportMode mode);
+	std::vector<Import::PhotoResult> importPhotoBatch(LabelId labelId, const QStringList& photoPaths, Import::PhotoImportMode mode);
 	// Creates the collection folder + its label; returns the created-or-existing label's id, None if refused.
 	LabelId createCollection(const QString& name, const QString& color = {}, bool refreshList = true);
 	// Sidebar "Create label": prompts for a name and creates a folder-backed label (a collection folder).
@@ -125,7 +125,7 @@ private:
 
 	// Best helpers (Best is a label in the Catalog; these are thin wrappers over it)
 	[[nodiscard]] static bool isInBest(const MediaId& id);
-	void toggleBestFolder(const MediaId& id);
+	void toggleBest(const MediaId& id);
 
 	void deleteSelectedItems();
 	void removeSelectedItemsFromLibrary();

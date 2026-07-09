@@ -5,7 +5,7 @@
 #include <QString>
 
 // The per-item import worker: registers one source video file into a collection. UI-free by design -
-// nothing here prompts or reports; every outcome is returned for the caller to present. MainWindow::processBatch
+// nothing here prompts or reports; every outcome is returned for the caller to present. MainWindow::importVideoBatch
 // is the batch coordinator on top of this and owns all the import UI (the app-wide processing lock, the
 // progress modal, folder-conflict partitioning/prompts, error boxes, catalog write batching, view refresh).
 namespace Import {

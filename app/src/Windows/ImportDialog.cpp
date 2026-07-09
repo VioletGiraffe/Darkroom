@@ -594,7 +594,7 @@ MediaItemWidget* ImportDialog::buildStagedCard(const MediaId& id, const QString&
 
 	// A label dropped here tags just this card, or the whole selection if this card is part of one.
 	card->setOnLabelDropped([this, id](const QString& labelId) {
-		for (const MediaId& target : stagedSelection(id))
+		for (const MediaId& target : effectiveStagedSelection(id))
 		{
 			auto it = m_staged.find(target);
 			if (it != m_staged.end() && !it->pendingLabelIds.contains(labelId))
@@ -787,7 +787,7 @@ void ImportDialog::updateCardLabelDots(const MediaId& id)
 	card->setLabelDots(colors, names.join(", "));
 }
 
-std::vector<MediaId> ImportDialog::stagedSelection(const MediaId& id) const
+std::vector<MediaId> ImportDialog::effectiveStagedSelection(const MediaId& id) const
 {
 	const QList<QListWidgetItem*> selected = m_stagedGrid->selectedItems();
 	if (selected.size() <= 1 || !selected.contains(m_staged.value(id).item))
@@ -804,7 +804,7 @@ void ImportDialog::showStagedCardContextMenu(const MediaId& id, const QPoint& gl
 {
 	if (!m_staged.contains(id))
 		return;
-	const std::vector<MediaId> selection = stagedSelection(id);
+	const std::vector<MediaId> selection = effectiveStagedSelection(id);
 
 	QMenu menu(this);
 

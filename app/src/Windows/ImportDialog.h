@@ -118,7 +118,7 @@ private:
 	void updateCardLabelDots(const MediaId& id);
 	// The staged items a card-targeted action applies to: the whole staged selection when `id` is part of a
 	// multi-selection, otherwise just `id`. Mirrors MainWindow::effectiveSelection for the staged grid.
-	[[nodiscard]] std::vector<MediaId> stagedSelection(const MediaId& id) const;
+	[[nodiscard]] std::vector<MediaId> effectiveStagedSelection(const MediaId& id) const;
 	void showStagedCardContextMenu(const MediaId& id, const QPoint& globalPos);
 	// Staged-card actions, mirroring MainWindow's media-item context menu but adapted for untracked items. The
 	// single-id ones act on the right-clicked card; the vector ones act on the effective staged selection.

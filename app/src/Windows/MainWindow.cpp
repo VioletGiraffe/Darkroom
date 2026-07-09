@@ -624,7 +624,7 @@ MediaItemWidget* MainWindow::buildMediaCard(const MediaId& id, bool isBest, cons
 		previewPaths, QString(),
 		id,
 		isBest,
-		[this, id] { toggleBestFolder(id); },
+		[this, id] { toggleBest(id); },
 		// double-click: a video opens in the built-in player, a photo in the system image viewer
 		[this, id, isPhoto] { if (isPhoto) openSourceInSystemApp(id); else playVideo(id); },
 		[this, id](QPoint globalPos) { showMediaItemContextMenu(id, globalPos); },
@@ -1045,7 +1045,7 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 
 	const bool inBest = isInBest(id);
 	menu.addAction(inBest ? tr("Remove from Best") : tr("Add to Best"), [this, id] {
-		toggleBestFolder(id);
+		toggleBest(id);
 	});
 
 	// Labels submenu: a checklist of every ordinary label. Each row's color-tinted checkbox reflects the whole
@@ -1209,7 +1209,7 @@ void MainWindow::splitVideoIntoFrames(const QString& videoFilePath, const QStrin
 	}
 }
 
-void MainWindow::processBatch(QStringList videoPaths, const QString& collectionPath, const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations)
+void MainWindow::importVideoBatch(QStringList videoPaths, const QString& collectionPath, const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations)
 {
 	if (videoPaths.empty())
 		return;
@@ -1295,7 +1295,7 @@ void MainWindow::processBatch(QStringList videoPaths, const QString& collectionP
 	refreshLibraryView();
 }
 
-std::vector<Import::PhotoResult> MainWindow::processPhotoBatch(LabelId labelId, const QStringList& photoPaths, Import::PhotoImportMode mode)
+std::vector<Import::PhotoResult> MainWindow::importPhotoBatch(LabelId labelId, const QStringList& photoPaths, Import::PhotoImportMode mode)
 {
 	Catalog& catalog = Catalog::instance();
 	const Catalog::Label* label = catalog.labelById(labelId);
@@ -1487,10 +1487,10 @@ void MainWindow::importToCollections(const QStringList& initialStaging)
 	ImportDialog::Callbacks callbacks{
 		.addMediaItemsRequested = [this](const QString& collectionName, const QStringList& videoPaths,
 				const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations) {
-			processBatch(videoPaths, rootFolder() + "/" + collectionName, stagedPreviewDirs, stagedDurations);
+			importVideoBatch(videoPaths, rootFolder() + "/" + collectionName, stagedPreviewDirs, stagedDurations);
 		},
 		.importPhotosRequested = [this](const QString& labelId, const QStringList& photoPaths, Import::PhotoImportMode mode) {
-			return processPhotoBatch(labelIdFromString(labelId), photoPaths, mode);
+			return importPhotoBatch(labelIdFromString(labelId), photoPaths, mode);
 		},
 		.createCollectionRequested = [this](const QString& name, const QString& color) -> QString {
 			const LabelId id = createCollection(name, color, /*refreshList*/ false);
@@ -1611,7 +1611,7 @@ bool MainWindow::isInBest(const MediaId& id)
 	return Catalog::instance().mediaItemHasLabel(id, Catalog::BestLabelId);
 }
 
-void MainWindow::toggleBestFolder(const MediaId& id)
+void MainWindow::toggleBest(const MediaId& id)
 {
 	Catalog& catalog = Catalog::instance();
 	if (catalog.mediaItemHasLabel(id, Catalog::BestLabelId))
