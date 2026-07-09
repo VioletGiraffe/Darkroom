@@ -1,6 +1,5 @@
 #pragma once
 
-#include "UiComponents/DragGestureHelper.h"
 #include "Core/MediaId.h"
 #include "Import.h"  // Import::PhotoImportMode / PhotoResult, used in the importPhotosRequested callback
 #include "Windows/SourceRelocation.h"  // SourceRelocation::Mode, importVideoGroup's parameter
@@ -103,8 +102,6 @@ protected:
 	// supported files).
 	void dragEnterEvent(QDragEnterEvent* event) override;
 	void dropEvent(QDropEvent* event) override;
-	// Drives the label list's drag-out gesture (mirrors LabelSidebar::eventFilter), installed on its viewport.
-	bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
 	void refreshLabelList();
@@ -214,10 +211,6 @@ private:
 
 	QListWidget* m_labelList  = nullptr;
 	QListWidget* m_stagedGrid = nullptr;
-
-	// Drag-out state for m_labelList, mirroring LabelSidebar's own drag-a-row gesture.
-	DragGestureHelper m_labelDragHelper;
-	QListWidgetItem*  m_labelPressedItem = nullptr;
 
 	// Source-file relocation controls - the machinery lives in SourceRelocation.h (see runImport for the use).
 	QComboBox* m_relocateModeCombo = nullptr;

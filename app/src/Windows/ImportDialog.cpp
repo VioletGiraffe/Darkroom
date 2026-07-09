@@ -3,6 +3,7 @@
 #include "Core/LabelId.h"
 #include "Ffmpeg.h"
 #include "UiComponents/ContentWidthListWidget.h"
+#include "UiComponents/DragGestureHelper.h"
 #include "UiComponents/LabelMimeType.h"
 #include "UiComponents/LabelVisuals.h"
 #include "Settings.h"
@@ -43,7 +44,6 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QMimeData>
-#include <QMouseEvent>
 #include <QPainter>
 #include <QPixmap>
 #include <QPushButton>
@@ -213,7 +213,12 @@ ImportDialog::ImportDialog(Callbacks callbacks, const QString& suggestedRelocate
 	// Hover fill matches the main-window sidebar's active-row highlight (BackgroundSecondary + ControlRadius), for a consistent feel.
 	m_labelList->setStyleSheet(QStringLiteral("QListWidget::item:hover { background-color: %1; border-radius: %2px; }")
 		.arg(Theme::current().BackgroundSecondary).arg(Theme::ControlRadius));
-	m_labelList->viewport()->installEventFilter(this);  // drives the row-drag gesture (see eventFilter)
+	// A press-and-drag on a label row drags the label out, to be dropped onto a staged card.
+	new ListRowDragFilter(m_labelList, [](const QListWidgetItem* item) {
+		auto* mime = new QMimeData();
+		mime->setData(LabelMimeType, item->data(kLabelIdRole).toString().toUtf8());
+		return mime;
+	});
 	m_labelList->setContextMenuPolicy(Qt::CustomContextMenu);  // right-click a row to edit a provisional label
 	connect(m_labelList, &QListWidget::customContextMenuRequested, this, &ImportDialog::showLabelListContextMenu);
 	labelPaneLayout->addWidget(m_labelList, 1);
@@ -350,52 +355,6 @@ void ImportDialog::dropEvent(QDropEvent* event)
 			stageMediaItems(paths);
 		}, Qt::QueuedConnection);
 	}
-}
-
-bool ImportDialog::eventFilter(QObject* watched, QEvent* event)
-{
-	if (watched != m_labelList->viewport())
-		return QDialog::eventFilter(watched, event);
-
-	switch (event->type())
-	{
-	case QEvent::MouseButtonPress:
-	{
-		auto* me = static_cast<QMouseEvent*>(event);
-		m_labelDragHelper.mousePressed(me);
-		m_labelPressedItem = m_labelList->itemAt(me->pos());
-		break;
-	}
-	case QEvent::MouseMove:
-	{
-		if (!m_labelPressedItem)
-			break;
-		const QString labelId = m_labelPressedItem->data(kLabelIdRole).toString();
-		auto* me = static_cast<QMouseEvent*>(event);
-		const QPixmap rowPixmap = m_labelList->viewport()->grab(m_labelList->visualItemRect(m_labelPressedItem));
-		const bool started = m_labelDragHelper.tryStartDrag(
-			m_labelList->viewport(), me,
-			[labelId] {
-				auto* mime = new QMimeData();
-				mime->setData(LabelMimeType, labelId.toUtf8());
-				return mime;
-			},
-			Qt::CopyAction, rowPixmap);
-		if (started)
-		{
-			m_labelPressedItem = nullptr;
-			return true;
-		}
-		break;
-	}
-	case QEvent::MouseButtonRelease:
-		m_labelPressedItem = nullptr;
-		break;
-	default:
-		break;
-	}
-
-	return QDialog::eventFilter(watched, event);
 }
 
 void ImportDialog::refreshLabelList()

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Core/LabelId.h"
-#include "UiComponents/DragGestureHelper.h"
 
 #include <QList>
 #include <QSet>
@@ -41,11 +40,6 @@ signals:
 	void setLabelColorRequested(LabelId labelId);
 	void deleteLabelRequested(LabelId labelId);
 
-protected:
-	// Watches the list viewport to turn a press-and-drag on a label row into a QDrag that assigns the
-	// label (dropped onto a card). Plain clicks are untouched, so row click-to-filter still works.
-	bool eventFilter(QObject* watched, QEvent* event) override;
-
 private:
 	void rebuildRows();
 	void applyRowHighlight();
@@ -56,6 +50,4 @@ private:
 	QListWidget*      m_list        = nullptr;   // flat single-column list; rows painted by a custom delegate
 	SegmentedToggle*  m_andOrToggle = nullptr;   // OR / AND combine-mode control (segment 1 == AND)
 	QSet<LabelId>     m_activeLabelIds;   // empty == All (no filter)
-	DragGestureHelper m_dragHelper;
-	QListWidgetItem*  m_pressedItem = nullptr;  // row under the last left-press, the drag's candidate label
 };

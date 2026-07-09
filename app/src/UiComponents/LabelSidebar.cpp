@@ -1,6 +1,7 @@
 #include "UiComponents/LabelSidebar.h"
 #include "Core/Catalog.h"
 #include "UiComponents/ContentWidthListWidget.h"
+#include "UiComponents/DragGestureHelper.h"
 #include "UiComponents/LabelMimeType.h"
 #include "UiComponents/SegmentedToggle.h"
 #include "Theme/Icons.h"
@@ -17,7 +18,6 @@
 #include <QListWidgetItem>
 #include <QMenu>
 #include <QMimeData>
-#include <QMouseEvent>
 #include <QPainter>
 #include <QPalette>
 #include <QPen>
@@ -223,7 +223,16 @@ LabelSidebar::LabelSidebar(QWidget* parent) : QWidget(parent)
 	m_list->setMouseTracking(true);   // so the delegate's hover highlight repaints as the cursor moves
 	m_list->setMinimumWidth(140);
 
-	m_list->viewport()->installEventFilter(this);  // drives the row-drag gesture (see eventFilter)
+	// A press-and-drag on an ordinary label row drags the label out, to be dropped onto a card. "All" and the
+	// virtual Best are filter-only, so they don't drag. Plain clicks are untouched: click-to-filter still works.
+	new ListRowDragFilter(m_list, [](const QListWidgetItem* item) -> QMimeData* {
+		const LabelId labelId = item->data(kLabelIdRole).value<LabelId>();
+		if (labelId == AllLabelId || labelId == Catalog::BestLabelId)
+			return nullptr;
+		auto* mime = new QMimeData();
+		mime->setData(LabelMimeType, toString(labelId).toUtf8());
+		return mime;
+	});
 	layout->addWidget(m_list, 1);
 
 	connect(m_list, &QListWidget::itemClicked, this, &LabelSidebar::onItemClicked);
@@ -330,56 +339,6 @@ void LabelSidebar::onItemClicked(QListWidgetItem* item)
 
 	applyRowHighlight();
 	emit filterChanged();
-}
-
-bool LabelSidebar::eventFilter(QObject* watched, QEvent* event)
-{
-	if (watched != m_list->viewport())
-		return QWidget::eventFilter(watched, event);
-
-	switch (event->type())
-	{
-	case QEvent::MouseButtonPress:
-	{
-		auto* me = static_cast<QMouseEvent*>(event);
-		m_dragHelper.mousePressed(me);
-		m_pressedItem = m_list->itemAt(me->pos());
-		break;
-	}
-	case QEvent::MouseMove:
-	{
-		if (!m_pressedItem)
-			break;
-		const LabelId labelId = m_pressedItem->data(kLabelIdRole).value<LabelId>();
-		// Only ordinary labels are draggable to assign; "All" and the virtual Best are filter-only.
-		if (labelId == AllLabelId || labelId == Catalog::BestLabelId)
-			break;
-
-		auto* me = static_cast<QMouseEvent*>(event);
-		const QPixmap rowPixmap = m_list->viewport()->grab(m_list->visualItemRect(m_pressedItem));
-		const bool started = m_dragHelper.tryStartDrag(
-			m_list->viewport(), me,
-			[labelId] {
-				auto* mime = new QMimeData();
-				mime->setData(LabelMimeType, toString(labelId).toUtf8());
-				return mime;
-			},
-			Qt::CopyAction, rowPixmap);
-		if (started)
-		{
-			m_pressedItem = nullptr;
-			return true;
-		}
-		break;
-	}
-	case QEvent::MouseButtonRelease:
-		m_pressedItem = nullptr;
-		break;
-	default:
-		break;
-	}
-
-	return QWidget::eventFilter(watched, event);
 }
 
 void LabelSidebar::showRowContextMenu(const QPoint& pos)
