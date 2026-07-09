@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783597769132,
+  "lastUpdate": 1783598697021,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -2778,6 +2778,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 281,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 32,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 27,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "159f800bf93cadf3dddf8759b95e72a3bcd98fc8",
+          "message": "PhotoCompareWindow launch code extracted/unified; file name sanitation unified",
+          "timestamp": "2026-07-09T14:56:45+03:00",
+          "tree_id": "af79c1b39443336b0571c0ade3537af2af1065d6",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/159f800bf93cadf3dddf8759b95e72a3bcd98fc8"
+        },
+        "date": 1783598694865,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 8108,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 3343,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 903,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 527,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 280.5,
             "unit": "KB"
           },
           {
