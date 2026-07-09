@@ -323,10 +323,13 @@ The scan reports four kinds of drift, each with its own resolution:
   file, repointing the entry through `applyRename`) plus Remove/Skip; an owned photo, which lives in the
   library tree, offers only Remove/Skip.
 
-`IntegrityCheckDialog::scanAndShowUi` owns all the scan/UI logic behind one static entry point; `MainWindow`
-only supplies the resolution callbacks that actually touch the `Catalog`/disk, including the manual "browse"
-paths (an untracked folder's source video, a moved referenced photo). The catalog-vs-disk drift scenarios
-described above (ghost / invisible cards, missing sources) defer to this tool for actual reconciliation.
+`IntegrityCheckDialog::scanAndShowUi` is the one static entry point; the dialog frame itself is thin,
+delegating the per-finding rows and their handlers — plus the per-section blanket actions ("Add all",
+"Re-import all", "Remove all", ...) — to a private `IntegrityCheckSections` helper (`IntegrityCheckSections.h`,
+included only by the dialog's `.cpp`). `MainWindow` only supplies the resolution callbacks that actually touch
+the `Catalog`/disk, including the manual "browse" paths (an untracked folder's source video, a moved
+referenced photo). The catalog-vs-disk drift scenarios described above (ghost / invisible cards, missing
+sources) defer to this tool for actual reconciliation.
 
 ---
 
