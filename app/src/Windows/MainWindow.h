@@ -133,11 +133,9 @@ private:
 	void updateEditActions();
 
 	void openSettings();
-	void renameItemInteractive(const MediaId& id);   // dispatches to the video- or photo-specific rename below
-	void renameVideoInteractive(const MediaId& id);
-	void renameVideo(const MediaId& oldId, const QString& newFolderPath);
-	void renamePhotoInteractive(const MediaId& id);
-	void renamePhoto(const MediaId& oldId, const QString& newSourcePath);
+	// Runs the interactive rename flow (see MediaRename.h), then refreshes the view and repoints the frame
+	// viewer if it was showing the renamed video's folder.
+	void renameItemInteractive(const MediaId& id);
 	void deleteFolderRecursively(const QString& folderPath);
 
 private:
