@@ -29,7 +29,6 @@ class MainWindow final : public QMainWindow
 public:
 	MainWindow(QWidget* parent = nullptr);
 	~MainWindow();
-	static MainWindow* instance();
 
 protected:
 	void dragEnterEvent(QDragEnterEvent* event) override;

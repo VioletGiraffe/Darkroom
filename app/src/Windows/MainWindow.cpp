@@ -93,8 +93,6 @@ inline QChar invalidFilenameChar(const QString& name)
 }
 }
 
-static MainWindow* s_instance = nullptr;
-
 // Per-frame preview image height (px); card width is this × the frame count. User-adjustable via Ctrl+wheel
 // over a card, persisted under a settings key local to this UI (not hoisted into the shared Settings.h).
 static const QString CARD_IMAGE_HEIGHT_KEY = "mainWindow/cardImageHeight";
@@ -122,8 +120,6 @@ inline int     cardImageHeight() { return QSettings{}.value(CARD_IMAGE_HEIGHT_KE
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
 {
-	s_instance = this;
-
 	setWindowTitle("Darkroom");
 	resize(1500, 800);
 	setAcceptDrops(true);
@@ -143,13 +139,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
 MainWindow::~MainWindow()
 {
 	delete m_frameViewer;
-	s_instance = nullptr;
 	saveSettings();
-}
-
-MainWindow* MainWindow::instance()
-{
-	return s_instance;
 }
 
 void MainWindow::setupUI()
@@ -1255,14 +1245,10 @@ void MainWindow::processBatch(QStringList videoPaths, const QString& collectionP
 	progressBox.setModal(true);
 	progressBox.show();
 
-	bool conflictFound = false;
 	// If a folder for the video already exists, ask about it later and process all unambiguous files first
-	const auto partition = std::ranges::stable_partition(videoPaths, [&conflictFound, &collectionPath](const QString& path) {
-		QFileInfo videoInfo(path);
-		const QString outputFolder = collectionPath + "/" + videoInfo.completeBaseName();
-		const bool conflict = QDir{ outputFolder }.exists();
-		conflictFound |= conflict;
-		return !conflict;
+	const auto partition = std::ranges::stable_partition(videoPaths, [&collectionPath](const QString& path) {
+		const QString outputFolder = collectionPath + "/" + QFileInfo(path).completeBaseName();
+		return !QDir{ outputFolder }.exists();
 	});
 
 	size_t i = 0;
