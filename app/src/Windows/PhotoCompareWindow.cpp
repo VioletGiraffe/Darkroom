@@ -19,6 +19,7 @@
 #include <QLabel>
 #include <QLineF>
 #include <QMenu>
+#include <QMessageBox>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
@@ -360,6 +361,31 @@ void PhotoComparePane::contextMenuEvent(QContextMenuEvent* event)
 }
 
 // ---------------------------------------------------------------------------------------------------------
+
+void PhotoCompareWindow::showForFiles(const QStringList& candidatePaths, QWidget* parent)
+{
+	QStringList paths;
+	static constexpr qsizetype MaxImages = 50;  // a bigger set stops being a useful comparison
+	for (const QString& path : candidatePaths)
+	{
+		if (!path.isEmpty() && QFileInfo::exists(path))
+		{
+			paths.push_back(path);
+			if (paths.size() >= MaxImages)
+				break;
+		}
+	}
+
+	if (paths.size() < 2)
+	{
+		QMessageBox::warning(parent, tr("Error"), tr("The selected photo files could not be found on disk."));
+		return;
+	}
+
+	auto* w = new PhotoCompareWindow(paths, parent);
+	w->setAttribute(Qt::WA_DeleteOnClose);
+	w->show();
+}
 
 PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* parent) : QWidget(parent, Qt::Window)
 {

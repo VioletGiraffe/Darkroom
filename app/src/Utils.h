@@ -44,6 +44,10 @@ void clearStuckHoverIfCursorLeft(QWidget* w);
 // from different sources (e.g. a catalog-stored path vs. one freshly walked off disk). Canonical form + lower case. Not meant for storing/directly using, but in practice fine for that too
 [[nodiscard]] QString pathComparisonKey(const QString& path);
 
+// Rejects characters illegal in Windows file/folder names: returns the first offending character, or a null
+// QChar (isNull()) for a clean name. For validating user-typed names in the rename flows.
+[[nodiscard]] QChar invalidFilenameChar(const QString& name);
+
 // Name filters (for QDir::entryList) matching the frame image files this app produces/reads.
 extern const QStringList IMAGE_FILE_FILTERS;
 

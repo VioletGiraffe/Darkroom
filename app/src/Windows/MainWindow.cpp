@@ -80,17 +80,6 @@ public:
 		option->icon = QIcon();
 	}
 };
-
-// Rejects characters illegal in Windows file/folder names. Returns the first offending character, or a null
-// QChar (isNull()) for a clean name. Shared by the video and photo rename flows.
-inline QChar invalidFilenameChar(const QString& name)
-{
-	static const QString invalidChars = R"(\/:*?"<>|)";
-	for (const QChar c : name)
-		if (invalidChars.contains(c))
-			return c;
-	return {};
-}
 }
 
 // Per-frame preview image height (px); card width is this × the frame count. User-adjustable via Ctrl+wheel
@@ -994,26 +983,9 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 	{
 		menu.addAction(tr("Compare photos"), [this, selection] {
 			QStringList paths;
-			static constexpr size_t MaxImages = 50;
 			for (const MediaId& sel : selection)
-			{
-				const QString path = Catalog::instance().sourcePathForMediaItem(sel);
-				if (!path.isEmpty() && QFileInfo::exists(path))
-				{
-					paths.push_back(path);
-					if (paths.size() >= MaxImages)
-						break;
-				}
-			}
-
-			if (paths.size() < 2)
-			{
-				QMessageBox::warning(this, tr("Error"), tr("The selected photo files could not be found on disk."));
-				return;
-			}
-			auto* w = new PhotoCompareWindow(paths, this);
-			w->setAttribute(Qt::WA_DeleteOnClose);
-			w->show();
+				paths << Catalog::instance().sourcePathForMediaItem(sel);
+			PhotoCompareWindow::showForFiles(paths, this);
 		});
 		menu.addSeparator();
 	}

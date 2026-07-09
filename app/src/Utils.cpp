@@ -121,6 +121,15 @@ QString pathComparisonKey(const QString& path)
 	return (canonical.isEmpty() ? QDir::cleanPath(path) : canonical).toLower();
 }
 
+QChar invalidFilenameChar(const QString& name)
+{
+	static const QString invalidChars = R"(\/:*?"<>|)";
+	for (const QChar c : name)
+		if (invalidChars.contains(c))
+			return c;
+	return {};
+}
+
 const QStringList IMAGE_FILE_FILTERS { "*.jpg", "*.jpeg", "*.tif", "*.tiff", "*.png" };
 
 QDateTime parseTrailingTimestamp(const QString& text)

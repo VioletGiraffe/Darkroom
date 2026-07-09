@@ -57,6 +57,11 @@ public:
 	explicit PhotoCompareWindow(const QStringList& photoPaths, QWidget* parent = nullptr);
 	~PhotoCompareWindow() override;
 
+	// The shared entry point for the "Compare photos" actions: opens a self-deleting compare window on the
+	// candidate files that exist on disk (empty paths and missing files - e.g. a referenced photo on an
+	// unmounted drive - are skipped, the rest capped at 50). Warns instead if fewer than 2 remain.
+	static void showForFiles(const QStringList& candidatePaths, QWidget* parent);
+
 protected:
 	void keyPressEvent(QKeyEvent* event) override;
 	void keyReleaseEvent(QKeyEvent* event) override;

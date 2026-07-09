@@ -1199,21 +1199,9 @@ void ImportDialog::copyStagedSourcePath(const MediaId& id)
 void ImportDialog::compareStagedPhotos(const std::vector<MediaId>& photoIds)
 {
 	QStringList paths;
-	paths.reserve(static_cast<int>(photoIds.size()));
 	for (const MediaId& id : photoIds)
-	{
-		const QString path = m_staged.value(id).path;
-		if (!path.isEmpty() && QFileInfo::exists(path))
-			paths << path;
-	}
-	if (paths.size() < 2)
-	{
-		QMessageBox::warning(this, tr("Error"), tr("The selected photo files could not be found on disk."));
-		return;
-	}
-	auto* w = new PhotoCompareWindow(paths, this);
-	w->setAttribute(Qt::WA_DeleteOnClose);
-	w->show();
+		paths << m_staged.value(id).path;
+	PhotoCompareWindow::showForFiles(paths, this);
 }
 
 void ImportDialog::setBestForStagedSelection(const std::vector<MediaId>& ids, bool inBest)
@@ -1281,9 +1269,9 @@ void ImportDialog::renameStagedItem(const MediaId& id)
 		QLineEdit::Normal, oldBase, &ok).trimmed();
 	if (!ok || newBase.isEmpty() || newBase == oldBase)
 		return;
-	if (newBase.contains('/') || newBase.contains('\\'))
+	if (const QChar bad = invalidFilenameChar(newBase); !bad.isNull())
 	{
-		QMessageBox::warning(this, tr("Rename"), tr("A file name can't contain a path separator."));
+		QMessageBox::warning(this, tr("Rename"), tr("Name contains an invalid character: '%1'").arg(bad));
 		return;
 	}
 
