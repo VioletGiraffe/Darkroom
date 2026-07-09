@@ -1509,15 +1509,6 @@ void MainWindow::deleteLabelInteractive(LabelId labelId)
 void MainWindow::importToCollections(const QStringList& initialStaging)
 {
 	ImportDialog::Callbacks callbacks{
-		// Every ordinary label is a candidate destination folder for the dialog's label list - single
-		// source of truth (the Catalog model), not a disk listing, so the dialog also gets each label's color.
-		.getLabelOptions = [] {
-			std::vector<ImportDialog::LabelOption> options;
-			for (const Catalog::Label& label : Catalog::instance().allLabels())
-				if (!label.isVirtual())
-					options.push_back(ImportDialog::LabelOption{ toString(label.id), label.displayName, label.color });  // dialog carries ids as strings
-			return options;
-		},
 		.addMediaItemsRequested = [this](const QString& collectionName, const QStringList& videoPaths,
 				const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations) {
 			processBatch(videoPaths, rootFolder() + "/" + collectionName, stagedPreviewDirs, stagedDurations);
@@ -1525,40 +1516,9 @@ void MainWindow::importToCollections(const QStringList& initialStaging)
 		.importPhotosRequested = [this](const QString& labelId, const QStringList& photoPaths, Import::PhotoImportMode mode) {
 			return processPhotoBatch(labelIdFromString(labelId), photoPaths, mode);
 		},
-		.findAlreadyImportedDuplicatePhoto = [](const QString& photoPath) -> QString {
-			return Catalog::instance().findPhotoBySameContent(photoPath);
-		},
 		.createCollectionRequested = [this](const QString& name, const QString& color) -> QString {
 			const LabelId id = createCollection(name, color, /*refreshList*/ false);
 			return id == LabelId::None ? QString{} : toString(id);  // empty = refused, which the dialog treats as failure
-		},
-		.generateLabelColor = [] { return Catalog::randomLabelColor(); },
-		.isMediaItemTrackedInCollection = [](const MediaId& id, const QString& collectionName) {
-			// Compare against the exact folder this import derives (Import::importVideo's outputFolder): on a
-			// name+size collision the id is tracked under some *other* folder - the staged copy was refused,
-			// so a plain "tracked at all" check would misreport it as imported.
-			const QString expectedFolder = rootFolder() + "/" + collectionName + "/" + QFileInfo(id.name()).completeBaseName();
-			return QString::compare(Catalog::instance().folderForMediaItem(id), expectedFolder, Qt::CaseInsensitive) == 0;
-		},
-		.markBestRequested = [](const std::vector<MediaId>& bestItems) {
-			// Items only reach this list after their import was confirmed, so "tracked in the catalog" is the
-			// guard against a stray id - uniform across videos and photos (a photo has no per-item folder whose
-			// existence could stand in for it).
-			Catalog::BatchScope batch;  // one store write for the whole flush instead of one per item
-			for (const MediaId& mediaId : bestItems)
-				if (Catalog::instance().containsMediaItem(mediaId))
-					Catalog::instance().addLabel(mediaId, Catalog::BestLabelId);
-		},
-		.assignExtraLabelsRequested = [](const std::vector<ImportDialog::ExtraLabelAssignment>& assignments) {
-			// Mirrors markBestRequested above, same "tracked" guard.
-			Catalog::BatchScope batch;  // one store write for the whole flush instead of one per assignment
-			for (const ImportDialog::ExtraLabelAssignment& assignment : assignments)
-			{
-				if (!Catalog::instance().containsMediaItem(assignment.mediaId))
-					continue;
-				for (const QString& labelId : assignment.labelIds)
-					Catalog::instance().addLabel(assignment.mediaId, labelIdFromString(labelId));
-			}
 		},
 		.viewChanged = [this] { refreshLibraryView(); }
 	};

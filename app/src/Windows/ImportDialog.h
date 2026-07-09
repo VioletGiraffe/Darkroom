@@ -52,20 +52,11 @@ public:
 		bool provisional = false;  // true = minted in this dialog (id "new:<n>"), not yet in the Catalog; created on Import
 	};
 
-	// One staged item's extra-label picks (every pending label beyond the destination-deciding first one).
-	// Identified by MediaId, not path: relocation (Move) deletes the source from its staged path before this
-	// is applied, so the path can no longer be resolved to the file - the stable id is what addLabel needs.
-	struct ExtraLabelAssignment
-	{
-		MediaId mediaId;
-		QStringList labelIds;
-	};
-
+	// Host (MainWindow) actions the dialog can't do itself: each either drives host-owned state (the busy
+	// guard, progress UI, view refresh) or is shared with other host flows (collection creation). Plain
+	// Catalog reads and writes are done directly - the dialog makes no attempt to be Catalog-agnostic.
 	struct Callbacks
 	{
-		// Every ordinary label, for the label-list panel. A staged item's first-dropped label also
-		// decides which one of these folders it's imported into - see runImport() in the .cpp.
-		std::function<std::vector<LabelOption>()> getLabelOptions;
 		// Adds the given video files to the named collection. stagedPreviewDirs maps each staged video's MediaId
 		// to the temp dir whose preview/ holds the frames already extracted for its staging card, so import
 		// can reuse them by copy instead of re-running ffmpeg (see Import::importVideo); a video absent
@@ -81,38 +72,15 @@ public:
 		// staged id, so all post-import bookkeeping (Best, extra labels) must use it.
 		std::function<std::vector<Import::PhotoResult>(const QString& labelId, const QStringList& photoPaths,
 			Import::PhotoImportMode mode)> importPhotosRequested;
-		// The source path of an already-imported photo with byte-identical content (matched by size, any
-		// name - catches renamed duplicates), or empty if none. Checked when staging a photo, so a duplicate
-		// is flagged before it can be labeled and imported.
-		std::function<QString(const QString& photoPath)> findAlreadyImportedDuplicatePhoto;
 		// Materializes one provisional label at Import time (called per used provisional from runImport): ensures a
 		// label with this name exists in the catalog and returns its id - which is what the dialog then rewrites
 		// the staged items' pending picks to, replacing the provisional stand-in id. The color applies only when
 		// the label is genuinely new; an existing same-name label keeps its own. Empty return = creation refused
 		// (reserved/invalid name), and the affected picks are dropped rather than remapped.
 		std::function<QString(const QString& name, const QString& color)> createCollectionRequested;
-		// A fresh random label color ("#rrggbb"), matching what the Catalog assigns a new label - gives a
-		// provisional (folder-derived or manually added) label a swatch before Import creates it for real.
-		std::function<QString()> generateLabelColor;
-		// True iff the item is now tracked by the Catalog at the frame folder this import derives for it
-		// (<collection>/<source base name>) - checked right after addMediaItemsRequested for each item in its
-		// batch, purely so runImport() knows which staged entries to clear (a successfully-added one) versus
-		// leave staged (declined overwrite, a collision, etc.). Deliberately not "tracked under *some* folder":
-		// on a name+size collision the id is already tracked elsewhere and import refused the staged copy -
-		// a mere "is tracked" check would misreport that as a success, unstaging the entry and silently
-		// dropping its pending labels. By MediaId, not path: Move relocation has already deleted the source
-		// from its staged path by now.
-		std::function<bool(const MediaId&, const QString& collectionName)> isMediaItemTrackedInCollection;
-		// Called once per successful Import, with the items flagged "Best" (may be empty). The flagged items
-		// have already been added - and are therefore tracked - via their type's apply path above. By MediaId
-		// for the same reason as ExtraLabelAssignment above.
-		std::function<void(const std::vector<MediaId>& bestItems)> markBestRequested;
-		// Called once per successful Import, with every imported item's extra-label picks (may be empty).
-		// Mirrors markBestRequested above: the items have already been added via their type's apply path.
-		std::function<void(const std::vector<ExtraLabelAssignment>& assignments)> assignExtraLabelsRequested;
-		// Called once at the end of an Import that imported at least one item, after the Best/extra-label flush
-		// above. addMediaItemsRequested may refresh the host view mid-Import (it imports folder-by-folder), but the
-		// post-import label flush has no refresh of its own - so without this, the host shows each item's
+		// Called once at the end of an Import that imported at least one item, after the dialog's own
+		// Best/extra-label flush. addMediaItemsRequested may refresh the host view mid-Import (it imports
+		// folder-by-folder), but that refresh predates the flush - so without this, the host shows each item's
 		// folder label but not its extra labels/Best until the dialog is closed. The dialog stays open after
 		// an Import, so that gap is visible. Lets the host repaint once with the fully-applied state.
 		std::function<void()> viewChanged;
@@ -169,7 +137,8 @@ private:
 	// MediaId" invariant runImport relies on. The extension is kept fixed so the type stays valid.
 	void renameStagedItem(const MediaId& id);
 	// Every staged entry whose pendingLabelIds isn't empty: grouped by its first label and imported via
-	// addMediaItemsRequested, then markBestRequested/assignExtraLabelsRequested for whatever landed.
+	// addMediaItemsRequested/importPhotosRequested, then the Best flags and extra-label picks of whatever
+	// landed are flushed to the Catalog directly.
 	void runImport();
 	[[nodiscard]] const LabelOption* findLabelOption(const QString& id) const;
 
@@ -207,7 +176,7 @@ private:
 	};
 
 	Callbacks m_callbacks;
-	std::vector<LabelOption> m_labelOptions;       // cached list: real labels (getLabelOptions()) + m_provisionalLabels
+	std::vector<LabelOption> m_labelOptions;       // cached list: m_provisionalLabels + the Catalog's real labels
 	std::vector<LabelOption> m_provisionalLabels;  // labels minted in-dialog, not in the Catalog until Import materializes them
 	int m_provisionalSeq = 0;                      // mints unique provisional ids ("new:<n>")
 	QHash<MediaId, StagedEntry> m_staged;

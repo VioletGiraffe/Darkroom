@@ -1,4 +1,6 @@
 #include "Windows/ImportDialog.h"
+#include "Core/Catalog.h"
+#include "Core/LabelId.h"
 #include "Ffmpeg.h"
 #include "UiComponents/ContentWidthListWidget.h"
 #include "UiComponents/LabelMimeType.h"
@@ -152,6 +154,17 @@ void playVideo(const QString& path, QWidget* parent)
 {
 	auto* player = new VideoPlayerWindow(path, MediaId::fromFile(path), parent);
 	player->show();
+}
+
+// True iff the item is tracked by the Catalog at the exact frame folder this import derives for it
+// (Import::importVideo's outputFolder). Checked right after a video batch import to tell a successfully-added
+// entry (clear from staging) from a declined/failed one (leave staged). Deliberately not "tracked under *some*
+// folder": on a name+size collision the id is already tracked elsewhere and the staged copy was refused - a
+// plain "is tracked" check would misreport that as imported, silently dropping the entry's pending labels.
+[[nodiscard]] bool isTrackedInCollection(const MediaId& id, const QString& collectionName)
+{
+	const QString expectedFolder = rootFolder() + "/" + collectionName + "/" + QFileInfo(id.name()).completeBaseName();
+	return QString::compare(Catalog::instance().folderForMediaItem(id), expectedFolder, Qt::CaseInsensitive) == 0;
 }
 
 // ============================================================================
@@ -623,8 +636,11 @@ void ImportDialog::refreshLabelList()
 	m_labelOptions.clear();
 	for (const LabelOption& provisional : m_provisionalLabels)
 		m_labelOptions.push_back(provisional);
-	for (const LabelOption& real : m_callbacks.getLabelOptions())
-		m_labelOptions.push_back(real);
+	// Every ordinary Catalog label is a candidate destination - read from the Catalog model (which also
+	// carries each label's color), not from a disk listing.
+	for (const Catalog::Label& label : Catalog::instance().allLabels())
+		if (!label.isVirtual())
+			m_labelOptions.push_back(LabelOption{ toString(label.id), label.displayName, label.color });
 
 	m_labelList->clear();
 	for (const LabelOption& option : m_labelOptions)
@@ -672,7 +688,7 @@ QString ImportDialog::addProvisionalLabel(const QString& name)
 	LabelOption option;
 	option.id = QStringLiteral("new:%1").arg(m_provisionalSeq++);
 	option.displayName = name;
-	option.color = m_callbacks.generateLabelColor ? m_callbacks.generateLabelColor() : QString();
+	option.color = Catalog::randomLabelColor();  // the swatch it will keep when Import creates it for real
 	option.provisional = true;
 	m_provisionalLabels.push_back(option);
 	m_labelOptions.push_back(option);  // keep the cached union live so a follow-up findLabelId/updateCardLabelDots sees it at once
@@ -920,7 +936,7 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 			videoPaths << path;
 			continue;
 		}
-		const QString existingPath = m_callbacks.findAlreadyImportedDuplicatePhoto(path);
+		const QString existingPath = Catalog::instance().findPhotoBySameContent(path);
 		if (!existingPath.isEmpty())
 			duplicateLines << tr("%1\n    is already imported as %2").arg(QDir::toNativeSeparators(path), QDir::toNativeSeparators(existingPath));
 		else
@@ -1349,7 +1365,7 @@ void ImportDialog::materializeUsedProvisionalLabels()
 		it->pendingLabelIds = remapped;
 	}
 
-	// Drop the now-created provisionals; getLabelOptions() returns them as real labels from here on, so a partial
+	// Drop the now-created provisionals; the Catalog lists them as real labels from here on, so a partial
 	// Import that leaves items staged won't try to recreate them on a second run.
 	m_provisionalLabels.erase(std::remove_if(m_provisionalLabels.begin(), m_provisionalLabels.end(),
 		[&](const LabelOption& o) { return !provisionalToReal.value(o.id).isEmpty(); }), m_provisionalLabels.end());
@@ -1381,6 +1397,15 @@ void ImportDialog::runImport()
 	}
 
 	const RelocateMode relocateMode = static_cast<RelocateMode>(m_relocateModeCombo->currentData().toInt());
+
+	// One imported item's extra-label picks (every pending label beyond the destination-deciding first one),
+	// flushed to the Catalog at the end. Keyed by the *registered* id, which for an auto-renamed owned photo
+	// differs from the staged one.
+	struct ExtraLabelAssignment
+	{
+		MediaId mediaId;
+		QStringList labelIds;
+	};
 
 	std::vector<MediaId> bestItems;
 	std::vector<ExtraLabelAssignment> extraLabelAssignments;
@@ -1489,7 +1514,7 @@ void ImportDialog::runImport()
 			if (const QString newPath = relocated.relocatedTo.value(entry.path); !newPath.isEmpty())
 				m_staged[id].path = newPath;
 
-			if (!m_callbacks.isMediaItemTrackedInCollection(id, option->displayName))
+			if (!isTrackedInCollection(id, option->displayName))
 				continue;  // import declined/failed, or the id collided with an item tracked elsewhere - stays staged with its labels intact
 
 			succeededIds.push_back(id);
@@ -1501,10 +1526,24 @@ void ImportDialog::runImport()
 		}
 	}
 
-	if (m_callbacks.markBestRequested && !bestItems.empty())
-		m_callbacks.markBestRequested(bestItems);
-	if (m_callbacks.assignExtraLabelsRequested && !extraLabelAssignments.empty())
-		m_callbacks.assignExtraLabelsRequested(extraLabelAssignments);
+	// Flush the imported items' Best flags and extra-label picks. Items only reach these lists after their
+	// import was confirmed, so "tracked in the catalog" is the guard against a stray id - uniform across
+	// videos and photos (a photo has no per-item folder whose existence could stand in for it).
+	if (!bestItems.empty() || !extraLabelAssignments.empty())
+	{
+		Catalog& catalog = Catalog::instance();
+		Catalog::BatchScope batch;  // one store write for the whole flush instead of one per label
+		for (const MediaId& id : bestItems)
+			if (catalog.containsMediaItem(id))
+				catalog.addLabel(id, Catalog::BestLabelId);
+		for (const ExtraLabelAssignment& assignment : extraLabelAssignments)
+		{
+			if (!catalog.containsMediaItem(assignment.mediaId))
+				continue;
+			for (const QString& labelId : assignment.labelIds)
+				catalog.addLabel(assignment.mediaId, labelIdFromString(labelId));
+		}
+	}
 
 	for (const MediaId& id : succeededIds)
 		unstage(id);
