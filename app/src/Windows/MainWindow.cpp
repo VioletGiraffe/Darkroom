@@ -441,6 +441,15 @@ public:
 	static bool descending;
 	static bool favoritesFirst;
 
+	// Copies the control's current settings into the statics above, so the next sortItems() run orders by
+	// what the toolbar shows. Must precede every sortItems() call - the statics are the comparator's only input.
+	static void setSortMode(const SortControl* control)
+	{
+		sortBy = control->sortBy();
+		descending = control->descending();
+		favoritesFirst = control->favoritesFirst();
+	}
+
 	MediaId mediaId;  // the card's identity; the grid is enumerated and addressed by this, not by folder path
 	ItemInfo info;
 
@@ -680,9 +689,7 @@ void MainWindow::refreshMediaGrid()
 	Catalog& catalog = Catalog::instance();
 	const QSet<MediaId> bestSet = catalog.mediaItemsForLabel(Catalog::BestLabelId);
 
-	GridItem::favoritesFirst = m_sortControl->favoritesFirst();
-	GridItem::sortBy = m_sortControl->sortBy();
-	GridItem::descending = m_sortControl->descending();
+	GridItem::setSortMode(m_sortControl);
 	const bool sortByDate = GridItem::sortBy == SortBy::Date;
 
 	// Media items to show = the structural filters applied to the catalog (final order comes from sortItems()
@@ -756,9 +763,7 @@ void MainWindow::resortMediaGrid()
 	Catalog& catalog = Catalog::instance();
 	const QSet<MediaId> bestSet = catalog.mediaItemsForLabel(Catalog::BestLabelId);
 
-	GridItem::favoritesFirst = m_sortControl->favoritesFirst();
-	GridItem::sortBy = m_sortControl->sortBy();
-	GridItem::descending = m_sortControl->descending();
+	GridItem::setSortMode(m_sortControl);
 	const bool sortByDate = GridItem::sortBy == SortBy::Date;
 
 	for (int row = 0; row < count; ++row)
@@ -976,6 +981,14 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 
 	QMenu menu(this);
 
+	// Adds an entry that displays the shortcut of its Edit-menu counterpart. Display-only (WidgetShortcut
+	// scope): the working accelerator stays on the grid-scoped source action.
+	const auto addActionMirroringShortcut = [&menu, this](const QString& text, const QAction* shortcutSource, auto&& slot) {
+		QAction* a = menu.addAction(text, this, std::forward<decltype(slot)>(slot));
+		a->setShortcut(shortcutSource->shortcut());
+		a->setShortcutContext(Qt::WidgetShortcut);
+	};
+
 	// One pass classifies the selection for the two compare actions below; each is offered only for a
 	// selection homogeneous in its media type.
 	size_t videoCount = 0;
@@ -1036,11 +1049,8 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 		if (!sourcePath.isEmpty())
 			QApplication::clipboard()->setText(QDir::toNativeSeparators(sourcePath));
 	});
-	auto* renameEntry = menu.addAction(isPhoto ? tr("Rename photo") : tr("Rename media file"), [this, id] {
-		renameItemInteractive(id);
-	});
-	renameEntry->setShortcut(m_renameAction->shortcut());
-	renameEntry->setShortcutContext(Qt::WidgetShortcut);
+	addActionMirroringShortcut(isPhoto ? tr("Rename photo") : tr("Rename media file"), m_renameAction,
+		[this, id] { renameItemInteractive(id); });
 	menu.addSeparator();
 
 	const bool inBest = isInBest(id);
@@ -1080,18 +1090,10 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 	LabelVisuals::buildChecklistMenu(menu.addMenu(tr("Labels")), std::move(labelRows));
 	menu.addSeparator();
 
-	{
-		auto* a = menu.addAction(selection.size() > 1 ? tr("Remove %1 items from library (untrack)").arg(selection.size()) : tr("Remove from library (untrack)"),
-			this, &MainWindow::removeSelectedItemsFromLibrary);
-		a->setShortcut(m_removeFromLibraryAction->shortcut());
-		a->setShortcutContext(Qt::WidgetShortcut);
-	}
-	{
-		auto* a = menu.addAction(selection.size() > 1 ? tr("Delete (%1 items)").arg(selection.size()) : tr("Delete"),
-			this, &MainWindow::deleteSelectedItems);
-		a->setShortcut(m_deleteAction->shortcut());
-		a->setShortcutContext(Qt::WidgetShortcut);
-	}
+	addActionMirroringShortcut(selection.size() > 1 ? tr("Remove %1 items from library (untrack)").arg(selection.size()) : tr("Remove from library (untrack)"),
+		m_removeFromLibraryAction, &MainWindow::removeSelectedItemsFromLibrary);
+	addActionMirroringShortcut(selection.size() > 1 ? tr("Delete (%1 items)").arg(selection.size()) : tr("Delete"),
+		m_deleteAction, &MainWindow::deleteSelectedItems);
 
 	menu.exec(globalPos);
 	m_contextMenuTarget = std::nullopt;
