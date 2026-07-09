@@ -552,30 +552,14 @@ ImportDialog::~ImportDialog()
 
 void ImportDialog::dragEnterEvent(QDragEnterEvent* event)
 {
-	if (event->mimeData()->hasUrls())
-	{
-		for (const QUrl& url : event->mimeData()->urls())
-		{
-			const QString path = url.toLocalFile();
-			if (QFileInfo(path).isDir() || isSupportedVideoFile(path) || isSupportedImageFile(path))
-			{
-				event->acceptProposedAction();
-				return;
-			}
-		}
-	}
+	if (hasSupportedPaths(event->mimeData()))
+		event->acceptProposedAction();
 }
 
 void ImportDialog::dropEvent(QDropEvent* event)
 {
 	// Files and folders both accepted; stageMediaItems expands any folder into the supported files under it.
-	QStringList paths;
-	for (const QUrl& url : event->mimeData()->urls())
-	{
-		QString path = url.toLocalFile();
-		if (QFileInfo(path).isDir() || isSupportedVideoFile(path) || isSupportedImageFile(path))
-			paths.push_back(std::move(path));
-	}
+	QStringList paths = supportedPaths(event->mimeData());
 	if (!paths.isEmpty())
 	{
 		raise();
@@ -1109,24 +1093,17 @@ void ImportDialog::showStagedCardContextMenu(const MediaId& id, const QPoint& gl
 	// Labels checklist - toggles the staged cards' pendingLabelIds instead of the Catalog (nothing is written there
 	// until "Import" runs). Each row's color-tinted checkbox reflects the whole staged selection; toggling makes it
 	// uniform (strip when all carry it, else add to all).
-	QMenu* labelsMenu = menu.addMenu(tr("Labels"));
-	if (m_labelOptions.empty())
+	std::vector<LabelVisuals::ChecklistRow> labelRows;
+	for (const LabelOption& option : m_labelOptions)
 	{
-		labelsMenu->addAction(tr("(no labels yet)"))->setEnabled(false);
-	}
-	else
-	{
-		for (const LabelOption& option : m_labelOptions)
-		{
-			int haveCount = 0;
-			for (const MediaId& sel : selection)
-				if (m_staged.value(sel).pendingLabelIds.contains(option.id))
-					++haveCount;
-			const LabelVisuals::Presence presence = LabelVisuals::presenceForCount(haveCount, static_cast<int>(selection.size()));
+		int haveCount = 0;
+		for (const MediaId& sel : selection)
+			if (m_staged.value(sel).pendingLabelIds.contains(option.id))
+				++haveCount;
 
-			QAction* action = labelsMenu->addAction(LabelVisuals::checkboxIcon(presence, QColor(option.color), labelsMenu), option.displayName);
-			const bool addToAll = presence != LabelVisuals::Presence::All;
-			connect(action, &QAction::triggered, this, [this, selection, labelId = option.id, addToAll] {
+		labelRows.push_back({ option.displayName, QColor(option.color),
+			LabelVisuals::presenceForCount(haveCount, static_cast<int>(selection.size())),
+			[this, selection, labelId = option.id](bool addToAll) {
 				for (const MediaId& target : selection)
 				{
 					auto it = m_staged.find(target);
@@ -1141,9 +1118,9 @@ void ImportDialog::showStagedCardContextMenu(const MediaId& id, const QPoint& gl
 						it->pendingLabelIds.removeAll(labelId);
 					updateCardLabelDots(target);
 				}
-			});
-		}
+			} });
 	}
+	LabelVisuals::buildChecklistMenu(menu.addMenu(tr("Labels")), std::move(labelRows));
 	menu.addSeparator();
 
 	// Remove from staging (no disk change) and Delete (removes the source from disk). Both act on the effective staged

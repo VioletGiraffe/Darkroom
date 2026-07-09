@@ -1,11 +1,15 @@
 #include "UiComponents/LabelVisuals.h"
 
+#include <QAction>
 #include <QColor>
+#include <QMenu>
 #include <QPainter>
 #include <QPalette>
 #include <QPen>
 #include <QPixmap>
 #include <QWidget>
+
+#include <utility>
 
 QIcon LabelVisuals::checkboxIcon(Presence presence, const QColor& tint, const QWidget* context)
 {
@@ -53,4 +57,23 @@ QIcon LabelVisuals::checkboxIcon(Presence presence, const QColor& tint, const QW
 		}
 	}
 	return QIcon(pm);
+}
+
+void LabelVisuals::buildChecklistMenu(QMenu* menu, std::vector<ChecklistRow> rows)
+{
+	if (rows.empty())
+	{
+		menu->addAction(QObject::tr("(no labels yet)"))->setEnabled(false);
+		return;
+	}
+
+	for (ChecklistRow& row : rows)
+	{
+		QAction* action = menu->addAction(checkboxIcon(row.presence, row.color, menu), row.displayName);
+		const bool addToAll = row.presence != Presence::All;
+		// Context is the submenu: it's destroyed when the parent menu's exec() returns, so the connection can only
+		// fire while the caller (which the onToggle closure captures) is still alive.
+		QObject::connect(action, &QAction::triggered, menu,
+			[onToggle = std::move(row.onToggle), addToAll] { onToggle(addToAll); });
+	}
 }

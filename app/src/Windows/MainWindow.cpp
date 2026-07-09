@@ -389,30 +389,14 @@ void MainWindow::dragEnterEvent(QDragEnterEvent* event)
 	if (event->source() == m_mediaGrid)
 		return;
 
-	if (event->mimeData()->hasUrls())
-	{
-		for (const QUrl& url : event->mimeData()->urls())
-		{
-			const QString path = url.toLocalFile();
-			if (QFileInfo(path).isDir() || isSupportedVideoFile(path) || isSupportedImageFile(path))
-			{
-				event->acceptProposedAction();
-				return;
-			}
-		}
-	}
+	if (hasSupportedPaths(event->mimeData()))
+		event->acceptProposedAction();
 }
 
 void MainWindow::dropEvent(QDropEvent* event)
 {
 	// Files and folders are forwarded as-is; the Import dialog expands any folder into the supported files under it.
-	QStringList paths;
-	for (const QUrl& url : event->mimeData()->urls())
-	{
-		QString path = url.toLocalFile();
-		if (QFileInfo(path).isDir() || isSupportedVideoFile(path) || isSupportedImageFile(path))
-			paths.push_back(std::move(path));
-	}
+	QStringList paths = supportedPaths(event->mimeData());
 
 	// There is no "current collection" in the label model, so hand the dropped paths to the Import dialog, where the
 	// user picks the destination label(s). Deferred so the drop source application is released promptly
@@ -1089,25 +1073,21 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 	// Labels submenu: a checklist of every ordinary label. Each row's color-tinted checkbox reflects the whole
 	// effective selection - checked when every selected item has the label, a dash when only some do, an empty box
 	// when none do. Toggling makes the selection uniform: strip the label when all already carry it, else add to all.
-	QMenu* labelsMenu = menu.addMenu(tr("Labels"));
+	std::vector<LabelVisuals::ChecklistRow> labelRows;
+	for (const Catalog::Label& label : catalog.allLabels())
 	{
-		bool anyLabel = false;
-		for (const Catalog::Label& label : catalog.allLabels())
-		{
-			if (label.isVirtual())  // Best is the star / "Add to Best" action above, not a dot/checkbox
-				continue;
-			anyLabel = true;
-			const LabelId labelId = label.id;
+		if (label.isVirtual())  // Best is the star / "Add to Best" action above, not a dot/checkbox
+			continue;
+		const LabelId labelId = label.id;
 
-			int haveCount = 0;
-			for (const MediaId& sel : selection)
-				if (catalog.mediaItemHasLabel(sel, labelId))
-					++haveCount;
-			const LabelVisuals::Presence presence = LabelVisuals::presenceForCount(haveCount, static_cast<int>(selection.size()));
+		int haveCount = 0;
+		for (const MediaId& sel : selection)
+			if (catalog.mediaItemHasLabel(sel, labelId))
+				++haveCount;
 
-			QAction* action = labelsMenu->addAction(LabelVisuals::checkboxIcon(presence, QColor(label.color), labelsMenu), label.displayName);
-			const bool addToAll = presence != LabelVisuals::Presence::All;
-			connect(action, &QAction::triggered, this, [this, selection, labelId, addToAll] {
+		labelRows.push_back({ label.displayName, QColor(label.color),
+			LabelVisuals::presenceForCount(haveCount, static_cast<int>(selection.size())),
+			[this, selection, labelId](bool addToAll) {
 				Catalog::BatchScope batch;  // one store write for the whole selection instead of one per item
 				for (const MediaId& target : selection)
 				{
@@ -1117,11 +1097,9 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 						Catalog::instance().removeLabel(target, labelId);
 				}
 				refreshLibraryView();
-			});
-		}
-		if (!anyLabel)
-			labelsMenu->addAction(tr("(no labels yet)"))->setEnabled(false);
+			} });
 	}
+	LabelVisuals::buildChecklistMenu(menu.addMenu(tr("Labels")), std::move(labelRows));
 	menu.addSeparator();
 
 	{

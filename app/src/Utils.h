@@ -6,6 +6,7 @@
 #include <QDir>
 
 class QDateTime;
+class QMimeData;
 class QWidget;
 
 void saveWindowGeometry(QWidget* w, const QString& key);
@@ -27,6 +28,13 @@ void clearStuckHoverIfCursorLeft(QWidget* w);
 
 [[nodiscard]] bool isSupportedVideoFile(const QString& filePath);
 [[nodiscard]] bool isSupportedImageFile(const QString& filePath);
+
+// Useful for drop handlers that accept directories or files
+[[nodiscard]] bool isDirectoryOrSupportedFile(const QString& path);
+
+// Returns the list paths from urls() for which isDirectoryOrSupportedFile() returns true
+[[nodiscard]] bool hasSupportedPaths(const QMimeData* mime);
+[[nodiscard]] QStringList supportedPaths(const QMimeData* mime);
 
 // Byte-for-byte comparison of two files; the size check short-circuits the common case where the
 // names collide but the content doesn't.

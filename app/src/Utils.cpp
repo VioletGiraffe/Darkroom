@@ -8,10 +8,12 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QMessageBox>
+#include <QMimeData>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QSettings>
 #include <QStringList>
+#include <QUrl>
 #include <QWidget>
 
 void saveWindowGeometry(QWidget* w, const QString& key)
@@ -65,6 +67,33 @@ bool isSupportedImageFile(const QString& filePath)
 	static const QStringList supportedExtensions { "jpg", "jpeg", "png", "tif", "tiff", "webp", "bmp" };
 	const QString extension = QFileInfo(filePath).suffix().toLower();
 	return supportedExtensions.contains(extension);
+}
+
+bool isDirectoryOrSupportedFile(const QString& path)
+{
+	return QFileInfo(path).isDir() || isSupportedVideoFile(path) || isSupportedImageFile(path);
+}
+
+bool hasSupportedPaths(const QMimeData* mime)
+{
+	for (const QUrl& url : mime->urls())
+	{
+		if (const QString path = url.toLocalFile(); isDirectoryOrSupportedFile(path))
+			return true;
+	}
+	return false;
+}
+
+QStringList supportedPaths(const QMimeData* mime)
+{
+	QStringList paths;
+	// A non-local URL yields an empty local path, which isDirectoryOrSupportedFile rejects - so this also filters those out.
+	for (const QUrl& url : mime->urls())
+	{
+		if (const QString path = url.toLocalFile(); isDirectoryOrSupportedFile(path))
+			paths.push_back(path);
+	}
+	return paths;
 }
 
 bool filesAreIdentical(const QString& pathA, const QString& pathB)
