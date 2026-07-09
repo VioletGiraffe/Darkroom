@@ -3,6 +3,7 @@
 #include "UiComponents/DragGestureHelper.h"
 #include "Core/MediaId.h"
 #include "Import.h"  // Import::PhotoImportMode / PhotoResult, used in the importPhotosRequested callback
+#include "Windows/SourceRelocation.h"  // SourceRelocation::Mode, importVideoGroup's parameter
 
 #include <QDialog>
 #include <QHash>
@@ -136,9 +137,34 @@ private:
 	// place (same grid item) so its callbacks bind to the new id - preserving the "staged key == current file's
 	// MediaId" invariant runImport relies on. The extension is kept fixed so the type stays valid.
 	void renameStagedItem(const MediaId& id);
-	// Every staged entry whose pendingLabelIds isn't empty: grouped by its first label and imported via
-	// addMediaItemsRequested/importPhotosRequested, then the Best flags and extra-label picks of whatever
-	// landed are flushed to the Catalog directly.
+	// --- Import (the "Import" button); see runImport for the flow ------------------------------------------
+	// One imported item's extra-label picks (every pending label beyond the destination-deciding first one).
+	// Keyed by the *registered* id - an owned-photo auto-rename changes the identity from the staged one.
+	struct ExtraLabelAssignment
+	{
+		MediaId mediaId;
+		QStringList labelIds;
+	};
+	// Everything one Import run accomplished, accumulated across the per-type group importers below and
+	// applied by runImport's epilogue: succeeded and skipped entries leave staging; the Best flags and
+	// extra-label picks of what landed are flushed to the Catalog.
+	struct ImportOutcome
+	{
+		std::vector<MediaId> succeededIds;
+		std::vector<MediaId> skippedIds;  // relocation collision resolved as "don't import" - cleared from staging like a success, minus the label flush
+		std::vector<MediaId> bestItems;
+		std::vector<ExtraLabelAssignment> extraLabelAssignments;
+	};
+	// Imports one first-label group's photos under the label via the host, with the "import an owned copy
+	// instead?" escape hatch for a Reference-mode id collision.
+	void importPhotoGroup(const QString& labelId, const std::vector<MediaId>& photoIds, Import::PhotoImportMode mode, ImportOutcome& outcome);
+	// Imports one first-label group's videos: optionally relocates each source file (SourceRelocation), hands
+	// the batch to the host, then classifies each entry into the outcome; a relocated-but-not-imported entry's
+	// staged path follows the file, so a later retry starts from where the file really is.
+	void importVideoGroup(const QString& collectionName, const std::vector<MediaId>& videoIds, SourceRelocation::Mode relocateMode, ImportOutcome& outcome);
+	// Every staged entry whose pendingLabelIds isn't empty: grouped by the first label dropped on it (which
+	// decides the import destination) and handed to the per-type group importers above, then the accumulated
+	// outcome is applied - the Catalog label flush, unstaging, one host repaint.
 	void runImport();
 	[[nodiscard]] const LabelOption* findLabelOption(const QString& id) const;
 

@@ -1133,13 +1133,103 @@ void ImportDialog::materializeUsedProvisionalLabels()
 			tr("Some labels could not be created (the name may be reserved or invalid); the affected items were left unlabeled and remain staged."));
 }
 
+void ImportDialog::importPhotoGroup(const QString& labelId, const std::vector<MediaId>& photoIds, Import::PhotoImportMode mode, ImportOutcome& outcome)
+{
+	QStringList photoPaths;
+	photoPaths.reserve(photoIds.size());
+	for (const MediaId& id : photoIds)
+		photoPaths << m_staged.value(id).path;
+
+	const std::vector<Import::PhotoResult> results = m_callbacks.importPhotosRequested(labelId, photoPaths, mode);
+	for (size_t i = 0; i < photoIds.size() && i < results.size(); ++i)
+	{
+		const MediaId& id = photoIds[i];
+		Import::PhotoResult result = results[i];
+
+		// Reference mode can hit an unresolvable name+size clash with an existing item; the escape
+		// hatch imports an owned copy instead, whose auto-rename resolves the clash.
+		if (result.status == Import::PhotoStatus::IdCollision
+			&& QMessageBox::question(this, tr("Already tracked"),
+				tr("%1\n\nhas the same name and size as an item already in the library, so it cannot be referenced in place.\n\n"
+				   "Import a copy into the library instead (renamed automatically to avoid the clash)?")
+				.arg(QDir::toNativeSeparators(m_staged.value(id).path)),
+				QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes)
+		{
+			const std::vector<Import::PhotoResult> retried =
+				m_callbacks.importPhotosRequested(labelId, { m_staged.value(id).path }, Import::PhotoImportMode::Copy);
+			if (!retried.empty())
+				result = retried.front();
+		}
+
+		if (result.status != Import::PhotoStatus::Success)
+			continue;  // failed or declined - stays staged with its labels intact (errors already reported by the host)
+
+		const StagedEntry entry = m_staged.value(id);
+		outcome.succeededIds.push_back(id);
+		// Bookkeeping keys on the *registered* id: an owned-import auto-rename gives the imported copy
+		// a new name, hence a new identity - the staged id no longer names anything in the catalog.
+		if (entry.pendingBest)
+			outcome.bestItems.push_back(result.registeredId);
+		if (entry.pendingLabelIds.size() > 1)
+			outcome.extraLabelAssignments.push_back(ExtraLabelAssignment{ result.registeredId, entry.pendingLabelIds.mid(1) });
+	}
+}
+
+void ImportDialog::importVideoGroup(const QString& collectionName, const std::vector<MediaId>& videoIds, SourceRelocation::Mode relocateMode, ImportOutcome& outcome)
+{
+	QStringList paths;
+	QHash<MediaId, QString> stagedPreviewDirs;  // by id: survives relocation rewriting the paths below
+	QHash<MediaId, qint64> stagedDurations;     // likewise by id: the duration probed while staging each video
+	paths.reserve(videoIds.size());
+	stagedPreviewDirs.reserve(videoIds.size());
+	stagedDurations.reserve(videoIds.size());
+	for (const MediaId& id : videoIds)
+	{
+		const StagedEntry entry = m_staged.value(id);
+		paths << entry.path;
+		stagedPreviewDirs.insert(id, entry.tempPreviewDir);
+		stagedDurations.insert(id, entry.durationMs);
+	}
+
+	const SourceRelocation::BatchResult relocated = SourceRelocation::relocateIfNeeded(this, paths, relocateMode, m_relocateFolderEdit->text());
+	m_callbacks.addMediaItemsRequested(collectionName, relocated.toImport, stagedPreviewDirs, stagedDurations);
+
+	for (const MediaId& id : videoIds)
+	{
+		const StagedEntry entry = m_staged.value(id);
+		if (relocated.keepStaged.contains(entry.path))
+			continue;  // relocation deferred (Cancel) - stays staged untouched, try again later
+
+		if (relocated.skipped.contains(entry.path))
+		{
+			outcome.skippedIds.push_back(id);  // resolved as "don't import" (the destination copy stands in for it) - clear from staging
+			continue;
+		}
+
+		// The file was copied/moved: the staged entry follows it, so if the import below failed or was
+		// declined, a later retry starts from where the file actually is (a Move deleted the original).
+		if (const QString newPath = relocated.relocatedTo.value(entry.path); !newPath.isEmpty())
+			m_staged[id].path = newPath;
+
+		if (!isTrackedInCollection(id, collectionName))
+			continue;  // import declined/failed, or the id collided with an item tracked elsewhere - stays staged with its labels intact
+
+		outcome.succeededIds.push_back(id);
+
+		if (entry.pendingBest)
+			outcome.bestItems.push_back(id);
+		if (entry.pendingLabelIds.size() > 1)
+			outcome.extraLabelAssignments.push_back(ExtraLabelAssignment{ id, entry.pendingLabelIds.mid(1) });
+	}
+}
+
 void ImportDialog::runImport()
 {
 	materializeUsedProvisionalLabels();
 
 	// Group labeled entries by the first label dropped on them - the only place that ordering matters. Keyed
 	// by MediaId throughout (the stable m_staged key, captured while the source file still existed): a Move
-	// relocation deletes the source from its staged path before the post-import bookkeeping below runs, so
+	// relocation deletes the source from its staged path before the post-import bookkeeping runs, so
 	// re-deriving a MediaId from the path then would fail.
 	QHash<QString, std::vector<MediaId>> idsByLabelId;
 	for (auto it = m_staged.constBegin(); it != m_staged.constEnd(); ++it)
@@ -1153,21 +1243,14 @@ void ImportDialog::runImport()
 	}
 
 	const RelocateMode relocateMode = static_cast<RelocateMode>(m_relocateModeCombo->currentData().toInt());
+	// The relocation mode doubles as the photo import mode: Copy/Move land the file in the library's
+	// photo storage, "leave in place" means tracking it right where it is (a referenced photo).
+	const Import::PhotoImportMode photoMode =
+		relocateMode == RelocateMode::Copy ? Import::PhotoImportMode::Copy :
+		relocateMode == RelocateMode::Move ? Import::PhotoImportMode::Move :
+		                                     Import::PhotoImportMode::Reference;
 
-	// One imported item's extra-label picks (every pending label beyond the destination-deciding first one),
-	// flushed to the Catalog at the end. Keyed by the *registered* id, which for an auto-renamed owned photo
-	// differs from the staged one.
-	struct ExtraLabelAssignment
-	{
-		MediaId mediaId;
-		QStringList labelIds;
-	};
-
-	std::vector<MediaId> bestItems;
-	std::vector<ExtraLabelAssignment> extraLabelAssignments;
-	std::vector<MediaId> succeededIds;
-	std::vector<MediaId> skippedIds;  // collision resolved as "don't import" - cleared from staging like a success, minus the label flush
-
+	ImportOutcome outcome;
 	for (auto it = idsByLabelId.constBegin(); it != idsByLabelId.constEnd(); ++it)
 	{
 		const LabelOption* option = findLabelOption(it.key());
@@ -1182,117 +1265,23 @@ void ImportDialog::runImport()
 		for (const MediaId& id : it.value())
 			(isSupportedImageFile(m_staged.value(id).path) ? photoIds : videoIds).push_back(id);
 
-		// --- Photos ---
 		if (!photoIds.empty())
-		{
-			// The relocation mode doubles as the photo import mode: Copy/Move land the file in the library's
-			// photo storage, "leave in place" means tracking it right where it is (a referenced photo).
-			const Import::PhotoImportMode photoMode =
-				relocateMode == RelocateMode::Copy ? Import::PhotoImportMode::Copy :
-				relocateMode == RelocateMode::Move ? Import::PhotoImportMode::Move :
-				                                     Import::PhotoImportMode::Reference;
-
-			QStringList photoPaths;
-			photoPaths.reserve(photoIds.size());
-			for (const MediaId& id : photoIds)
-				photoPaths << m_staged.value(id).path;
-
-			const std::vector<Import::PhotoResult> results = m_callbacks.importPhotosRequested(it.key(), photoPaths, photoMode);
-			for (size_t i = 0; i < photoIds.size() && i < results.size(); ++i)
-			{
-				const MediaId& id = photoIds[i];
-				Import::PhotoResult result = results[i];
-
-				// Reference mode can hit an unresolvable name+size clash with an existing item; the escape
-				// hatch imports an owned copy instead, whose auto-rename resolves the clash.
-				if (result.status == Import::PhotoStatus::IdCollision
-					&& QMessageBox::question(this, tr("Already tracked"),
-						tr("%1\n\nhas the same name and size as an item already in the library, so it cannot be referenced in place.\n\n"
-						   "Import a copy into the library instead (renamed automatically to avoid the clash)?")
-						.arg(QDir::toNativeSeparators(m_staged.value(id).path)),
-						QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes)
-				{
-					const std::vector<Import::PhotoResult> retried =
-						m_callbacks.importPhotosRequested(it.key(), { m_staged.value(id).path }, Import::PhotoImportMode::Copy);
-					if (!retried.empty())
-						result = retried.front();
-				}
-
-				if (result.status != Import::PhotoStatus::Success)
-					continue;  // failed or declined - stays staged with its labels intact (errors already reported by the host)
-
-				const StagedEntry entry = m_staged.value(id);
-				succeededIds.push_back(id);
-				// Bookkeeping keys on the *registered* id: an owned-import auto-rename gives the imported copy
-				// a new name, hence a new identity - the staged id no longer names anything in the catalog.
-				if (entry.pendingBest)
-					bestItems.push_back(result.registeredId);
-				if (entry.pendingLabelIds.size() > 1)
-					extraLabelAssignments.push_back(ExtraLabelAssignment{ result.registeredId, entry.pendingLabelIds.mid(1) });
-			}
-		}
-
-		// --- Videos ---
-		if (videoIds.empty())
-			continue;
-
-		QStringList paths;
-		QHash<MediaId, QString> stagedPreviewDirs;  // by id: survives relocation rewriting the paths below
-		QHash<MediaId, qint64> stagedDurations;     // likewise by id: the duration probed while staging each video
-		paths.reserve(videoIds.size());
-		stagedPreviewDirs.reserve(videoIds.size());
-		stagedDurations.reserve(videoIds.size());
-		for (const MediaId& id : videoIds)
-		{
-			const StagedEntry entry = m_staged.value(id);
-			paths << entry.path;
-			stagedPreviewDirs.insert(id, entry.tempPreviewDir);
-			stagedDurations.insert(id, entry.durationMs);
-		}
-
-		const SourceRelocation::BatchResult relocated = SourceRelocation::relocateIfNeeded(this, paths, relocateMode, m_relocateFolderEdit->text());
-		m_callbacks.addMediaItemsRequested(option->displayName, relocated.toImport, stagedPreviewDirs, stagedDurations);
-
-		for (const MediaId& id : videoIds)
-		{
-			const StagedEntry entry = m_staged.value(id);
-			if (relocated.keepStaged.contains(entry.path))
-				continue;  // relocation deferred (Cancel) - stays staged untouched, try again later
-
-			if (relocated.skipped.contains(entry.path))
-			{
-				skippedIds.push_back(id);  // resolved as "don't import" (the destination copy stands in for it) - clear from staging
-				continue;
-			}
-
-			// The file was copied/moved: the staged entry follows it, so if the import below failed or was
-			// declined, a later retry starts from where the file actually is (a Move deleted the original).
-			if (const QString newPath = relocated.relocatedTo.value(entry.path); !newPath.isEmpty())
-				m_staged[id].path = newPath;
-
-			if (!isTrackedInCollection(id, option->displayName))
-				continue;  // import declined/failed, or the id collided with an item tracked elsewhere - stays staged with its labels intact
-
-			succeededIds.push_back(id);
-
-			if (entry.pendingBest)
-				bestItems.push_back(id);
-			if (entry.pendingLabelIds.size() > 1)
-				extraLabelAssignments.push_back(ExtraLabelAssignment{ id, entry.pendingLabelIds.mid(1) });
-		}
+			importPhotoGroup(it.key(), photoIds, photoMode, outcome);
+		if (!videoIds.empty())
+			importVideoGroup(option->displayName, videoIds, relocateMode, outcome);
 	}
 
 	// Flush the imported items' Best flags and extra-label picks. Items only reach these lists after their
 	// import was confirmed, so "tracked in the catalog" is the guard against a stray id - uniform across
 	// videos and photos (a photo has no per-item folder whose existence could stand in for it).
-	if (!bestItems.empty() || !extraLabelAssignments.empty())
+	if (!outcome.bestItems.empty() || !outcome.extraLabelAssignments.empty())
 	{
 		Catalog& catalog = Catalog::instance();
 		Catalog::BatchScope batch;  // one store write for the whole flush instead of one per label
-		for (const MediaId& id : bestItems)
+		for (const MediaId& id : outcome.bestItems)
 			if (catalog.containsMediaItem(id))
 				catalog.addLabel(id, Catalog::BestLabelId);
-		for (const ExtraLabelAssignment& assignment : extraLabelAssignments)
+		for (const ExtraLabelAssignment& assignment : outcome.extraLabelAssignments)
 		{
 			if (!catalog.containsMediaItem(assignment.mediaId))
 				continue;
@@ -1301,13 +1290,13 @@ void ImportDialog::runImport()
 		}
 	}
 
-	for (const MediaId& id : succeededIds)
+	for (const MediaId& id : outcome.succeededIds)
 		unstage(id);
-	for (const MediaId& id : skippedIds)
+	for (const MediaId& id : outcome.skippedIds)
 		unstage(id);
 
 	// Repaint the host once with the fully-applied state - the dialog stays open, so the mid-Import refresh
 	// that addMediaItemsRequested may have done only shows folder labels, not the Best/extra labels flushed just above.
-	if (!succeededIds.empty() && m_callbacks.viewChanged)
+	if (!outcome.succeededIds.empty() && m_callbacks.viewChanged)
 		m_callbacks.viewChanged();
 }
