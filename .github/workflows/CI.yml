@@ -43,9 +43,17 @@ jobs:
         winget install --id AlDanial.Cloc --exact --silent --accept-package-agreements --accept-source-agreements
         "$env:LOCALAPPDATA\Microsoft\WinGet\Links" >> $env:GITHUB_PATH
 
-        $loc = (cloc --include-lang="C,C++" --strip-str-comments --exclude-dir=tests,bin,build,.git,3rdparty --json --quiet ./app/ | ConvertFrom-Json).SUM.code
+        $result = cloc --include-lang="C,C++" --strip-str-comments `--exclude-dir=tests,bin,build,.git,3rdparty ` --by-file --json --quiet ./app/ | ConvertFrom-Json
+
+        $loc = $result.SUM.code
         "App C/C++ code: $loc LOC"
         "LOC_APP=$loc" >> $env:GITHUB_ENV
+
+        # Per-file counts (everything except the 'header' and 'SUM' meta entries)
+        $result.PSObject.Properties |
+          Where-Object { $_.Name -notin 'header','SUM' } |
+          Sort-Object { $_.Value.code } -Descending |
+          ForEach-Object { "{0,6}  {1}" -f $_.Value.code, $_.Name }
 
     - name: LOC count - libs
       if: "startsWith(matrix.os, 'windows')"
