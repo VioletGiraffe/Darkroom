@@ -14,6 +14,7 @@
 class FrameViewerWindow;
 class LabelSidebar;
 class MediaGrid;
+class MediaItemWidget;
 class QAction;
 class QComboBox;
 class QLineEdit;
@@ -48,6 +49,14 @@ private:
 	// system image viewer for a photo (after checking the file exists).
 	void openSourceInSystemApp(const MediaId& id);
 	void refreshMediaGrid();
+	// The media items the structural (grid-rebuilding) filters select: the sidebar's label filter (AND/OR)
+	// plus the header's All/Videos/Photos switch. The name filter is deliberately absent here - it's a
+	// view-level hide/show over the already-built cards (applyNameFilter).
+	[[nodiscard]] std::vector<MediaId> mediaItemsMatchingFilters() const;
+	// Builds and wires one grid card for refreshMediaGrid: thumbnails, star, duration pill, label dots and
+	// every callback. Returns null for a video whose preview/ is missing or empty - such an item gets no
+	// card at all (rather than a frameless ghost one).
+	[[nodiscard]] MediaItemWidget* buildMediaCard(const MediaId& id, bool isBest, const QSize& photoCanvas, const QSize& videoCanvas, int previewFrameCount);
 	// Refreshes the grid AND the label sidebar (labels/counts). Use after structural changes (add/delete/
 	// rename an item, create a label); plain refreshMediaGrid is for filter/sort/zoom changes.
 	void refreshLibraryView();

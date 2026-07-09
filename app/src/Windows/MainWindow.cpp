@@ -559,119 +559,11 @@ bool MainWindow::regeneratePreviewFor(const MediaId& id)
 	return result.ok();
 }
 
-void MainWindow::refreshMediaGrid()
+std::vector<MediaId> MainWindow::mediaItemsMatchingFilters() const
 {
-	m_mediaGrid->clear();
-
-	const int previewFrameCount = m_previewFrameCountCombo->currentData().toInt();
-	const int imageHeight = cardImageHeight();
-
-	// Card thumbnail canvases: a photo is square; a video is a horizontal strip sized to tile with
-	// previewFrameCount photo cards (so a video's width + gap spans that many photo widths + gaps), letting a
-	// mixed grid line up on one column grid. Both are fixed per refresh, so each is computed once here.
-	const QSize photoCanvas{ imageHeight, imageHeight };
-	const QSize videoCanvas{ MediaItemWidget::videoCanvasWidthForTiling(imageHeight, previewFrameCount, m_mediaGrid->spacing()), imageHeight };
-
-	// The catalog is the authoritative in-memory model, kept current by its mutations, so the grid reads it
-	// directly - no per-refresh re-derivation. Look up the Best set once: the per-card star state and the
-	// favorites-first sort below share it.
 	Catalog& catalog = Catalog::instance();
-	const QSet<MediaId> bestSet = catalog.mediaItemsForLabel(Catalog::BestLabelId);
 
-	GridItem::favoritesFirst = m_sortControl->favoritesFirst();
-	GridItem::sortBy = m_sortControl->sortBy();
-	GridItem::descending = m_sortControl->descending();
-	const bool sortByDate = GridItem::sortBy == SortBy::Date;
-
-	// Card widgets are attached in a second pass (after the addItem loop and sortItems), not inline: interleaving
-	// setItemWidget with addItem makes each insert's endInsertRows walk every persistent editor index created so
-	// far -> O(N^2). This list carries each item and its not-yet-attached card between the two passes.
-	std::vector<std::pair<GridItem*, MediaItemWidget*>> pendingAttach;
-
-	// Cards come in two fixed sizes, one per media type (a video's frame strip, a photo's square), so the size
-	// hint for each type is computed once from that type's first built card and reused - a card's size depends
-	// only on its type. Querying every card would needlessly activate each one's layout. The two widths are
-	// chosen to tile on one column grid (see photoCanvas/videoCanvas above), so a mixed grid still lines up.
-	QSize videoCardHint, photoCardHint;
-
-	// Cards are added in catalog order with their sort info attached, then sortItems() (using
-	// GridItem::operator<) puts them in their final order; captions are numbered after that.
-	const auto addCard = [&](const MediaId& id) {
-		const QString folderPath = catalog.folderForMediaItem(id);
-		const bool isPhoto = catalog.mediaType(id) == Catalog::MediaType::Photo;
-		QStringList previewPaths;
-		if (isPhoto)
-		{
-			// A photo card decodes the photo file itself - no preview cache (v1). An unloadable path (e.g. a
-			// referenced photo on an unmounted drive) renders a blank card rather than hiding the item.
-			previewPaths << catalog.sourcePathForMediaItem(id);
-		}
-		else
-		{
-			// Video cards always render from the permanent preview/ subfolder, never the real frame folder
-			// directly - this is what lets a not-yet-split video (no real frames yet) still show a real thumbnail.
-			QDir previewDir(Catalog::previewDirFor(folderPath));
-			const QStringList imageFiles = previewDir.entryList(IMAGE_FILE_FILTERS, QDir::Files, QDir::Name);
-			if (imageFiles.isEmpty())
-				return;  // preview/ missing or empty (externally deleted folder, or preview generation failed outright) - don't show a frameless ghost card
-
-			previewPaths = pickEvenlySpacedFrames(previewDir, imageFiles, previewFrameCount);
-		}
-
-		auto* card = new MediaItemWidget(
-			isPhoto ? photoCanvas : videoCanvas,
-			previewPaths, QString(),
-			id,
-			bestSet.contains(id),
-			[this, id] { toggleBestFolder(id); },
-			// double-click: a video opens in the built-in player, a photo in the system image viewer
-			[this, id, isPhoto] { if (isPhoto) openSourceInSystemApp(id); else playVideo(id); },
-			[this, id](QPoint globalPos) { showMediaItemContextMenu(id, globalPos); },
-			/* dynamic size hint */false,
-			/* film strip */ !isPhoto   // videos read as a perforated film strip; photos stay a plain square
-		);
-		if (!isPhoto)  // the frame viewer browses a video's frame folder; a photo has no frames, so no middle-click
-		{
-			card->setOnMiddleButtonClick([this, id, folderPath] {
-				ensureFramesSplit(id);  // transparently runs the full split first, if this video hasn't had one yet
-				m_frameViewer->showForFolder(folderPath);
-			});
-		}
-		card->setOnMouseWheelCallback([this](int steps) { zoomCards(steps); });
-		card->setFramesExtracted(!isPhoto && catalog.isSplitIntoFrames(id));  // green "frames ready" badge - videos only (a photo reports split==true but has no frames)
-		card->setDuration(catalog.durationMsForMediaItem(id));  // shows the duration pill on videos; photos / not-yet-probed videos return -1 -> no pill
-
-		// A label dragged from the sidebar onto this card is added to it (or to the whole selection if this card
-		// is part of it). Mirrors the context-menu "Labels" add path; drag only ever adds, never removes.
-		// Deferred: refreshLibraryView rebuilds the grid, deleting this very card mid-dropEvent, so the mutation
-		// runs after the drop event unwinds (same reason MainWindow::dropEvent defers opening the Import dialog).
-		card->setOnLabelDropped([this, id](const QString& labelId) {
-			const std::vector<MediaId> targets = effectiveSelection(id);
-			const LabelId dropped = labelIdFromString(labelId);  // the mime payload is the id's decimal string
-			QMetaObject::invokeMethod(this, [this, targets, dropped] {
-				Catalog::BatchScope batch;  // one store write for the whole selection instead of one per item
-				for (const MediaId& target : targets)
-					Catalog::instance().addLabel(target, dropped);
-				refreshLibraryView();
-			}, Qt::QueuedConnection);
-		});
-
-		applyLabelDots(catalog, id, card);
-
-		auto* item = new GridItem();
-		item->mediaId = id;
-		item->info = itemInfoFor(catalog, id, bestSet.contains(id), sortByDate);
-		QSize& typeHint = isPhoto ? photoCardHint : videoCardHint;   // one cached hint per media type (see above)
-		if (!typeHint.isValid())
-			typeHint = card->sizeHint();
-		item->setSizeHint(typeHint);
-		m_mediaGrid->addItem(item);
-
-		pendingAttach.emplace_back(item, card);   // widget attached in the second pass, after sortItems()
-	};
-
-	// Media items to show = the sidebar's active label filter applied to the catalog (final order comes from
-	// sortItems() below, so the enumeration order here doesn't matter).
+	// The sidebar's active label filter applied to the catalog.
 	const QList<LabelId> activeLabelIds = m_labelSidebar->activeLabelIds();
 	std::vector<MediaId> mediaItems;
 	if (activeLabelIds.isEmpty())
@@ -700,17 +592,143 @@ void MainWindow::refreshMediaGrid()
 		std::erase_if(mediaItems, [&](const MediaId& id) { return catalog.mediaType(id) != wanted; });
 	}
 
+	return mediaItems;
+}
+
+MediaItemWidget* MainWindow::buildMediaCard(const MediaId& id, bool isBest, const QSize& photoCanvas, const QSize& videoCanvas, int previewFrameCount)
+{
+	Catalog& catalog = Catalog::instance();
+	const QString folderPath = catalog.folderForMediaItem(id);
+	const bool isPhoto = catalog.mediaType(id) == Catalog::MediaType::Photo;
+	QStringList previewPaths;
+	if (isPhoto)
+	{
+		// A photo card decodes the photo file itself - no preview cache (v1). An unloadable path (e.g. a
+		// referenced photo on an unmounted drive) renders a blank card rather than hiding the item.
+		previewPaths << catalog.sourcePathForMediaItem(id);
+	}
+	else
+	{
+		// Video cards always render from the permanent preview/ subfolder, never the real frame folder
+		// directly - this is what lets a not-yet-split video (no real frames yet) still show a real thumbnail.
+		QDir previewDir(Catalog::previewDirFor(folderPath));
+		const QStringList imageFiles = previewDir.entryList(IMAGE_FILE_FILTERS, QDir::Files, QDir::Name);
+		if (imageFiles.isEmpty())
+			return nullptr;  // preview/ missing or empty (externally deleted folder, or preview generation failed outright) - don't show a frameless ghost card
+
+		previewPaths = pickEvenlySpacedFrames(previewDir, imageFiles, previewFrameCount);
+	}
+
+	auto* card = new MediaItemWidget(
+		isPhoto ? photoCanvas : videoCanvas,
+		previewPaths, QString(),
+		id,
+		isBest,
+		[this, id] { toggleBestFolder(id); },
+		// double-click: a video opens in the built-in player, a photo in the system image viewer
+		[this, id, isPhoto] { if (isPhoto) openSourceInSystemApp(id); else playVideo(id); },
+		[this, id](QPoint globalPos) { showMediaItemContextMenu(id, globalPos); },
+		/* dynamic size hint */false,
+		/* film strip */ !isPhoto   // videos read as a perforated film strip; photos stay a plain square
+	);
+	if (!isPhoto)  // the frame viewer browses a video's frame folder; a photo has no frames, so no middle-click
+	{
+		card->setOnMiddleButtonClick([this, id, folderPath] {
+			ensureFramesSplit(id);  // transparently runs the full split first, if this video hasn't had one yet
+			m_frameViewer->showForFolder(folderPath);
+		});
+	}
+	card->setOnMouseWheelCallback([this](int steps) { zoomCards(steps); });
+	card->setFramesExtracted(!isPhoto && catalog.isSplitIntoFrames(id));  // green "frames ready" badge - videos only (a photo reports split==true but has no frames)
+	card->setDuration(catalog.durationMsForMediaItem(id));  // shows the duration pill on videos; photos / not-yet-probed videos return -1 -> no pill
+
+	// A label dragged from the sidebar onto this card is added to it (or to the whole selection if this card
+	// is part of it). Mirrors the context-menu "Labels" add path; drag only ever adds, never removes.
+	// Deferred: refreshLibraryView rebuilds the grid, deleting this very card mid-dropEvent, so the mutation
+	// runs after the drop event unwinds (same reason MainWindow::dropEvent defers opening the Import dialog).
+	card->setOnLabelDropped([this, id](const QString& labelId) {
+		const std::vector<MediaId> targets = effectiveSelection(id);
+		const LabelId dropped = labelIdFromString(labelId);  // the mime payload is the id's decimal string
+		QMetaObject::invokeMethod(this, [this, targets, dropped] {
+			Catalog::BatchScope batch;  // one store write for the whole selection instead of one per item
+			for (const MediaId& target : targets)
+				Catalog::instance().addLabel(target, dropped);
+			refreshLibraryView();
+		}, Qt::QueuedConnection);
+	});
+
+	applyLabelDots(catalog, id, card);
+	return card;
+}
+
+void MainWindow::refreshMediaGrid()
+{
+	m_mediaGrid->clear();
+
+	const int previewFrameCount = m_previewFrameCountCombo->currentData().toInt();
+	const int imageHeight = cardImageHeight();
+
+	// Card thumbnail canvases: a photo is square; a video is a horizontal strip sized to tile with
+	// previewFrameCount photo cards (so a video's width + gap spans that many photo widths + gaps), letting a
+	// mixed grid line up on one column grid. Both are fixed per refresh, so each is computed once here.
+	const QSize photoCanvas{ imageHeight, imageHeight };
+	const QSize videoCanvas{ MediaItemWidget::videoCanvasWidthForTiling(imageHeight, previewFrameCount, m_mediaGrid->spacing()), imageHeight };
+
+	// The catalog is the authoritative in-memory model, kept current by its mutations, so the grid reads it
+	// directly - no per-refresh re-derivation. Look up the Best set once: the per-card star state and the
+	// favorites-first sort below share it.
+	Catalog& catalog = Catalog::instance();
+	const QSet<MediaId> bestSet = catalog.mediaItemsForLabel(Catalog::BestLabelId);
+
+	GridItem::favoritesFirst = m_sortControl->favoritesFirst();
+	GridItem::sortBy = m_sortControl->sortBy();
+	GridItem::descending = m_sortControl->descending();
+	const bool sortByDate = GridItem::sortBy == SortBy::Date;
+
+	// Media items to show = the structural filters applied to the catalog (final order comes from sortItems()
+	// below, so the enumeration order doesn't matter).
+	const std::vector<MediaId> mediaItems = mediaItemsMatchingFilters();
+
 	// Empty-state text, painted by the grid when no card is visible. "Library empty" is the catalog's own
-	// state, not something inferred from this rebuild's filters; every other empty case (label/type filter
-	// here, or the name filter hiding every card later) is the filters matching nothing.
+	// state, not something inferred from this rebuild's filters; every other empty case (the label/type
+	// filters, or the name filter hiding every card later) is the filters matching nothing.
 	m_mediaGrid->setEmptyMessage(catalog.mediaItemCount() == 0
 		? tr("The library is empty.\nDrop media files here, or use Tools > Import to collections.")
 		: tr("No items match the current filters."));
 
+	// Card widgets are attached in a second pass (after the addItem loop and sortItems), not inline: interleaving
+	// setItemWidget with addItem makes each insert's endInsertRows walk every persistent editor index created so
+	// far -> O(N^2). This list carries each item and its not-yet-attached card between the two passes.
+	std::vector<std::pair<GridItem*, MediaItemWidget*>> pendingAttach;
 	pendingAttach.reserve(mediaItems.size());
 
-	for (const MediaId& id : mediaItems)   // pass 1: build cards + insert bare items (editor-free, so O(N))
-		addCard(id);
+	// Cards come in two fixed sizes, one per media type (a video's frame strip, a photo's square), so the size
+	// hint for each type is computed once from that type's first built card and reused - a card's size depends
+	// only on its type. Querying every card would needlessly activate each one's layout. The two widths are
+	// chosen to tile on one column grid (see photoCanvas/videoCanvas above), so a mixed grid still lines up.
+	QSize videoCardHint, photoCardHint;
+
+	// Pass 1: build cards + insert bare items (editor-free, so O(N)), in enumeration order with their sort
+	// info attached; sortItems() below (via GridItem::operator<) puts them in their final order, and captions
+	// are numbered after that.
+	for (const MediaId& id : mediaItems)
+	{
+		const bool isBest = bestSet.contains(id);
+		MediaItemWidget* card = buildMediaCard(id, isBest, photoCanvas, videoCanvas, previewFrameCount);
+		if (!card)
+			continue;  // a video with no preview frames gets no card (see buildMediaCard)
+
+		auto* item = new GridItem();
+		item->mediaId = id;
+		item->info = itemInfoFor(catalog, id, isBest, sortByDate);
+		QSize& typeHint = catalog.mediaType(id) == Catalog::MediaType::Photo ? photoCardHint : videoCardHint;   // one cached hint per media type (see above)
+		if (!typeHint.isValid())
+			typeHint = card->sizeHint();
+		item->setSizeHint(typeHint);
+		m_mediaGrid->addItem(item);
+
+		pendingAttach.emplace_back(item, card);   // widget attached in the second pass, after sortItems()
+	}
 
 	m_mediaGrid->sortItems(Qt::AscendingOrder);   // sorts bare items, no editors to reposition -> cheap
 
@@ -958,10 +976,16 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 
 	QMenu menu(this);
 
-	// CompareWindow browses frame folders, so it's videos-only (photos get their own PhotoCompareWindow
-	// below) - offered only when nothing in the selection is a photo.
-	const bool selectionAllVideos = std::all_of(selection.cbegin(), selection.cend(),
-		[&catalog](const MediaId& sel) { return catalog.mediaType(sel) == Catalog::MediaType::Video; });
+	// One pass classifies the selection for the two compare actions below; each is offered only for a
+	// selection homogeneous in its media type.
+	size_t videoCount = 0;
+	for (const MediaId& sel : selection)
+		if (catalog.mediaType(sel) == Catalog::MediaType::Video)
+			++videoCount;
+	const bool selectionAllVideos = videoCount == selection.size();
+	const bool selectionAllPhotos = videoCount == 0;
+
+	// CompareWindow browses frame folders, so it's videos-only (photos get their own PhotoCompareWindow below).
 	if (selectionAllVideos)
 	{
 		menu.addAction(selection.size() > 1 ? tr("Compare selected") : tr("Inspect"), [this, selection] {
@@ -977,8 +1001,6 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 
 	// PhotoCompareWindow: synchronized zoom/pan over the photo files themselves - offered for a small
 	// all-photo selection (2..4; a bigger grid stops being a useful comparison).
-	const bool selectionAllPhotos = std::all_of(selection.cbegin(), selection.cend(),
-		[&catalog](const MediaId& sel) { return catalog.mediaType(sel) == Catalog::MediaType::Photo; });
 	if (selectionAllPhotos && selection.size() >= 2)
 	{
 		menu.addAction(tr("Compare photos"), [this, selection] {
@@ -1217,11 +1239,13 @@ void MainWindow::processBatch(QStringList videoPaths, const QString& collectionP
 		return !QDir{ outputFolder }.exists();
 	});
 
-	size_t i = 0;
-	const auto processFilesRange = [&i, &progressBox, this, &collectionPath, &stagedPreviewDirs, &stagedDurations, totalSize = videoPaths.size()](const auto& begin, const auto& end, bool overwriteExisting = false) {
+	// firstNumber: the 1-based display index of the range's first video, so the conflicting range (the second
+	// call below) continues the progress numbering where the unambiguous one stopped.
+	const auto processFilesRange = [&progressBox, this, &collectionPath, &stagedPreviewDirs, &stagedDurations, totalSize = videoPaths.size()](const auto& begin, const auto& end, qsizetype firstNumber, bool overwriteExisting = false) {
+		qsizetype displayNumber = firstNumber;
 		for (const QString& videoPath : std::ranges::subrange(begin, end))
 		{
-			progressBox.setText(tr("Adding video %1/%2...").arg(++i).arg(totalSize));
+			progressBox.setText(tr("Adding video %1/%2...").arg(displayNumber++).arg(totalSize));
 			QApplication::processEvents();
 			// Staged frames and the staged duration are keyed by the stable MediaId (re-derived here from the possibly-relocated path).
 			const MediaId id = MediaId::fromFile(videoPath);
@@ -1246,7 +1270,7 @@ void MainWindow::processBatch(QStringList videoPaths, const QString& collectionP
 	};
 
 	// Process non-conflicting files first
-	processFilesRange(videoPaths.begin(), partition.begin());
+	processFilesRange(videoPaths.begin(), partition.begin(), 1);
 
 	if (partition.begin() != partition.end())
 	{
@@ -1264,7 +1288,7 @@ void MainWindow::processBatch(QStringList videoPaths, const QString& collectionP
 		if (choice != QMessageBox::NoToAll)
 		{
 			// Process conflicting files
-			processFilesRange(partition.begin(), partition.end(), choice == QMessageBox::YesToAll);
+			processFilesRange(partition.begin(), partition.end(), partition.begin() - videoPaths.begin() + 1, choice == QMessageBox::YesToAll);
 		}
 	}
 
