@@ -164,19 +164,20 @@ QDateTime getSourceFileDate(const QString& sourcePath, const QString& folderPath
 	return birth.isValid() ? birth : folderInfo.lastModified();
 }
 
-void openInExplorer(const QString& path)
+bool openInExplorer(const QString& path)
 {
 	const QFileInfo fi{ path };
-	if (fi.exists())
-	{
-		const QStringList param{ "/select,", QDir::toNativeSeparators(fi.canonicalFilePath()) };
-		QProcess::startDetached("explorer.exe", param);
-	}
+	if (!fi.exists())
+		return false;
+
+	const QStringList param{ "/select,", QDir::toNativeSeparators(fi.canonicalFilePath()) };
+	QProcess::startDetached("explorer.exe", param);
+	return true;
 }
 
 void reportMissingFile(QWidget* parent, const QString& path)
 {
-	QMessageBox::warning(parent, QObject::tr("File not found"), QObject::tr("This file no longer exists:\n%1").arg(path));
+	QMessageBox::warning(parent, QObject::tr("File not found"), QObject::tr("This file or folder no longer exists:\n") + path);
 }
 
 QString ffmpegPath()

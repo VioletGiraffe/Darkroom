@@ -154,12 +154,14 @@ void FrameViewerWindow::showThumbnailContextMenu(const QPoint& pos)
 		return;
 
 	QMenu menu;
-	menu.addAction(tr("Open in Explorer"), [senderWidget] {
-		openInExplorer(senderWidget->filePath());
+	menu.addAction(tr("Open in Explorer"), [senderWidget, this] {
+		if (const QString path = senderWidget->filePath(); !openInExplorer(path))
+			reportMissingFile(this, path);
 	});
 	menu.addAction(tr("Copy file path"), [senderWidget] {
 		QApplication::clipboard()->setText(QDir::toNativeSeparators(senderWidget->filePath()));
 	});
 	menu.exec(senderWidget->mapToGlobal(pos));
+
 	clearStuckHoverIfCursorLeft(senderWidget);  // else the popup grab leaves #framedThumbnail:hover stuck on
 }

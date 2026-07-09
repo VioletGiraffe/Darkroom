@@ -1184,10 +1184,9 @@ void ImportDialog::locateStagedSourceFile(const MediaId& id)
 	const auto it = m_staged.constFind(id);
 	if (it == m_staged.constEnd())
 		return;
-	if (!QFileInfo::exists(it->path))  // openInExplorer silently no-ops on a missing path, so guard + report here
+
+	if (!openInExplorer(it->path))
 		reportMissingFile(this, it->path);
-	else
-		openInExplorer(it->path);
 }
 
 void ImportDialog::copyStagedSourcePath(const MediaId& id)

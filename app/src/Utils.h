@@ -76,7 +76,7 @@ void forEachFolder(const QString& root, F&& callback)
 // both the source path (from the catalog) and the frame folder for the last-resort fallback.
 [[nodiscard]] QDateTime getSourceFileDate(const QString& sourcePath, const QString& folderPath);
 
-void openInExplorer(const QString& path);
+[[nodiscard]] bool openInExplorer(const QString& path);
 
 // Modal warning that names a file the app expected to find but didn't. Centralizes the one wording so every
 // "the source file is gone" path reports identically and always tells the user which path is missing.

@@ -1022,8 +1022,9 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 	// folder of its own to open - "Locate source file" below is how to reach the photo itself.
 	if (!isPhoto)
 	{
-		menu.addAction(tr("Open in Explorer"), [folderPath] {
-			openInExplorer(folderPath);
+		menu.addAction(tr("Open in Explorer"), [folderPath, this] {
+			if (!openInExplorer(folderPath))
+				reportMissingFile(this, folderPath);
 		});
 	}
 	menu.addAction(isPhoto ? tr("Open photo") : tr("Play source video"), [this, id] {
@@ -1032,16 +1033,9 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 	menu.addAction(tr("Locate source file"), [this, id] {
 		const QString sourcePath = Catalog::instance().sourcePathForMediaItem(id);
 		if (sourcePath.isEmpty())
-		{
 			QMessageBox::warning(this, tr("Error"), tr("No source file is recorded for this item."));
-			return;
-		}
-		if (!QFileInfo::exists(sourcePath))  // openInExplorer silently no-ops on a missing path, so guard+report here
-		{
+		else if (!openInExplorer(sourcePath))
 			reportMissingFile(this, sourcePath);
-			return;
-		}
-		openInExplorer(sourcePath);
 	});
 	menu.addAction(tr("Copy source path to clipboard"), [id] {
 		const QString sourcePath = Catalog::instance().sourcePathForMediaItem(id);
