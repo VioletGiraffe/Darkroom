@@ -23,15 +23,18 @@
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPolygonF>
 #include <QSettings>
 #include <QSlider>
 #include <QStackedLayout>
+#include <QtMath>
 #include <QUrl>
 #include <QVBoxLayout>
 #include <QWheelEvent>
 
 #include <algorithm>
 #include <cmath>
+#include <numbers>
 
 // This window's persisted UI state. These keys live here, not in Settings.h, because they are local to the
 // compare tool rather than app-wide configuration - but stay under the Settings namespace for the uniform
@@ -44,8 +47,6 @@ namespace Settings {
 
 namespace {
 
-constexpr double Pi = 3.14159265358979323846;
-
 // p rotated by angle (radians) about the origin - the R factor of a photo's image -> subject similarity.
 QPointF rotated(const QPointF& p, double angle)
 {
@@ -57,17 +58,10 @@ QPointF rotated(const QPointF& p, double angle)
 // rotation, offset) into image coordinates - the bounding rect when rotation makes the image non-axis-aligned.
 QRectF subjectRectToImage(const QRectF& rect, double scale, double rotation, const QPointF& offset)
 {
-	const QPointF corners[] = { rect.topLeft(), rect.topRight(), rect.bottomLeft(), rect.bottomRight() };
-	QRectF result(rotated(corners[0] - offset, -rotation) / scale, QSizeF());
-	for (int i = 1; i < 4; ++i)
-	{
-		const QPointF p = rotated(corners[i] - offset, -rotation) / scale;
-		result.setLeft(std::min(result.left(), p.x()));
-		result.setTop(std::min(result.top(), p.y()));
-		result.setRight(std::max(result.right(), p.x()));
-		result.setBottom(std::max(result.bottom(), p.y()));
-	}
-	return result;
+	QPolygonF corners;
+	for (const QPointF& corner : { rect.topLeft(), rect.topRight(), rect.bottomLeft(), rect.bottomRight() })
+		corners.push_back(rotated(corner - offset, -rotation) / scale);
+	return corners.boundingRect();
 }
 
 } // namespace
@@ -99,6 +93,8 @@ private:
 	// The photo this pane represents: its own grid position, or the slider-picked one for the full-view pane.
 	[[nodiscard]] int photoIndex() const { return m_index >= 0 ? m_index : m_owner.m_fullViewIndex; }
 
+	void drawCaption(QPainter& painter, const PhotoCompareWindow::Photo& photo, int renderIndex) const;
+
 	PhotoCompareWindow& m_owner;
 	const int m_index;  // grid/photo index, or -1 for the full-view pane
 
@@ -123,7 +119,6 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 
 	const int renderIndex = m_owner.m_flickerIndex >= 0 ? m_owner.m_flickerIndex : photoIndex();
 	PhotoCompareWindow::Photo& photo = m_owner.m_photos[renderIndex];
-	const double effectiveScale = m_owner.m_viewZoom * photo.alignScale;
 
 	const auto drawPhoto = [&](PhotoCompareWindow::Photo& drawn) {
 		const double drawnScale = m_owner.m_viewZoom * drawn.alignScale;
@@ -132,7 +127,7 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 		painter.save();
 		painter.setRenderHint(QPainter::SmoothPixmapTransform);
 		painter.translate(m_owner.m_viewZoom * drawn.alignOffset + m_owner.m_viewPan);
-		painter.rotate(drawn.alignRotation * (180.0 / Pi));  // rotation and uniform scale commute, so the order is free
+		painter.rotate(qRadiansToDegrees(drawn.alignRotation));  // rotation and uniform scale commute, so the order is free
 		painter.scale(residualScale, residualScale);
 		painter.drawImage(0, 0, source);
 		painter.restore();
@@ -154,13 +149,13 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 
 	painter.setRenderHint(QPainter::Antialiasing);
 
-	// Calibration crosshairs - always the pane's OWN points (flicker is inert while calibrating).
+	// Calibration crosshairs - the pane's OWN points ('photo' is exactly that: flicker is inert while calibrating).
 	if (m_owner.m_calibrating)
 	{
 		painter.setPen(QPen(QColor(Theme::current().AccentBorder), 2));
-		for (const QPointF& imagePos : m_owner.m_photos[photoIndex()].calibPoints)
+		for (const QPointF& imagePos : photo.calibPoints)
 		{
-			const QPointF c = m_owner.widgetFromImage(m_owner.m_photos[photoIndex()], imagePos);
+			const QPointF c = m_owner.widgetFromImage(photo, imagePos);
 			painter.drawLine(c - QPointF(8, 0), c + QPointF(8, 0));
 			painter.drawLine(c - QPointF(0, 8), c + QPointF(0, 8));
 		}
@@ -196,43 +191,7 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 		                        m_owner.m_alignAoi.size() * m_owner.m_viewZoom));
 	}
 
-	// Corner caption, stacked lines. Headline "2 · name.jpg · 6000x4000 (24 MP) · 63%": the leading digit
-	// doubles as the pane's flicker key, then the photo's pixel resolution, then its on-screen scale (100% =
-	// 1 image px per widget px), making any compensation difference between panes visible at a glance. The
-	// alignment line spells out this photo's raw similarity into subject space (scale, rotation in degrees,
-	// offset in subject px). The score
-	// line appears only once auto-align has evaluated this photo: the run's two quality measures
-	// (conf = weighted patch ZNCC fitness, coarse = coarse whole-frame score), the fitted rotation's 1-sigma
-	// error bar, and the align call's runtime.
-	QStringList captionLines;
-	captionLines << QString("%1 · %2 · %3x%4 (%5 MP) · %6%")
-		.arg(renderIndex + 1).arg(photo.caption)
-		.arg(photo.image.width()).arg(photo.image.height())
-		.arg(qRound(photo.image.width() * photo.image.height() / 1e6))
-		.arg(qRound(effectiveScale * 100.0));
-	captionLines << QString("scale %1 · rot %2° · offset (%3, %4)")
-		.arg(photo.alignScale, 0, 'f', 3)
-		.arg(photo.alignRotation * (180.0 / Pi), 0, 'f', 2)
-		.arg(qRound(photo.alignOffset.x())).arg(qRound(photo.alignOffset.y()));
-	if (photo.alignScored)
-	{
-		QString scoreLine = QString("conf %1 · coarse %2 · rot ±%3° · %4 ms")
-			.arg(photo.alignConfidence, 0, 'f', 2).arg(photo.alignBootstrapZncc, 0, 'f', 2)
-			.arg(photo.alignRotationSigma * (180.0 / Pi), 0, 'f', 2).arg(photo.alignTimeMs, 0, 'f', 0);
-		if (!photo.alignSucceeded)  // the alignment on screen is the kept previous one - make that impossible to miss
-			scoreLine.prepend(tr("FAILED · "));
-		captionLines << scoreLine;
-	}
-	const QFontMetrics fm = painter.fontMetrics();
-	int textWidth = 0;
-	for (const QString& line : captionLines)
-		textWidth = std::max(textWidth, fm.horizontalAdvance(line));
-	const QRectF textRect(8, 8, textWidth + 12, captionLines.size() * fm.height() + 6.0);
-	painter.setPen(Qt::NoPen);
-	painter.setBrush(QColor(0, 0, 0, 150));
-	painter.drawRoundedRect(textRect, 4, 4);
-	painter.setPen(QColor(0xe8, 0xe8, 0xe8));
-	painter.drawText(textRect, Qt::AlignCenter, captionLines.join('\n'));
+	drawCaption(painter, photo, renderIndex);
 
 	// The reference pane - the photo difference mode and both alignment paths work against - is outlined in yellow
 	if (photoIndex() == m_owner.m_refIndex && m_owner.m_photos.size() > 1)
@@ -249,6 +208,46 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 		painter.setBrush(Qt::NoBrush);
 		painter.drawRect(rect().adjusted(1, 1, -2, -2));
 	}
+}
+
+// Corner caption, stacked lines. Headline "2 · name.jpg · 6000x4000 (24 MP) · 63%": the leading digit
+// doubles as the pane's flicker key, then the photo's pixel resolution, then its on-screen scale (100% =
+// 1 image px per widget px), making any compensation difference between panes visible at a glance. The
+// alignment line spells out this photo's raw similarity into subject space (scale, rotation in degrees,
+// offset in subject px). The score line appears only once auto-align has evaluated this photo: the run's
+// two quality measures (conf = weighted patch ZNCC fitness, coarse = coarse whole-frame score), the fitted
+// rotation's 1-sigma error bar, and the align call's runtime.
+void PhotoComparePane::drawCaption(QPainter& painter, const PhotoCompareWindow::Photo& photo, int renderIndex) const
+{
+	QStringList captionLines;
+	captionLines << QString("%1 · %2 · %3x%4 (%5 MP) · %6%")
+		.arg(renderIndex + 1).arg(photo.caption)
+		.arg(photo.image.width()).arg(photo.image.height())
+		.arg(qRound(photo.image.width() * photo.image.height() / 1e6))
+		.arg(qRound(m_owner.m_viewZoom * photo.alignScale * 100.0));
+	captionLines << QString("scale %1 · rot %2° · offset (%3, %4)")
+		.arg(photo.alignScale, 0, 'f', 3)
+		.arg(qRadiansToDegrees(photo.alignRotation), 0, 'f', 2)
+		.arg(qRound(photo.alignOffset.x())).arg(qRound(photo.alignOffset.y()));
+	if (photo.alignScored)
+	{
+		QString scoreLine = QString("conf %1 · coarse %2 · rot ±%3° · %4 ms")
+			.arg(photo.alignConfidence, 0, 'f', 2).arg(photo.alignBootstrapZncc, 0, 'f', 2)
+			.arg(qRadiansToDegrees(photo.alignRotationSigma), 0, 'f', 2).arg(photo.alignTimeMs, 0, 'f', 0);
+		if (!photo.alignSucceeded)  // the alignment on screen is the kept previous one - make that impossible to miss
+			scoreLine.prepend(tr("FAILED · "));
+		captionLines << scoreLine;
+	}
+	const QFontMetrics fm = painter.fontMetrics();
+	int textWidth = 0;
+	for (const QString& line : captionLines)
+		textWidth = std::max(textWidth, fm.horizontalAdvance(line));
+	const QRectF textRect(8, 8, textWidth + 12, captionLines.size() * fm.height() + 6.0);
+	painter.setPen(Qt::NoPen);
+	painter.setBrush(QColor(0, 0, 0, 150));
+	painter.drawRoundedRect(textRect, 4, 4);
+	painter.setPen(QColor(0xe8, 0xe8, 0xe8));
+	painter.drawText(textRect, Qt::AlignCenter, captionLines.join('\n'));
 }
 
 void PhotoComparePane::wheelEvent(QWheelEvent* event)
@@ -456,14 +455,22 @@ PhotoCompareWindow::~PhotoCompareWindow()
 	saveWindowGeometry(this, "photoCompareWindow");
 	// Persist the align region as fractions of the reference frame (resolution-independent). Empty (no region,
 	// or no photos to anchor it) stores an empty rect, which reads back as "no region".
-	QRectF normalizedAoi;
-	if (!m_alignAoi.isEmpty() && !m_photos.empty())
-	{
-		const QRectF r = referenceSubjectRect();
-		normalizedAoi = QRectF((m_alignAoi.x() - r.x()) / r.width(), (m_alignAoi.y() - r.y()) / r.height(),
-		                       m_alignAoi.width() / r.width(), m_alignAoi.height() / r.height());
-	}
+	const QRectF normalizedAoi = !m_alignAoi.isEmpty() && !m_photos.empty() ? normalizedFromSubjectRect(m_alignAoi) : QRectF();
 	QSettings{}.setValue(Settings::PhotoCompareAoi, normalizedAoi);
+}
+
+QRectF PhotoCompareWindow::normalizedFromSubjectRect(const QRectF& rect) const
+{
+	const QRectF r = referenceSubjectRect();
+	return QRectF((rect.x() - r.x()) / r.width(), (rect.y() - r.y()) / r.height(),
+	              rect.width() / r.width(), rect.height() / r.height());
+}
+
+QRectF PhotoCompareWindow::subjectRectFromNormalized(const QRectF& normalized) const
+{
+	const QRectF r = referenceSubjectRect();
+	return QRectF(r.x() + normalized.x() * r.width(), r.y() + normalized.y() * r.height(),
+	              normalized.width() * r.width(), normalized.height() * r.height());
 }
 
 QRectF PhotoCompareWindow::referenceSubjectRect() const
@@ -551,11 +558,7 @@ void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
 	{
 		const QRectF normalizedAoi = QSettings{}.value(Settings::PhotoCompareAoi).toRectF();
 		if (!normalizedAoi.isEmpty())
-		{
-			const QRectF r = referenceSubjectRect();
-			m_alignAoi = QRectF(r.x() + normalizedAoi.x() * r.width(), r.y() + normalizedAoi.y() * r.height(),
-			                    normalizedAoi.width() * r.width(), normalizedAoi.height() * r.height());
-		}
+			m_alignAoi = subjectRectFromNormalized(normalizedAoi);
 	}
 	updateHintText();
 	updateAllPanes();
@@ -758,6 +761,25 @@ void PhotoCompareWindow::movePhotoOffset(int index, const QPointF& widgetDelta)
 	updateAllPanes();
 }
 
+// Folds the reference's alignment into the view transform, making subject space the reference's pixel coords
+// (the frame both alignment paths work in) while the reference stays pixel-frozen on screen. The view has no
+// rotation, so only the scale+offset part can be folded: a (rare) rotation on the reference itself becomes a
+// small one-time visual jump as it rebases; subject space stays exact. The user's align region lives in
+// subject space, so it is rebased along, keeping it glued to its content.
+AlignmentTransform PhotoCompareWindow::rebaseSubjectSpaceToReference()
+{
+	Photo& ref = m_photos[m_refIndex];
+	const AlignmentTransform oldTransform{ ref.alignScale, ref.alignRotation, ref.alignOffset };
+	m_viewPan += m_viewZoom * ref.alignOffset;
+	m_viewZoom *= ref.alignScale;
+	if (!m_alignAoi.isEmpty())
+		m_alignAoi = subjectRectToImage(m_alignAoi, oldTransform.scale, oldTransform.rotation, oldTransform.offset);
+	ref.alignScale = 1.0;
+	ref.alignRotation = 0.0;
+	ref.alignOffset = QPointF();
+	return oldTransform;
+}
+
 void PhotoCompareWindow::autoAlignPhotos()
 {
 	if (m_photos.size() < 2)
@@ -772,24 +794,10 @@ void PhotoCompareWindow::autoAlignPhotos()
 	}
 
 	Photo& ref = m_photos[m_refIndex];
-	// The library works in the reference's PIXEL space; subject space differs from it by the reference's own
-	// transform. Fold that into the view first (keeps the reference pixel-frozen on screen, same as manual
-	// calibration) - from here on subject space IS reference pixel space, and each photo's current mapping
-	// into it serves both as the initial guess and as the kept alignment when the aligner reports failure.
-	// The view has no rotation, so only the scale+offset part can be folded: a (rare) rotation on the
-	// reference itself becomes a small one-time visual jump as it rebases; subject space stays exact.
-	const double refScale = ref.alignScale;
-	const double refRotation = ref.alignRotation;
-	const QPointF refOffset = ref.alignOffset;
-	m_viewPan += m_viewZoom * refOffset;
-	m_viewZoom *= refScale;
-	ref.alignScale = 1.0;
-	ref.alignRotation = 0.0;
-	ref.alignOffset = QPointF();
-	// The user's align region lives in subject space, which the fold just rebased to the reference's pixel
-	// coords - rebase the rect along (which also makes it directly usable as the library's areaOfInterest).
-	if (!m_alignAoi.isEmpty())
-		m_alignAoi = subjectRectToImage(m_alignAoi, refScale, refRotation, refOffset);
+	// The library works in the reference's PIXEL space - rebase subject space onto it. From here on each
+	// photo's current mapping serves both as the initial guess and as the kept alignment when the aligner
+	// reports failure, and the rebased m_alignAoi is directly usable as the library's areaOfInterest.
+	const AlignmentTransform refTransform = rebaseSubjectSpaceToReference();
 
 	for (size_t i = 0; i < m_photos.size(); ++i)
 	{
@@ -800,8 +808,8 @@ void PhotoCompareWindow::autoAlignPhotos()
 		options.areaOfInterest = m_alignAoi;  // empty = whole frame
 		options.fitRotation = !m_ignoreRotationCheck->isChecked();
 		// refTransform^-1 * photoTransform: the photo's mapping into the rebased subject space.
-		options.initialGuess = { photo.alignScale / refScale, photo.alignRotation - refRotation,
-		                         rotated(photo.alignOffset - refOffset, -refRotation) / refScale };
+		options.initialGuess = { photo.alignScale / refTransform.scale, photo.alignRotation - refTransform.rotation,
+		                         rotated(photo.alignOffset - refTransform.offset, -refTransform.rotation) / refTransform.scale };
 		QElapsedTimer alignTimer;
 		alignTimer.start();
 		const AlignmentResult result = alignImages(ref.image, photo.image, options);
@@ -812,16 +820,8 @@ void PhotoCompareWindow::autoAlignPhotos()
 		photo.alignRotationSigma = result.rotationSigma;
 		photo.alignSucceeded = result.succeeded;
 		photo.alignScored = true;
-		//qDebug() << "Auto-align photo" << (i + 1) << "vs" << (m_refIndex + 1) << ": succeeded" << result.succeeded
-		//         << " confidence" << result.confidence << " coarse" << result.bootstrapZncc
-		//         << " scale" << result.transform.scale << " offset" << result.transform.offset
-		//         << " rotation" << result.transform.rotation * (180.0 / Pi) << "+-" << result.rotationSigma * (180.0 / Pi) << "deg"
-		//         << " radial k" << result.radialK << " time" << photo.alignTimeMs << "ms";
-		static constexpr const char* fateNames[] = { "accepted", "accepted (coarse)", "outside overlap", "flat", "weak match", "outlier" };
 		for (const AlignmentPatchInfo& patchInfo : result.patches)
 		{
-			//qDebug() << "  patch @" << patchInfo.refPoint << fateNames[static_cast<int>(patchInfo.fate)]
-			//         << " zncc" << patchInfo.zncc << " residual" << patchInfo.residual;
 			const auto kind = patchInfo.fate == AlignmentPatchFate::Accepted ? AlignmentMark::Kind::Used
 			                : patchInfo.fate == AlignmentPatchFate::AcceptedCoarse ? AlignmentMark::Kind::UsedCoarse
 			                : patchInfo.fate == AlignmentPatchFate::Outlier ? AlignmentMark::Kind::Outlier
@@ -909,18 +909,9 @@ void PhotoCompareWindow::applyCalibration()
 	// onto the reference's two: scale = the distance ratio, rotation = the angle between the segments,
 	// offset = what maps the midpoints. Two point pairs determine all four parameters, so this handles
 	// arbitrary angles - beyond auto-align's small-angle capture range.
-	Photo& ref = m_photos[m_refIndex];
+	const Photo& ref = m_photos[m_refIndex];
 	const QLineF refLine(ref.calibPoints[0], ref.calibPoints[1]);
-	// Fold the reference's old alignment into the view transform so the reference image stays exactly where
-	// it was on screen (same zoom, same position) and only the other photos move to meet it. The view has no
-	// rotation, so a (rare) rotation on the reference itself becomes a small one-time visual jump.
-	m_viewPan += m_viewZoom * ref.alignOffset;
-	m_viewZoom *= ref.alignScale;
-	if (!m_alignAoi.isEmpty())  // subject space is being rebased - keep the align region glued to its content
-		m_alignAoi = subjectRectToImage(m_alignAoi, ref.alignScale, ref.alignRotation, ref.alignOffset);
-	ref.alignScale = 1.0;
-	ref.alignRotation = 0.0;
-	ref.alignOffset = QPointF();
+	rebaseSubjectSpaceToReference();  // the reference image stays exactly where it was on screen; only the other photos move to meet it
 	for (size_t i = 0; i < m_photos.size(); ++i)
 	{
 		if (static_cast<int>(i) == m_refIndex)
@@ -928,11 +919,8 @@ void PhotoCompareWindow::applyCalibration()
 		Photo& photo = m_photos[i];
 		const QLineF line(photo.calibPoints[0], photo.calibPoints[1]);
 		photo.alignScale = refLine.length() / line.length();
-		double rotation = std::atan2(refLine.dy(), refLine.dx()) - std::atan2(line.dy(), line.dx());
-		if (rotation > Pi)  // wrap the atan2 difference back into (-Pi, Pi]
-			rotation -= 2.0 * Pi;
-		else if (rotation <= -Pi)
-			rotation += 2.0 * Pi;
+		// std::remainder wraps the atan2 difference back into [-Pi, Pi]
+		const double rotation = std::remainder(std::atan2(refLine.dy(), refLine.dx()) - std::atan2(line.dy(), line.dx()), 2.0 * std::numbers::pi);
 		photo.alignRotation = rotation;
 		photo.alignOffset = refLine.center() - photo.alignScale * rotated(line.center(), rotation);
 	}
@@ -944,21 +932,13 @@ void PhotoCompareWindow::setFullViewIndex(int index)
 	const bool entering = m_fullViewIndex < 0;
 	m_fullViewIndex = index;
 	m_slider->setValue(index);  // no-op when the slider itself is the source
-	if (entering)
+	if (entering)  // the viewport grows from one grid cell to the whole stack area
+		switchViewportPage(1, m_paneWidgets[0]->size(), m_viewStack->widget(0)->size());
+	else
 	{
-		// The viewport grows from one grid cell to the whole stack area. A touched view keeps the subject
-		// point at the viewport's center fixed (both sizes are current when read here, before the switch);
-		// an untouched one re-fits to the new viewport as it would on any resize.
-		const QSizeF oldSize = m_paneWidgets[0]->size();
-		const QSizeF newSize = m_viewStack->widget(0)->size();
-		m_viewStack->setCurrentIndex(1);
-		if (m_viewTouched)
-			m_viewPan += QPointF(newSize.width() - oldSize.width(), newSize.height() - oldSize.height()) / 2.0;
-		else
-			fitView();  // a stale m_fullPane size here self-corrects: the layout resizes it -> onPaneResized -> re-fit
+		updateHintText();  // the "N/M" position readout
+		updateAllPanes();
 	}
-	updateHintText();  // mode line, and the "N/M" position readout on every switch
-	updateAllPanes();
 }
 
 void PhotoCompareWindow::exitFullView()
@@ -966,13 +946,19 @@ void PhotoCompareWindow::exitFullView()
 	if (m_fullViewIndex < 0)
 		return;
 	m_fullViewIndex = -1;
-	const QSizeF oldSize = m_fullPane->size();
-	const QSizeF newSize = m_paneWidgets[0]->size();  // grid panes keep their pre-full-view geometry while hidden
-	m_viewStack->setCurrentIndex(0);
+	// Grid panes keep their pre-full-view geometry while hidden, so pane 0's size is the new viewport.
+	switchViewportPage(0, m_fullPane->size(), m_paneWidgets[0]->size());
+}
+
+void PhotoCompareWindow::switchViewportPage(int page, const QSizeF& oldViewportSize, const QSizeF& newViewportSize)
+{
+	m_viewStack->setCurrentIndex(page);
+	// A touched view keeps the subject point at the viewport's center fixed (both sizes were read before the
+	// switch); an untouched one re-fits to the new viewport as it would on any resize.
 	if (m_viewTouched)
-		m_viewPan += QPointF(newSize.width() - oldSize.width(), newSize.height() - oldSize.height()) / 2.0;
+		m_viewPan += QPointF(newViewportSize.width() - oldViewportSize.width(), newViewportSize.height() - oldViewportSize.height()) / 2.0;
 	else
-		fitView();
+		fitView();  // a stale new-pane size here self-corrects: the layout resizes it -> onPaneResized -> re-fit
 	updateHintText();
 	updateAllPanes();
 }

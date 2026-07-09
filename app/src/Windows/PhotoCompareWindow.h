@@ -15,6 +15,7 @@ class QSlider;
 class QStackedLayout;
 class PhotoComparePane;
 class SegmentedToggle;
+struct AlignmentTransform;
 
 // N-way (2..4) photo comparison in a square grid of panes. All panes share ONE zoom+pan view, while each
 // photo additionally carries its own alignment transform (a similarity: uniform scale + rotation + offset)
@@ -122,6 +123,10 @@ private:
 
 	// The reference photo's image rect mapped into subject space (rotation assumed 0 - see the definition).
 	[[nodiscard]] QRectF referenceSubjectRect() const;
+	// The persisted align-region form: a subject-space rect as fractions of the reference frame
+	// (resolution-independent), and back.
+	[[nodiscard]] QRectF normalizedFromSubjectRect(const QRectF& rect) const;
+	[[nodiscard]] QRectF subjectRectFromNormalized(const QRectF& normalized) const;
 	// Height-normalizes the photo to the reference's subject rect and centers it (the default alignment).
 	void setDefaultAlignment(Photo& photo);
 	// R: return to the first-open layout - default alignment for every photo (the current reference kept), no
@@ -137,6 +142,11 @@ private:
 	void adjustPhotoScale(int index, double factor, const QPointF& widgetAnchor);
 	void movePhotoOffset(int index, const QPointF& widgetDelta);
 
+	// Folds the reference's alignment into the view transform (rebasing m_alignAoi along), making subject space
+	// the reference's pixel coords - the frame both alignment paths work in - while the reference stays
+	// pixel-frozen on screen. Returns the reference's replaced transform.
+	AlignmentTransform rebaseSubjectSpaceToReference();
+
 	// One-click automatic alignment of every photo against the reference (the A key).
 	void autoAlignPhotos();
 
@@ -150,6 +160,9 @@ private:
 	// Full (single-pane) view, driven by the bottom slider.
 	void setFullViewIndex(int index);  // switches the full view to this photo, entering the mode if the grid is showing
 	void exitFullView();
+	// Switches m_viewStack to 'page', compensating the shared view for the viewport size change: a touched
+	// view keeps its center subject point, an untouched one re-fits.
+	void switchViewportPage(int page, const QSizeF& oldViewportSize, const QSizeF& newViewportSize);
 
 	void setDifferenceMode(bool difference);  // non-reference photos render as |photo - reference| (D key / bottom toggle)
 
