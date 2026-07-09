@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783603841957,
+  "lastUpdate": 1783604100832,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -3123,6 +3123,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 281,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 32,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 27,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "109a4ab77feade12d0963e0478283acb6fc2cda9",
+          "message": "ImportDialog deduplication/flow cleanup",
+          "timestamp": "2026-07-09T16:31:53+03:00",
+          "tree_id": "7f3a3e248f297e0b90894c704b83df099445ca10",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/109a4ab77feade12d0963e0478283acb6fc2cda9"
+        },
+        "date": 1783604098935,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 8141,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 3343,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 904.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 527.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 281.5,
             "unit": "KB"
           },
           {
