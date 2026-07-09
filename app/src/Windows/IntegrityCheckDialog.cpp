@@ -112,6 +112,21 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 		return true;
 	};
 
+	// The batch analog of resolve: run a blanket action over rows. For each still-open row that `applies`, run the
+	// resolution; a success closes the row (via resolve) and counts toward done, a failure counts toward failed. The
+	// {done, failed} tally lets the driver compose its summary; rows re-enable their blanket buttons via onClosed.
+	const auto runBlanket = [resolve](auto& rows, auto applies, auto act, const QString& successText) {
+		int done = 0, failed = 0;
+		for (auto& r : rows)
+		{
+			if (r.row->closed || !applies(r))
+				continue;
+			if (resolve(r.row, successText, [&] { return act(r); })) ++done;
+			else ++failed;
+		}
+		return std::pair{done, failed};
+	};
+
 	// Wires a single-row action button: on click run the resolution; on success the row records it and disables
 	// (stays visible as a record of what happened); on failure warn and leave the row active so the user can retry.
 	// The blanket drivers below reuse the very same callbacks but aggregate into one summary instead of warning per item.
@@ -150,7 +165,7 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 	// control) rather than the native StyledPanel bevel. One sheet string shared by every row.
 	const QString rowStyle = QStringLiteral("QFrame#integrityRow { border: 1px solid %1; border-radius: %2px; }")
 		.arg(Theme::current().BorderSubtle).arg(Theme::ControlRadius);
-	const auto addRow = [&](const QString& statusText) -> std::pair<QFrame*, std::shared_ptr<ResolvableRow>> {
+	const auto addRow = [&](const QString& statusText) -> std::pair<QHBoxLayout*, std::shared_ptr<ResolvableRow>> {
 		QFrame* frame = new QFrame(content);
 		frame->setObjectName("integrityRow");
 		frame->setStyleSheet(rowStyle);
@@ -160,7 +175,16 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 		row->statusLabel->setWordWrap(true);
 		rowLayout->addWidget(row->statusLabel, 1);
 		contentLayout->addWidget(frame);
-		return { frame, row };
+		return { rowLayout, row };
+	};
+
+	// Creates one row button, adds it to the row's layout, and registers it so the row's close() disables it later.
+	// Returns the button so the caller can wire it (parent comes from the layout, i.e. the row frame).
+	const auto addRowButton = [](QHBoxLayout* rowLayout, const std::shared_ptr<ResolvableRow>& row, const QString& text) {
+		QPushButton* button = new QPushButton(text, rowLayout->parentWidget());
+		rowLayout->addWidget(button);
+		row->buttons.push_back(button);
+		return button;
 	};
 
 	// A section header: the bold class caption on the left, its blanket-action buttons (appended by the caller)
@@ -180,14 +204,10 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 		addSectionHeader(tr("<b>Untracked folders</b> - on disk, not in the catalog"));
 		for (const CatalogIntegrity::UntrackedFolder& u : report.untracked)
 		{
-			const auto [frame, row] = addRow(QFileInfo(u.folderPath).fileName());
-			QHBoxLayout* rowLayout = static_cast<QHBoxLayout*>(frame->layout());
+			const auto [rowLayout, row] = addRow(QFileInfo(u.folderPath).fileName());
 
-			QPushButton* browseButton = new QPushButton(tr("Browse..."), frame);
-			QPushButton* skipButton   = new QPushButton(tr("Skip"), frame);
-			rowLayout->addWidget(browseButton);
-			rowLayout->addWidget(skipButton);
-			row->buttons = { browseButton, skipButton };
+			QPushButton* browseButton = addRowButton(rowLayout, row, tr("Browse..."));
+			QPushButton* skipButton   = addRowButton(rowLayout, row, tr("Skip"));
 
 			const QString folderPath = u.folderPath;
 
@@ -220,14 +240,10 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 
 		for (const CatalogIntegrity::UntrackedPhoto& p : report.untrackedPhotos)
 		{
-			const auto [frame, row] = addRow(QFileInfo(p.filePath).fileName() + "<br>" + tr("label: %1").arg(p.labelName));
-			QHBoxLayout* rowLayout = static_cast<QHBoxLayout*>(frame->layout());
+			const auto [rowLayout, row] = addRow(QFileInfo(p.filePath).fileName() + "<br>" + tr("label: %1").arg(p.labelName));
 
-			QPushButton* addButton  = new QPushButton(tr("Add to catalog"), frame);
-			QPushButton* skipButton = new QPushButton(tr("Skip"), frame);
-			rowLayout->addWidget(addButton);
-			rowLayout->addWidget(skipButton);
-			row->buttons = { addButton, skipButton };
+			QPushButton* addButton  = addRowButton(rowLayout, row, tr("Add to catalog"));
+			QPushButton* skipButton = addRowButton(rowLayout, row, tr("Skip"));
 			row->onClosed = refreshBlanket;
 
 			const QString filePath = p.filePath;
@@ -243,15 +259,9 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 
 		// Add all: adopt every still-open untracked photo. Each already sits in its label's Photos dir, so this is
 		// just the row action run in a loop; a name+size clash counts as a failure and leaves that row open.
-		connect(addAllButton, &QPushButton::clicked, this, [this, rows] {
-			int added = 0, failed = 0;
-			for (AdoptRow& r : *rows)
-			{
-				if (r.row->closed)
-					continue;
-				if (m_callbacks.adoptPhotoRequested(r.filePath)) { r.row->close(tr("Added to catalog.")); ++added; }
-				else ++failed;
-			}
+		connect(addAllButton, &QPushButton::clicked, this, [this, rows, runBlanket] {
+			const auto [added, failed] = runBlanket(*rows, [](const AdoptRow&) { return true; },
+				[this](AdoptRow& r) { return m_callbacks.adoptPhotoRequested(r.filePath); }, tr("Added to catalog."));
 			QString msg = tr("Added %1 photo(s) to the catalog.").arg(added);
 			if (failed)
 				msg += "\n" + tr("%1 could not be added - a file with the same name and size is already tracked.").arg(failed);
@@ -310,8 +320,7 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 				                                        : tr("source missing: %1").arg(issue.sourcePath));
 			const QString status = QFileInfo(issue.folder).fileName() + "<br>" + problems.join(QStringLiteral("; "));
 
-			const auto [frame, row] = addRow(status);
-			QHBoxLayout* rowLayout = static_cast<QHBoxLayout*>(frame->layout());
+			const auto [rowLayout, row] = addRow(status);
 
 			const MediaId id = issue.id;
 
@@ -322,18 +331,11 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 			const bool canRegenerate = issue.isInvisible() && !issue.isGhost() && (issue.realFramesPresent || issue.sourcePresent);
 			const bool canMarkSplit  = issue.isStale() && !issue.isInvisible();
 
-			QPushButton* reimportButton   = canReimport   ? new QPushButton(tr("Re-import"), frame) : nullptr;
-			QPushButton* regenerateButton = canRegenerate ? new QPushButton(tr("Regenerate preview"), frame) : nullptr;
-			QPushButton* markSplitButton  = canMarkSplit  ? new QPushButton(tr("Mark as fully split"), frame) : nullptr;
-			QPushButton* removeButton      = new QPushButton(tr("Remove"), frame);
-			QPushButton* skipButton        = new QPushButton(tr("Skip"), frame);
-
-			for (QPushButton* b : { reimportButton, regenerateButton, markSplitButton, removeButton, skipButton })
-				if (b)
-				{
-					rowLayout->addWidget(b);
-					row->buttons.push_back(b);
-				}
+			QPushButton* reimportButton   = canReimport   ? addRowButton(rowLayout, row, tr("Re-import")) : nullptr;
+			QPushButton* regenerateButton = canRegenerate ? addRowButton(rowLayout, row, tr("Regenerate preview")) : nullptr;
+			QPushButton* markSplitButton  = canMarkSplit  ? addRowButton(rowLayout, row, tr("Mark as fully split")) : nullptr;
+			QPushButton* removeButton     = addRowButton(rowLayout, row, tr("Remove"));
+			QPushButton* skipButton       = addRowButton(rowLayout, row, tr("Skip"));
 			row->onClosed = refreshBlanket;
 
 			if (reimportButton)
@@ -359,22 +361,15 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 
 		// Re-import all: re-extract every open ghost whose source is present. Heavy (an ffmpeg run per video), so
 		// confirm first and show a wait cursor for the batch.
-		connect(reimportAllButton, &QPushButton::clicked, this, [this, rows, refreshBlanket] {
+		connect(reimportAllButton, &QPushButton::clicked, this, [this, rows, runBlanket] {
 			if (QMessageBox::question(this, tr("Re-import all"),
 			        tr("Re-extract frames for every re-importable video? This re-runs ffmpeg and can take a while."))
 			    != QMessageBox::Yes)
 				return;
 			QApplication::setOverrideCursor(Qt::WaitCursor);
-			int done = 0, failed = 0;
-			for (VideoRow& v : *rows)
-			{
-				if (v.row->closed || !v.canReimport)
-					continue;
-				if (m_callbacks.reimportRequested(v.id)) { v.row->close(tr("Re-imported.")); ++done; }
-				else ++failed;
-			}
+			const auto [done, failed] = runBlanket(*rows, [](const VideoRow& v) { return v.canReimport; },
+				[this](VideoRow& v) { return m_callbacks.reimportRequested(v.id); }, tr("Re-imported."));
 			QApplication::restoreOverrideCursor();
-			refreshBlanket();
 			QString msg = tr("Re-imported %1 video(s).").arg(done);
 			if (failed)
 				msg += "\n" + tr("%1 could not be re-imported.").arg(failed);
@@ -383,18 +378,11 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 
 		// Regenerate all previews: rebuild the card render for every open invisible entry that can be rebuilt (from
 		// real frames where present, else the source). Lighter than re-import but still worth a wait cursor.
-		connect(regenerateAllButton, &QPushButton::clicked, this, [this, rows, refreshBlanket] {
+		connect(regenerateAllButton, &QPushButton::clicked, this, [this, rows, runBlanket] {
 			QApplication::setOverrideCursor(Qt::WaitCursor);
-			int done = 0, failed = 0;
-			for (VideoRow& v : *rows)
-			{
-				if (v.row->closed || !v.canRegenerate)
-					continue;
-				if (m_callbacks.regeneratePreviewRequested(v.id)) { v.row->close(tr("Preview regenerated.")); ++done; }
-				else ++failed;
-			}
+			const auto [done, failed] = runBlanket(*rows, [](const VideoRow& v) { return v.canRegenerate; },
+				[this](VideoRow& v) { return m_callbacks.regeneratePreviewRequested(v.id); }, tr("Preview regenerated."));
 			QApplication::restoreOverrideCursor();
-			refreshBlanket();
 			QString msg = tr("Regenerated %1 preview(s).").arg(done);
 			if (failed)
 				msg += "\n" + tr("%1 could not be regenerated.").arg(failed);
@@ -403,7 +391,7 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 
 		// Remove all: drop every still-open broken entry from the catalog. Destructive, so confirm with the count;
 		// on-disk frame folders and source files are left untouched (removal only forgets the catalog record).
-		connect(removeAllButton, &QPushButton::clicked, this, [this, rows, refreshBlanket] {
+		connect(removeAllButton, &QPushButton::clicked, this, [this, rows, runBlanket] {
 			const int open = static_cast<int>(std::count_if(rows->cbegin(), rows->cend(), [](const VideoRow& v) { return !v.row->closed; }));
 			if (open == 0)
 				return;
@@ -411,14 +399,8 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 			        tr("Remove all %1 broken video entries from the catalog? Frame folders and source files on disk are not touched.").arg(open))
 			    != QMessageBox::Yes)
 				return;
-			for (VideoRow& v : *rows)
-			{
-				if (v.row->closed)
-					continue;
-				m_callbacks.removeEntryRequested(v.id);
-				v.row->close(tr("Removed from catalog."));
-			}
-			refreshBlanket();
+			runBlanket(*rows, [](const VideoRow&) { return true; },
+				[this](VideoRow& v) { m_callbacks.removeEntryRequested(v.id); return true; }, tr("Removed from catalog."));
 			QMessageBox::information(this, tr("Remove all"), tr("Removed %1 broken video(s) from the catalog.").arg(open));
 		});
 
@@ -459,24 +441,16 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 			const QString name   = photo.sourcePath.isEmpty() ? tr("(no source recorded)") : QFileInfo(photo.sourcePath).fileName();
 			const QString what   = photo.referenced ? tr("referenced file moved or unmounted") : tr("the library's own file is gone");
 			const QString detail = photo.sourcePath.isEmpty() ? QString{} : "<br>" + photo.sourcePath;
-			const auto [frame, row] = addRow(name + "<br>" + what + detail);
-			QHBoxLayout* rowLayout = static_cast<QHBoxLayout*>(frame->layout());
+			const auto [rowLayout, row] = addRow(name + "<br>" + what + detail);
 
 			const MediaId id = photo.id;
 			const QString recordedPath = photo.sourcePath;
 
 			// Locate is offered only for a referenced photo - its file may have just moved, so pointing at it
 			// repoints the entry. An owned photo lives in the library tree, so a missing owned file is Remove/Skip.
-			QPushButton* locateButton = photo.referenced ? new QPushButton(tr("Locate..."), frame) : nullptr;
-			QPushButton* removeButton = new QPushButton(tr("Remove"), frame);
-			QPushButton* skipButton   = new QPushButton(tr("Skip"), frame);
-
-			for (QPushButton* b : { locateButton, removeButton, skipButton })
-				if (b)
-				{
-					rowLayout->addWidget(b);
-					row->buttons.push_back(b);
-				}
+			QPushButton* locateButton = photo.referenced ? addRowButton(rowLayout, row, tr("Locate...")) : nullptr;
+			QPushButton* removeButton = addRowButton(rowLayout, row, tr("Remove"));
+			QPushButton* skipButton   = addRowButton(rowLayout, row, tr("Skip"));
 			row->onClosed = refreshBlanket;
 
 			if (locateButton)
@@ -535,7 +509,7 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 
 		// Remove all: drop every still-open missing-photo entry from the catalog. Destructive, so confirm with the
 		// count; any file still on disk is left untouched (removal only forgets the catalog record).
-		connect(removeAllButton, &QPushButton::clicked, this, [this, rows, refreshBlanket] {
+		connect(removeAllButton, &QPushButton::clicked, this, [this, rows, runBlanket] {
 			const int open = static_cast<int>(std::count_if(rows->cbegin(), rows->cend(), [](const MissingPhotoRow& m) { return !m.row->closed; }));
 			if (open == 0)
 				return;
@@ -543,14 +517,8 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 			        tr("Remove all %1 missing-photo entries from the catalog? Any files still on disk are not touched.").arg(open))
 			    != QMessageBox::Yes)
 				return;
-			for (MissingPhotoRow& m : *rows)
-			{
-				if (m.row->closed)
-					continue;
-				m_callbacks.removeEntryRequested(m.id);
-				m.row->close(tr("Removed from catalog."));
-			}
-			refreshBlanket();
+			runBlanket(*rows, [](const MissingPhotoRow&) { return true; },
+				[this](MissingPhotoRow& m) { m_callbacks.removeEntryRequested(m.id); return true; }, tr("Removed from catalog."));
 			QMessageBox::information(this, tr("Remove all"), tr("Removed %1 photo(s) from the catalog.").arg(open));
 		});
 
