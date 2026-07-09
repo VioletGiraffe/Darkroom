@@ -181,6 +181,11 @@ private:
 	void deleteProvisionalLabel(const QString& provisionalId);
 	// Reassign every staged pick from provisionalId to targetId, then drop the merged provisional (purely local).
 	void mergeProvisionalInto(const QString& provisionalId, const QString& targetId);
+	// The shared mechanics of the label ops above and of materialization below: rewrites every staged entry's
+	// pendingLabelIds through the mapping - an unmapped id passes through, an id mapped to empty is dropped,
+	// and a duplicate the rewrite produces is collapsed (order kept, so the destination-deciding first pick
+	// stays first). Re-derives the dots of every changed card. Returns whether any pick was dropped.
+	bool remapStagedLabelIds(const QHash<QString, QString>& mapping);
 	void updateAllCardLabelDots();  // re-derive every staged card's dots after a label name/color change
 	// Import prologue: create in the Catalog each provisional label a staged item actually uses, then rewrite every
 	// staged pick from its provisional stand-in to the real id, so the rest of runImport sees only real labels.

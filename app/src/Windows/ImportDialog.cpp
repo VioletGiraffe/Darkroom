@@ -544,12 +544,33 @@ void ImportDialog::setProvisionalLabelColor(const QString& provisionalId)
 	updateAllCardLabelDots();
 }
 
+bool ImportDialog::remapStagedLabelIds(const QHash<QString, QString>& mapping)
+{
+	bool anyDropped = false;
+	for (auto it = m_staged.begin(); it != m_staged.end(); ++it)
+	{
+		QStringList remapped;
+		for (const QString& labelId : std::as_const(it->pendingLabelIds))
+		{
+			const QString mapped = mapping.value(labelId, labelId);
+			if (mapped.isEmpty())
+				anyDropped = true;
+			else if (!remapped.contains(mapped))
+				remapped << mapped;
+		}
+		if (remapped != it->pendingLabelIds)
+		{
+			it->pendingLabelIds = remapped;
+			updateCardLabelDots(it.key());
+		}
+	}
+	return anyDropped;
+}
+
 void ImportDialog::deleteProvisionalLabel(const QString& provisionalId)
 {
 	// Strip the label from every staged card that carried it, then drop it from the list.
-	for (auto it = m_staged.begin(); it != m_staged.end(); ++it)
-		if (it->pendingLabelIds.removeAll(provisionalId) > 0)
-			updateCardLabelDots(it.key());
+	remapStagedLabelIds({ { provisionalId, QString{} } });
 
 	m_provisionalLabels.erase(std::remove_if(m_provisionalLabels.begin(), m_provisionalLabels.end(),
 		[&](const LabelOption& o) { return o.id == provisionalId; }), m_provisionalLabels.end());
@@ -559,22 +580,8 @@ void ImportDialog::deleteProvisionalLabel(const QString& provisionalId)
 void ImportDialog::mergeProvisionalInto(const QString& provisionalId, const QString& targetId)
 {
 	// Point every staged pick at the target and drop the now-merged provisional. Pre-import this is purely local -
-	// nothing in the Catalog changes; it's a rewrite of the staged cards' pending assignments (the first id still
-	// decides the import destination, so order is preserved and any resulting duplicate collapsed).
-	for (auto it = m_staged.begin(); it != m_staged.end(); ++it)
-	{
-		if (!it->pendingLabelIds.contains(provisionalId))
-			continue;
-		QStringList remapped;
-		for (const QString& id : std::as_const(it->pendingLabelIds))
-		{
-			const QString mapped = (id == provisionalId) ? targetId : id;
-			if (!remapped.contains(mapped))
-				remapped << mapped;
-		}
-		it->pendingLabelIds = remapped;
-		updateCardLabelDots(it.key());
-	}
+	// nothing in the Catalog changes; it's a rewrite of the staged cards' pending assignments.
+	remapStagedLabelIds({ { provisionalId, targetId } });
 
 	m_provisionalLabels.erase(std::remove_if(m_provisionalLabels.begin(), m_provisionalLabels.end(),
 		[&](const LabelOption& o) { return o.id == provisionalId; }), m_provisionalLabels.end());
@@ -1103,32 +1110,16 @@ void ImportDialog::materializeUsedProvisionalLabels()
 	if (provisionalToReal.isEmpty())
 		return;
 
-	// Rewrite every staged pick through the mapping (real ids pass through unchanged); a label that failed to be
-	// created is dropped from the pick, leaving its item staged but that bit unlabeled.
-	bool anyFailed = false;
-	for (auto it = m_staged.begin(); it != m_staged.end(); ++it)
-	{
-		QStringList remapped;
-		for (const QString& labelId : std::as_const(it->pendingLabelIds))
-		{
-			const QString mapped = provisionalToReal.value(labelId, labelId);
-			if (mapped.isEmpty())
-				anyFailed = true;
-			else if (!remapped.contains(mapped))
-				remapped << mapped;
-		}
-
-		it->pendingLabelIds = remapped;
-	}
-
 	// Drop the now-created provisionals; the Catalog lists them as real labels from here on, so a partial
-	// Import that leaves items staged won't try to recreate them on a second run.
+	// Import that leaves items staged won't try to recreate them on a second run. Refreshed before the remap
+	// below so the changed cards' re-derived dots resolve the new real ids.
 	m_provisionalLabels.erase(std::remove_if(m_provisionalLabels.begin(), m_provisionalLabels.end(),
 		[&](const LabelOption& o) { return !provisionalToReal.value(o.id).isEmpty(); }), m_provisionalLabels.end());
 	refreshLabelList();
-	updateAllCardLabelDots();  // any card left staged now reflects real ids (and drops a label that failed to create)
 
-	if (anyFailed)
+	// Rewrite every staged pick through the mapping (real ids pass through unchanged); a label that failed to
+	// be created maps to empty and is dropped from the pick, leaving its item staged but that bit unlabeled.
+	if (remapStagedLabelIds(provisionalToReal))
 		QMessageBox::warning(this, tr("Import"),
 			tr("Some labels could not be created (the name may be reserved or invalid); the affected items were left unlabeled and remain staged."));
 }
