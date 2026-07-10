@@ -203,7 +203,7 @@ ImportDialog::ImportDialog(Callbacks callbacks, const QString& suggestedRelocate
 	// instead (horizontal scrolling off). No explicit minimum width, so the minimum tracks content up to the cap.
 	m_labelList->setMaximumWidth(LABEL_LIST_MAX_WIDTH);
 	m_labelList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-	// Hover fill matches the main-window sidebar's active-row highlight (BackgroundSecondary + ControlRadius), for a consistent feel.
+	// Row hover fill: BackgroundSecondary (the theme's raised-row surface) at ControlRadius.
 	m_labelList->setStyleSheet(QStringLiteral("QListWidget::item:hover { background-color: %1; border-radius: %2px; }")
 		.arg(Theme::current().BackgroundSecondary).arg(Theme::ControlRadius));
 	// A press-and-drag on a label row drags the label out, to be dropped onto a staged card.

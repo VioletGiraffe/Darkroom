@@ -125,12 +125,14 @@ Two paths, both add-only (except the context-menu checklist, which also removes)
 
 A flat **`QListWidget`** (single column) whose rows are painted by a custom **`LabelRowDelegate`** — the
 non-stock look from the design mockup: a leading color dot, the name, a right-aligned count, and per-row
-state drawn by the delegate (active rows get a `BackgroundSecondary`-filled pill — the theme's hue-shifted
-raised-row surface — **plus a left accent bar tinted to that label's own colour**; hovered rows a dashed
-outline in a translucent text overlay). That per-row accent colour is exactly what
-plain QSS can't express, which is why it's a delegate. Row data rides on item roles; active state is a role
-flag (repainted on toggle), **not** a selection (the list is `NoSelection` — we toggle the filter on click
-ourselves).
+state drawn by the delegate. Active rows are filled with a **translucent tint of the label's own colour**
+(composited over the panel background, so one tint reads correctly in both themes) and carry a **vertical
+spine threaded through the colour dot**; the spines of vertically adjacent active rows **fuse into one
+continuous line** down the column, with a faint halo holding each dot clear of the line so it still reads as
+a node. Hovered rows get a dashed outline in a translucent text overlay. Those per-row colours are exactly
+what plain QSS can't express, which is why it's a delegate. Row data rides on item roles; active state is a
+role flag (repainted on toggle), **not** a selection (the list is `NoSelection` — we toggle the filter on
+click ourselves).
 
 Row order: **All** (no dot) → **Best** (gold dot **and** a gold `★`, via `kStarRole`) → a **divider** row
 (`kDividerRole`, `NoItemFlags`, painted as a hairline, `sizeHint` width 0 so it never widens the panel,

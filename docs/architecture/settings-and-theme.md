@@ -45,9 +45,9 @@ color — pick the wrong half and it'll look subtly off. Distinct from both, **`
 text-selection pair (the `QLineEdit`/text-edit selection and the app-wide `Highlight`/`HighlightedText` roles): `SelectionHighlight`
 is `AccentBorder` pushed away from the *un-inverted* selected text so it stays legible — darkened but still vivid in dark, kept bright
 in light — while `SelectedText` equals `TextPrimary` today but is its own token so a future theme can diverge. Two colors deliberately sit *off* the neutral ramp
-(the mockup's hue-shift retune, adopted 2026-07): **`BackgroundSecondary`** (the raised/selected-row surface,
-e.g. the sidebar's active row) and **`MutedText`** — sage-tinted in light, wine-tinted in dark — so the
-selected-row fill and the least-prominent text have a character of their own rather than being more grey
+(the mockup's hue-shift retune, adopted 2026-07): **`BackgroundSecondary`** (a raised-row surface,
+e.g. the import dialog's label-row hover fill) and **`MutedText`** — sage-tinted in light, wine-tinted in dark — so the
+raised-row fill and the least-prominent text have a character of their own rather than being more grey
 steps. The accent family stays **blue** on purpose where the mockup's `info` tokens are green: a settled
 divergence, not drift (the mockup's own selected-row bar uses this blue).
 

@@ -52,8 +52,8 @@ struct ThemeColors {
 	const char* MutedText;          // --color-text-tertiary: counts, placeholders, the least prominent label
 	const char* InstructionText;    // --color-text-secondary: explanatory body text, section labels
 	const char* BackgroundPrimary;  // --color-background-primary: window/base/button fill (drives the app QPalette)
-	const char* BackgroundSecondary; // --color-background-secondary: the raised/selected row fill (sidebar active row) - one
-	                                 // hue-shifted step off BackgroundPrimary, so other colors (per-label accent bars) sit on it cleanly
+	const char* BackgroundSecondary; // --color-background-secondary: a raised-row surface one hue-shifted step off
+	                                 // BackgroundPrimary (e.g. the import dialog's label-row hover fill)
 	const char* TextPrimary;        // --color-text-primary: window/base/button text (drives the app QPalette)
 	const char* BorderSubtle;       // --color-border-tertiary: faint hairlines - card borders, dividers, panel edges
 	const char* BorderMedium;       // --color-border-secondary: floating-surface / container outlines - menus, tooltips, combo popups, list frames
