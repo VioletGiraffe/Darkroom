@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783703679496,
+  "lastUpdate": 1783718540492,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -3877,6 +3877,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .text",
             "value": 549.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 287,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 29,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 28,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "350677574e720441f57d66d8cc80efed845db9a0",
+          "message": "LabelSidebar: squircle",
+          "timestamp": "2026-07-11T00:19:01+03:00",
+          "tree_id": "be2627737e5fcd8ddf4364dba7d0d7716f6698c1",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/350677574e720441f57d66d8cc80efed845db9a0"
+        },
+        "date": 1783718538370,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 10550,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 6769,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 931.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 550.5,
             "unit": "KB"
           },
           {
