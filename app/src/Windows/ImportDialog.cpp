@@ -25,7 +25,6 @@
 #include <QComboBox>
 #include <QDesktopServices>
 #include <QDir>
-#include <QDirIterator>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QFile>
@@ -113,16 +112,10 @@ QList<StagedFile> flattenToSupportedMediaFiles(const QStringList& paths)
 			// (dropping "Root" -> labels start with "Root", not with whatever sits below it). cleanPath strips a
 			// trailing slash, which would otherwise make absolutePath() return the folder itself, not its parent.
 			const QDir base(QFileInfo(QDir::cleanPath(path)).absolutePath());
-			QDirIterator it(path, QDir::Files, QDirIterator::Subdirectories);
-			while (it.hasNext())
-			{
-				it.next();
-				const QFileInfo fi = it.fileInfo();
-				if (isSupportedVideoFile(fi.filePath()) || isSupportedImageFile(fi.filePath()))
-					files.append({ fi.filePath(), base.relativeFilePath(fi.absolutePath()).replace('/', '-') });
-			}
+			for (const QString& file : collectFilesInDirectory(path, /*recursive=*/true, isSupportedMediaFile))
+				files.append({ file, base.relativeFilePath(QFileInfo(file).absolutePath()).replace('/', '-') });
 		}
-		else if (isSupportedVideoFile(path) || isSupportedImageFile(path))
+		else if (isSupportedMediaFile(path))
 			files.append({ path, {} });
 	}
 	return files;

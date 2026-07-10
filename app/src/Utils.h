@@ -5,6 +5,8 @@
 // declarations below. Everything else this header's implementations need lives in Utils.cpp.
 #include <QDir>
 
+#include <functional>
+
 class QDateTime;
 class QMimeData;
 class QWidget;
@@ -28,6 +30,9 @@ void clearStuckHoverIfCursorLeft(QWidget* w);
 
 [[nodiscard]] bool isSupportedVideoFile(const QString& filePath);
 [[nodiscard]] bool isSupportedImageFile(const QString& filePath);
+// Either kind of media the app ingests - a supported video or a supported photo. The two predicates above stay
+// distinct (import routes videos and photos differently); this is the "is it either" test the walk/drop paths want.
+[[nodiscard]] bool isSupportedMediaFile(const QString& filePath);
 
 // Useful for drop handlers that accept directories or files
 [[nodiscard]] bool isDirectoryOrSupportedFile(const QString& path);
@@ -50,6 +55,12 @@ void clearStuckHoverIfCursorLeft(QWidget* w);
 
 // Name filters (for QDir::entryList) matching the frame image files this app produces/reads.
 extern const QStringList IMAGE_FILE_FILTERS;
+
+// Full paths of the files under `directory` satisfying `filterPredicate` - its immediate children when `recursive`
+// is false, the whole subtree when true. Order is filesystem-defined; sort at the call site when it matters. The
+// one folder-to-files expansion the drop and scan paths share (pass isSupportedImageFile, isSupportedMediaFile, ...).
+[[nodiscard]] QStringList collectFilesInDirectory(const QString& directory, bool recursive,
+                                                  const std::function<bool(const QString&)>& filterPredicate);
 
 // Visits every (collection, folderPath) pair under root, in collection-name order.
 template <typename F>

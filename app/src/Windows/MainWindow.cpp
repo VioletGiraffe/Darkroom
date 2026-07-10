@@ -34,7 +34,6 @@
 #include <QComboBox>
 #include <QDesktopServices>
 #include <QDir>
-#include <QDirIterator>
 #include <QDragEnterEvent>
 #include <QFile>
 #include <QFileDialog>
@@ -1533,13 +1532,9 @@ void MainWindow::scanForUntrackedFiles()
 	settings.setValue(lastFolderKey, dir);
 
 	QStringList untracked;
-	QDirIterator it(dir, QDir::Files, QDirIterator::Subdirectories);
-	while (it.hasNext())
-	{
-		const QString path = it.next();
-		if ((isSupportedVideoFile(path) || isSupportedImageFile(path)) && !tracked.contains(pathComparisonKey(path)))
+	for (const QString& path : collectFilesInDirectory(dir, /*recursive=*/true, isSupportedMediaFile))
+		if (!tracked.contains(pathComparisonKey(path)))
 			untracked.push_back(QDir::toNativeSeparators(path));
-	}
 
 	if (untracked.isEmpty())
 	{

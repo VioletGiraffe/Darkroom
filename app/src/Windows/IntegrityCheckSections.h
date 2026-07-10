@@ -6,7 +6,7 @@
 
 #include <QApplication>
 #include <QCoreApplication>
-#include <QDirIterator>
+#include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFrame>
@@ -418,12 +418,8 @@ inline void IntegrityCheckSections::buildMissingPhotos(const CatalogIntegrity::I
 			return;
 
 		QHash<QString, QString> byIdentity;   // MediaId::key() -> first file found under dir carrying that identity
-		QDirIterator it(dir, QDir::Files, QDirIterator::Subdirectories);
-		while (it.hasNext())
+		for (const QString& path : collectFilesInDirectory(dir, /*recursive=*/true, isSupportedImageFile))
 		{
-			const QString path = it.next();
-			if (!isSupportedImageFile(path))
-				continue;
 			const QString identity = MediaId::fromFile(path).key();
 			if (!byIdentity.contains(identity))
 				byIdentity.insert(identity, QDir::toNativeSeparators(path));

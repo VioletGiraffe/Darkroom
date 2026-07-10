@@ -5,6 +5,7 @@
 #include <QCursor>
 #include <QDateTime>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QMessageBox>
@@ -15,6 +16,8 @@
 #include <QStringList>
 #include <QUrl>
 #include <QWidget>
+
+#include <functional>
 
 void saveWindowGeometry(QWidget* w, const QString& key)
 {
@@ -69,9 +72,27 @@ bool isSupportedImageFile(const QString& filePath)
 	return supportedExtensions.contains(extension);
 }
 
+bool isSupportedMediaFile(const QString& filePath)
+{
+	return isSupportedVideoFile(filePath) || isSupportedImageFile(filePath);
+}
+
 bool isDirectoryOrSupportedFile(const QString& path)
 {
-	return QFileInfo(path).isDir() || isSupportedVideoFile(path) || isSupportedImageFile(path);
+	return QFileInfo(path).isDir() || isSupportedMediaFile(path);
+}
+
+QStringList collectFilesInDirectory(const QString& directory, bool recursive, const std::function<bool(const QString&)>& filterPredicate)
+{
+	QStringList files;
+	QDirIterator it(directory, QDir::Files, recursive ? QDirIterator::Subdirectories : QDirIterator::NoIteratorFlags);
+	while (it.hasNext())
+	{
+		it.next();
+		if (filterPredicate(it.filePath()))
+			files.push_back(it.filePath());
+	}
+	return files;
 }
 
 bool hasSupportedPaths(const QMimeData* mime)

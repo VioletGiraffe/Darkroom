@@ -91,9 +91,13 @@ IntegrityReport scan()
 		if (collection.compare(PHOTOS_DIR_NAME, Qt::CaseInsensitive) == 0)
 		{
 			const QString labelName = QFileInfo(folderPath).fileName();
-			for (const QFileInfo& file : QDir(folderPath).entryInfoList(IMAGE_FILE_FILTERS, QDir::Files))
-				if (!trackedSources.contains(pathComparisonKey(file.absoluteFilePath())))
-					report.untrackedPhotos.push_back({ file.absoluteFilePath(), labelName });
+			// Owned photos may be any importable format (isSupportedImageFile - incl. webp/bmp), not only the frame
+			// formats in IMAGE_FILE_FILTERS, so scan by that predicate. Sorted for a stable, name-ordered report.
+			QStringList photoFiles = collectFilesInDirectory(folderPath, /*recursive=*/false, isSupportedImageFile);
+			photoFiles.sort();
+			for (const QString& file : photoFiles)
+				if (!trackedSources.contains(pathComparisonKey(file)))
+					report.untrackedPhotos.push_back({ file, labelName });
 			return;
 		}
 		if (knownFolders.contains(pathComparisonKey(folderPath)))

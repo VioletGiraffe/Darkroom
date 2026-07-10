@@ -138,8 +138,10 @@ grid only if `preview/` itself is empty.
 `Utils.h` (mostly inline free functions): `rootFolder()`, `ffmpegPath()`, `openInExplorer()`,
 `getSourceFileDate(sourcePath, folderPath)` (prefers a timestamp parsed from the filename —
 `parseTrailingTimestamp` — so it survives moves; falls back to the source file's birth time, then the
-folder's own timestamp as a last resort), `isSupportedVideoFile()`, `filesAreIdentical()` (size-gated
-byte-for-byte file comparison), `IMAGE_FILE_FILTERS`, `forEachFolder(root, cb)` (visits every
+folder's own timestamp as a last resort), `isSupportedVideoFile()` / `isSupportedImageFile()` / `isSupportedMediaFile()` (the last is either kind),
+`filesAreIdentical()` (size-gated byte-for-byte file comparison), `IMAGE_FILE_FILTERS`,
+`collectFilesInDirectory(dir, recursive, predicate)` (the shared folder-to-files expansion behind the compare/import
+drops and the untracked/locate scans; pass a per-file predicate — e.g. `isSupportedImageFile`), `forEachFolder(root, cb)` (visits every
 `(collection, folderPath)` pair — used by the integrity scan and untracked-file discovery, not by per-card lookups),
 `pickEvenlySpacedFrames()`, window-geometry save/restore. The source-path lookups this used to do itself
 (`getSourceVideoPath`, `existingSourceVideoDir`) are gone — callers now ask `Catalog`

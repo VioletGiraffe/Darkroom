@@ -46,7 +46,7 @@ struct AlignmentTransform;
 //       per-channel absolute difference against the reference, the reference stays normal;
 //   bottom slider = full view: one pane covering the whole grid area, showing the photo at the slider's
 //       position (drag to scrub between photos; Left/Right step it; held digit keys still override);
-//   drop image files anywhere on the window = add them to the comparison;
+//   drop image files or whole folders (scanned recursively for images) anywhere on the window = add them to the comparison;
 //   right-click a pane = context menu: open the photo's containing folder, or make it the reference
 //       (the reference pane is outlined in yellow);
 //   Esc = leave full view / cancel calibration / close.

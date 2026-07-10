@@ -47,6 +47,10 @@ namespace Settings {
 
 namespace {
 
+// The compare window shows at most this many photos: each holds a full-resolution image plus a mipmap chain, so
+// the working set stays bounded, and beyond roughly this count an N-way visual comparison stops being useful.
+constexpr qsizetype MaxImages = 50;
+
 // p rotated by angle (radians) about the origin - the R factor of a photo's image -> subject similarity.
 QPointF rotated(const QPointF& p, double angle)
 {
@@ -364,7 +368,6 @@ void PhotoComparePane::contextMenuEvent(QContextMenuEvent* event)
 void PhotoCompareWindow::showForFiles(const QStringList& candidatePaths, QWidget* parent)
 {
 	QStringList paths;
-	static constexpr qsizetype MaxImages = 50;  // a bigger set stops being a useful comparison
 	for (const QString& path : candidatePaths)
 	{
 		if (!path.isEmpty() && QFileInfo::exists(path))
@@ -396,7 +399,7 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 	mainLayout->setContentsMargins(4, 4, 4, 4);
 
 	m_gridPage = new QWidget(this);
-	m_dropHintLabel = new QLabel(tr("Drop image files here to compare them"), m_gridPage);
+	m_dropHintLabel = new QLabel(tr("Drop images or folders here to compare them"), m_gridPage);
 	m_dropHintLabel->setAlignment(Qt::AlignCenter);
 
 	m_fullPane = new PhotoComparePane(*this, -1);
@@ -601,7 +604,7 @@ void PhotoCompareWindow::rebuildPaneGrid()
 
 void PhotoCompareWindow::dragEnterEvent(QDragEnterEvent* event)
 {
-	// Accept any local files; whether they are images is decided by the load attempt on drop.
+	// Accept any local path; folders are expanded and non-images filtered out on drop.
 	const QList<QUrl> urls = event->mimeData()->urls();
 	if (std::any_of(urls.cbegin(), urls.cend(), [](const QUrl& url) { return url.isLocalFile(); }))
 		event->acceptProposedAction();
@@ -609,13 +612,33 @@ void PhotoCompareWindow::dragEnterEvent(QDragEnterEvent* event)
 
 void PhotoCompareWindow::dropEvent(QDropEvent* event)
 {
+	// A dropped folder is scanned recursively for image files (so a whole shoot drops in at once); plain files
+	// pass straight to the load attempt in addPhotosFromFiles. The total is capped at MaxImages, counting photos
+	// already loaded: each photo holds a full-resolution image plus its mipmap chain, so an unbounded folder would
+	// exhaust memory - and, as in showForFiles, a larger set stops being a useful comparison.
 	QStringList paths;
 	for (const QUrl& url : event->mimeData()->urls())
 	{
-		if (url.isLocalFile())
-			paths.push_back(url.toLocalFile());
+		if (!url.isLocalFile())
+			continue;
+		const QString localPath = url.toLocalFile();
+		if (!QFileInfo(localPath).isDir())
+		{
+			paths.push_back(localPath);
+			continue;
+		}
+		QStringList folderImages = collectFilesInDirectory(localPath, /*recursive=*/true, isSupportedImageFile);
+		folderImages.sort();  // filesystem order is unspecified; sort so the panes follow file-name order
+		paths += folderImages;
 	}
+
+	const qsizetype capacity = std::max<qsizetype>(0, MaxImages - static_cast<qsizetype>(m_photos.size()));
+	const bool truncated = paths.size() > capacity;
+	if (truncated)
+		paths = paths.mid(0, capacity);
 	addPhotosFromFiles(paths);
+	if (truncated)  // set after addPhotosFromFiles, whose own updateHintText would otherwise overwrite this notice
+		m_hintLabel->setText(tr("The comparison is limited to %1 photos; the remaining dropped files were skipped.").arg(MaxImages));
 	event->acceptProposedAction();
 }
 
@@ -989,7 +1012,7 @@ void PhotoCompareWindow::updateAllPanes()
 void PhotoCompareWindow::updateHintText()
 {
 	if (m_photos.empty())
-		m_hintLabel->setText(tr("Drop image files onto the window to load them · Esc: close"));
+		m_hintLabel->setText(tr("Drop images or folders onto the window to load them · Esc: close"));
 	else if (m_calibrating)
 	{
 		QStringList progress;
