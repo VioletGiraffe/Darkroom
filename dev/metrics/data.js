@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783618150963,
+  "lastUpdate": 1783697697540,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -3685,6 +3685,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 26.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "04121027e37758dabf95880b917172986486ca47",
+          "message": "Alignment multithreading via CWorkerThreadPool",
+          "timestamp": "2026-07-10T18:31:52+03:00",
+          "tree_id": "df0ac8a8ace99696b174777b2f90dc66c8b31708",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/04121027e37758dabf95880b917172986486ca47"
+        },
+        "date": 1783697695549,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 10495,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 6769,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 930,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 549,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 287,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 29,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 28,
             "unit": "KB"
           },
           {
