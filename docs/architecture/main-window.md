@@ -124,17 +124,18 @@ Two paths, both add-only (except the context-menu checklist, which also removes)
 ## LabelSidebar structure (`src/UiComponents/LabelSidebar.h/.cpp`)
 
 A flat **`QListWidget`** (single column) whose rows are painted by a custom **`LabelRowDelegate`** — the
-non-stock look from the design mockup: a leading color dot, the name, a right-aligned count, and per-row
+non-stock look from the design mockup: a leading colour swatch (a squat, horizontally-elongated rounded
+rectangle — a squircle, chosen to contrast the vertical spine), the name, a right-aligned count, and per-row
 state drawn by the delegate. Active rows are filled with a **translucent tint of the label's own colour**
 (composited over the panel background, so one tint reads correctly in both themes) and carry a **vertical
-spine threaded through the colour dot**; the spines of vertically adjacent active rows **fuse into one
-continuous line** down the column, with a faint halo holding each dot clear of the line so it still reads as
-a node. Hovered rows get a dashed outline in a translucent text overlay. Those per-row colours are exactly
+spine threaded through the colour swatch**; the spines of vertically adjacent active rows **fuse into one
+continuous line** down the column, with a faint halo holding each swatch clear of the line so it still reads
+as a node. Hovered rows get a dashed outline in a translucent text overlay. Those per-row colours are exactly
 what plain QSS can't express, which is why it's a delegate. Row data rides on item roles; active state is a
 role flag (repainted on toggle), **not** a selection (the list is `NoSelection` — we toggle the filter on
 click ourselves).
 
-Row order: **All** (no dot) → **Best** (gold dot **and** a gold `★`, via `kStarRole`) → a **divider** row
+Row order: **All** (no swatch) → **Best** (gold swatch **and** a gold `★`, via `kStarRole`) → a **divider** row
 (`kDividerRole`, `NoItemFlags`, painted as a hairline, `sizeHint` width 0 so it never widens the panel,
 skipped in `applyRowHighlight`/`onItemClicked`) → the ordinary labels. Best is pulled from
 `Catalog::allLabels()` by `Catalog::BestLabelId` and pinned — this relies on Best being present in that list.

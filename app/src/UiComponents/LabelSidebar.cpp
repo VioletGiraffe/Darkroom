@@ -57,7 +57,9 @@ inline QColor swatchColorFor(const Catalog::Label& l)
 // pinned All/Best rows and the ordinary labels.
 class LabelRowDelegate final : public QStyledItemDelegate {
 private:
-	static constexpr int DOT = 10;  // leading color dot diameter (ordinary label rows)
+	static constexpr int   SWATCH_W = 14;        // leading color swatch size (ordinary label rows)
+	static constexpr int   SWATCH_H = 8;
+	static constexpr qreal SWATCH_RADIUS = 3.5;  // below full (H/2) so the swatch reads as a squircle, not a capsule
 	static constexpr int ICON = 16; // leading glyph box (the All row's stack icon) - wider than a dot, per the mockup
 	static constexpr int GAP = 8;   // dot/icon -> name gap
 	static constexpr int PAD_L = 10;  // left breathing room
@@ -78,7 +80,7 @@ public:
 
 		const QString name  = index.data(Qt::DisplayRole).toString();
 		const QString count = index.data(kCountRole).toString();
-		const int leading = index.data(kLabelIdRole).value<LabelId>() == AllLabelId ? ICON : DOT;  // the All row's stack icon is wider than a dot
+		const int leading = index.data(kLabelIdRole).value<LabelId>() == AllLabelId ? ICON : SWATCH_W;
 		const int starW = index.data(kStarRole).toBool() ? option.fontMetrics.horizontalAdvance(QStringLiteral("★")) + GAP : 0;
 		const int width = PAD_L + leading + GAP + starW + option.fontMetrics.horizontalAdvance(name)
 		                + COUNT_GAP + option.fontMetrics.horizontalAdvance(count) + PAD_R;
@@ -111,6 +113,7 @@ public:
 
 		const qreal cy = r.top() + r.height() / 2.0;  // exact center: QRect::center() truncates and sits visibly high in an even-height row
 		const int dotX = r.left() + PAD_L;
+		const QRectF swatchRect(dotX, cy - SWATCH_H / 2.0, SWATCH_W, SWATCH_H);
 
 		// Active rows get a pill filled with a translucent tint of the label's own color (composited over the
 		// panel background, so one alpha works in both themes) and a vertical spine centered on the dot. The
@@ -151,7 +154,7 @@ public:
 				// spine, or - if the view clips painting to the row - cut off flat at the boundary. Either way the
 				// seam ends up flush and square, with no second squaring pass. A terminated end stops short of the
 				// pill and keeps its softened cap.
-				const qreal cx      = dotX + DOT / 2.0;
+				const qreal cx      = dotX + SWATCH_W / 2.0;
 				const qreal topY    = joinAbove ? r.top() - CAP_RADIUS : pill.top() + END_INSET;
 				const qreal bottomY = joinBelow ? r.top() + r.height() + CAP_RADIUS : pill.top() + pill.height() - END_INSET;
 				p->setBrush(accent);
@@ -161,14 +164,14 @@ public:
 				// BackgroundPrimary (what the pill tint composites over) erases the spine within the annulus, then
 				// the accent re-applied a touch stronger than the fill tints that ring. Concentric with the dot,
 				// so nothing can misalign.
-				const QPointF dotCenter(cx, cy);
-				const qreal ringR = DOT / 2.0 + RING_W;
+				const QRectF ringRect = swatchRect.adjusted(-RING_W, -RING_W, RING_W, RING_W);
+				const qreal ringRadius = SWATCH_RADIUS + RING_W;
 				p->setBrush(colorFromHex(t.BackgroundPrimary));
-				p->drawEllipse(dotCenter, ringR, ringR);
+				p->drawRoundedRect(ringRect, ringRadius, ringRadius);
 				QColor halo = accent;
 				halo.setAlpha(RING_ALPHA);
 				p->setBrush(halo);
-				p->drawEllipse(dotCenter, ringR, ringR);
+				p->drawRoundedRect(ringRect, ringRadius, ringRadius);
 			}
 		}
 
@@ -189,10 +192,10 @@ public:
 		{
 			p->setPen(Qt::NoPen);
 			p->setBrush(swatch);
-			p->drawEllipse(QPointF(dotX + DOT / 2.0, cy), DOT / 2.0, DOT / 2.0);
+			p->drawRoundedRect(swatchRect, SWATCH_RADIUS, SWATCH_RADIUS);
 		}
 
-		int nameX = dotX + (isAll ? ICON : DOT) + GAP;
+		int nameX = dotX + (isAll ? ICON : SWATCH_W) + GAP;
 		if (index.data(kStarRole).toBool())   // the Best row: a gold star just right of its dot
 		{
 			const QString star  = QStringLiteral("★");
