@@ -31,9 +31,9 @@
 namespace {
 constexpr int kLabelIdRole     = Qt::UserRole;       // LabelId (QVariant::fromValue): the row's label; AllLabelId on the All row
 constexpr int kCountRole       = Qt::UserRole + 1;   // QString: the per-row item count, painted right-aligned
-constexpr int kSwatchColorRole = Qt::UserRole + 2;   // QColor: leading dot color (invalid == no dot, e.g. the All row)
+constexpr int kSwatchColorRole = Qt::UserRole + 2;   // QColor: leading swatch color (invalid == no swatch, e.g. the All row)
 constexpr int kActiveRole      = Qt::UserRole + 3;   // bool: row is in the active filter (painted highlighted)
-constexpr int kStarRole        = Qt::UserRole + 4;   // bool: draw a gold star after the dot (the Best row)
+constexpr int kStarRole        = Qt::UserRole + 4;   // bool: draw a gold star after the swatch (the Best row)
 constexpr int kDividerRole     = Qt::UserRole + 5;   // bool: separator line between the pinned rows and the labels
 
 // The All row carries no real label - None is distinct from Best and every generated id.
@@ -48,20 +48,20 @@ inline QColor swatchColorFor(const Catalog::Label& l)
 	return colorFromHex(Theme::current().MutedText);     // neutral for an uncolored label
 }
 
-// Paints a whole label row as one unit: a leading color dot, the name, a right-aligned count, and - for
+// Paints a whole label row as one unit: a leading color swatch, the name, a right-aligned count, and - for
 // rows in the active filter - a pill filled with a translucent tint of that label's own color plus a
-// vertical spine threaded through the dot, fusing with the spines of adjacent active rows into one
+// vertical spine threaded through the swatch, fusing with the spines of adjacent active rows into one
 // continuous line (the per-row accent color is exactly what plain QSS can't express, which is why this is
 // a delegate). Hovered rows get a dashed outline instead. Two special rows are also handled: the Best row
-// draws a gold star after its dot (kStarRole), and a kDividerRole row draws the separator between the
+// draws a gold star after its swatch (kStarRole), and a kDividerRole row draws the separator between the
 // pinned All/Best rows and the ordinary labels.
 class LabelRowDelegate final : public QStyledItemDelegate {
 private:
 	static constexpr int   SWATCH_W = 14;        // leading color swatch size (ordinary label rows)
 	static constexpr int   SWATCH_H = 8;
 	static constexpr qreal SWATCH_RADIUS = 3.5;  // below full (H/2) so the swatch reads as a squircle, not a capsule
-	static constexpr int ICON = 16; // leading glyph box (the All row's stack icon) - wider than a dot, per the mockup
-	static constexpr int GAP = 8;   // dot/icon -> name gap
+	static constexpr int ICON = 16; // leading glyph box (the All row's stack icon) - wider than a swatch, per the mockup
+	static constexpr int GAP = 8;   // swatch/icon -> name gap
 	static constexpr int PAD_L = 10;  // left breathing room
 	static constexpr int PAD_R = 12;  // right breathing room (count -> edge)
 	static constexpr int PAD_V = 6;   // vertical breathing room per row
@@ -109,14 +109,14 @@ public:
 		const QColor  swatch = index.data(kSwatchColorRole).value<QColor>();
 		const bool    active = index.data(kActiveRole).toBool();
 		const bool    hover  = option.state & QStyle::State_MouseOver;
-		const bool    isAll  = index.data(kLabelIdRole).value<LabelId>() == AllLabelId;   // gets the stack glyph instead of a dot
+		const bool    isAll  = index.data(kLabelIdRole).value<LabelId>() == AllLabelId;   // gets the stack glyph instead of a swatch
 
 		const qreal cy = r.top() + r.height() / 2.0;  // exact center: QRect::center() truncates and sits visibly high in an even-height row
-		const int dotX = r.left() + PAD_L;
-		const QRectF swatchRect(dotX, cy - SWATCH_H / 2.0, SWATCH_W, SWATCH_H);
+		const int swatchX = r.left() + PAD_L;
+		const QRectF swatchRect(swatchX, cy - SWATCH_H / 2.0, SWATCH_W, SWATCH_H);
 
 		// Active rows get a pill filled with a translucent tint of the label's own color (composited over the
-		// panel background, so one alpha works in both themes) and a vertical spine centered on the dot. The
+		// panel background, so one alpha works in both themes) and a vertical spine centered on the swatch. The
 		// spines of vertically adjacent active rows fuse across the row boundary into one continuous line; a
 		// terminated end stops short of the pill edge. Hover is a dashed outline in a translucent text-color
 		// overlay, so it reads against both the plain window and an active row's fill.
@@ -124,10 +124,10 @@ public:
 		if (active)
 		{
 			constexpr int   TINT_ALPHA = 33;    // ~13%: enough to read as the label's color, faint enough under text
-			constexpr int   SPINE_W    = 4;     // even, so it centers crisply on the even-diameter dot
+			constexpr int   SPINE_W    = 4;     // even, so it centers crisply on the even-width swatch
 			constexpr int   END_INSET  = 4;     // terminated spine end -> pill edge gap
 			constexpr qreal CAP_RADIUS = 1.0;   // softens the cut ends without reading as a cap shape
-			constexpr qreal RING_W     = 1.5;   // faint halo thickness around the dot (the annulus knocked out over the spine)
+			constexpr qreal RING_W     = 1.5;   // faint halo thickness around the swatch (the ring band knocked out over the spine)
 			constexpr int   RING_ALPHA = 60;    // ~25%: halo accent over BackgroundPrimary, ~2x the fill so the outline reads but stays quiet
 
 			const QColor accent = swatch.isValid() ? swatch : colorFromHex(t.AccentBorder);
@@ -137,7 +137,7 @@ public:
 			p->setBrush(tint);
 			p->drawRoundedRect(pill, RADIUS, RADIUS);
 
-			// The All row's stack icon leaves no dot to thread the spine through, and All is only ever active
+			// The All row's stack icon leaves no swatch to thread the spine through, and All is only ever active
 			// alone - its tint is the whole highlight.
 			if (!isAll)
 			{
@@ -148,22 +148,22 @@ public:
 				const bool joinAbove = isRowActive(index.row() - 1);   // the divider row is never active, so runs can't cross it
 				const bool joinBelow = isRowActive(index.row() + 1);
 
-				// Spine: one continuous bar straight through the dot's center, drawn in a single call - the dot and
+				// Spine: one continuous bar straight through the swatch's center, drawn in a single call - the swatch and
 				// its halo paint over the middle (below). A joined end overshoots the row boundary by the cap radius
 				// so its rounded cap lands in the neighbor's row: covered there by the neighbor's own full-width
 				// spine, or - if the view clips painting to the row - cut off flat at the boundary. Either way the
 				// seam ends up flush and square, with no second squaring pass. A terminated end stops short of the
 				// pill and keeps its softened cap.
-				const qreal cx      = dotX + SWATCH_W / 2.0;
+				const qreal cx      = swatchX + SWATCH_W / 2.0;
 				const qreal topY    = joinAbove ? r.top() - CAP_RADIUS : pill.top() + END_INSET;
 				const qreal bottomY = joinBelow ? r.top() + r.height() + CAP_RADIUS : pill.top() + pill.height() - END_INSET;
 				p->setBrush(accent);
 				p->drawRoundedRect(QRectF(cx - SPINE_W / 2.0, topY, SPINE_W, bottomY - topY), CAP_RADIUS, CAP_RADIUS);
 
-				// Ring: a faint halo around the dot so it reads as a node on the line, not fused to it. Opaque
-				// BackgroundPrimary (what the pill tint composites over) erases the spine within the annulus, then
-				// the accent re-applied a touch stronger than the fill tints that ring. Concentric with the dot,
-				// so nothing can misalign.
+				// Ring: a faint halo around the swatch so it reads as a node on the line, not fused to it. Opaque
+				// BackgroundPrimary (what the pill tint composites over) erases the spine within the ring band, then
+				// the accent re-applied a touch stronger than the fill tints that ring. Grown from the swatch rect
+				// (inflated by RING_W, radius grown to match), so nothing can misalign.
 				const QRectF ringRect = swatchRect.adjusted(-RING_W, -RING_W, RING_W, RING_W);
 				const qreal ringRadius = SWATCH_RADIUS + RING_W;
 				p->setBrush(colorFromHex(t.BackgroundPrimary));
@@ -187,7 +187,7 @@ public:
 		}
 
 		if (isAll)
-			p->drawPixmap(QPointF(dotX, cy - ICON / 2.0), allRowIcon(colorFromHex(t.MutedText), iconDpr(option)));
+			p->drawPixmap(QPointF(swatchX, cy - ICON / 2.0), allRowIcon(colorFromHex(t.MutedText), iconDpr(option)));
 		else if (swatch.isValid())
 		{
 			p->setPen(Qt::NoPen);
@@ -195,8 +195,8 @@ public:
 			p->drawRoundedRect(swatchRect, SWATCH_RADIUS, SWATCH_RADIUS);
 		}
 
-		int nameX = dotX + (isAll ? ICON : SWATCH_W) + GAP;
-		if (index.data(kStarRole).toBool())   // the Best row: a gold star just right of its dot
+		int nameX = swatchX + (isAll ? ICON : SWATCH_W) + GAP;
+		if (index.data(kStarRole).toBool())   // the Best row: a gold star just right of its swatch
 		{
 			const QString star  = QStringLiteral("★");
 			const int     starW = option.fontMetrics.horizontalAdvance(star);
@@ -261,7 +261,7 @@ LabelSidebar::LabelSidebar(QWidget* parent) : QWidget(parent)
 			emit filterChanged();
 	});
 
-	// A flat single-column list used purely as a row container; LabelRowDelegate paints each row (color dot,
+	// A flat single-column list used purely as a row container; LabelRowDelegate paints each row (color swatch,
 	// name, right-aligned count, plus the active tint/spine highlight and the hover outline).
 	// ContentWidthListWidget sizes the panel to the widest row, so names never need to clip.
 	m_list = new ContentWidthListWidget();
@@ -321,7 +321,7 @@ void LabelSidebar::rebuildRows()
 			item->setData(kStarRole, true);
 	};
 
-	// Pinned rows: All, then Best (gold dot + star), separated from the ordinary labels by a divider.
+	// Pinned rows: All, then Best (gold swatch + star), separated from the ordinary labels by a divider.
 	auto* allItem = new QListWidgetItem(tr("All"), m_list);
 	allItem->setData(kLabelIdRole, QVariant::fromValue(AllLabelId));
 	allItem->setData(kCountRole, QString::number(catalog.mediaItemCount()));
