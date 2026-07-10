@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783697697540,
+  "lastUpdate": 1783700997850,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -3739,6 +3739,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .text",
             "value": 549,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 287,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 29,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 28,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "5f7610329bafe6ca202b9f32b2332693f5404128",
+          "message": "PhotoCompareWindow supports drop for folders, expands the contents; new helper collectFilesInDirectory() added in Utils.h and used throughout",
+          "timestamp": "2026-07-10T19:26:55+03:00",
+          "tree_id": "fbea035ba406be1177ce94f852e55f82f264f038",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/5f7610329bafe6ca202b9f32b2332693f5404128"
+        },
+        "date": 1783700995853,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 10518,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 6769,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 930.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 549.5,
             "unit": "KB"
           },
           {
