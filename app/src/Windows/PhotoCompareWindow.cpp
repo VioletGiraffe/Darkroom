@@ -635,7 +635,7 @@ void PhotoCompareWindow::dropEvent(QDropEvent* event)
 	const qsizetype capacity = std::max<qsizetype>(0, MaxImages - static_cast<qsizetype>(m_photos.size()));
 	const bool truncated = paths.size() > capacity;
 	if (truncated)
-		paths = paths.mid(0, capacity);
+		paths.resize(capacity);
 	addPhotosFromFiles(paths);
 	if (truncated)  // set after addPhotosFromFiles, whose own updateHintText would otherwise overwrite this notice
 		m_hintLabel->setText(tr("The comparison is limited to %1 photos; the remaining dropped files were skipped.").arg(MaxImages));

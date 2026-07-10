@@ -8,6 +8,7 @@
 #include <QDebug>
 #include <QDir>
 #include <QIcon>
+#include <QImageReader>
 #include <QSettings>
 #include <QStyleHints>
 
@@ -27,6 +28,8 @@ int main(int argc, char* argv[])
 	CCrashHandler crashHandler([](const wchar_t* msg) {
 		qInfo() << QString::fromWCharArray(msg);
 	});
+
+	QImageReader::setAllocationLimit(2048);  // raise Qt's 256 MB decode cap; 67 MP at 3x8 bits already exceeds it
 
 	const int scheme = QSettings{}.value(Settings::ColorScheme, Defaults::ColorScheme).toInt();
 	app.styleHints()->setColorScheme(static_cast<Qt::ColorScheme>(scheme));
