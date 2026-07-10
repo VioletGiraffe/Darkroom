@@ -55,7 +55,8 @@ RESOURCES += res/resources.qrc
 #                 LIBS
 ###################################################
 
-LIBS += -L$${DESTDIR} -lqtutils -lcpputils -lmagic-alignment
+# magic-alignment before cpputils: it uses the cpputils thread pool, and GNU ld resolves left to right
+LIBS += -L$${DESTDIR} -lqtutils -lmagic-alignment -lcpputils
 
 ###################################################
 #    Platform-specific compiler options and libs
