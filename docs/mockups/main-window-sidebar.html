@@ -7,6 +7,8 @@
   here, not the app's current Theme — light is warm paper, dark is a matching warm-neutral ramp with the
   same slightly-olive cast (app/src/Theme.cpp will be tuned to these, not the reverse). A leaf green is only the
   selection accent; the gold star and the label swatch colors are identities and stay constant across themes.
+  Selected label rows mirror the shipped delegate: a pill tinted in the label's own colour, with a spine
+  threaded through the dot and vertically-adjacent selections fusing into one continuous line.
 -->
 <html lang="en" data-theme="light">
 <head>
@@ -133,12 +135,14 @@
 
       <div style="height:1px; background:var(--color-border-tertiary); margin:5px 6px;"></div>
 
-      <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--border-radius-md); font-size:13px; background:var(--color-background-secondary); box-shadow:inset 2px 0 0 #378ADD;">
-        <span style="width:10px; height:10px; border-radius:50%; background:#378ADD;"></span>
+      <div style="position:relative; display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--border-radius-md); font-size:13px; background:color-mix(in srgb, #378ADD 15%, transparent);">
+        <div style="position:absolute; left:11px; top:5px; bottom:-1px; width:4px; border-radius:2px 2px 0 0; background:#378ADD;"></div>
+        <span style="position:relative; width:10px; height:10px; border-radius:50%; background:#378ADD; box-shadow:0 0 0 2px color-mix(in srgb, #378ADD 25%, var(--color-background-primary));"></span>
         <span style="flex:1; font-weight:500;">beach</span><span style="font-size:11px; color:var(--color-text-tertiary);">40</span>
       </div>
-      <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--border-radius-md); font-size:13px; background:var(--color-background-secondary); box-shadow:inset 2px 0 0 #7F77DD;">
-        <span style="width:10px; height:10px; border-radius:50%; background:#7F77DD;"></span>
+      <div style="position:relative; display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--border-radius-md); font-size:13px; background:color-mix(in srgb, #7F77DD 15%, transparent);">
+        <div style="position:absolute; left:11px; top:-1px; bottom:5px; width:4px; border-radius:0 0 2px 2px; background:#7F77DD;"></div>
+        <span style="position:relative; width:10px; height:10px; border-radius:50%; background:#7F77DD; box-shadow:0 0 0 2px color-mix(in srgb, #7F77DD 25%, var(--color-background-primary));"></span>
         <span style="flex:1; font-weight:500;">night</span><span style="font-size:11px; color:var(--color-text-tertiary);">23</span>
       </div>
       <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:var(--border-radius-md); font-size:13px;">
