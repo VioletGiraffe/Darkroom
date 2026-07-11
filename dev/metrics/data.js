@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783777879829,
+  "lastUpdate": 1783786481116,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -4030,6 +4030,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 28,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "0b5f467f182f7726565ef30f6c2a226e254a8d7b",
+          "message": "Threading in PhotoCompareWindow: loading images in parallel, and using the same thread pool for alignment",
+          "timestamp": "2026-07-11T19:11:45+03:00",
+          "tree_id": "3e603853cee15e6c533b9193197b0b0ed88cfb9e",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/0b5f467f182f7726565ef30f6c2a226e254a8d7b"
+        },
+        "date": 1783786478456,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 10614,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 6861,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 943.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 558,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 289,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 30.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 29,
             "unit": "KB"
           },
           {
