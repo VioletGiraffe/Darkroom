@@ -575,11 +575,11 @@ void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
 	}
 	updateHintText();
 
-	// Two-stage load (see ARCHITECTURE.md "Core principles"). Stage 1, the process-wide I/O thread: read the
-	// files one at a time, handing each one's bytes to the compute pool to decode as soon as they arrive.
-	// Tagged with this window so the destructor can retire() the read loop. The tasks own a share of the batch
-	// state, so nothing here outlives the window's teardown guarantees.
-	IoThreadPool::enqueue([this, batch] {
+	// Two-stage load (see ARCHITECTURE.md "Core principles"). Stage 1, the process-wide I/O pool (routed by the
+	// storage medium under the batch's first path): read the files one at a time, handing each one's bytes to
+	// the compute pool to decode as soon as they arrive. Tagged with this window so the destructor can retire()
+	// the read loop. The tasks own a share of the batch state, so nothing here outlives the window's teardown guarantees.
+	IoThreadPool::enqueue(batch->paths.front(), [this, batch] {
 		for (qsizetype i = 0; i < batch->paths.size(); ++i)
 		{
 			if (batch->abort)

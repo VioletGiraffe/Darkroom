@@ -169,9 +169,9 @@ namespace {
 		QString m_readError;
 	};
 
-	// Stage 1 (single I/O thread): read each source file into memory, then hand the bytes to the decode pool. It
-	// touches only the job (never the widget), so it is safe whatever the widget's lifetime. Serialized on the one
-	// I/O thread, it keeps a spinning disk from being seek-thrashed and lets OS read-ahead work one file at a time.
+	// Stage 1 (I/O pool): read each source file into memory, then hand the bytes to the decode pool. It touches
+	// only the job (never the widget), so it is safe whatever the widget's lifetime. On seek-penalty media the
+	// pool serializes the reads onto one thread (no seek-thrashing, OS read-ahead works one file at a time).
 	void readStage(const std::shared_ptr<ThumbnailWidget::LoadJob>& jobPtr)
 	{
 		ThumbnailWidget::LoadJob& job = *jobPtr;
@@ -352,7 +352,7 @@ void ThumbnailWidget::scheduleRender()
 		? QSize(m_maxSize.width(), qMax(1, m_maxSize.height() - 2 * filmStripBandHeight(m_maxSize.height())))
 		: m_maxSize;
 	m_job->m_dpr = m_renderDpr;
-	IoThreadPool::enqueue([job = m_job] { readStage(job); });   // stage 1 (read) on the single I/O thread; it posts stage 2 (decode) to the CPU pool
+	IoThreadPool::enqueue(m_sourcePaths.value(0), [job = m_job] { readStage(job); });   // stage 1 (read) on the I/O pool; it posts stage 2 (decode) to the CPU pool
 }
 
 void ThumbnailWidget::setOnMouseWheelCallback(std::function<void(int)> handler)
