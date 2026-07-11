@@ -1,3 +1,4 @@
+#include "Core/IoThreadPool.h"
 #include "Windows/MainWindow.h"
 #include "Settings.h"
 #include "Theme/Style.h"
@@ -39,5 +40,7 @@ int main(int argc, char* argv[])
 	MainWindow window;
 	window.show();
 
-	return app.exec();
+	const int result = app.exec();
+	IoThreadPool::finishAllThreads();
+	return result;
 }

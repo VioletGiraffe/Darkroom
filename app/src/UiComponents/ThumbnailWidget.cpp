@@ -169,43 +169,38 @@ namespace {
 	// Stage 1 (single I/O thread): read each source file into memory, then hand the bytes to the decode pool. It
 	// touches only the job (never the widget), so it is safe whatever the widget's lifetime. Serialized on the one
 	// I/O thread, it keeps a spinning disk from being seek-thrashed and lets OS read-ahead work one file at a time.
-	struct ReadStage final : public QRunnable {
-		explicit ReadStage(std::shared_ptr<ThumbnailWidget::LoadJob> job) : m_job{ std::move(job) } {}
-
-		void run() override {
-			ThumbnailWidget::LoadJob& job = *m_job;
-			{
-				std::lock_guard lock{ job.m_mutex };
-				if (job.m_disarmed)   // superseded, or the widget went away, before the I/O thread reached us: skip the read entirely
-					return;
-			}
-
-			std::vector<QByteArray> bytes;
-			QString firstReadError;
-			bytes.reserve(job.m_paths.size());
-			for (const QString& path : std::as_const(job.m_paths))
-			{
-				QFile file(path);
-				if (file.open(QIODevice::ReadOnly))
-					bytes.push_back(file.readAll());
-				else
-				{
-					bytes.emplace_back();
-					if (firstReadError.isEmpty())
-						firstReadError = file.errorString();
-				}
-			}
-
-			{
-				std::lock_guard lock{ job.m_mutex };
-				if (job.m_disarmed)   // disarmed while we were reading: don't bother decoding
-					return;
-			}
-			QThreadPool::globalInstance()->start(new DecodeStage{ m_job, std::move(bytes), std::move(firstReadError) });  // decode on the shared CPU pool
+	void readStage(const std::shared_ptr<ThumbnailWidget::LoadJob>& jobPtr)
+	{
+		ThumbnailWidget::LoadJob& job = *jobPtr;
+		{
+			std::lock_guard lock{ job.m_mutex };
+			if (job.m_disarmed)   // superseded, or the widget went away, before the I/O thread reached us: skip the read entirely
+				return;
 		}
 
-		std::shared_ptr<ThumbnailWidget::LoadJob> m_job;
-	};
+		std::vector<QByteArray> bytes;
+		QString firstReadError;
+		bytes.reserve(job.m_paths.size());
+		for (const QString& path : std::as_const(job.m_paths))
+		{
+			QFile file(path);
+			if (file.open(QIODevice::ReadOnly))
+				bytes.push_back(file.readAll());
+			else
+			{
+				bytes.emplace_back();
+				if (firstReadError.isEmpty())
+					firstReadError = file.errorString();
+			}
+		}
+
+		{
+			std::lock_guard lock{ job.m_mutex };
+			if (job.m_disarmed)   // disarmed while we were reading: don't bother decoding
+				return;
+		}
+		QThreadPool::globalInstance()->start(new DecodeStage{ jobPtr, std::move(bytes), std::move(firstReadError) });  // decode on the shared CPU pool
+	}
 
 	// Film-strip chrome, painted by paintEvent over a video card. paintFilmBase lays the black film base across the
 	// whole image area (the frame composite's transparent gaps then read as black separators); paintSprockets punches
@@ -354,7 +349,7 @@ void ThumbnailWidget::scheduleRender()
 		? QSize(m_maxSize.width(), qMax(1, m_maxSize.height() - 2 * filmStripBandHeight(m_maxSize.height())))
 		: m_maxSize;
 	m_job->m_dpr = m_renderDpr;
-	IoThreadPool::start(new ReadStage{ m_job });   // stage 1 (read) on the single I/O thread; it posts stage 2 (decode) to the CPU pool
+	IoThreadPool::enqueue([job = m_job] { readStage(job); });   // stage 1 (read) on the single I/O thread; it posts stage 2 (decode) to the CPU pool
 }
 
 void ThumbnailWidget::setOnMouseWheelCallback(std::function<void(int)> handler)

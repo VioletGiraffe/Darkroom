@@ -1,28 +1,26 @@
 #include "Core/IoThreadPool.h"
 
-#include <QThreadPool>
+#include <utility>
 
 namespace {
-	QThreadPool& pool()
+	CWorkerThreadPool& pool()
 	{
-		// Leaked on purpose: a function-local QThreadPool would run its destructor (waitForDone + thread join) at
-		// static teardown, after QApplication is already gone - a needless hazard. The OS reclaims it on exit.
-		static QThreadPool* instance = [] {
-			auto* p = new QThreadPool;
-			p->setMaxThreadCount(1);        // the whole point: exactly one I/O worker for the entire process
-			p->setObjectName("IoThreadPool"); // names the worker thread for the debugger
-			return p;
-		}();
-		return *instance;
+		static CWorkerThreadPool instance{ 1, "io" };  // the whole point: exactly one I/O worker for the entire process
+		return instance;
 	}
 }
 
-void IoThreadPool::start(QRunnable* task)
+void IoThreadPool::enqueue(TaskType task, const uint64_t tag)
 {
-	pool().start(task);
+	pool().enqueue(std::move(task), tag);
 }
 
-bool IoThreadPool::tryTake(QRunnable* task)
+void IoThreadPool::retire(const uint64_t tag)
 {
-	return pool().tryTake(task);
+	pool().retire(tag);
+}
+
+void IoThreadPool::finishAllThreads()
+{
+	pool().finishAllThreads();
 }
