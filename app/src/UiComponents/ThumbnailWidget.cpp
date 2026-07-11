@@ -9,6 +9,7 @@
 #include <QColor>
 #include <QDesktopServices>
 #include <QFile>
+#include <QFileInfo>
 #include <QImageIOHandler>
 #include <QImageReader>
 #include <QMessageBox>
@@ -85,11 +86,13 @@ namespace {
 			std::vector<Fitted> fitted;
 			fitted.reserve(n);
 			QString firstError = m_readError;
-			for (QByteArray& bytes : m_bytes)   // non-const: QBuffer wraps a QByteArray*, so it can't be a const ref
+			for (int i = 0; i < n; ++i)
 			{
+				QByteArray& bytes = m_bytes[static_cast<size_t>(i)];   // non-const: QBuffer wraps a QByteArray*, so it can't be a const ref
 				QBuffer buffer(&bytes);
 				buffer.open(QIODevice::ReadOnly);
-				QImageReader reader(&buffer);
+				// The suffix is only a hint (that plugin is tried first); content detection remains the fallback
+				QImageReader reader(&buffer, QFileInfo(job.m_paths[i]).suffix().toLower().toUtf8());
 				reader.setAutoTransform(true);
 
 				const QSize rawSize = reader.size();   // header only, no full decode
