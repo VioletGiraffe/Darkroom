@@ -4,6 +4,8 @@
 #include "UiComponents/SegmentedToggle.h"
 #include "Utils.h"
 
+#include "assert/advanced_assert.h"
+
 #include <QApplication>
 #include <QCheckBox>
 #include <QContextMenuEvent>
@@ -33,8 +35,11 @@
 #include <QWheelEvent>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
+#include <memory>
 #include <numbers>
+#include <thread>
 
 // This window's persisted UI state. These keys live here, not in Settings.h, because they are local to the
 // compare tool rather than app-wide configuration - but stay under the Settings namespace for the uniform
@@ -69,6 +74,16 @@ QRectF subjectRectToImage(const QRectF& rect, double scale, double rotation, con
 }
 
 } // namespace
+
+// The decode work and results of one addPhotosFromFiles call, shared between the GUI thread and the pool task.
+struct PhotoCompareWindow::PhotoLoadBatch
+{
+	QStringList paths;
+	std::vector<QImage> images;  // [i] decoded from paths[i]; null = the file failed to load
+	QString completionNotice;    // transient status to show once the batch is applied (e.g. the drop-truncation notice)
+	std::atomic<int> completedCount{ 0 };  // decoded-or-failed so far; drives the progress line in updateHintText
+	std::atomic<bool> abort{ false };      // set by the destructor: remaining decodes become no-ops so the pool joins quickly
+};
 
 // One grid cell: a viewport onto the shared view. All state (images, alignment, the view itself) lives in
 // the owning PhotoCompareWindow; the pane renders and translates mouse input into owner calls.
@@ -389,7 +404,9 @@ void PhotoCompareWindow::showForFiles(const QStringList& candidatePaths, QWidget
 	w->show();
 }
 
-PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* parent) : QWidget(parent, Qt::Window)
+PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* parent) : QWidget(parent, Qt::Window),
+	// Hardware threads minus one, so the GUI thread keeps a core while the workers decode and align
+	m_workerPool(std::max(std::thread::hardware_concurrency(), 2u) - 1, "photo-compare")
 {
 	setWindowTitle(tr("Compare Photos"));
 	setFocusPolicy(Qt::StrongFocus);  // the panes never take focus, so key events land here
@@ -399,7 +416,7 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 	mainLayout->setContentsMargins(4, 4, 4, 4);
 
 	m_gridPage = new QWidget(this);
-	m_dropHintLabel = new QLabel(tr("Drop images or folders here to compare them"), m_gridPage);
+	m_dropHintLabel = new QLabel(m_gridPage);  // the text is set in rebuildPaneGrid (drop prompt, or a loading notice)
 	m_dropHintLabel->setAlignment(Qt::AlignCenter);
 
 	m_fullPane = new PhotoComparePane(*this, -1);
@@ -443,8 +460,9 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 	m_hintLabel->setAlignment(Qt::AlignCenter);
 	mainLayout->addWidget(m_hintLabel, 0);
 
-	addPhotosFromFiles(photoPaths);  // also puts the empty drop-target state in place when the list is empty (the
-	                                 // saved align region is restored inside, once the first photos actually exist)
+	addPhotosFromFiles(photoPaths);  // async: the photos appear once decoded; an empty list puts the empty drop-target
+	                                 // state in place immediately (the saved align region is restored on apply, once
+	                                 // the first photos actually exist)
 
 	if (!restoreWindowGeometry(this, "photoCompareWindow"))
 	{
@@ -455,6 +473,8 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 
 PhotoCompareWindow::~PhotoCompareWindow()
 {
+	if (m_loadBatch)
+		m_loadBatch->abort = true;  // the remaining decodes become no-ops, so m_workerPool's destruction joins quickly
 	saveWindowGeometry(this, "photoCompareWindow");
 	// Persist the align region as fractions of the reference frame (resolution-independent). Empty (no region,
 	// or no photos to anchor it) stores an empty rect, which reads back as "no region".
@@ -526,21 +546,59 @@ void PhotoCompareWindow::resetToInitialState()
 
 void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
 {
-	const size_t oldCount = m_photos.size();
-	for (const QString& path : photoPaths)
+	assert_debug_only(!m_loadBatch);  // drops are denied while a batch is in flight, so batches never overlap
+	if (photoPaths.isEmpty())
 	{
-		QImageReader reader(path);
-		reader.setAutoTransform(true);  // apply the EXIF orientation
-		QImage image = reader.read();
+		PhotoLoadBatch emptyBatch;
+		applyLoadedPhotoBatch(emptyBatch);  // still (re)builds the count-dependent state - the empty drop-target UI
+		return;
+	}
+
+	auto batch = std::make_shared<PhotoLoadBatch>();
+	batch->paths = photoPaths;
+	batch->images.resize(static_cast<size_t>(photoPaths.size()));
+	m_loadBatch = batch;
+	if (m_photos.empty())
+	{
+		rebuildPaneGrid();  // no photos to show while decoding: put the centered "Loading photos..." placeholder in the grid page
+		m_slider->setEnabled(false);
+	}
+	updateHintText();
+
+	// The pool decodes the files in parallel; the completion, run on the worker that decodes the last file,
+	// hands the whole ordered batch to the GUI thread. The tasks own a share of the batch state, so the window
+	// closing mid-load only has to flip the abort flag and let the pool member's destructor join.
+	m_workerPool.parallelForAsync(static_cast<size_t>(batch->paths.size()),
+		[this, batch](size_t i) {
+			if (batch->abort)
+				return;
+			const QString& path = batch->paths[static_cast<qsizetype>(i)];
+			QImageReader reader(path);
+			reader.setAutoTransform(true);  // apply the EXIF orientation
+			batch->images[i] = reader.read();
+			if (batch->images[i].isNull())
+				qWarning() << "PhotoCompareWindow: failed to load" << path << "-" << reader.errorString();
+			++batch->completedCount;
+			// The m_loadBatch check keeps a late progress update from overwriting a transient completion notice
+			QMetaObject::invokeMethod(this, [this] { if (m_loadBatch) updateHintText(); }, Qt::QueuedConnection);
+		},
+		[this, batch] { QMetaObject::invokeMethod(this, [this, batch] { applyLoadedPhotoBatch(*batch); }, Qt::QueuedConnection); });
+}
+
+void PhotoCompareWindow::applyLoadedPhotoBatch(PhotoLoadBatch& batch)
+{
+	m_loadBatch.reset();
+
+	const size_t oldCount = m_photos.size();
+	for (qsizetype i = 0; i < batch.paths.size(); ++i)
+	{
+		QImage& image = batch.images[static_cast<size_t>(i)];
 		if (image.isNull())
-		{
-			qWarning() << "PhotoCompareWindow: failed to load" << path << "-" << reader.errorString();
-			continue;
-		}
+			continue;  // failed to load; the decode already logged the warning
 		Photo photo;
 		photo.image = std::move(image);
-		photo.filePath = path;
-		photo.caption = QFileInfo(path).fileName();
+		photo.filePath = batch.paths[i];
+		photo.caption = QFileInfo(batch.paths[i]).fileName();
 		// Default alignment: normalize the photo's height to the reference's subject-space height and center
 		// the two on each other - so identical shots that only differ in export resolution line up with no
 		// user action at all. The very first photo keeps the identity default: it defines subject space.
@@ -565,8 +623,11 @@ void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
 	}
 	updateHintText();
 	updateAllPanes();
-	if (m_photos.size() == oldCount && !photoPaths.isEmpty())  // transient status, like the auto-align summary
+	// Transient status, like the auto-align summary: set after updateHintText, which would otherwise overwrite it
+	if (m_photos.size() == oldCount && !batch.paths.isEmpty())
 		m_hintLabel->setText(tr("None of the files could be loaded as images."));
+	else if (!batch.completionNotice.isEmpty())
+		m_hintLabel->setText(batch.completionNotice);
 }
 
 void PhotoCompareWindow::rebuildPaneGrid()
@@ -582,6 +643,7 @@ void PhotoCompareWindow::rebuildPaneGrid()
 	m_dropHintLabel->setVisible(photoCount == 0);
 	if (photoCount == 0)
 	{
+		m_dropHintLabel->setText(m_loadBatch ? tr("Loading photos...") : tr("Drop images or folders here to compare them"));
 		grid->addWidget(m_dropHintLabel, 0, 0);
 		return;
 	}
@@ -604,6 +666,8 @@ void PhotoCompareWindow::rebuildPaneGrid()
 
 void PhotoCompareWindow::dragEnterEvent(QDragEnterEvent* event)
 {
+	if (m_loadBatch)
+		return;  // one batch at a time: deny drops until the current load is applied
 	// Accept any local path; folders are expanded and non-images filtered out on drop.
 	const QList<QUrl> urls = event->mimeData()->urls();
 	if (std::any_of(urls.cbegin(), urls.cend(), [](const QUrl& url) { return url.isLocalFile(); }))
@@ -637,8 +701,14 @@ void PhotoCompareWindow::dropEvent(QDropEvent* event)
 	if (truncated)
 		paths.resize(capacity);
 	addPhotosFromFiles(paths);
-	if (truncated)  // set after addPhotosFromFiles, whose own updateHintText would otherwise overwrite this notice
-		m_hintLabel->setText(tr("The comparison is limited to %1 photos; the remaining dropped files were skipped.").arg(MaxImages));
+	if (truncated)
+	{
+		const QString notice = tr("The comparison is limited to %1 photos; the remaining dropped files were skipped.").arg(MaxImages);
+		if (m_loadBatch)
+			m_loadBatch->completionNotice = notice;  // shown on apply; the load's own hint updates would overwrite it if set now
+		else
+			m_hintLabel->setText(notice);  // capacity was 0, so no load started and nothing will overwrite the notice
+	}
 	event->acceptProposedAction();
 }
 
@@ -835,7 +905,7 @@ void PhotoCompareWindow::autoAlignPhotos()
 		                         rotated(photo.alignOffset - refTransform.offset, -refTransform.rotation) / refTransform.scale };
 		QElapsedTimer alignTimer;
 		alignTimer.start();
-		const AlignmentResult result = alignImages(ref.image, photo.image, options);
+		const AlignmentResult result = alignImages(ref.image, photo.image, options, &m_workerPool);
 		photo.alignTimeMs = alignTimer.nsecsElapsed() / 1e6;
 		m_alignMarkSize = result.patchSize;  // in reference px == subject units (the subject space was just rebased)
 		photo.alignConfidence = result.confidence;        // all surfaced in this photo's corner caption, success or not
@@ -1011,7 +1081,9 @@ void PhotoCompareWindow::updateAllPanes()
 
 void PhotoCompareWindow::updateHintText()
 {
-	if (m_photos.empty())
+	if (m_loadBatch)
+		m_hintLabel->setText(tr("Loading photos... %1 of %2").arg(m_loadBatch->completedCount.load()).arg(m_loadBatch->paths.size()));
+	else if (m_photos.empty())
 		m_hintLabel->setText(tr("Drop images or folders onto the window to load them · Esc: close"));
 	else if (m_calibrating)
 	{

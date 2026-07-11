@@ -1,11 +1,14 @@
 #pragma once
 
+#include "threading/cworkerthread.h"
+
 #include <QImage>
 #include <QPointF>
 #include <QRectF>
 #include <QStringList>
 #include <QWidget>
 
+#include <memory>
 #include <stdint.h>
 #include <vector>
 
@@ -116,9 +119,16 @@ private:
 	// levels on demand, and the residual scale the painter must still apply to that level.
 	[[nodiscard]] const QImage& imageForScale(Photo& photo, double effectiveScale, double& residualScale);
 
-	// Loads and appends photos (the constructor's initial batch, or files dropped onto the window), then
-	// refreshes everything that depends on the photo count. Unreadable files are skipped with a warning.
+	// One in-flight background photo load (the paths and the images decoded from them); defined in the .cpp.
+	struct PhotoLoadBatch;
+
+	// Starts a background load of the given files (the constructor's initial batch, or files dropped onto the
+	// window): the pool decodes them in parallel, then applyLoadedPhotoBatch runs on the GUI thread. One batch
+	// at a time - dragEnterEvent denies drops while m_loadBatch is set. An empty list applies immediately.
 	void addPhotosFromFiles(const QStringList& photoPaths);
+	// Appends the batch's decoded photos (unreadable files were skipped with a warning at decode time), then
+	// refreshes everything that depends on the photo count.
+	void applyLoadedPhotoBatch(PhotoLoadBatch& batch);
 	void rebuildPaneGrid();  // re-places every pane after a photo count change; shows the drop hint when empty
 
 	// The reference photo's image rect mapped into subject space (rotation assumed 0 - see the definition).
@@ -194,4 +204,7 @@ private:
 	bool m_calibrating = false;
 	bool m_differenceMode = false;
 	bool m_viewTouched = false;  // until the user navigates, pane resizes keep re-fitting the view
+
+	std::shared_ptr<PhotoLoadBatch> m_loadBatch;  // the in-flight load, non-null from addPhotosFromFiles until applied; drops are denied meanwhile
+	CWorkerThreadPool m_workerPool;  // parallelizes photo decoding and auto-alignment; sized in the constructor to leave the GUI thread a core
 };
