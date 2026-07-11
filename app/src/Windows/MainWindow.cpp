@@ -1551,16 +1551,14 @@ void MainWindow::checkCatalogIntegrity()
 {
 	IntegrityCheckDialog::Callbacks callbacks{
 		.registerRequested = [this](const QString& folderPath, const QString& sourcePath) {
-			const bool ok = Catalog::instance().addMediaItem(MediaId::fromFile(sourcePath), sourcePath, folderPath, /*splitIntoFrames=*/true);
-			return ok;
+			return Catalog::instance().addMediaItem(MediaId::fromFile(sourcePath), sourcePath, folderPath, /*splitIntoFrames=*/true);
 		},
 		.adoptPhotoRequested = [this](const QString& filePath) {
 			// The untracked image already lives in <root>/Photos/<label>/, so adopt it in place as an owned photo
 			// under that label (its parent dir). addPhoto ensures the label exists and refuses a name+size clash.
 			Catalog& catalog = Catalog::instance();
 			const QString labelDir = QFileInfo(filePath).absolutePath();
-			const bool ok = catalog.addPhoto(MediaId::fromFile(filePath), filePath, labelDir, /*referenced=*/false);
-			return ok;
+			return catalog.addPhoto(MediaId::fromFile(filePath), filePath, labelDir, /*referenced=*/false);
 		},
 		.reimportRequested = [this](const MediaId& id) {
 			// Same re-extraction path reExportAllVideos uses for any catalog video, just for this one: clear the
@@ -1571,8 +1569,7 @@ void MainWindow::checkCatalogIntegrity()
 			return !QDir(folder).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty();
 		},
 		.regeneratePreviewRequested = [this](const MediaId& id) {
-			const bool ok = regeneratePreviewFor(id);
-			return ok;
+			return regeneratePreviewFor(id);
 		},
 		.markSplitRequested = [this](const MediaId& id) {
 			Catalog::instance().markSplitComplete(id);
@@ -1586,8 +1583,7 @@ void MainWindow::checkCatalogIntegrity()
 			// Repoint a referenced photo at the file the user located. applyRename carries the record (labels,
 			// referenced flag) to the new identity and refuses an id clash; a referenced photo has no storage
 			// folder, so it stays folder-less (empty newFolderAbs).
-			const bool ok = Catalog::instance().applyRename(id, MediaId::fromFile(newSourcePath), newSourcePath, /*newFolderAbs=*/QString{});
-			return ok;
+			return Catalog::instance().applyRename(id, MediaId::fromFile(newSourcePath), newSourcePath, /*newFolderAbs=*/QString{});
 		},
 	};
 
