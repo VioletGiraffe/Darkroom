@@ -1,4 +1,5 @@
 #include "Windows/PhotoCompareWindow.h"
+#include "Core/IoThreadPool.h"
 #include "MagicAlignment.h"
 #include "Theme/Theme.h"
 #include "UiComponents/SegmentedToggle.h"
@@ -8,12 +9,14 @@
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
 #include <QApplication>
+#include <QBuffer>
 #include <QCheckBox>
 #include <QContextMenuEvent>
 #include <QDebug>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QElapsedTimer>
+#include <QFile>
 #include <QFileInfo>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -76,14 +79,15 @@ QRectF subjectRectToImage(const QRectF& rect, double scale, double rotation, con
 
 } // namespace
 
-// The decode work and results of one addPhotosFromFiles call, shared between the GUI thread and the pool task.
+// The load work and results of one addPhotosFromFiles call, shared between the GUI thread and the two loading
+// stages (the file reads on the process-wide I/O thread, the decodes on m_workerPool).
 struct PhotoCompareWindow::PhotoLoadBatch
 {
 	QStringList paths;
 	std::vector<QImage> images;  // [i] decoded from paths[i]; null = the file failed to load
 	QString completionNotice;    // transient status to show once the batch is applied (e.g. the drop-truncation notice)
 	std::atomic<int> completedCount{ 0 };  // decoded-or-failed so far; drives the progress line in updateHintText
-	std::atomic<bool> abort{ false };      // set by the destructor: remaining decodes become no-ops so the pool joins quickly
+	std::atomic<bool> abort{ false };      // set by the destructor: the remaining reads and decodes become no-ops, so its waits stay short
 };
 
 // One grid cell: a viewport onto the shared view. All state (images, alignment, the view itself) lives in
@@ -475,7 +479,12 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 PhotoCompareWindow::~PhotoCompareWindow()
 {
 	if (m_loadBatch)
-		m_loadBatch->abort = true;  // the remaining decodes become no-ops, so m_workerPool's destruction joins quickly
+	{
+		m_loadBatch->abort = true;  // the remaining reads and decodes become no-ops, bounding the waits below to one file each
+		// After retire() the read loop is gone (not merely aborted): it can no longer touch the dying window or
+		// enqueue into m_workerPool. The decodes already enqueued are dropped or joined by m_workerPool's destruction.
+		IoThreadPool::retire(reinterpret_cast<uint64_t>(this));
+	}
 	saveWindowGeometry(this, "photoCompareWindow");
 	// Persist the align region as fractions of the reference frame (resolution-independent). Empty (no region,
 	// or no photos to anchor it) stores an empty rect, which reads back as "no region".
@@ -566,24 +575,43 @@ void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
 	}
 	updateHintText();
 
-	// The pool decodes the files in parallel; the completion, run on the worker that decodes the last file,
-	// hands the whole ordered batch to the GUI thread. The tasks own a share of the batch state, so the window
-	// closing mid-load only has to flip the abort flag and let the pool member's destructor join.
-	m_workerPool.parallelForAsync(static_cast<size_t>(batch->paths.size()),
-		[this, batch](size_t i) {
+	// Two-stage load (see ARCHITECTURE.md "Core principles"). Stage 1, the process-wide I/O thread: read the
+	// files one at a time, handing each one's bytes to the compute pool to decode as soon as they arrive.
+	// Tagged with this window so the destructor can retire() the read loop. The tasks own a share of the batch
+	// state, so nothing here outlives the window's teardown guarantees.
+	IoThreadPool::enqueue([this, batch] {
+		for (qsizetype i = 0; i < batch->paths.size(); ++i)
+		{
 			if (batch->abort)
 				return;
-			const QString& path = batch->paths[static_cast<qsizetype>(i)];
-			QImageReader reader(path);
-			reader.setAutoTransform(true);  // apply the EXIF orientation
-			batch->images[i] = reader.read();
-			if (batch->images[i].isNull())
-				qWarning() << "PhotoCompareWindow: failed to load" << path << "-" << reader.errorString();
-			++batch->completedCount;
-			// The m_loadBatch check keeps a late progress update from overwriting a transient completion notice
-			QMetaObject::invokeMethod(this, [this] { if (m_loadBatch) updateHintText(); }, Qt::QueuedConnection);
-		},
-		[this, batch] { QMetaObject::invokeMethod(this, [this, batch] { applyLoadedPhotoBatch(*batch); }, Qt::QueuedConnection); });
+			QFile file(batch->paths[i]);
+			QByteArray fileBytes;
+			if (file.open(QIODevice::ReadOnly))
+				fileBytes = file.readAll();
+			else
+				qWarning() << "PhotoCompareWindow: failed to read" << batch->paths[i] << "-" << file.errorString();
+			// Stage 2, the compute pool: decode in parallel; the decode that completes the batch hands the whole
+			// ordered batch to the GUI thread.
+			m_workerPool.enqueue([this, batch, i, fileBytes = std::move(fileBytes)]() mutable {
+				if (!batch->abort)
+				{
+					QBuffer buffer(&fileBytes);
+					// The suffix is only a hint (that plugin is tried first); content detection remains the fallback
+					QImageReader reader(&buffer, QFileInfo(batch->paths[i]).suffix().toLower().toUtf8());
+					reader.setAutoTransform(true);  // apply the EXIF orientation
+					QImage& image = batch->images[static_cast<size_t>(i)];
+					image = reader.read();
+					if (image.isNull())
+						qWarning() << "PhotoCompareWindow: failed to decode" << batch->paths[i] << "-" << reader.errorString();
+				}
+				if (++batch->completedCount == static_cast<int>(batch->paths.size()))
+					QMetaObject::invokeMethod(this, [this, batch] { applyLoadedPhotoBatch(*batch); }, Qt::QueuedConnection);
+				else
+					// The m_loadBatch check keeps a late progress update from overwriting a transient completion notice
+					QMetaObject::invokeMethod(this, [this] { if (m_loadBatch) updateHintText(); }, Qt::QueuedConnection);
+			});
+		}
+	}, reinterpret_cast<uint64_t>(this));
 }
 
 void PhotoCompareWindow::applyLoadedPhotoBatch(PhotoLoadBatch& batch)
