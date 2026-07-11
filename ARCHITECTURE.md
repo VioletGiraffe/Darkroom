@@ -63,6 +63,9 @@ not just when reading existing code.
   before calling the swap done. See
   [main-window.md](docs/architecture/main-window.md#media-grid--multi-select) for the multi-select
   regression this caught once already.
+- **Language/framework coding conventions live in [guidelines.md](docs/guidelines.md)** — assertions
+  (`assert_r`, never `<cassert>`), containers (`std::vector` over `QList`), identity (`MediaId` over path),
+  dialog flush via `done()`, natural sorting, `tr()` i18n, and QSS gotchas. Read before writing new code.
 
 ---
 
