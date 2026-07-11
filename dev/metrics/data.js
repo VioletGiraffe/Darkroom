@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783811120522,
+  "lastUpdate": 1783811395226,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -4414,6 +4414,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Lines of code (app)",
             "value": 10666,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 6987,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 960.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 572.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 290.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 30.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 30,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "a5fcda25d64c64a676dfd99d3b5ca7a9bf0f77ec",
+          "message": "IntegrityCheckDialog: do not refreshLibraryView() on each action",
+          "timestamp": "2026-07-12T02:06:55+03:00",
+          "tree_id": "37a0867dbee45bc736342cdca2a0107b38dfa7de",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/a5fcda25d64c64a676dfd99d3b5ca7a9bf0f77ec"
+        },
+        "date": 1783811392974,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 10657,
             "unit": "LOC"
           },
           {
