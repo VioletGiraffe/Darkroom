@@ -5,6 +5,7 @@
 #include "Utils.h"
 
 #include "assert/advanced_assert.h"
+#include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
 #include <QApplication>
 #include <QCheckBox>
@@ -692,7 +693,8 @@ void PhotoCompareWindow::dropEvent(QDropEvent* event)
 			continue;
 		}
 		QStringList folderImages = collectFilesInDirectory(localPath, /*recursive=*/true, isSupportedImageFile);
-		folderImages.sort();  // filesystem order is unspecified; sort so the panes follow file-name order
+		// filesystem order is unspecified; sort so the panes follow file-name order
+		std::ranges::sort(folderImages, &NaturalSort::lessCaseSensitive);
 		paths += folderImages;
 	}
 

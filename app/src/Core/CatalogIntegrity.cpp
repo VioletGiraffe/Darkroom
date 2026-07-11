@@ -2,9 +2,13 @@
 #include "Core/Catalog.h"
 #include "Utils.h"
 
+#include "utils/naturalsorting/cnaturalsorterqcollator.h"
+
 #include <QDir>
 #include <QFileInfo>
 #include <QSet>
+
+#include <algorithm>
 
 // --- Integrity check -------------------------------------------------------------------------------------
 //
@@ -94,7 +98,7 @@ IntegrityReport scan()
 			// Owned photos may be any importable format (isSupportedImageFile - incl. webp/bmp), not only the frame
 			// formats in IMAGE_FILE_FILTERS, so scan by that predicate. Sorted for a stable, name-ordered report.
 			QStringList photoFiles = collectFilesInDirectory(folderPath, /*recursive=*/false, isSupportedImageFile);
-			photoFiles.sort();
+			std::ranges::sort(photoFiles, &NaturalSort::lessCaseSensitive);
 			for (const QString& file : photoFiles)
 				if (!trackedSources.contains(pathComparisonKey(file)))
 					report.untrackedPhotos.push_back({ file, labelName });

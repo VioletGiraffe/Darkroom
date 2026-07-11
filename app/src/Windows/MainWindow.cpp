@@ -25,6 +25,7 @@
 #include "Shortcuts.h"
 
 #include "aboutdialog/caboutdialog.h"
+#include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
 #include <QAbstractItemView>
 #include <QApplication>
@@ -1542,7 +1543,7 @@ void MainWindow::scanForUntrackedFiles()
 		return;
 	}
 
-	untracked.sort(Qt::CaseInsensitive);
+	std::ranges::sort(untracked, &NaturalSort::lessCaseInsensitive);
 	importToCollections(untracked);   // ImportDialog's staging is the rich triage UI: preview, remove, label, compare
 }
 
