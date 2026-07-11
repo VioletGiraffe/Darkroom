@@ -13,17 +13,18 @@
 #include <memory>
 #include <utility>
 
-void IntegrityCheckDialog::scanAndShowUi(Callbacks callbacks, QWidget* parent)
+bool IntegrityCheckDialog::scanAndShowUi(Callbacks callbacks, QWidget* parent)
 {
 	const CatalogIntegrity::IntegrityReport report = CatalogIntegrity::scan();
 	if (report.isEmpty())
 	{
 		QMessageBox::information(parent, tr("Catalog integrity check"), tr("No issues found - the catalog matches what's on disk."));
-		return;
+		return false;
 	}
 
 	IntegrityCheckDialog dialog(report, std::move(callbacks), parent);
 	dialog.exec();
+	return true;
 }
 
 IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityReport& report, Callbacks callbacks, QWidget* parent)

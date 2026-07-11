@@ -1552,8 +1552,6 @@ void MainWindow::checkCatalogIntegrity()
 	IntegrityCheckDialog::Callbacks callbacks{
 		.registerRequested = [this](const QString& folderPath, const QString& sourcePath) {
 			const bool ok = Catalog::instance().addMediaItem(MediaId::fromFile(sourcePath), sourcePath, folderPath, /*splitIntoFrames=*/true);
-			if (ok)
-				refreshLibraryView();
 			return ok;
 		},
 		.adoptPhotoRequested = [this](const QString& filePath) {
@@ -1562,8 +1560,6 @@ void MainWindow::checkCatalogIntegrity()
 			Catalog& catalog = Catalog::instance();
 			const QString labelDir = QFileInfo(filePath).absolutePath();
 			const bool ok = catalog.addPhoto(MediaId::fromFile(filePath), filePath, labelDir, /*referenced=*/false);
-			if (ok)
-				refreshLibraryView();
 			return ok;
 		},
 		.reimportRequested = [this](const MediaId& id) {
@@ -1572,23 +1568,18 @@ void MainWindow::checkCatalogIntegrity()
 			Catalog& catalog = Catalog::instance();
 			const QString folder = catalog.folderForMediaItem(id);
 			resplitVideoIntoFrames(catalog.sourcePathForMediaItem(id), folder, /*preserveExistingPreview=*/false);
-			refreshLibraryView();
 			return !QDir(folder).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty();
 		},
 		.regeneratePreviewRequested = [this](const MediaId& id) {
 			const bool ok = regeneratePreviewFor(id);
-			if (ok)
-				refreshLibraryView();
 			return ok;
 		},
 		.markSplitRequested = [this](const MediaId& id) {
 			Catalog::instance().markSplitComplete(id);
-			refreshLibraryView();
 			return true;
 		},
 		.removeEntryRequested = [this](const MediaId& id) {
 			Catalog::instance().removeMediaItem(id);
-			refreshLibraryView();
 			return true;
 		},
 		.locatePhotoRequested = [this](const MediaId& id, const QString& newSourcePath) {
@@ -1596,12 +1587,12 @@ void MainWindow::checkCatalogIntegrity()
 			// referenced flag) to the new identity and refuses an id clash; a referenced photo has no storage
 			// folder, so it stays folder-less (empty newFolderAbs).
 			const bool ok = Catalog::instance().applyRename(id, MediaId::fromFile(newSourcePath), newSourcePath, /*newFolderAbs=*/QString{});
-			if (ok)
-				refreshLibraryView();
 			return ok;
 		},
 	};
-	IntegrityCheckDialog::scanAndShowUi(std::move(callbacks), this);
+
+	if (IntegrityCheckDialog::scanAndShowUi(std::move(callbacks), this))
+		refreshLibraryView();
 }
 
 bool MainWindow::isInBest(const MediaId& id)
