@@ -894,22 +894,35 @@ void PhotoCompareWindow::autoAlignPhotos()
 	// reports failure, and the rebased m_alignAoi is directly usable as the library's areaOfInterest.
 	const AlignmentTransform refTransform = rebaseSubjectSpaceToReference();
 
+	// Non-reference photos align against the reference independently, so run them across the window pool. Each
+	// task writes only its own m_photos[targets[k]] and its own contrib[k]; the reference-side marks (every
+	// photo appends to the single ref.alignMarks) and m_alignMarkSize are merged on this thread after the
+	// region, in photo order, so the outcome is bit-identical to a serial run. alignImages still receives the
+	// pool: nesting parallelFor on it is deadlock-free and self-balancing - few photos let each inner fit use
+	// the spare cores, many photos saturate the pool from the outer loop so each fit then runs mostly inline.
+	const bool fitRotation = !m_ignoreRotationCheck->isChecked();  // hoisted: no widget access off the GUI thread
+
+	std::vector<size_t> targets;  // the non-reference photos, in order
 	for (size_t i = 0; i < m_photos.size(); ++i)
-	{
-		if (static_cast<int>(i) == m_refIndex)
-			continue;
-		Photo& photo = m_photos[i];
+		if (static_cast<int>(i) != m_refIndex)
+			targets.push_back(i);
+
+	struct RefContribution { std::vector<AlignmentMark> refMarks; double patchSize = 0.0; };
+	std::vector<RefContribution> contrib(targets.size());  // one slot per task, merged serially below
+
+	m_workerPool.parallelFor(targets.size(), [&](size_t k) {
+		Photo& photo = m_photos[targets[k]];
 		AlignmentOptions options;
 		options.areaOfInterest = m_alignAoi;  // empty = whole frame
-		options.fitRotation = !m_ignoreRotationCheck->isChecked();
+		options.fitRotation = fitRotation;
 		// refTransform^-1 * photoTransform: the photo's mapping into the rebased subject space.
 		options.initialGuess = { photo.alignScale / refTransform.scale, photo.alignRotation - refTransform.rotation,
 		                         rotated(photo.alignOffset - refTransform.offset, -refTransform.rotation) / refTransform.scale };
 		QElapsedTimer alignTimer;
 		alignTimer.start();
 		const AlignmentResult result = alignImages(ref.image, photo.image, options, &m_workerPool);
-		photo.alignTimeMs = alignTimer.nsecsElapsed() / 1e6;
-		m_alignMarkSize = result.patchSize;  // in reference px == subject units (the subject space was just rebased)
+		photo.alignTimeMs = alignTimer.nsecsElapsed() / 1e6;  // wall time; under the parallel run it reflects core contention
+		contrib[k].patchSize = result.patchSize;
 		photo.alignConfidence = result.confidence;        // all surfaced in this photo's corner caption, success or not
 		photo.alignBootstrapZncc = result.bootstrapZncc;
 		photo.alignRotationSigma = result.rotationSigma;
@@ -921,7 +934,7 @@ void PhotoCompareWindow::autoAlignPhotos()
 			                : patchInfo.fate == AlignmentPatchFate::AcceptedCoarse ? AlignmentMark::Kind::UsedCoarse
 			                : patchInfo.fate == AlignmentPatchFate::Outlier ? AlignmentMark::Kind::Outlier
 			                                                                : AlignmentMark::Kind::Failed;
-			ref.alignMarks.push_back({ patchInfo.refPoint, kind });
+			contrib[k].refMarks.push_back({ patchInfo.refPoint, kind });
 			if (patchInfo.zncc > 0.0)  // targetPoint is meaningless for a patch that never matched
 				photo.alignMarks.push_back({ patchInfo.targetPoint, kind });
 		}
@@ -937,7 +950,12 @@ void PhotoCompareWindow::autoAlignPhotos()
 			photo.alignRotation = options.initialGuess.rotation;
 			photo.alignOffset = options.initialGuess.offset;
 		}
-	}
+	});
+
+	// Merge each photo's reference-side marks in photo order (identical to the serial accumulation).
+	for (const RefContribution& c : contrib)
+		ref.alignMarks.insert(ref.alignMarks.end(), c.refMarks.begin(), c.refMarks.end());
+	m_alignMarkSize = contrib.front().patchSize;  // every call returns the same patchSize; in reference px == subject units
 	QApplication::restoreOverrideCursor();
 	updateAllPanes();
 }
