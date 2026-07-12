@@ -123,7 +123,9 @@ Two paths, both add-only (except the context-menu checklist, which also removes)
 
 ## LabelSidebar structure (`src/UiComponents/LabelSidebar.h/.cpp`)
 
-A flat **`QListWidget`** (single column) whose rows are painted by a custom **`LabelRowDelegate`** — the
+A flat **`QListWidget`** (single column) whose rows are painted by a custom **`LabelRowDelegate`**
+(`src/UiComponents/LabelRowDelegate.h/.cpp` — also installed on `ImportDialog`'s label list, which uses only
+the swatch + name + hover subset; the roles below are published as constants on the class) — the
 non-stock look from the design mockup: a leading colour swatch (a squat, horizontally-elongated rounded
 rectangle — a squircle, chosen to contrast the vertical spine), the name, a right-aligned count, and per-row
 state drawn by the delegate. Active rows are filled with a **translucent tint of the label's own colour**
@@ -135,8 +137,9 @@ what plain QSS can't express, which is why it's a delegate. Row data rides on it
 role flag (repainted on toggle), **not** a selection (the list is `NoSelection` — we toggle the filter on
 click ourselves).
 
-Row order: **All** (no swatch) → **Best** (gold swatch **and** a gold `★`, via `kStarRole`) → a **divider** row
-(`kDividerRole`, `NoItemFlags`, painted as a hairline, `sizeHint` width 0 so it never widens the panel,
+Row order: **All** (stack icon instead of a swatch, via `AllRole`) → **Best** (gold swatch **and** a gold `★`,
+via `StarRole`) → a **divider** row
+(`DividerRole`, `NoItemFlags`, painted as a hairline, `sizeHint` width 0 so it never widens the panel,
 skipped in `applyRowHighlight`/`onItemClicked`) → the ordinary labels. Best is pulled from
 `Catalog::allLabels()` by `Catalog::BestLabelId` and pinned — this relies on Best being present in that list.
 

@@ -5,6 +5,7 @@
 #include "UiComponents/ContentWidthListWidget.h"
 #include "UiComponents/DragGestureHelper.h"
 #include "UiComponents/LabelMimeType.h"
+#include "UiComponents/LabelRowDelegate.h"
 #include "UiComponents/LabelVisuals.h"
 #include "Settings.h"
 #include "Shortcuts.h"
@@ -33,7 +34,6 @@
 #include <QFont>
 #include <QFrame>
 #include <QHBoxLayout>
-#include <QIcon>
 #include <QInputDialog>
 #include <QKeySequence>
 #include <QLabel>
@@ -43,8 +43,6 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QMimeData>
-#include <QPainter>
-#include <QPixmap>
 #include <QPushButton>
 #include <QSettings>
 #include <QSplitter>
@@ -65,20 +63,6 @@ constexpr int STAGED_CARD_IMAGE_HEIGHT = 120;
 // The label list hugs its content width (ContentWidthListWidget) but is capped here so a pathologically long
 // label name can't grow the pane without bound - past this the row elides instead.
 constexpr int LABEL_LIST_MAX_WIDTH = 300;
-
-// A small filled circle, used as each label-list row's leading icon - the flat, non-interactive cousin of
-// LabelRowDelegate's dot (no active/hover states to paint here, so a plain decoration icon suffices).
-QIcon colorDotIcon(const QColor& color)
-{
-	QPixmap pixmap(12, 12);
-	pixmap.fill(Qt::transparent);
-	QPainter p(&pixmap);
-	p.setRenderHint(QPainter::Antialiasing);
-	p.setPen(Qt::NoPen);
-	p.setBrush(color.isValid() ? color : QColor("#888888"));
-	p.drawEllipse(1, 1, 10, 10);
-	return QIcon(pixmap);
-}
 
 // A fresh, unique scratch directory for one staged video's temp preview frames.
 QString uniqueTempPreviewDir()
@@ -203,9 +187,11 @@ ImportDialog::ImportDialog(Callbacks callbacks, const QString& suggestedRelocate
 	// instead (horizontal scrolling off). No explicit minimum width, so the minimum tracks content up to the cap.
 	m_labelList->setMaximumWidth(LABEL_LIST_MAX_WIDTH);
 	m_labelList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-	// Row hover fill: BackgroundSecondary (the theme's raised-row surface) at ControlRadius.
-	m_labelList->setStyleSheet(QStringLiteral("QListWidget::item:hover { background-color: %1; border-radius: %2px; }")
-		.arg(Theme::current().BackgroundSecondary).arg(Theme::ControlRadius));
+	// LabelRowDelegate paints the rows just like the main window's sidebar: squircle swatch, name, dashed
+	// hover outline (mouse tracking on so hover repaints). The active pill/spine states simply never engage
+	// here - no row is ever marked active.
+	m_labelList->setItemDelegate(new LabelRowDelegate(m_labelList));
+	m_labelList->setMouseTracking(true);
 	// A press-and-drag on a label row drags the label out, to be dropped onto a staged card.
 	new ListRowDragFilter(m_labelList, [](const QListWidgetItem* item) {
 		auto* mime = new QMimeData();
@@ -366,9 +352,10 @@ void ImportDialog::refreshLabelList()
 	m_labelList->clear();
 	for (const LabelOption& option : m_labelOptions)
 	{
-		auto* item = new QListWidgetItem(colorDotIcon(QColor(option.color)),
+		auto* item = new QListWidgetItem(
 			option.provisional ? tr("%1  (new)").arg(option.displayName) : option.displayName, m_labelList);
 		item->setData(kLabelIdRole, option.id);
+		item->setData(LabelRowDelegate::SwatchColorRole, LabelRowDelegate::swatchColor(option.color));
 		if (option.provisional)
 		{
 			QFont font = item->font();
