@@ -113,7 +113,7 @@ through to the view. Dragging a card is owned by the **grid view** (`MediaGrid`,
 [main-window.md](main-window.md)): it exports the selected cards' **source files** as `file://` URLs
 (`CopyAction`) to Explorer or another app, drawing the grabbed card as the drag image (plus a count badge for
 a multi-file drag). The **label drop target** above is the card's only *incoming* drag. (An earlier
-card-owned "move video between collections" drag was retired when that became "drag a label onto a card"
+card-owned "move video between storage folders" drag was retired when that became "drag a label onto a card"
 instead.)
 
 ---

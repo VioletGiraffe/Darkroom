@@ -101,7 +101,7 @@ Reference** — the file is tracked where it is and the catalog entry is marked 
   owned copy instead?" — which routes the file through the Copy path where the auto-rename works.
 - **A referenced photo's first label** is applied by `importPhotoBatch` via `Catalog::addLabel` right after
   registration (it has no storage folder to derive a label from); an owned photo's first label derives from
-  the `Photos/<label>` dir it landed in, exactly like a video's collection folder.
+  the `Photos/<label>` dir it landed in, exactly like a video's storage folder.
 
 `Ffmpeg::generatePreviewFrames` (`src/Ffmpeg.h/.cpp`, free functions) is that extraction engine, used whenever
 a fresh preview is needed — the fallback above, the re-split paths, and the Import dialog's staging. Given a video's
@@ -142,7 +142,7 @@ folder's own timestamp as a last resort), `isSupportedVideoFile()` / `isSupporte
 `filesAreIdentical()` (size-gated byte-for-byte file comparison), `IMAGE_FILE_FILTERS`,
 `collectFilesInDirectory(dir, recursive, predicate)` (the shared folder-to-files expansion behind the compare/import
 drops and the untracked/locate scans; pass a per-file predicate — e.g. `isSupportedImageFile`), `forEachFolder(root, cb)` (visits every
-`(collection, folderPath)` pair — used by the integrity scan and untracked-file discovery, not by per-card lookups),
+`(storageFolder, folderPath)` pair — used by the integrity scan and untracked-file discovery, not by per-card lookups),
 `pickEvenlySpacedFrames()`, window-geometry save/restore. The source-path lookups this used to do itself
 (`getSourceVideoPath`, `existingSourceVideoDir`) are gone — callers now ask `Catalog`
 (`sourcePathForMediaItem`, `anySourceDir`; see [catalog-and-labels.md](catalog-and-labels.md)).
@@ -151,14 +151,14 @@ drops and the untracked/locate scans; pass a per-file predicate — e.g. `isSupp
 
 ## `ImportDialog` (`src/Windows/ImportDialog.h/.cpp`)
 
-Import dialog: copy/move source files into a collection.
+Import dialog: copy/move source files under a label.
 
 `ImportDialog` reads the `Catalog` directly for lookups (label options, photo-content duplicates, the
 id-tracking check, random label colors) and calls back into its host (`MainWindow`) only for host-owned
 actions it can't do itself. That is the whole `Callbacks` struct now — four members:
 `addMediaItemsRequested` / `importPhotosRequested` (the import workers, which own the app-wide busy lock and
-the progress modal), `createCollectionRequested` (shared with the sidebar's create-label flow), and
-`viewChanged` (the host repaint). The Best/extra-label flush and the tracked-in-collection check that used to
+the progress modal), `createLabelRequested` (shared with the sidebar's create-label flow), and
+`viewChanged` (the host repaint). The Best/extra-label flush and the tracked-under-label check that used to
 be callbacks are done in-dialog now (below). Source-file relocation — copy/move into a chosen folder, with
 the interactive same-name collision dialog — lives in its own **`SourceRelocation`** module
 (`src/Windows/SourceRelocation.h/.cpp`), entry point `SourceRelocation::relocateIfNeeded`; `FileCollisionDialog`
@@ -194,7 +194,7 @@ The dialog is one big staging area (a media-item-card grid) plus a small label-l
 (see [main-window.md](main-window.md)), so they get the identical squircle swatch and dashed hover outline;
 only the swatch + name subset of its roles is used here (no counts, no active pill/spine — the list has no
 filter concept). Dropping a file or folder onto the dialog, or `addToStaging()` (used by
-`MainWindow`'s own drop and to pre-fill staging from the untracked-file scan via `importToCollections`), calls `stageMediaItems()`, which
+`MainWindow`'s own drop and to pre-fill staging from the untracked-file scan via `openImportDialog`), calls `stageMediaItems()`, which
 first flattens its input — a dropped **folder** is scanned recursively and contributes every supported
 video/photo file under it (`flattenToSupportedMediaFiles`), so a folder drops in exactly as if its files were
 selected individually. Each file harvested from a folder also carries a **folder-derived label name**: the path
@@ -251,8 +251,8 @@ just an ordinary additional tag, applied the same way Best is.
 ### `runImport()` (the "Import" button)
 
 0. **`materializeUsedProvisionalLabels()`** runs first — the *only* point provisional labels reach the Catalog.
-   For each provisional id any staged entry actually carries, it calls `createCollectionRequested(name, color)`
-   (→ `MainWindow::createCollection`, which honors the color only for a genuinely new label) to get the real id
+   For each provisional id any staged entry actually carries, it calls `createLabelRequested(name, color)`
+   (→ `MainWindow::createFolderLabel`, which honors the color only for a genuinely new label) to get the real id
    back, then rewrites every entry's `pendingLabelIds` from provisional stand-in to real id. A creation that
    fails (reserved/invalid name) maps to empty and is dropped from the pick, leaving that item staged but
    unlabeled (one summary warning). Successfully-created provisionals are removed from `m_provisionalLabels`
@@ -274,9 +274,9 @@ just an ordinary additional tag, applied the same way Best is.
    file dropped on the main window ends up, since a drop just opens this dialog pre-staged). It passes along
    each video's staging temp dir so import can reuse the already-extracted preview frames (see "Import:
    preview frames only" above). Per video: deferred relocation (`Cancel`) or
-   `isTrackedInCollection(id, collection)` (a local free function) coming back false leaves it staged, labels intact, to
+   `isTrackedUnderLabel(id, labelName)` (a local free function) coming back false leaves it staged, labels intact, to
    retry later. That check compares the item's tracked frame folder against the one this import derives
-   (`<collection>/<source base name>`), not just "tracked at all" — so both an import that was
+   (`<storageFolder>/<source base name>`), not just "tracked at all" — so both an import that was
    declined/failed *and* a name+size collision with an item tracked elsewhere (import refuses those, see
    "Duplicate detection" above) are correctly left staged rather than misread as successes. The staged path
    is first updated to the relocated location when the file was actually copied/moved, so that retry starts
@@ -286,7 +286,7 @@ just an ordinary additional tag, applied the same way Best is.
 4. Both group importers accumulate into one `ImportOutcome` (`succeededIds` / `skippedIds` / `bestItems` /
    `extraLabelAssignments`). Once every group is processed, `runImport` flushes it directly to the Catalog —
    `Catalog::addLabel` for each Best flag and extra-label pick, guarded by `Catalog::containsMediaItem` (items
-   only reach these lists after a confirmed import; the old per-collection frame-folder-exists guard was
+   only reach these lists after a confirmed import; the old frame-folder-exists guard was
    video-shaped and meaningless for photos), the whole flush wrapped in one `Catalog::BatchScope` (see
    [catalog-and-labels.md](catalog-and-labels.md)) so a multi-item Import session writes the store once. Every
    successfully-imported (or skip-resolved) entry is then unstaged.
@@ -301,13 +301,13 @@ dirs, a purely local resource the caller never depends on seeing.
 
 ### Why `MediaId`, not path, addresses an item once it's mid-Import
 
-`isTrackedInCollection`, the accumulated `bestItems`, and `ExtraLabelAssignment` all take a `MediaId`, captured once at
+`isTrackedUnderLabel`, the accumulated `bestItems`, and `ExtraLabelAssignment` all take a `MediaId`, captured once at
 stage time, rather than the staged path. `MediaId::fromFile(path)` stats the file for its size — if
 relocation mode is **Move**, the source has already been deleted from that path by the time step 3/4 above
 run, so re-deriving the id from the path there would return an invalid id matching nothing (the bug this
 shape replaced: a Move-imported video's card never unstaged, and any label beyond the first silently never
 applied). `MediaId::name()` still gives the original filename for string-only needs (e.g. deriving
-`<collection>/<baseName>` without touching disk) — see [data-model.md](data-model.md).
+`<storageFolder>/<baseName>` without touching disk) — see [data-model.md](data-model.md).
 
 `LabelOption` (the label-list row payload, and the type `findLabelOption()` looks up) is nested directly
 inside `ImportDialog`, not inside its `Callbacks` namespace — a qualified reference like

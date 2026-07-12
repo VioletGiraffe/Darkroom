@@ -1,6 +1,6 @@
 # Darkroom — Architecture
 
-C++/Qt6 desktop app (Windows primary target) for organizing video-frame collections and extracting frames
+C++/Qt6 desktop app (Windows primary target) for organizing a local library of video frames and extracting frames
 from source videos via ffmpeg. Requires Qt 6.5+ (uses `QGuiApplication::styleHints()->colorScheme()`).
 
 This document is the living architectural reference: a high-level index plus the core cross-cutting
@@ -77,7 +77,7 @@ not just when reading existing code.
 ## Subsystems
 
 ### [Data model & identity](docs/architecture/data-model.md)
-The on-disk structure (`rootFolder()`, collection folders, frame folders), the `MediaId` identity scheme, and
+The on-disk structure (`rootFolder()`, storage folders, frame folders), the `MediaId` identity scheme, and
 `MetadataStore` — the dumb `MediaId`-keyed persistence layer (with batched-write support) that `Catalog`
 loads itself from and writes through.
 

@@ -14,8 +14,9 @@ label a stored extra, and no label operation or deletion ever touches its file. 
 `"labels"` field's id-list (de)serialization, and the model's lifecycle. Callers talk to `Catalog`, never to
 `MetadataStore`, for anything item- or label-related. Meyers singleton, GUI-thread.
 
-This replaced the original one-folder-per-collection model: collections are now dynamic in-app **filters by
-label** (an item can have many; `★ Best` is just another label) rather than a 1:1 item→folder mapping. A
+This replaced the original folder-based organization, where each item belonged to exactly one folder:
+items now carry **labels** (an item can have many; `★ Best` is just another label) and are browsed via dynamic
+in-app **filters by label** rather than a 1:1 item→folder mapping. A
 later pass (see "Import lifecycle" below) replaced the *disk-walk-per-refresh* implementation of that
 model with the current in-memory one — identity is minted from a file (a stat for name+size) at exactly one
 point, import (`addMediaItem`); everywhere else an item is addressed by the `MediaId` it already carries.
@@ -30,7 +31,7 @@ point, import (`addMediaItem`); everywhere else an item is addressed by the `Med
   `displayName`) leaves the id and every association intact. Per-item membership in `MetadataStore`'s
   `"labels"` field is a list of **label ids**, not names.
 - **A label owns nothing on disk.** It does not know about folders. It just so happens that an item's frames
-  live in a collection folder whose name equals the `displayName` of one of the item's labels — a pure
+  live in a storage folder whose name equals the `displayName` of one of the item's labels — a pure
   per-item **storage detail**, derived from disk, never recorded on the label and never a stored "primary"
   flag. `isVirtual()` is **derived** (`id == BestLabelId`), not a stored field: `Best` is the sole **virtual**
   label — a filter-only label that never names a storage folder.
@@ -42,7 +43,7 @@ point, import (`addMediaItem`); everywhere else an item is addressed by the `Med
 
 An earlier draft of this design (recorded in session memory before implementation, see "Design rationale"
 below) modelled a **"folder-backed" attribute on the label itself** — i.e. a label would *know* whether it
-was backed by a collection folder. That was deliberately abandoned mid-implementation in favor of the
+was backed by a storage folder. That was deliberately abandoned mid-implementation in favor of the
 current model, where the folder coincidence is purely a per-item runtime fact, never stored on the label.
 The reasoning: a label's relationship to a folder is a *storage detail of the items that happen to use it*,
 not a property of the label as a concept — modelling it as a label attribute conflates two different things
@@ -52,17 +53,17 @@ the label itself changing identity).
 ## Persistence
 
 - **Registry (`labels.json`)** in `rootFolder()`: an ordered `[{id, displayName, color}]`. Seeded on
-  `rebuildIndex()` — `Best` (pinned first) plus one label per collection an item **in the catalog model**
+  `rebuildIndex()` — `Best` (pinned first) plus one label per storage folder an item **in the catalog model**
   actually lives in (`ensureBestAndFolderLabels`/`ensureFolderLabelExists`). This is derived from the model,
-  not a disk walk, which is why an **empty collection needs an explicit `createLabel(displayName)` call** —
-  there's no item to derive its label from otherwise; `MainWindow::createCollection` calls it after `mkdir`.
+  not a disk walk, which is why an **empty label needs an explicit `createLabel(displayName)` call** —
+  there's no item to derive its label from otherwise; `MainWindow::createFolderLabel` calls it after `mkdir`.
   Saved only when seeding actually adds an entry. Each `id` persists as a **JSON number** (a `LabelId`).
 - Per-item extra labels live in `MetadataStore`'s `"labels"` field (a `QJsonArray` of label ids), keyed by
   `MediaId` — see [data-model.md](data-model.md).
 
 ## The reconciliation model
 
-An item's labels = the label its storage location implies (`storageLabelNameOf`: the collection segment of a
+An item's labels = the label its storage location implies (`storageLabelNameOf`: the storage-folder segment of a
 video's folder, the label-dir name of an owned photo's `Photos/<label>` folder, nothing for a referenced
 photo) **∪** the stored label ids. The app reconciles the folder coincidence at **exactly three points, and
 nowhere else** — photos joined the same three points, no fourth was added:
@@ -72,7 +73,7 @@ nowhere else** — photos joined the same three points, no fourth was added:
    removes them (a 0-item label is a normal state, see "Labels persist independent of item count" below).
    Referenced photos seed nothing — their stored label ids
    must already exist in the registry.
-2. **`renameLabel`** — renames the backing folders (up to two: the collection folder and the label's
+2. **`renameLabel`** — renames the backing folders (up to two: the storage folder and the label's
    `<root>/Photos/<label>` dir, both collision-checked before either rename runs, with a rollback if the
    second rename fails), rewrites the stored `folder` field of every item that was under them (plus the
    source path of owned photos — their file lives inside the renamed dir), then updates the registry
@@ -104,7 +105,7 @@ that case stays clean.
 - **Mutations**: `addLabel`/`removeLabel`. `addLabel` only writes the stored id list (no-op on an invalid id —
   a missing-source item can't be labeled). `removeLabel` is metadata-only too, **except** when the label
   names the item's storage location: then it relocates that storage (a video's frame folder into the
-  destination collection; an owned photo's file into the destination's `Photos/<label>` dir, updating its
+  destination's storage folder; an owned photo's file into the destination's `Photos/<label>` dir, updating its
   source path too) to the item's alphabetically-first remaining ordinary label. The **≥1-ordinary-label
   invariant is uniform**: the relocate path refuses to remove a stored-under item's last ordinary label, and
   `removeLabel` equally refuses to strip the last ordinary label of a folder-less item (a referenced photo,
@@ -117,7 +118,7 @@ that case stays clean.
   **`addPhoto(id, sourcePath, labelDirAbs, referenced)`** is its photo counterpart (same collision rule,
   writes the `"type"`/`"referenced"` fields; `labelDirAbs` is empty for a referenced photo, which is
   registered label-less — the import coordinator applies its first label via `addLabel` right after, see
-  [import.md](import.md)). `addMediaItem` ensures the collection's folder label exists. **Refuses** (returns `false`, logs a `qWarning`, leaves the existing
+  [import.md](import.md)). `addMediaItem` ensures the folder label for its storage folder exists. **Refuses** (returns `false`, logs a `qWarning`, leaves the existing
   entry untouched) if `id` already names an item tracked under a *different* folder — a name+size collision
   with an existing item. `splitVideoIntoFrames` (the one caller that calls this after a real, full
   extraction) treats refusal as a failure: it deletes the just-extracted frames rather than leave them on
@@ -165,8 +166,8 @@ Best/extra-label flush.
 
 - **`createLabel(displayName, color = {})`** — creates a folder-backed label with this name if none exists yet
   (with the given color, or a random one), and returns the created-or-existing label's id. Exists
-  because empty collections have no item to derive a folder-label from (see "Persistence" above);
-  `createCollection` calls it explicitly after creating the on-disk folder and passes the id through to its
+  because empty labels have no item to derive a folder-label from (see "Persistence" above);
+  `createFolderLabel` calls it explicitly after creating the on-disk folder and passes the id through to its
   own caller (the Import dialog's provisional-label materialization keys on it — see
   [import.md](import.md#runimport-the-import-button)). Registry-idempotent if the name is taken: the existing
   label keeps its color, and its id is returned all the same.
@@ -177,7 +178,7 @@ Best/extra-label flush.
 - **`deleteLabel(labelId)`** — the destructive one. User explicitly chose **delete-and-relocate** over
   refuse-if-used (see "Design rationale" below): it relocates every item stored under the label off it
   (reusing the per-item relocate), untags any item that merely carried it as an extra, removes the
-  now-empty backing folders (the collection folder and the label's `Photos/<label>` dir, each only if
+  now-empty backing folders (the storage folder and the label's `Photos/<label>` dir, each only if
   empty), then drops the registry entry. **Refuses** (no-op on the registry) for:
   Best, an unknown id, if any item would be orphaned (a stored-under item with no other ordinary label to
   fall back on, or a folder-less referenced photo carrying this as its last ordinary label — untagging it
@@ -190,8 +191,8 @@ Best/extra-label flush.
 All registry mutations persist `labels.json`.
 
 **`"Photos"` is a reserved name**: `<root>/Photos` is the owned-photo storage tree (one subdir per label —
-see [data-model.md](data-model.md)), living in the same namespace as collection folders. `createCollection`
-(UI side) and `renameLabel` (catalog side) both refuse it case-insensitively. A *legacy* collection folder
+see [data-model.md](data-model.md)), living in the same namespace as label storage folders. `createFolderLabel`
+(UI side) and `renameLabel` (catalog side) both refuse it case-insensitively. A *legacy* storage folder
 literally named `Photos` predating this rule is not auto-migrated — accepted as a non-case for this
 library; the guards only prevent creating the conflict from here on.
 
@@ -234,8 +235,8 @@ existed, looking for real gaps rather than just describing the design optimistic
 
 ### Bug found and fixed: reserved-name guard checked the wrong string
 
-`MainWindow`'s reserved-name guard on creating a new label/collection (`BEST_COLLECTION_NAME`, used by
-`createCollection`'s "Create label"/"New collection" validation) was still the **pre-Catalog tab name**
+`MainWindow`'s reserved-name guard on creating a new label (`BEST_LABEL_NAME`, used by
+`createFolderLabel`'s "Create label" validation) was still the **pre-Catalog tab name**
 `"★ Best"`, never updated when Best's `Catalog` displayName became plain `"Best"` (set in
 `ensureBestLabelExists`). **Reachable through completely ordinary UI usage, not external disk tampering**:
 typing "Best" into the name prompt wasn't blocked. It would create a real folder named `Best`, and the next
@@ -249,7 +250,7 @@ by correcting the constant's value to `"Best"`.
 
 `rebuildIndex`/`ensureBestAndFolderLabels` only ever *add* registry entries; they never *remove* a label
 whose last item is gone. This is intentional: a label is a first-class object, and **a 0-item label is a
-normal, valid state** — a freshly created empty collection, or a label whose items were all relabeled or
+normal, valid state** — a freshly created empty label, or a label whose items were all relabeled or
 removed. Such a label stays in the sidebar (with a 0 count) until the user explicitly deletes it via
 `deleteLabel`. There is deliberately no count-based auto-pruning: a transient 0 (mid-relocation, a
 momentarily-unmounted drive) is not a "this label is done" signal, and discarding a label's

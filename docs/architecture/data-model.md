@@ -13,16 +13,16 @@ on-demand integrity tool walks it; see [catalog-and-labels.md](catalog-and-label
 (below) is how the model is *persisted*, not a second source of truth; nothing treats `MetadataStore`'s
 records as the catalog — callers ask `Catalog`.
 
-- `rootFolder()` (configured, default `H:/VideoFrames`) contains one **subfolder per collection**, plus the
+- `rootFolder()` (configured, default `H:/VideoFrames`) contains one **storage folder per label**, plus the
   reserved **`Photos/`** tree for owned photos (below).
-- Each collection folder contains **frame folders** — one per imported video — holding the extracted frame
+- Each storage folder contains **frame folders** — one per imported video — holding the extracted frame
   images. A frame folder is what the UI shows as a card.
 - **Photos** are first-class catalog items beside videos (`Catalog::MediaType`; the record's `"type"` field,
   absent = video). An **owned** photo's file lives at `<root>/Photos/<label>/<file>` (label subdir mirroring
-  video collections, created lazily on first photo import to that label); a **referenced** photo (the
+  video storage folders, created lazily on first photo import to that label); a **referenced** photo (the
   record's `"referenced"` field) stays wherever the user keeps it — the catalog tracks it in place, never
   moves or deletes its file, and it has no storage folder (all its labels are stored ids). `"Photos"` is a
-  reserved label/collection name for this reason (see
+  reserved label name for this reason (see
   [catalog-and-labels.md](catalog-and-labels.md)).
 - The link from a frame folder back to its source video is recorded in the catalog (`Catalog::addMediaItem`
   persists it via `MetadataStore`), not read from disk per-card.
@@ -80,7 +80,7 @@ Single shared store for per-item metadata. Dumb persistence only — it has no n
 "folder" means; `Catalog` is the only caller that interprets its records.
 
 - **Meyers singleton** (`MetadataStore::instance()`), GUI-thread only, no internal locking.
-- Backing file: one **`catalog.json`** in `rootFolder()` (so it travels with the collection, e.g. on an
+- Backing file: one **`catalog.json`** in `rootFolder()` (so it travels with the library, e.g. on an
   external drive), keyed by `MediaId::key()`, **one record (JSON object of named fields) per item**.
   Written atomically via `QSaveFile`, indented for readability. Loaded once at first use.
 - **Field-granular API** (`get`/`set` a single named field, `remove` a whole record) so independent features

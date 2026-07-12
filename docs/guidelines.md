@@ -80,7 +80,7 @@ All user-facing strings in `app/src` are wrapped for translation-readiness (no `
 wired up yet). Match this for new UI strings:
 
 - Member-function strings use `tr(...)`; free-function / namespace-scope strings use `QObject::tr(...)`.
-- Concatenated messages use `%1` placeholders — `tr("Failed to create collection:\n%1").arg(path)` — not
+- Concatenated messages use `%1` placeholders — `tr("Failed to create label:\n%1").arg(path)` — not
   fragment-wrapping.
 - Don't add `Q_OBJECT` solely for `tr()` — strings-only.
 - Leave un-wrapped: `QSettings` keys, stylesheet/QSS, object names, ffmpeg args/paths, `QTime` format codes,
