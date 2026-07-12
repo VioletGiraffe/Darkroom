@@ -93,8 +93,8 @@ void Catalog::ensureBestAndFolderLabels()
 {
 	bool changed = ensureBestLabelExists();
 
-	// Folder labels come from where items actually live, not from a disk walk - so an empty collection folder
-	// no longer yields a label. A video's label is the collection segment of its folder; an owned photo's is
+	// Folder labels come from where items actually live, not from a disk walk - so an empty storage folder
+	// no longer yields a label. A video's label is the storage-folder segment of its folder; an owned photo's is
 	// its label-dir name (the last segment of Photos/<label>). Referenced photos have no folder and seed
 	// nothing - all their labels are stored ids that must already exist in the registry.
 	MetadataStore& store = MetadataStore::instance();
@@ -105,7 +105,7 @@ void Catalog::ensureBestAndFolderLabels()
 		if (folderRel.isEmpty())
 			continue;
 		const bool isPhoto = store.get(id, kTypeField).toString() == kPhotoTypeValue;
-		labelNames.insert(isPhoto ? QFileInfo(folderRel).fileName() : collectionNameOf(absoluteFolder(folderRel)));
+		labelNames.insert(isPhoto ? QFileInfo(folderRel).fileName() : storageFolderNameOf(absoluteFolder(folderRel)));
 	}
 	for (const QString& labelName : labelNames)
 		changed = ensureFolderLabelExists(labelName) || changed;
@@ -198,9 +198,9 @@ void Catalog::writeStoredLabelIds(const MediaId& id, const QList<LabelId>& label
 
 // --- Folder helpers ------------------------------------------------------------------------------------
 
-QString Catalog::collectionNameOf(const QString& folderAbs)
+QString Catalog::storageFolderNameOf(const QString& folderAbs)
 {
-	// A video's frame folder lives at <root>/<collection>/<videoFolder>; the collection-folder name is the
+	// A video's frame folder lives at <root>/<storageFolder>/<videoFolder>; the storage-folder name is the
 	// display name of the video's storage label.
 	return QFileInfo(folderAbs).dir().dirName();
 }
@@ -210,8 +210,8 @@ QString Catalog::storageLabelNameOf(const Entry& e)
 	if (e.folder.isEmpty())
 		return {};  // a referenced photo - no storage folder, no derived label
 	// An owned photo's folder is the label dir itself (<root>/Photos/<label>); a video's label is the
-	// collection segment above its frame folder.
-	return e.type == MediaType::Photo ? QFileInfo(e.folder).fileName() : collectionNameOf(e.folder);
+	// storage-folder segment above its frame folder.
+	return e.type == MediaType::Photo ? QFileInfo(e.folder).fileName() : storageFolderNameOf(e.folder);
 }
 
 LabelId Catalog::storageLabelIdOf(const Entry& e) const
@@ -254,7 +254,7 @@ QList<LabelId> Catalog::computeLabelIds(const MediaId& id, const Entry& e) const
 
 void Catalog::rebuildIndex()
 {
-	ensureBestAndFolderLabels();  // every collection an item lives in + Best has a registry label before labels resolve
+	ensureBestAndFolderLabels();  // every storage folder an item lives in + Best has a registry label before labels resolve
 
 	_mediaItems.clear();
 	MetadataStore& store = MetadataStore::instance();
@@ -465,7 +465,7 @@ bool Catalog::addMediaItem(const MediaId& id, const QString& sourcePath, const Q
 	if (effectiveDurationMs > 0)
 		writer.set(id, kDurationMsField, effectiveDurationMs);
 
-	if (ensureFolderLabelExists(collectionNameOf(folderAbs)))
+	if (ensureFolderLabelExists(storageFolderNameOf(folderAbs)))
 		saveRegistry();
 
 	Entry e;
@@ -613,7 +613,7 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, LabelId removedLabelId)
 	// move just closes it with nothing written.
 	MetadataStore::Writer writer = MetadataStore::instance().beginBatch();
 
-	// The disk move: a video relocates its whole frame folder into the destination's collection folder; an
+	// The disk move: a video relocates its whole frame folder into the destination's storage folder; an
 	// owned photo relocates its file into the destination's label dir under <root>/Photos, and its folder
 	// field is that dir. (Referenced photos never reach here - they have no storage label to remove.)
 	QString newFolderAbs;
@@ -639,14 +639,14 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, LabelId removedLabelId)
 	}
 	else
 	{
-		const QString destCollection = rootFolder() + "/" + dest->displayName;
-		newFolderAbs = destCollection + "/" + QFileInfo(entryIt->folder).fileName();
+		const QString destStorageFolder = rootFolder() + "/" + dest->displayName;
+		newFolderAbs = destStorageFolder + "/" + QFileInfo(entryIt->folder).fileName();
 		if (QFileInfo::exists(newFolderAbs))
 		{
 			qWarning() << "Catalog: cannot relocate" << entryIt->folder << "to" << newFolderAbs << "- destination already exists";
 			return;
 		}
-		QDir{}.mkpath(destCollection);  // the destination label may not have a folder on disk yet
+		QDir{}.mkpath(destStorageFolder);  // the destination label may not have a folder on disk yet
 		if (!QFile::rename(entryIt->folder, newFolderAbs))
 		{
 			qWarning() << "Catalog: failed to relocate" << entryIt->folder << "to" << newFolderAbs;
@@ -700,7 +700,7 @@ bool Catalog::renameLabel(LabelId labelId, const QString& newDisplayName)
 			return false;
 		}
 
-	// Rename the backing folders if they exist (a freshly created label may have neither yet): the collection
+	// Rename the backing folders if they exist (a freshly created label may have neither yet): the storage
 	// folder and the label's photo dir under <root>/Photos. Every item under them rides along in the directory
 	// rename; associations are by id, so nothing else changes. Both destinations are collision-checked before
 	// either rename runs, so a refusal never leaves just one of the two renamed.
@@ -709,14 +709,14 @@ bool Catalog::renameLabel(LabelId labelId, const QString& newDisplayName)
 	const QString newFolder = rootFolder() + "/" + newName;
 	const QString oldPhotoDir = photosRootFolder() + "/" + oldName;
 	const QString newPhotoDir = photosRootFolder() + "/" + newName;
-	const bool haveCollectionFolder = QDir(oldFolder).exists();
+	const bool haveStorageFolder = QDir(oldFolder).exists();
 	const bool havePhotoDir         = QDir(oldPhotoDir).exists();
-	if ((haveCollectionFolder && QFileInfo::exists(newFolder)) || (havePhotoDir && QFileInfo::exists(newPhotoDir)))
+	if ((haveStorageFolder && QFileInfo::exists(newFolder)) || (havePhotoDir && QFileInfo::exists(newPhotoDir)))
 	{
 		qWarning() << "Catalog: cannot rename" << oldName << "to" << newName << "- a folder by that name already exists";
 		return false;
 	}
-	if (haveCollectionFolder && !QFile::rename(oldFolder, newFolder))
+	if (haveStorageFolder && !QFile::rename(oldFolder, newFolder))
 	{
 		qWarning() << "Catalog: failed to rename folder" << oldFolder << "to" << newFolder;
 		return false;
@@ -724,7 +724,7 @@ bool Catalog::renameLabel(LabelId labelId, const QString& newDisplayName)
 	if (havePhotoDir && !QFile::rename(oldPhotoDir, newPhotoDir))
 	{
 		qWarning() << "Catalog: failed to rename folder" << oldPhotoDir << "to" << newPhotoDir;
-		if (haveCollectionFolder)
+		if (haveStorageFolder)
 			QFile::rename(newFolder, oldFolder);  // roll back so the two dirs don't end up under different names
 		return false;
 	}
@@ -844,9 +844,9 @@ bool Catalog::deleteLabel(LabelId labelId)
 
 	if (!stillNamed)
 	{
-		QDir collection{ rootFolder() + "/" + displayName };
-		if (collection.exists() && collection.isEmpty())  // empty after relocation; guard against nuking stray contents
-			collection.removeRecursively();
+		QDir storageFolder{ rootFolder() + "/" + displayName };
+		if (storageFolder.exists() && storageFolder.isEmpty())  // empty after relocation; guard against nuking stray contents
+			storageFolder.removeRecursively();
 		QDir photoDir{ photosRootFolder() + "/" + displayName };  // the label's owned-photo dir, same empty-only guard
 		if (photoDir.exists() && photoDir.isEmpty())
 			photoDir.removeRecursively();

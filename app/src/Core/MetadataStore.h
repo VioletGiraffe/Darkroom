@@ -7,7 +7,7 @@
 #include <vector>
 
 // App-owned per-video metadata that isn't derivable from disk (e.g. playback loop intervals, and
-// later: labels). Persisted as a single JSON document in the collection root, keyed by MediaId, one
+// later: labels). Persisted as a single JSON document in the root folder, keyed by MediaId, one
 // record (a JSON object of named fields) per item. Field-granular get/set so independent features
 // can share a record without clobbering each other's fields. Single shared instance. All writes go
 // through a Writer obtained from beginBatch() (see below). GUI-thread only - no internal locking.

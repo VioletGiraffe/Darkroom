@@ -62,16 +62,16 @@ extern const QStringList IMAGE_FILE_FILTERS;
 [[nodiscard]] QStringList collectFilesInDirectory(const QString& directory, bool recursive,
                                                   const std::function<bool(const QString&)>& filterPredicate);
 
-// Visits every (collection, folderPath) pair under root, in collection-name order.
+// Visits every (storageFolder, folderPath) pair under root, in storage-folder-name order.
 template <typename F>
 void forEachFolder(const QString& root, F&& callback)
 {
 	const QDir rootDir(root);
-	for (const QString& collection : rootDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name))
+	for (const QString& storageFolder : rootDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name))
 	{
-		const QDir collDir(rootDir.filePath(collection));
-		for (const QString& folder : collDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name))
-			callback(collection, collDir.filePath(folder));
+		const QDir storageDir(rootDir.filePath(storageFolder));
+		for (const QString& folder : storageDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name))
+			callback(storageFolder, storageDir.filePath(folder));
 	}
 }
 
@@ -103,8 +103,8 @@ void reportMissingFile(QWidget* parent, const QString& path);
 
 // The reserved directory under rootFolder() where owned photos are stored, one subfolder per label:
 // <photosRootFolder()>/<label>/<photo file>. Created lazily on first photo import to a label. Because it
-// shares the namespace of collection folders, "Photos" is a reserved name - no ordinary label may use it
-// (createCollection and Catalog::renameLabel refuse it), or its collection folder would intermingle with
+// shares the namespace of label storage folders, "Photos" is a reserved name - no ordinary label may use it
+// (createFolderLabel and Catalog::renameLabel refuse it), or its storage folder would intermingle with
 // the photo storage.
 extern const QString PHOTOS_DIR_NAME;
 [[nodiscard]] QString photosRootFolder();

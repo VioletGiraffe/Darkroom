@@ -112,9 +112,9 @@ using RelocateMode = SourceRelocation::Mode;
 // entry (clear from staging) from a declined/failed one (leave staged). Deliberately not "tracked under *some*
 // folder": on a name+size collision the id is already tracked elsewhere and the staged copy was refused - a
 // plain "is tracked" check would misreport that as imported, silently dropping the entry's pending labels.
-[[nodiscard]] bool isTrackedInCollection(const MediaId& id, const QString& collectionName)
+[[nodiscard]] bool isTrackedUnderLabel(const MediaId& id, const QString& labelName)
 {
-	const QString expectedFolder = rootFolder() + "/" + collectionName + "/" + QFileInfo(id.name()).completeBaseName();
+	const QString expectedFolder = rootFolder() + "/" + labelName + "/" + QFileInfo(id.name()).completeBaseName();
 	return QString::compare(Catalog::instance().folderForMediaItem(id), expectedFolder, Qt::CaseInsensitive) == 0;
 }
 
@@ -1041,7 +1041,7 @@ void ImportDialog::materializeUsedProvisionalLabels()
 			{
 				const LabelOption* option = findLabelOption(labelId);
 				provisionalToReal.insert(labelId,
-					option ? m_callbacks.createCollectionRequested(option->displayName, option->color) : QString());
+					option ? m_callbacks.createLabelRequested(option->displayName, option->color) : QString());
 			}
 		}
 	}
@@ -1105,7 +1105,7 @@ void ImportDialog::importPhotoGroup(const QString& labelId, const std::vector<Me
 	}
 }
 
-void ImportDialog::importVideoGroup(const QString& collectionName, const std::vector<MediaId>& videoIds, SourceRelocation::Mode relocateMode, ImportOutcome& outcome)
+void ImportDialog::importVideoGroup(const QString& labelName, const std::vector<MediaId>& videoIds, SourceRelocation::Mode relocateMode, ImportOutcome& outcome)
 {
 	QStringList paths;
 	QHash<MediaId, QString> stagedPreviewDirs;  // by id: survives relocation rewriting the paths below
@@ -1122,7 +1122,7 @@ void ImportDialog::importVideoGroup(const QString& collectionName, const std::ve
 	}
 
 	const SourceRelocation::BatchResult relocated = SourceRelocation::relocateIfNeeded(this, paths, relocateMode, m_relocateFolderEdit->text());
-	m_callbacks.addMediaItemsRequested(collectionName, relocated.toImport, stagedPreviewDirs, stagedDurations);
+	m_callbacks.addMediaItemsRequested(labelName, relocated.toImport, stagedPreviewDirs, stagedDurations);
 
 	for (const MediaId& id : videoIds)
 	{
@@ -1141,7 +1141,7 @@ void ImportDialog::importVideoGroup(const QString& collectionName, const std::ve
 		if (const QString newPath = relocated.relocatedTo.value(entry.path); !newPath.isEmpty())
 			m_staged[id].path = newPath;
 
-		if (!isTrackedInCollection(id, collectionName))
+		if (!isTrackedUnderLabel(id, labelName))
 			continue;  // import declined/failed, or the id collided with an item tracked elsewhere - stays staged with its labels intact
 
 		outcome.succeededIds.push_back(id);
@@ -1188,7 +1188,7 @@ void ImportDialog::runImport()
 			continue;  // the label vanished from the catalog mid-session - skip the group rather than guess
 
 		// Photos and videos take different apply paths: videos relocate (optionally) to the user-chosen folder
-		// and extract into <collection>/<baseName>/, photos land in the label's own photo dir (or are merely
+		// and extract into <storageFolder>/<baseName>/, photos land in the label's own photo dir (or are merely
 		// referenced) via importPhotosRequested - so each group is split by type first.
 		std::vector<MediaId> videoIds;
 		std::vector<MediaId> photoIds;

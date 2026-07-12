@@ -100,24 +100,24 @@ private:
 	// stagedPreviewDirs / stagedDurations map each staged video's MediaId to, respectively, the temp dir whose
 	// preview/ holds its already-extracted frames (reused by copy - see Import::importVideo) and the duration
 	// the Import dialog already probed for it; a video absent from a map is handled fresh (re-extracted / re-probed).
-	void importVideoBatch(QStringList videoPaths, const QString& collectionPath, const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations);
+	void importVideoBatch(QStringList videoPaths, const QString& storageFolderPath, const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations);
 	// The photo counterpart to importVideoBatch: imports each photo under the label via Import::importPhoto,
 	// reports errors, applies a referenced photo's initial label (it has no storage folder to derive it
 	// from), and refreshes the view. Returns one result per path, in order - the Import dialog's bookkeeping
 	// branches on them (see ImportDialog::Callbacks::importPhotosRequested).
 	std::vector<Import::PhotoResult> importPhotoBatch(LabelId labelId, const QStringList& photoPaths, Import::PhotoImportMode mode);
-	// Creates the collection folder + its label; returns the created-or-existing label's id, None if refused.
-	LabelId createCollection(const QString& name, const QString& color = {}, bool refreshList = true);
-	// Sidebar "Create label": prompts for a name and creates a folder-backed label (a collection folder).
+	// Creates a folder-backed label and its storage folder on disk; returns the created-or-existing label's id, None if refused.
+	LabelId createFolderLabel(const QString& name, const QString& color = {}, bool refreshList = true);
+	// Sidebar "Create label": prompts for a name and creates a folder-backed label (a storage folder).
 	void createLabelInteractive();
 	// Sidebar label right-click menu: each prompts/confirms, mutates the Catalog, then refreshes the view.
 	void renameLabelInteractive(LabelId labelId);
 	void setLabelColorInteractive(LabelId labelId);
 	void deleteLabelInteractive(LabelId labelId);
 	// Opens the Import dialog; initialStaging pre-fills the staging area (used by scanForUntrackedFiles).
-	void importToCollections(const QStringList& initialStaging = {});
-	// Tools menu: recursively scans a chosen folder for supported media (videos and photos) not tracked by any
-	// collection, sending any found straight to the Import dialog for staging.
+	void openImportDialog(const QStringList& initialStaging = {});
+	// Tools menu: recursively scans a chosen folder for supported media (videos and photos) not tracked by the
+	// catalog, sending any found straight to the Import dialog for staging.
 	void scanForUntrackedFiles();
 	// Tools menu: scans the catalog against disk for drift (untracked frame folders and broken video
 	// entries) and lets the user resolve each finding via IntegrityCheckDialog.

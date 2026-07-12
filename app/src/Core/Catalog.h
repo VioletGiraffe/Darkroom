@@ -14,14 +14,14 @@
 
 // The logical label model for the library. A label is a first-class object with a stable id (so renaming
 // its display name never disturbs associations), a display name, a color, and a "virtual" flag. An item
-// carries a flat set of labels: its positional folder label (derived from which collection folder its
+// carries a flat set of labels: its positional folder label (derived from which storage folder its
 // frames sit in) plus any extra labels assigned app-side. Extra labels are stored in MetadataStore under
 // the "labels" field - a list of label *ids* - keyed by MediaId. `Best` is the one virtual label (no
 // backing folder; pure membership).
 //
 // Catalog is THE catalog: the authoritative in-memory model of the media-item set, keyed by MediaId. For each
 // item it holds its storage folder, source path, and full label-id set. An item is a video or a photo
-// (MediaType): a video's folder is its frame folder (<root>/<collection>/<name>); an owned photo's folder is
+// (MediaType): a video's folder is its frame folder (<root>/<storageFolder>/<name>); an owned photo's folder is
 // the <root>/Photos/<label> dir its file sits in; a referenced photo is tracked in place - no storage folder
 // at all, every label a stored extra. Every item-set / label query is answered from this in-memory model. MetadataStore is how the model is *persisted* - a dumb,
 // field-granular, MediaId-keyed store shared with other features (e.g. the player's loop intervals); the
@@ -59,7 +59,7 @@ public:
 	[[nodiscard]] const std::vector<Label>& allLabels() const { return _labels; }
 	[[nodiscard]] const Label* labelById(LabelId id) const;
 
-	// Re-syncs the in-memory model from the persisted store (and ensures every collection + Best has a
+	// Re-syncs the in-memory model from the persisted store (and ensures every storage folder + Best has a
 	// registry entry). The model is kept current by the mutations below, so this is only needed when the
 	// store may have changed underneath - call it after a structural change if in doubt; it is idempotent.
 	void rebuildIndex();
@@ -151,7 +151,7 @@ public:
 
 	// Media item lifecycle.
 	// addMediaItem registers a freshly imported item (source path + frame folder both known); ensures the
-	// collection's folder label exists. splitIntoFrames records whether the folder already holds the full
+	// folder label for its storage folder exists. splitIntoFrames records whether the folder already holds the full
 	// real frame set (true) or only preview frames pending an on-demand split (false) - see isSplitIntoFrames.
 	// Returns false (no-op) if this id already names an item tracked under a different folder - a name+size
 	// collision with an existing video, which the caller must not paper over by leaving newly extracted frames
@@ -165,7 +165,7 @@ public:
 	// addPhoto is addMediaItem's photo counterpart, same collision rule. labelDirAbs is the <root>/Photos/<label>
 	// dir the (owned) photo's file sits in, empty for a referenced photo - which is registered with no labels
 	// at all, so the caller must follow up with addLabel for the initial label (an owned photo derives its
-	// storage label from labelDirAbs like a video does from its collection folder).
+	// storage label from labelDirAbs like a video does from its storage folder).
 	bool addPhoto(const MediaId& id, const QString& sourcePath, const QString& labelDirAbs, bool referenced);
 	void removeMediaItem(const MediaId& id);
 	// Applies an in-app rename: carries the whole metadata record from oldId to newId (re-key; loop intervals
@@ -180,7 +180,7 @@ public:
 	void setDurationMs(const MediaId& id, qint64 durationMs);
 
 	// Registry mutations (the label objects themselves). renameLabel validates newDisplayName is unique, renames
-	// the matching on-disk folders if they exist (the collection folder and the <root>/Photos/<label> dir),
+	// the matching on-disk folders if they exist (the storage folder and the <root>/Photos/<label> dir),
 	// rewrites the stored folder (and, for owned photos, source path) of every item under it, and updates the
 	// registry display name - the id and every association are preserved. Returns false (no-op) for Best, an
 	// empty/duplicate/reserved name, or a failed or colliding folder rename. setColor stores a hex color
@@ -189,8 +189,8 @@ public:
 	void setColor(LabelId labelId, const QString& color);
 
 	// Creates a folder-backed label with this display name if none exists yet - for the user adding an empty
-	// collection up front, before any item lives in it (such a label can't be derived from the model, since no
-	// item references its collection). Persists labels.json. The caller creates the backing collection folder
+	// label up front, before any item lives in it (such a label can't be derived from the model, since no
+	// item references its storage folder). Persists labels.json. The caller creates the backing storage folder
 	// on disk. An explicit color is honored only when the label is actually created; an already-existing label
 	// keeps its color (empty color = pick a random one). Returns the created-or-existing label's id.
 	LabelId createLabel(const QString& displayName, const QString& color = {});
@@ -210,7 +210,7 @@ public:
 	[[nodiscard]] DeleteImpact deleteLabelImpact(LabelId labelId) const;
 
 	// Removes the label everywhere: relocates each item stored under it to its alphabetically-first remaining
-	// ordinary label, untags any item that merely carried it, removes the (now-empty) backing collection folder
+	// ordinary label, untags any item that merely carried it, removes the (now-empty) backing storage folder
 	// and the registry entry. Returns false (no-op on the registry) for Best, an unknown id, if any stored-under
 	// item would be orphaned (no other ordinary label - check deleteLabelImpact().wouldOrphan first for a
 	// message), or if a relocation was blocked (e.g. a name collision) so a folder still names the label.
@@ -234,16 +234,16 @@ private:
 	// Registry (labels.json): load/save, and ensuring the labels the current model implies exist.
 	void loadRegistry();
 	void saveRegistry() const;
-	void ensureBestAndFolderLabels();                          // add any missing: Best + one folder-backed label per collection an item lives in
+	void ensureBestAndFolderLabels();                          // add any missing: Best + one folder-backed label per storage folder an item lives in
 	bool ensureBestLabelExists();                              // returns true if it added the entry
 	bool ensureFolderLabelExists(const QString& displayName, const QString& color = {});  // returns true if it added the entry
 	[[nodiscard]] LabelId generateLabelId();  // ++_nextLabelId; monotonic, so never collides. Non-const.
 	[[nodiscard]] LabelId ordinaryLabelIdByName(const QString& displayName) const;  // non-virtual displayName match (case-insensitive); None if none
 	[[nodiscard]] static QString registryPath();
 
-	[[nodiscard]] static QString collectionNameOf(const QString& folderAbs);  // the collection-folder name (a *video's* storage-label display name)
-	// The label display name the entry's storage location implies: the collection-folder name for a video
-	// (<root>/<collection>/<frameFolder>), the label-dir name for an owned photo (<root>/Photos/<label>).
+	[[nodiscard]] static QString storageFolderNameOf(const QString& folderAbs);  // the storage-folder name (a *video's* storage-label display name)
+	// The label display name the entry's storage location implies: the storage-folder name for a video
+	// (<root>/<storageFolder>/<frameFolder>), the label-dir name for an owned photo (<root>/Photos/<label>).
 	// Empty when the entry has no storage folder (a referenced photo).
 	[[nodiscard]] static QString storageLabelNameOf(const Entry& e);
 	// Id of the ordinary label naming the entry's storage location; empty if none (incl. referenced photos).

@@ -4,7 +4,7 @@
 
 #include <QString>
 
-// The per-item import worker: registers one source video file into a collection. UI-free by design -
+// The per-item import worker: registers one source video file under a label. UI-free by design -
 // nothing here prompts or reports; every outcome is returned for the caller to present. MainWindow::importVideoBatch
 // is the batch coordinator on top of this and owns all the import UI (the app-wide processing lock, the
 // progress modal, folder-conflict partitioning/prompts, error boxes, catalog write batching, view refresh).
@@ -25,7 +25,7 @@ struct Result
 	QString errorMessage;  // user-presentable; set iff status == Error
 };
 
-// Creates <collectionPath>/<video base name>/ (wiping a pre-existing one when overwriteExisting allows it),
+// Creates <storageFolderPath>/<video base name>/ (wiping a pre-existing one when overwriteExisting allows it),
 // fills its preview/ subfolder (copied from stagedPreviewDir when the Import dialog already extracted frames
 // there, extracted fresh otherwise) and registers the video in the Catalog with the full frame split
 // deferred. A registration refusal (name+size collision with an item tracked elsewhere) deletes the
@@ -33,7 +33,7 @@ struct Result
 // stagedDurationMs is the duration the Import dialog already probed while staging this video (-1 when unknown, e.g.
 // a direct import that reuses no staged frames); it's recorded on the item, saving a redundant probe. The
 // fresh-extraction fallback probes anyway, so its result supersedes a -1 here.
-[[nodiscard]] Result importVideo(const QString& videoPath, const QString& collectionPath, const QString& stagedPreviewDir, bool overwriteExisting, qint64 stagedDurationMs = -1);
+[[nodiscard]] Result importVideo(const QString& videoPath, const QString& storageFolderPath, const QString& stagedPreviewDir, bool overwriteExisting, qint64 stagedDurationMs = -1);
 
 // How a photo enters the library: its file copied or moved into <root>/Photos/<label>/ (owned), or left
 // where it is and merely tracked (referenced).

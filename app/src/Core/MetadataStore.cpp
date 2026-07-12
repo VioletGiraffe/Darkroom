@@ -35,7 +35,7 @@ void MetadataStore::load()
 
 void MetadataStore::save() const
 {
-	QDir{}.mkpath(rootFolder()); // the collection root should already exist, but don't fail a write if it doesn't
+	QDir{}.mkpath(rootFolder()); // the root folder should already exist, but don't fail a write if it doesn't
 
 	QSaveFile file{ filePath() };
 	if (!file.open(QIODevice::WriteOnly))

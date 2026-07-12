@@ -28,7 +28,7 @@ static bool copyPreviewFrames(const QString& srcPreviewDir, const QString& dstPr
 	return copiedAny;
 }
 
-Import::Result Import::importVideo(const QString& videoPath, const QString& collectionPath, const QString& stagedPreviewDir, bool overwriteExisting, qint64 stagedDurationMs)
+Import::Result Import::importVideo(const QString& videoPath, const QString& storageFolderPath, const QString& stagedPreviewDir, bool overwriteExisting, qint64 stagedDurationMs)
 {
 	QFileInfo videoInfo(videoPath);
 	if (!videoInfo.exists())
@@ -36,9 +36,9 @@ Import::Result Import::importVideo(const QString& videoPath, const QString& coll
 
 	// Create output folder
 	const QString baseName = videoInfo.completeBaseName();
-	const QString outputFolder = collectionPath + "/" + baseName;
-	if (!QDir{}.mkpath(collectionPath))
-		return { Status::Error, QObject::tr("Failed to create collection folder:\n%1").arg(collectionPath) };
+	const QString outputFolder = storageFolderPath + "/" + baseName;
+	if (!QDir{}.mkpath(storageFolderPath))
+		return { Status::Error, QObject::tr("Failed to create label folder:\n%1").arg(storageFolderPath) };
 
 	if (QDir{ outputFolder }.exists())
 	{
@@ -66,7 +66,7 @@ Import::Result Import::importVideo(const QString& videoPath, const QString& coll
 
 	if (!Catalog::instance().addMediaItem(MediaId::fromFile(videoPath), videoPath, outputFolder, /*splitIntoFrames=*/false, durationMs))
 	{
-		QString message = QObject::tr("An item with the same name and file size is already tracked in a different collection:\n%1").arg(videoPath);
+		QString message = QObject::tr("An item with the same name and file size is already tracked under a different label:\n%1").arg(videoPath);
 		if (!QDir(outputFolder).removeRecursively())
 			message += "\n\n" + QObject::tr("Additionally, failed to clean up the created folder:\n%1").arg(outputFolder);
 		return { Status::Error, message };

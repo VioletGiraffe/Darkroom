@@ -53,16 +53,16 @@ public:
 	};
 
 	// Host (MainWindow) actions the dialog can't do itself: each either drives host-owned state (the busy
-	// guard, progress UI, view refresh) or is shared with other host flows (collection creation). Plain
+	// guard, progress UI, view refresh) or is shared with other host flows (label creation). Plain
 	// Catalog reads and writes are done directly - the dialog makes no attempt to be Catalog-agnostic.
 	struct Callbacks
 	{
-		// Adds the given video files to the named collection. stagedPreviewDirs maps each staged video's MediaId
+		// Adds the given video files to the named label. stagedPreviewDirs maps each staged video's MediaId
 		// to the temp dir whose preview/ holds the frames already extracted for its staging card, so import
 		// can reuse them by copy instead of re-running ffmpeg (see Import::importVideo); a video absent
 		// from the map, or whose staged frames are gone, is extracted fresh. stagedDurations likewise carries
 		// the duration already probed for each video during staging, so import records it without re-probing.
-		std::function<void(const QString& collectionName, const QStringList& videoPaths,
+		std::function<void(const QString& labelName, const QStringList& videoPaths,
 			const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations)> addMediaItemsRequested;
 		// Imports the given photos under the label (owned modes copy/move each file into the label's photo
 		// dir, Reference tracks them in place - see Import::importPhoto). Returns one result per path, in
@@ -77,7 +77,7 @@ public:
 		// the staged items' pending picks to, replacing the provisional stand-in id. The color applies only when
 		// the label is genuinely new; an existing same-name label keeps its own. Empty return = creation refused
 		// (reserved/invalid name), and the affected picks are dropped rather than remapped.
-		std::function<QString(const QString& name, const QString& color)> createCollectionRequested;
+		std::function<QString(const QString& name, const QString& color)> createLabelRequested;
 		// Called once at the end of an Import that imported at least one item, after the dialog's own
 		// Best/extra-label flush. addMediaItemsRequested may refresh the host view mid-Import (it imports
 		// folder-by-folder), but that refresh predates the flush - so without this, the host shows each item's
@@ -158,7 +158,7 @@ private:
 	// Imports one first-label group's videos: optionally relocates each source file (SourceRelocation), hands
 	// the batch to the host, then classifies each entry into the outcome; a relocated-but-not-imported entry's
 	// staged path follows the file, so a later retry starts from where the file really is.
-	void importVideoGroup(const QString& collectionName, const std::vector<MediaId>& videoIds, SourceRelocation::Mode relocateMode, ImportOutcome& outcome);
+	void importVideoGroup(const QString& labelName, const std::vector<MediaId>& videoIds, SourceRelocation::Mode relocateMode, ImportOutcome& outcome);
 	// Every staged entry whose pendingLabelIds isn't empty: grouped by the first label dropped on it (which
 	// decides the import destination) and handed to the per-type group importers above, then the accumulated
 	// outcome is applied - the Catalog label flush, unstaging, one host repaint.

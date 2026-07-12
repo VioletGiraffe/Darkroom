@@ -61,7 +61,7 @@ Result renameVideo(const MediaId& oldId, const QString& newFolderPath, QWidget* 
 		if (sourceWasRenamed)
 			QFile::rename(newSourcePath, oldSourcePath);
 		QMessageBox::critical(parent, dialogTitle,
-			QObject::tr("An item with the same name and file size is already tracked in a different collection:\n%1").arg(newSourcePath));
+			QObject::tr("An item with the same name and file size is already tracked under a different label:\n%1").arg(newSourcePath));
 		return {};
 	}
 
@@ -138,7 +138,7 @@ Result renameVideoInteractive(const MediaId& id, QWidget* parent)
 	message += QObject::tr("• Frame folder:\n  %1\n  → %2").arg(originalFolderPath, newFolderPath);
 
 	if (Catalog::instance().mediaItemHasLabel(id, Catalog::BestLabelId))
-		message += QObject::tr("\n\n• Best collection reference will be updated.");
+		message += QObject::tr("\n\n• Best label reference will be updated.");
 
 	if (QMessageBox::question(parent, QObject::tr("Rename media file"), message,
 		QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes) != QMessageBox::Yes)
@@ -227,7 +227,7 @@ Result renamePhotoInteractive(const MediaId& id, QWidget* parent)
 		? QObject::tr("• This photo is referenced in place - its file below, outside the library, will be renamed:\n  %1\n  → %2").arg(oldSourcePath, newSourcePath)
 		: QObject::tr("• File:\n  %1\n  → %2").arg(oldSourcePath, newSourcePath);
 	if (Catalog::instance().mediaItemHasLabel(id, Catalog::BestLabelId))
-		message += QObject::tr("\n\n• Best collection reference will be updated.");
+		message += QObject::tr("\n\n• Best label reference will be updated.");
 
 	if (QMessageBox::question(parent, title, message, QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes) != QMessageBox::Yes)
 		return {};

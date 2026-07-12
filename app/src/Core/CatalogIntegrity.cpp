@@ -88,11 +88,11 @@ IntegrityReport scan()
 			report.issues.push_back(issue);
 	}
 
-	// Untracked - on-disk content no entry claims. forEachFolder yields the second level: for a normal collection
-	// that's a video frame folder; for the reserved Photos collection it's a <label> dir whose untracked units are
-	// the image FILES inside (owned photos), not the folder itself.
-	forEachFolder(rootFolder(), [&](const QString& collection, const QString& folderPath) {
-		if (collection.compare(PHOTOS_DIR_NAME, Qt::CaseInsensitive) == 0)
+	// Untracked - on-disk content no entry claims. forEachFolder yields the second level: for a normal label
+	// storage folder that's a video frame folder; for the reserved Photos folder it's a <label> dir whose untracked
+	// units are the image FILES inside (owned photos), not the folder itself.
+	forEachFolder(rootFolder(), [&](const QString& storageFolder, const QString& folderPath) {
+		if (storageFolder.compare(PHOTOS_DIR_NAME, Qt::CaseInsensitive) == 0)
 		{
 			const QString labelName = QFileInfo(folderPath).fileName();
 			// Owned photos may be any importable format (isSupportedImageFile - incl. webp/bmp), not only the frame
