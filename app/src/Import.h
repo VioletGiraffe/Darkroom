@@ -61,13 +61,12 @@ struct PhotoResult
 	MediaId registeredId;
 };
 
-// Imports one photo under the given label. Owned modes copy/move the file into <root>/Photos/<label>/
-// (created lazily), auto-renaming the incoming file (name_2.ext, name_3.ext, ...) when its name collides on
+// Imports one photo under the given label. Owned modes copy/move the file into the caller-verified label photo
+// folder (created lazily), auto-renaming the incoming file (name_2.ext, name_3.ext, ...) when its name collides on
 // disk or its name+size id collides with a differently-stored catalog item - one rename resolves both. A
 // byte-identical file already at the destination is adopted as-is instead of copied again. Reference mode
 // touches no files: it registers the photo at photoPath with the referenced flag; the caller applies the
 // initial label afterwards (a referenced photo has no storage folder to derive it from).
-[[nodiscard]] PhotoResult importPhoto(Catalog& catalog, const QString& photosRootFolder, const QString& photoPath,
-	const QString& labelDisplayName, PhotoImportMode mode);
+[[nodiscard]] PhotoResult importPhoto(Catalog& catalog, const QString& labelPhotoFolder, const QString& photoPath, PhotoImportMode mode);
 
 } // namespace Import

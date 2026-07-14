@@ -98,11 +98,6 @@ static constexpr int CARD_IMAGE_HEIGHT_STEP = 20;
 static constexpr int MIN_PREVIEW_FRAME_COUNT = 1;
 static constexpr int MAX_PREVIEW_FRAME_COUNT = 10;
 
-// Must match Catalog's reserved Best label displayName (see Catalog::ensureBestLabelExists) - Best can never
-// be renamed, so this can't drift. A stale "★ Best" (the pre-Catalog tab name) here would let a label
-// literally named "Best" be created through this guard, colliding in the sidebar with the real virtual one.
-static const QString BEST_LABEL_NAME = "Best";
-
 inline bool    useTiff()     { return QSettings{}.value(Settings::UseTiff,      Defaults::UseTiff).toBool(); }
 inline int     jpegQuality() { return QSettings{}.value(Settings::JpegQuality,  Defaults::JpegQuality).toInt(); }
 inline int     frameStep()   { return QSettings{}.value(Settings::FrameStep,    Defaults::FrameStep).toInt(); }
@@ -1450,6 +1445,13 @@ std::vector<Import::PhotoResult> MainWindow::importPhotoBatch(LabelId labelId, c
 	const Catalog::Label* label = catalog.labelById(labelId);
 	if (!label || label->isVirtual())
 		return {};  // the label vanished from the catalog mid-session; the caller leaves everything staged
+	const QString photoFolder = catalog.photoFolderForLabel(labelId);
+	if (photoFolder.isEmpty())
+	{
+		QMessageBox::warning(this, tr("Import"),
+			tr("This label does not have a safe photo-storage path:\n%1").arg(label->displayName));
+		return {};
+	}
 
 	Catalog::BatchScope batch(catalog);  // one store write for the whole batch instead of one per photo
 
@@ -1457,7 +1459,7 @@ std::vector<Import::PhotoResult> MainWindow::importPhotoBatch(LabelId labelId, c
 	results.reserve(photoPaths.size());
 	for (const QString& path : photoPaths)
 	{
-		const Import::PhotoResult result = Import::importPhoto(catalog, m_library.photosRootFolder(), path, label->displayName, mode);
+		const Import::PhotoResult result = Import::importPhoto(catalog, photoFolder, path, mode);
 		if (result.status == Import::PhotoStatus::Error)
 			QMessageBox::critical(this, tr("Error"), result.errorMessage);
 		// A referenced photo has no storage folder to derive its first label from - store it explicitly.
@@ -1534,24 +1536,13 @@ void MainWindow::reExportAllVideos()
 
 LabelId MainWindow::createFolderLabel(const QString& name, const QString& color, bool refreshList)
 {
-	// "Photos" is reserved for the owned-photo storage dir (<root>/Photos/<label>) - a label storage folder by
-	// that name would intermingle with it. Catalog::renameLabel refuses the same name.
-	if (name.compare(BEST_LABEL_NAME, Qt::CaseInsensitive) == 0 || name.compare(Catalog::PhotosDirectoryName.toString(), Qt::CaseInsensitive) == 0)
+	QString error;
+	const LabelId labelId = libraryCatalog().createLabel(name, color, &error);
+	if (labelId == LabelId::None)
 	{
-		QMessageBox::warning(this, tr("Error"), tr("\"%1\" is a reserved name.").arg(name));
+		QMessageBox::warning(this, tr("Create label"), error);
 		return {};
 	}
-
-	const QString folderPath = m_library.rootFolder() + "/" + name;
-	if (!QDir{}.mkpath(folderPath))
-	{
-		QMessageBox::warning(this, tr("Error"), tr("Failed to create label:\n%1").arg(folderPath));
-		return {};
-	}
-
-	// Register the folder label now: an empty label has no item to derive it from, so the catalog
-	// won't surface it otherwise.
-	const LabelId labelId = libraryCatalog().createLabel(name, color);
 
 	if (refreshList)
 		refreshLibraryView();
@@ -1560,9 +1551,10 @@ LabelId MainWindow::createFolderLabel(const QString& name, const QString& color,
 
 void MainWindow::createLabelInteractive()
 {
-	const QString name = QInputDialog::getText(this, tr("New label"), tr("Label name:")).trimmed();
-	if (!name.isEmpty())
-		createFolderLabel(name);   // creates the backing folder; createFolderLabel refreshes the view
+	bool ok = false;
+	const QString name = QInputDialog::getText(this, tr("New label"), tr("Label name:"), QLineEdit::Normal, QString{}, &ok);
+	if (ok)
+		createFolderLabel(name);  // creates the backing folder; createFolderLabel refreshes the view
 }
 
 void MainWindow::renameLabelInteractive(LabelId labelId)
@@ -1572,14 +1564,14 @@ void MainWindow::renameLabelInteractive(LabelId labelId)
 		return;
 
 	bool ok = false;
-	const QString newName = QInputDialog::getText(this, tr("Rename label"), tr("New name:"), QLineEdit::Normal, label->displayName, &ok).trimmed();
-	if (!ok || newName.isEmpty() || newName == label->displayName)
+	const QString newName = QInputDialog::getText(this, tr("Rename label"), tr("New name:"), QLineEdit::Normal, label->displayName, &ok);
+	if (!ok || newName == label->displayName)
 		return;
 
-	if (!libraryCatalog().renameLabel(labelId, newName))
+	QString error;
+	if (!libraryCatalog().renameLabel(labelId, newName, &error))
 	{
-		QMessageBox::warning(this, tr("Rename label"),
-			tr("Could not rename to \"%1\". The name may already be in use, or a folder by that name already exists.").arg(newName));
+		QMessageBox::warning(this, tr("Rename label"), error);
 		return;
 	}
 	refreshLibraryView();
@@ -1635,9 +1627,18 @@ void MainWindow::deleteLabelInteractive(LabelId labelId)
 void MainWindow::openImportDialog(const QStringList& initialStaging)
 {
 	ImportDialog::Callbacks callbacks{
-		.addMediaItemsRequested = [this](const QString& labelName, const QStringList& videoPaths,
+		.addMediaItemsRequested = [this](const QString& labelId, const QStringList& videoPaths,
 				const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations) {
-			importVideoBatch(videoPaths, m_library.rootFolder() + "/" + labelName, stagedPreviewDirs, stagedDurations);
+			const LabelId id = labelIdFromString(labelId);
+			const QString storageFolder = libraryCatalog().storageFolderForLabel(id);
+			if (storageFolder.isEmpty())
+			{
+				const Catalog::Label* label = libraryCatalog().labelById(id);
+				QMessageBox::warning(this, tr("Import"),
+					tr("This label does not have a safe storage path:\n%1").arg(label ? label->displayName : labelId));
+				return;
+			}
+			importVideoBatch(videoPaths, storageFolder, stagedPreviewDirs, stagedDurations);
 		},
 		.importPhotosRequested = [this](const QString& labelId, const QStringList& photoPaths, Import::PhotoImportMode mode) {
 			return importPhotoBatch(labelIdFromString(labelId), photoPaths, mode);

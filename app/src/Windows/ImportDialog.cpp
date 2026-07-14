@@ -113,9 +113,12 @@ using RelocateMode = SourceRelocation::Mode;
 // entry (clear from staging) from a declined/failed one (leave staged). Deliberately not "tracked under *some*
 // folder": on a name+size collision the id is already tracked elsewhere and the staged copy was refused - a
 // plain "is tracked" check would misreport that as imported, silently dropping the entry's pending labels.
-[[nodiscard]] bool isTrackedUnderLabel(const Catalog& catalog, const QString& rootFolder, const MediaId& id, const QString& labelName)
+[[nodiscard]] bool isTrackedUnderLabel(const Catalog& catalog, const MediaId& id, const QString& labelId)
 {
-	const QString expectedFolder = rootFolder + "/" + labelName + "/" + QFileInfo(id.name()).completeBaseName();
+	const QString storageFolder = catalog.storageFolderForLabel(labelIdFromString(labelId));
+	if (storageFolder.isEmpty())
+		return false;
+	const QString expectedFolder = storageFolder + "/" + QFileInfo(id.name()).completeBaseName();
 	return QString::compare(catalog.folderForMediaItem(id), expectedFolder, Qt::CaseInsensitive) == 0;
 }
 
@@ -212,9 +215,15 @@ ImportDialog::ImportDialog(Library& library, Callbacks callbacks, const QString&
 	addLabelButton->setShortcut(QKeySequence(Shortcuts::CreateLabel));
 	addLabelButton->setToolTip(tr("Create a new label (%1)").arg(addLabelButton->shortcut().toString(QKeySequence::NativeText)));
 	connect(addLabelButton, &QPushButton::clicked, this, [this] {
-		const QString name = QInputDialog::getText(this, tr("New Label"), tr("Label name:")).trimmed();
-		if (name.isEmpty())
+		bool ok = false;
+		const QString name = QInputDialog::getText(this, tr("New Label"), tr("Label name:"), QLineEdit::Normal, QString{}, &ok);
+		if (!ok)
 			return;
+		if (const char* error = Catalog::labelNameValidationError(name))
+		{
+			QMessageBox::warning(this, tr("New Label"), tr(error));
+			return;
+		}
 		// A manually added label is provisional too (created in the Catalog only on Import). Reusing silently on a
 		// name clash would surprise here (the user just typed it), so inform instead.
 		if (!findLabelIdByName(name, {}).isEmpty())
@@ -451,9 +460,14 @@ void ImportDialog::renameProvisionalLabel(const QString& provisionalId)
 
 	bool ok = false;
 	const QString newName = QInputDialog::getText(this, tr("Rename label"), tr("New name:"),
-		QLineEdit::Normal, option->displayName, &ok).trimmed();
-	if (!ok || newName.isEmpty() || newName == option->displayName)
+		QLineEdit::Normal, option->displayName, &ok);
+	if (!ok || newName == option->displayName)
 		return;
+	if (const char* error = Catalog::labelNameValidationError(newName))
+	{
+		QMessageBox::warning(this, tr("Rename label"), tr(error));
+		return;
+	}
 
 	// Renaming onto an existing label (real or another provisional) offers to merge into it instead of minting a clash.
 	if (const QString clashId = findLabelIdByName(newName, provisionalId); !clashId.isEmpty())
@@ -1107,8 +1121,18 @@ void ImportDialog::importPhotoGroup(const QString& labelId, const std::vector<Me
 	}
 }
 
-void ImportDialog::importVideoGroup(const QString& labelName, const std::vector<MediaId>& videoIds, SourceRelocation::Mode relocateMode, ImportOutcome& outcome)
+void ImportDialog::importVideoGroup(const QString& labelId, const std::vector<MediaId>& videoIds, SourceRelocation::Mode relocateMode, ImportOutcome& outcome)
 {
+	const LabelOption* label = findLabelOption(labelId);
+	if (!label)
+		return;
+	if (m_library.catalog().storageFolderForLabel(labelIdFromString(labelId)).isEmpty())
+	{
+		QMessageBox::warning(this, tr("Import"),
+			tr("This label does not have a safe storage path:\n%1").arg(label->displayName));
+		return;
+	}
+
 	QStringList paths;
 	QHash<MediaId, QString> stagedPreviewDirs;  // by id: survives relocation rewriting the paths below
 	QHash<MediaId, qint64> stagedDurations;     // likewise by id: the duration probed while staging each video
@@ -1125,7 +1149,7 @@ void ImportDialog::importVideoGroup(const QString& labelName, const std::vector<
 
 	const SourceRelocation::BatchResult relocated = SourceRelocation::relocateIfNeeded(
 		m_library, this, paths, relocateMode, m_relocateFolderEdit->text());
-	m_callbacks.addMediaItemsRequested(labelName, relocated.toImport, stagedPreviewDirs, stagedDurations);
+	m_callbacks.addMediaItemsRequested(labelId, relocated.toImport, stagedPreviewDirs, stagedDurations);
 
 	for (const MediaId& id : videoIds)
 	{
@@ -1144,7 +1168,7 @@ void ImportDialog::importVideoGroup(const QString& labelName, const std::vector<
 		if (const QString newPath = relocated.relocatedTo.value(entry.path); !newPath.isEmpty())
 			m_staged[id].path = newPath;
 
-		if (!isTrackedUnderLabel(m_library.catalog(), m_library.rootFolder(), id, labelName))
+		if (!isTrackedUnderLabel(m_library.catalog(), id, labelId))
 			continue;  // import declined/failed, or the id collided with an item tracked elsewhere - stays staged with its labels intact
 
 		outcome.succeededIds.push_back(id);
@@ -1201,7 +1225,7 @@ void ImportDialog::runImport()
 		if (!photoIds.empty())
 			importPhotoGroup(it.key(), photoIds, photoMode, outcome);
 		if (!videoIds.empty())
-			importVideoGroup(option->displayName, videoIds, relocateMode, outcome);
+			importVideoGroup(it.key(), videoIds, relocateMode, outcome);
 	}
 
 	// Flush the imported items' Best flags and extra-label picks. Items only reach these lists after their

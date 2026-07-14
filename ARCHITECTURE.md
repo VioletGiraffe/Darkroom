@@ -77,8 +77,10 @@ not just when reading existing code.
   [catalog-and-labels.md](docs/architecture/catalog-and-labels.md).
 - **`Catalog`'s mutation API refuses or no-ops on ambiguity rather than silently deleting data.** No
   operation will orphan an item (leave it with zero ordinary labels) or silently drop a registry entry that
-  still has a backing folder. See
-  [catalog-and-labels.md](docs/architecture/catalog-and-labels.md#fs-reconciliation-audit-done--findings).
+  still has a backing folder. Label creation/rename also enforce one portable, safe directory component;
+  `Catalog::createLabel()` owns backing-folder creation so an invalid name cannot reach the filesystem before
+  the model rejects it, and filesystem consumers resolve label folders through verified Catalog paths. See
+  [catalog-and-labels.md](docs/architecture/catalog-and-labels.md#label-name-and-path-safety).
 - **When swapping a container/widget for a different shape or look, list what the old one gave for free**
   (selection model, keyboard nav, drag-and-drop, focus handling) and confirm each still has an equivalent
   before calling the swap done. See

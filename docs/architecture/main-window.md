@@ -183,7 +183,10 @@ the label id. `MainWindow` handles each (mirroring `addLabelRequested → create
 `renameLabelInteractive` (`QInputDialog` → `Catalog::renameLabel`), `setLabelColorInteractive`
 (`QColorDialog` → `setColor`), and `deleteLabelInteractive` (reads `deleteLabelImpact` to refuse orphaning
 up front and to show relocate/untag counts in a confirm dialog, then `deleteLabel`). All finish with
-`refreshLibraryView()`. See [catalog-and-labels.md](catalog-and-labels.md) for the underlying `Catalog` API.
+`refreshLibraryView()`. Create and rename display the Catalog's precise validation/filesystem error; the
+window does not duplicate name/path rules or create the backing folder itself. Import callbacks likewise
+resolve the destination from the real label id through the Catalog's verified path accessors. See
+[catalog-and-labels.md](catalog-and-labels.md) for the underlying `Catalog` API.
 
 ## Card interactions
 

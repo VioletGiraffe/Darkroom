@@ -81,8 +81,9 @@ other import failure.
 
 ## Photo import: `Import::importPhoto`
 
-`Import::importPhoto(photoPath, labelDisplayName, mode)` is the photo counterpart to `importVideo` — equally
-UI-free, returning an `Import::PhotoResult` (`Success` / `IdCollision` / `Error` + message + the
+`Import::importPhoto(labelPhotoFolder, photoPath, mode)` is the photo counterpart to `importVideo` — equally
+UI-free, taking the verified destination produced by `Catalog::photoFolderForLabel` and returning an
+`Import::PhotoResult` (`Success` / `IdCollision` / `Error` + message + the
 **`registeredId`** actually registered). `MainWindow::importPhotoBatch` is its coordinator (batch scope,
 error boxes, view refresh), driven from the Import dialog via the `importPhotosRequested` callback. The
 `PhotoImportMode` comes from the Import dialog's existing relocation combo, which doubles as the photo import
@@ -229,8 +230,11 @@ row offers **Rename** / **Set color** / **Delete** (all local mutations that re-
 where a rename onto an existing name (real or provisional) offers to *merge* into it — `mergeProvisionalInto`
 rewrites the staged cards' picks and drops the source, purely locally. Right-clicking a *real* row offers only
 **Rename**, which explains that real labels are edited in the main window, not here. Name matching everywhere is
-case-insensitive, matching the Catalog/filesystem rule. The panel supports the same drag-a-row-out gesture as
-`LabelSidebar`, both built on the shared `ListRowDragFilter` (`src/UiComponents/DragGestureHelper.h/.cpp`)
+case-insensitive, matching the Catalog/filesystem rule. Manually creating or renaming a provisional runs the
+same `Catalog::labelNameValidationError` contract immediately and displays its precise reason. Folder-derived
+provisionals are also revalidated when materialized, before any backing path is created. The panel supports
+the same drag-a-row-out gesture as `LabelSidebar`, both built on the shared `ListRowDragFilter`
+(`src/UiComponents/DragGestureHelper.h/.cpp`)
 with a per-list MIME-data factory — a factory that returns null vetoes an undraggable row. Dragging a label onto a
 staged card — or onto a multi-selection containing it, same effective-selection shape as the main grid's
 own card drop — appends the label id to that card's `pendingLabelIds` (no-op if already present) and
@@ -253,7 +257,8 @@ just an ordinary additional tag, applied the same way Best is.
 
 0. **`materializeUsedProvisionalLabels()`** runs first — the *only* point provisional labels reach the Catalog.
    For each provisional id any staged entry actually carries, it calls `createLabelRequested(name, color)`
-   (→ `MainWindow::createFolderLabel`, which honors the color only for a genuinely new label) to get the real id
+   (→ `MainWindow::createFolderLabel` → `Catalog::createLabel`, which validates/creates the backing folder and
+   honors the color only for a genuinely new label) to get the real id
    back, then rewrites every entry's `pendingLabelIds` from provisional stand-in to real id. A creation that
    fails (reserved/invalid name) maps to empty and is dropped from the pick, leaving that item staged but
    unlabeled (one summary warning). Successfully-created provisionals are removed from `m_provisionalLabels`
@@ -261,7 +266,8 @@ just an ordinary additional tag, applied the same way Best is.
    second run. Everything below then sees only real label ids.
 1. Groups every staged entry with a non-empty `pendingLabelIds` by its first id; entries with no label are
    skipped entirely, left staged. Each group is then split by type — photos and videos take different apply
-   paths.
+   paths. The host receives that real id and asks `Catalog::storageFolderForLabel` /
+   `photoFolderForLabel` for a verified path; it never reconstructs a destination from the display name.
 2. **Photos in the group** (`importPhotoGroup`) go through `importPhotosRequested` (→ `MainWindow::importPhotoBatch` →
    `Import::importPhoto`, see "Photo import" above), with the relocation combo mapped to the
    `PhotoImportMode` (leave-in-place = Reference). An `IdCollision` result (Reference mode's unresolvable
@@ -269,13 +275,14 @@ just an ordinary additional tag, applied the same way Best is.
    the Copy mode. A success unstages the entry; Best/extra-label bookkeeping records the result's
    `registeredId` (an owned-import auto-rename gives the copy a new identity - the staged id no longer names
    anything). Anything else stays staged with its labels intact.
-3. **Videos in the group** (`importVideoGroup`): resolves the label's display name, relocates the group's source files if
-   relocation is enabled (`SourceRelocation::relocateIfNeeded`, "Duplicate detection" above and the module intro),
-   then calls `addMediaItemsRequested` — the `importVideoBatch`/`Import::importVideo` apply path (also where a
+3. **Videos in the group** (`importVideoGroup`): verifies the real label id resolves to a safe storage path,
+   relocates the group's source files if relocation is enabled (`SourceRelocation::relocateIfNeeded`,
+   "Duplicate detection" above and the module intro), then calls `addMediaItemsRequested` — the
+   `importVideoBatch`/`Import::importVideo` apply path (also where a
    file dropped on the main window ends up, since a drop just opens this dialog pre-staged). It passes along
    each video's staging temp dir so import can reuse the already-extracted preview frames (see "Import:
    preview frames only" above). Per video: deferred relocation (`Cancel`) or
-   `isTrackedUnderLabel(id, labelName)` (a local free function) coming back false leaves it staged, labels intact, to
+   `isTrackedUnderLabel(id, labelId)` (a local free function) coming back false leaves it staged, labels intact, to
    retry later. That check compares the item's tracked frame folder against the one this import derives
    (`<storageFolder>/<source base name>`), not just "tracked at all" — so both an import that was
    declined/failed *and* a name+size collision with an item tracked elsewhere (import refuses those, see

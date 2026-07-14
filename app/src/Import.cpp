@@ -76,8 +76,7 @@ Import::Result Import::importVideo(Catalog& catalog, const QString& videoPath, c
 	return {};
 }
 
-Import::PhotoResult Import::importPhoto(Catalog& catalog, const QString& photosRootFolder, const QString& photoPath,
-	const QString& labelDisplayName, PhotoImportMode mode)
+Import::PhotoResult Import::importPhoto(Catalog& catalog, const QString& labelPhotoFolder, const QString& photoPath, PhotoImportMode mode)
 {
 	const QFileInfo photoInfo(photoPath);
 	if (!photoInfo.isFile())
@@ -98,9 +97,8 @@ Import::PhotoResult Import::importPhoto(Catalog& catalog, const QString& photosR
 	}
 
 	// Owned import: land the file in the label's photo dir, auto-renaming around collisions.
-	const QString destDir = photosRootFolder + "/" + labelDisplayName;
-	if (!QDir{}.mkpath(destDir))
-		return { PhotoStatus::Error, QObject::tr("Failed to create photo folder:\n%1").arg(destDir), {} };
+	if (!QDir{}.mkpath(labelPhotoFolder))
+		return { PhotoStatus::Error, QObject::tr("Failed to create photo folder:\n%1").arg(labelPhotoFolder), {} };
 
 	// Pick a destination name that is free both on disk and in the catalog - the id is name+size and a
 	// copy/move preserves the size, so one rename resolves a path collision and an id collision alike. A
@@ -113,11 +111,11 @@ Import::PhotoResult Import::importPhoto(Catalog& catalog, const QString& photosR
 	for (int attempt = 1; ; ++attempt)
 	{
 		if (attempt > 9999)
-			return { PhotoStatus::Error, QObject::tr("Could not find a free file name for:\n%1\nin:\n%2").arg(photoPath, destDir), {} };
+			return { PhotoStatus::Error, QObject::tr("Could not find a free file name for:\n%1\nin:\n%2").arg(photoPath, labelPhotoFolder), {} };
 
 		const QString candidateName = attempt == 1 ? photoInfo.fileName()
 		                                           : baseName + "_" + QString::number(attempt) + "." + suffix;
-		const QString candidatePath = destDir + "/" + candidateName;
+		const QString candidatePath = labelPhotoFolder + "/" + candidateName;
 		if (QFile::exists(candidatePath))
 		{
 			if (!filesAreIdentical(photoPath, candidatePath))
@@ -141,7 +139,7 @@ Import::PhotoResult Import::importPhoto(Catalog& catalog, const QString& photosR
 	}
 
 	const MediaId registeredId = MediaId::fromFile(destPath);
-	if (!catalog.addPhoto(registeredId, destPath, destDir, /*referenced=*/false))
+	if (!catalog.addPhoto(registeredId, destPath, labelPhotoFolder, /*referenced=*/false))
 	{
 		// Undo the relocation rather than leave an untracked copy behind (mirrors importVideo's cleanup).
 		if (!adoptExisting)

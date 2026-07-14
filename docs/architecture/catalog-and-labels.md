@@ -57,7 +57,8 @@ the label itself changing identity).
   `rebuildIndex()` — `Best` (pinned first) plus one label per storage folder an item **in the catalog model**
   actually lives in (`ensureBestAndFolderLabels`/`ensureFolderLabelExists`). This is derived from the model,
   not a disk walk, which is why an **empty label needs an explicit `createLabel(displayName)` call** —
-  there's no item to derive its label from otherwise; `MainWindow::createFolderLabel` calls it after `mkdir`.
+  there's no item to derive its label from otherwise; that operation validates the name and creates the
+  direct-child backing folder itself.
   Saved only when seeding actually adds an entry. Each `id` persists as a **JSON number** (a `LabelId`).
 - Per-item extra labels live in `MetadataStore`'s `"labels"` field (a `QJsonArray` of label ids), keyed by
   `MediaId` — see [data-model.md](data-model.md).
@@ -167,16 +168,19 @@ Best/extra-label flush.
 
 ## Registry mutations (the label objects themselves)
 
-- **`createLabel(displayName, color = {})`** — creates a folder-backed label with this name if none exists yet
-  (with the given color, or a random one), and returns the created-or-existing label's id. Exists
-  because empty labels have no item to derive a folder-label from (see "Persistence" above);
-  `createFolderLabel` calls it explicitly after creating the on-disk folder and passes the id through to its
-  own caller (the Import dialog's provisional-label materialization keys on it — see
-  [import.md](import.md#runimport-the-import-button)). Registry-idempotent if the name is taken: the existing
-  label keeps its color, and its id is returned all the same.
-- **`renameLabel(labelId, newName)`** — uniqueness-checked (case-insensitive); renames the backing folders
-  if they exist (see reconciliation point 2 above), then updates `displayName` keeping the id. Refuses: Best,
-  empty name, duplicate name, the reserved name `"Photos"` (see below), or a colliding/failed folder rename.
+- **`createLabel(displayName, color = {}, error)`** — validates the name, derives and verifies its direct-child
+  storage path, creates that folder, then creates the registry label if none exists (with the given color, or
+  a random one). Returns the created-or-existing id; on validation/path/filesystem failure it returns `None`
+  with the precise reason. Registry-idempotent if the name is taken: the existing label keeps its color and
+  id, while its backing folder is ensured. The Import dialog's provisional-label materialization keys on the
+  returned id; see [import.md](import.md#runimport-the-import-button).
+- **`renameLabel(labelId, newName, error)`** — applies the same name validator, checks uniqueness
+  case-insensitively, verifies old and new paths remain direct children (and do not alias symlinks), renames
+  the backing folders if they exist (see reconciliation point 2 above), then updates `displayName` keeping the
+  id. Every refusal returns its specific validation, collision, containment, or filesystem reason.
+- **`storageFolderForLabel` / `photoFolderForLabel`** — return verified direct-child paths only for a valid
+  ordinary label whose existing folder does not alias another location. Import, item relocation, and empty-
+  folder cleanup use these instead of composing paths from a registry display name.
 - **`setColor(labelId, color)`** — registry-only, no folder involvement.
 - **`deleteLabel(labelId)`** — the destructive one. User explicitly chose **delete-and-relocate** over
   refuse-if-used (see "Design rationale" below): it relocates every item stored under the label off it
@@ -193,11 +197,22 @@ Best/extra-label flush.
 
 All registry mutations persist `labels.json`.
 
-**`"Photos"` is a reserved name**: `<root>/Photos` is the owned-photo storage tree (one subdir per label —
-see [data-model.md](data-model.md)), living in the same namespace as label storage folders. `createFolderLabel`
-(UI side) and `renameLabel` (catalog side) both refuse it case-insensitively. A *legacy* storage folder
-literally named `Photos` predating this rule is not auto-migrated — accepted as a non-case for this
-library; the guards only prevent creating the conflict from here on.
+### Label-name and path safety
+
+`Catalog::labelNameValidationError` is the one contract used by create, rename, and the Import dialog's
+manual provisional-label editors. It returns a plain source-text alias (or `nullptr` for a valid name), and
+the direct caller applies its own translation context. A name must be one portable directory component:
+non-empty; no leading or trailing whitespace, control characters, separators, or other Windows-invalid characters; not `.` / `..`;
+no trailing dot; not an app-reserved `Best` / `Photos`; and not a Windows device basename (`CON`, `NUL`,
+`COM1`...`COM9`, `LPT1`...`LPT9`, including forms with an extension). `Photos` is reserved because
+`<root>/Photos` is the owned-photo storage tree; `Best` is the virtual label.
+
+Syntax validation is backed by `validatedDirectChildPath`: create/rename refuse a path whose resolved parent
+is not the intended root or whose existing child is a symlink. This is deliberately checked at the Catalog
+boundary, before `mkpath` or rename, rather than relying on every UI to concatenate paths correctly. The path
+accessors apply that same verification when an existing registry label is consumed, so a legacy unsafe name
+or aliased folder cannot become an import, relocation, or cleanup destination. Such registry/folder names are
+not silently removed during load; they remain visible but filesystem mutations through them are refused.
 
 ## In-memory model
 
@@ -238,7 +253,7 @@ existed, looking for real gaps rather than just describing the design optimistic
 
 ### Bug found and fixed: reserved-name guard checked the wrong string
 
-`MainWindow`'s reserved-name guard on creating a new label (`BEST_LABEL_NAME`, used by
+At the time, `MainWindow`'s reserved-name guard on creating a new label (`BEST_LABEL_NAME`, used by
 `createFolderLabel`'s "Create label" validation) was still the **pre-Catalog tab name**
 `"★ Best"`, never updated when Best's `Catalog` displayName became plain `"Best"` (set in
 `ensureBestLabelExists`). **Reachable through completely ordinary UI usage, not external disk tampering**:
@@ -246,8 +261,9 @@ typing "Best" into the name prompt wasn't blocked. It would create a real folder
 `rebuildIndex` → `ensureFolderLabelExists("Best")` would mint a **second, distinct label** that *also*
 displays as "Best" — `ordinaryLabelIdByName`'s lookup excludes the virtual Best from its search (only
 ordinary labels can name a folder), so it never recognizes the new folder as "already covered" by the real
-Best. Result: two rows both reading "Best" in the sidebar (one gold/virtual, one grey/ordinary). **Fixed**
-by correcting the constant's value to `"Best"`.
+Best. Result: two rows both reading "Best" in the sidebar (one gold/virtual, one grey/ordinary). The immediate
+constant correction was later superseded by the centralized Catalog validator above; the UI constant and
+parallel reserved-name guard no longer exist.
 
 ### Labels persist independent of item count
 

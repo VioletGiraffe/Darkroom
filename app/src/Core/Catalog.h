@@ -180,21 +180,31 @@ public:
 	// directly. No-op on an unknown id, a non-positive duration, or one already equal to the stored value.
 	void setDurationMs(const MediaId& id, qint64 durationMs);
 
-	// Registry mutations (the label objects themselves). renameLabel validates newDisplayName is unique, renames
-	// the matching on-disk folders if they exist (the storage folder and the <root>/Photos/<label> dir),
+	// Registry mutations (the label objects themselves). labelNameValidationError is the shared syntax/path-
+	// component contract for every user-entered or provisional name; it returns a plain source-text alias for
+	// the caller to translate, or nullptr when valid. renameLabel also
+	// validates uniqueness and renames the matching on-disk folders if they exist (the storage folder and the
+	// <root>/Photos/<label> dir),
 	// rewrites the stored folder (and, for owned photos, source path) of every item under it, and updates the
-	// registry display name - the id and every association are preserved. Returns false (no-op) for Best, an
-	// empty/duplicate/reserved name, or a failed or colliding folder rename. setColor stores a hex color
-	// ("" = unset). Both persist labels.json.
-	bool renameLabel(LabelId labelId, const QString& newDisplayName);
+	// registry display name - the id and every association are preserved. Returns false (with error populated)
+	// for Best, an invalid/duplicate name, an unsafe path, or a failed/colliding folder rename. setColor stores
+	// a hex color ("" = unset). Both persist labels.json.
+	[[nodiscard]] static const char* labelNameValidationError(const QString& displayName);
+	// Verified direct-child paths for an ordinary, valid label. Empty for an unknown/virtual/invalid label or
+	// when an existing path aliases another location. Filesystem consumers must use these instead of composing
+	// a path from Label::displayName themselves, because a legacy registry may still contain an unsafe name.
+	[[nodiscard]] QString storageFolderForLabel(LabelId labelId) const;
+	[[nodiscard]] QString photoFolderForLabel(LabelId labelId) const;
+	bool renameLabel(LabelId labelId, const QString& newDisplayName, QString* error = nullptr);
 	void setColor(LabelId labelId, const QString& color);
 
 	// Creates a folder-backed label with this display name if none exists yet - for the user adding an empty
 	// label up front, before any item lives in it (such a label can't be derived from the model, since no
-	// item references its storage folder). Persists labels.json. The caller creates the backing storage folder
-	// on disk. An explicit color is honored only when the label is actually created; an already-existing label
-	// keeps its color (empty color = pick a random one). Returns the created-or-existing label's id.
-	LabelId createLabel(const QString& displayName, const QString& color = {});
+	// item references its storage folder). Validates the name, creates its direct-child storage folder, and
+	// persists labels.json. An explicit color is honored only when the label is actually created; an
+	// already-existing label keeps its color (empty color = pick a random one). Returns the created-or-existing
+	// label's id, or None with error populated on failure.
+	LabelId createLabel(const QString& displayName, const QString& color = {}, QString* error = nullptr);
 
 	// A pleasant, randomized label color ("#rrggbb") - the same generator new labels get on creation, exposed so
 	// callers minting a label elsewhere (e.g. the Import dialog's staging area) can show a matching swatch up front.

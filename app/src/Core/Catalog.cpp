@@ -12,6 +12,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QObject>
 #include <QRandomGenerator>
 #include <QSaveFile>
 
@@ -27,6 +28,43 @@ namespace
 	constexpr QStringView kReferencedField      = u"referenced";       // bool; photos only
 	constexpr QStringView kDurationMsField      = u"durationMs";       // video source length in ms; absent = unknown (pre-existing record / photo)
 	constexpr QStringView kPhotoTypeValue       = u"photo";
+	constexpr QStringView kBestLabelName        = u"Best";
+
+	[[nodiscard]] bool isReservedWindowsDeviceName(const QString& name)
+	{
+		const QString stem = name.section('.', 0, 0).trimmed().toUpper();
+		if (stem == QLatin1String("CON") || stem == QLatin1String("PRN") || stem == QLatin1String("AUX") || stem == QLatin1String("NUL"))
+			return true;
+		if (stem.size() != 4 || (!stem.startsWith(QLatin1String("COM")) && !stem.startsWith(QLatin1String("LPT"))))
+			return false;
+		const QChar suffix = stem.back();
+		return (suffix >= QLatin1Char('1') && suffix <= QLatin1Char('9'))
+			|| suffix == QChar(0x00b9) || suffix == QChar(0x00b2) || suffix == QChar(0x00b3);
+	}
+
+	// Defense behind labelNameValidationError: even if its component rules regress, callers never receive a
+	// path whose parent resolves somewhere other than the requested parent. Existing symlinks are rejected so
+	// a label cannot alias a different storage tree.
+	[[nodiscard]] QString validatedDirectChildPath(const QString& parentFolder, const QString& childName)
+	{
+		const QString parent = QDir(parentFolder).absolutePath();
+		const QString child = QDir(parent).absoluteFilePath(childName);
+		if (pathComparisonKey(QFileInfo(child).absolutePath()) != pathComparisonKey(parent))
+			return {};
+
+		const QFileInfo childInfo(child);
+		if (childInfo.isSymLink())
+			return {};
+		if (childInfo.exists())
+		{
+			const QString canonicalChild = childInfo.canonicalFilePath();
+			if (canonicalChild.isEmpty()
+				|| pathComparisonKey(QFileInfo(canonicalChild).absolutePath()) != pathComparisonKey(parent)
+				|| QFileInfo(canonicalChild).fileName().compare(childInfo.fileName(), Qt::CaseInsensitive) != 0)
+				return {};
+		}
+		return child;
+	}
 }
 
 Catalog::Catalog(QString rootFolder, MetadataStore& metadataStore)
@@ -120,7 +158,7 @@ bool Catalog::ensureBestLabelExists()
 {
 	if (labelById(BestLabelId))
 		return false;
-	_labels.insert(_labels.begin(), Label{ BestLabelId, "Best", Theme::StarActive });  // pin Best first (virtual is derived from the id); gold, matching the star
+	_labels.insert(_labels.begin(), Label{ BestLabelId, kBestLabelName.toString(), Theme::StarActive });  // pin Best first (virtual is derived from the id); gold, matching the star
 	return true;
 }
 
@@ -598,7 +636,7 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, LabelId removedLabelId)
 		if (labelId == removedLabelId)
 			continue;
 		const Label* l = labelById(labelId);
-		if (!l || l->isVirtual())
+		if (!l || l->isVirtual() || labelNameValidationError(l->displayName))
 			continue;
 		if (!dest || l->displayName.compare(dest->displayName, Qt::CaseInsensitive) < 0)
 			dest = l;
@@ -621,7 +659,13 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, LabelId removedLabelId)
 	QString newFolderAbs;
 	if (entryIt->type == MediaType::Photo)
 	{
-		const QString destDir     = photosRootFolder() + "/" + dest->displayName;
+		const QString sourceDir = photoFolderForLabel(removedLabelId);
+		if (sourceDir.isEmpty() || pathComparisonKey(entryIt->folder) != pathComparisonKey(sourceDir)
+			|| pathComparisonKey(QFileInfo(entryIt->sourcePath).absolutePath()) != pathComparisonKey(sourceDir))
+			return;
+		const QString destDir = photoFolderForLabel(dest->id);
+		if (destDir.isEmpty())
+			return;
 		const QString newFilePath = destDir + "/" + QFileInfo(entryIt->sourcePath).fileName();
 		if (QFileInfo::exists(newFilePath))
 		{
@@ -641,7 +685,15 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, LabelId removedLabelId)
 	}
 	else
 	{
-		const QString destStorageFolder = _rootFolder + "/" + dest->displayName;
+		const QString sourceStorageFolder = storageFolderForLabel(removedLabelId);
+		if (sourceStorageFolder.isEmpty())
+			return;
+		const QString sourceFolder = validatedDirectChildPath(sourceStorageFolder, QFileInfo(entryIt->folder).fileName());
+		if (sourceFolder.isEmpty() || pathComparisonKey(entryIt->folder) != pathComparisonKey(sourceFolder))
+			return;
+		const QString destStorageFolder = storageFolderForLabel(dest->id);
+		if (destStorageFolder.isEmpty())
+			return;
 		newFolderAbs = destStorageFolder + "/" + QFileInfo(entryIt->folder).fileName();
 		if (QFileInfo::exists(newFolderAbs))
 		{
@@ -673,62 +725,106 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, LabelId removedLabelId)
 
 // --- Registry mutations (the label objects) ------------------------------------------------------------
 
-bool Catalog::renameLabel(LabelId labelId, const QString& newDisplayName)
+const char* Catalog::labelNameValidationError(const QString& displayName)
 {
+	if (displayName.isEmpty() || displayName.trimmed().isEmpty())
+		return "The label name cannot be empty.";
+	if (displayName.front().isSpace() || displayName.back().isSpace())
+		return "The label name cannot begin or end with whitespace.";
+	if (displayName == QLatin1String(".") || displayName == QLatin1String(".."))
+		return "'.' and '..' cannot be used as label names.";
+	if (displayName.endsWith(QLatin1Char('.')))
+		return "The label name cannot end with a dot.";
+	for (const QChar c : displayName)
+		if (c.category() == QChar::Other_Control)
+			return "The label name cannot contain control characters.";
+	if (!invalidFilenameChar(displayName).isNull())
+		return "The label name contains a character that is not allowed in file names.";
+	if (displayName.compare(kBestLabelName.toString(), Qt::CaseInsensitive) == 0
+		|| displayName.compare(PhotosDirectoryName.toString(), Qt::CaseInsensitive) == 0)
+		return "This label name is reserved.";
+	if (isReservedWindowsDeviceName(displayName))
+		return "This label name is a reserved Windows device name.";
+	return nullptr;
+}
+
+QString Catalog::storageFolderForLabel(LabelId labelId) const
+{
+	const Label* label = labelById(labelId);
+	if (!label || label->isVirtual() || labelNameValidationError(label->displayName))
+		return {};
+	return validatedDirectChildPath(_rootFolder, label->displayName);
+}
+
+QString Catalog::photoFolderForLabel(LabelId labelId) const
+{
+	const Label* label = labelById(labelId);
+	if (!label || label->isVirtual() || labelNameValidationError(label->displayName))
+		return {};
+	return validatedDirectChildPath(photosRootFolder(), label->displayName);
+}
+
+bool Catalog::renameLabel(LabelId labelId, const QString& newDisplayName, QString* error)
+{
+	if (error)
+		error->clear();
+	const auto fail = [error](const QString& message) {
+		if (error)
+			*error = message;
+		return false;
+	};
+
 	Label* label = mutableLabelById(labelId);
 	if (!label)
-		return false;
+		return fail(QObject::tr("The label no longer exists."));
 	if (label->isVirtual())
 	{
 		qWarning() << "Catalog: cannot rename the virtual Best label";
-		return false;
+		return fail(QObject::tr("The Best label cannot be renamed."));
 	}
 
-	const QString newName = newDisplayName.trimmed();
-	if (newName.isEmpty())
-		return false;
+	const QString& newName = newDisplayName;
+	if (const char* validationError = labelNameValidationError(newName))
+		return fail(QObject::tr(validationError));
 	if (newName == label->displayName)
 		return true;  // nothing to do
-	if (newName.compare(PhotosDirectoryName.toString(), Qt::CaseInsensitive) == 0)
-	{
-		qWarning() << "Catalog: cannot rename a label to the reserved name" << PhotosDirectoryName.toString();
-		return false;
-	}
 
 	for (const Label& l : _labels)
 		if (&l != label && l.displayName.compare(newName, Qt::CaseInsensitive) == 0)
 		{
 			qWarning() << "Catalog: cannot rename to" << newName << "- another label already uses that name";
-			return false;
+			return fail(QObject::tr("A label named '%1' already exists.").arg(newName));
 		}
 
-	// Rename the backing folders if they exist (a freshly created label may have neither yet): the storage
+	// Rename the backing folders if they exist (a legacy/model-derived label may not have both): the storage
 	// folder and the label's photo dir under <root>/Photos. Every item under them rides along in the directory
 	// rename; associations are by id, so nothing else changes. Both destinations are collision-checked before
 	// either rename runs, so a refusal never leaves just one of the two renamed.
 	const QString oldName = label->displayName;
-	const QString oldFolder = _rootFolder + "/" + oldName;
-	const QString newFolder = _rootFolder + "/" + newName;
-	const QString oldPhotoDir = photosRootFolder() + "/" + oldName;
-	const QString newPhotoDir = photosRootFolder() + "/" + newName;
+	const QString oldFolder = validatedDirectChildPath(_rootFolder, oldName);
+	const QString newFolder = validatedDirectChildPath(_rootFolder, newName);
+	const QString oldPhotoDir = validatedDirectChildPath(photosRootFolder(), oldName);
+	const QString newPhotoDir = validatedDirectChildPath(photosRootFolder(), newName);
+	if (oldFolder.isEmpty() || newFolder.isEmpty() || oldPhotoDir.isEmpty() || newPhotoDir.isEmpty())
+		return fail(QObject::tr("The label's storage path is not safely contained within the library."));
 	const bool haveStorageFolder = QDir(oldFolder).exists();
 	const bool havePhotoDir         = QDir(oldPhotoDir).exists();
 	if ((haveStorageFolder && QFileInfo::exists(newFolder)) || (havePhotoDir && QFileInfo::exists(newPhotoDir)))
 	{
 		qWarning() << "Catalog: cannot rename" << oldName << "to" << newName << "- a folder by that name already exists";
-		return false;
+		return fail(QObject::tr("A folder for label '%1' already exists.").arg(newName));
 	}
 	if (haveStorageFolder && !QFile::rename(oldFolder, newFolder))
 	{
 		qWarning() << "Catalog: failed to rename folder" << oldFolder << "to" << newFolder;
-		return false;
+		return fail(QObject::tr("Could not rename the label folder:\n%1").arg(QDir::toNativeSeparators(oldFolder)));
 	}
 	if (havePhotoDir && !QFile::rename(oldPhotoDir, newPhotoDir))
 	{
 		qWarning() << "Catalog: failed to rename folder" << oldPhotoDir << "to" << newPhotoDir;
 		if (haveStorageFolder)
 			QFile::rename(newFolder, oldFolder);  // roll back so the two dirs don't end up under different names
-		return false;
+		return fail(QObject::tr("Could not rename the label's photo folder:\n%1").arg(QDir::toNativeSeparators(oldPhotoDir)));
 	}
 
 	// The folders moved, so every item stored under oldName now lives under newName: rewrite the stored fields
@@ -767,8 +863,31 @@ void Catalog::setColor(LabelId labelId, const QString& color)
 	saveRegistry();
 }
 
-LabelId Catalog::createLabel(const QString& displayName, const QString& color)
+LabelId Catalog::createLabel(const QString& displayName, const QString& color, QString* error)
 {
+	if (error)
+		error->clear();
+	if (const char* validationError = labelNameValidationError(displayName))
+	{
+		if (error)
+			*error = QObject::tr(validationError);
+		return LabelId::None;
+	}
+
+	const QString folderPath = validatedDirectChildPath(_rootFolder, displayName);
+	if (folderPath.isEmpty())
+	{
+		if (error)
+			*error = QObject::tr("The label's storage path is not safely contained within the library.");
+		return LabelId::None;
+	}
+	if (!QDir{}.mkpath(folderPath))
+	{
+		if (error)
+			*error = QObject::tr("Could not create the label folder:\n%1").arg(QDir::toNativeSeparators(folderPath));
+		return LabelId::None;
+	}
+
 	if (ensureFolderLabelExists(displayName, color))
 		saveRegistry();
 	return ordinaryLabelIdByName(displayName);  // created or pre-existing, same answer
@@ -811,8 +930,6 @@ bool Catalog::deleteLabel(LabelId labelId)
 	if (deleteLabelImpact(labelId).wouldOrphan)
 		return false;
 
-	const QString displayName = label->displayName;
-
 	// Relocate every item stored under the label off it. Collect first: relocateFolderOffLabel mutates _mediaItems.
 	std::vector<MediaId> storedHere;
 	for (const MediaId& id : mediaItemsForLabel(labelId))
@@ -846,12 +963,20 @@ bool Catalog::deleteLabel(LabelId labelId)
 
 	if (!stillNamed)
 	{
-		QDir storageFolder{ _rootFolder + "/" + displayName };
-		if (storageFolder.exists() && storageFolder.isEmpty())  // empty after relocation; guard against nuking stray contents
-			storageFolder.removeRecursively();
-		QDir photoDir{ photosRootFolder() + "/" + displayName };  // the label's owned-photo dir, same empty-only guard
-		if (photoDir.exists() && photoDir.isEmpty())
-			photoDir.removeRecursively();
+		const QString storageFolderPath = storageFolderForLabel(labelId);
+		if (!storageFolderPath.isEmpty())
+		{
+			QDir storageFolder{ storageFolderPath };
+			if (storageFolder.exists() && storageFolder.isEmpty())  // empty after relocation; guard against nuking stray contents
+				storageFolder.removeRecursively();
+		}
+		const QString photoFolderPath = photoFolderForLabel(labelId);
+		if (!photoFolderPath.isEmpty())
+		{
+			QDir photoDir{ photoFolderPath };
+			if (photoDir.exists() && photoDir.isEmpty())
+				photoDir.removeRecursively();
+		}
 		std::erase_if(_labels, [&labelId](const Label& l) { return l.id == labelId; });
 	}
 
