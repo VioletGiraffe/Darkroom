@@ -13,17 +13,31 @@ orient, then follow the link for the subsystem you're touching.
 
 ---
 
+## Quick-start workflow
+
+1. Read [the coding conventions](docs/guidelines.md) before writing C++, then follow the relevant subsystem
+   link below and inspect the implementation plus nearby examples of the same kind of code.
+2. Before changing QSS, `QComboBox`, or custom styling, also read
+   [the Qt styling-system quirks](docs/tips/qt-styling-system-quirks.md); it records framework dead ends and
+   the established solutions in `Theme/Style.cpp`.
+3. Keep changes inside the app unless the responsibility genuinely belongs in a shared submodule. Preserve
+   the architectural invariants below and update the relevant document when behavior or rationale changes.
+
+---
+
 ## Build & dependencies
 
 - **Build system**: qmake, top-level `Darkroom.pro` (`SUBDIRS`): the app itself (`app/app.pro`) plus the
-  static-library submodules it links — `qtutils`/`cpputils`/`cpp-template-utils` and `magic-alignment`
+  static-library Git submodules it links — `qtutils`/`cpputils`/`cpp-template-utils` and `magic-alignment`
   (a Qt-only automatic image-alignment library used by `PhotoCompareWindow`, same `$$files` glob convention).
   Sources and headers come from a recursive glob evaluated each time qmake runs —
   `SOURCES += $$files(src/*.cpp, true)`, `HEADERS += $$files(src/*.h, true)` + `$$files(src/*.hpp, true)`.
   Because the glob walks the *whole* `src/` subtree, a new file dropped anywhere under it is enumerated
   automatically. **New source files do not need to be registered in any way**.
   (`Q_OBJECT` types are moc'd automatically because the headers are globbed in the same way.)
-- **The Visual Studio IDE project is auto-generated and git-ignored, do not edit any related files and also do not use as source of truth.** 
+- **Generated artifacts are not sources of truth.** Do not edit `Darkroom.sln`, `Makefile`, `.qmake.stash`,
+  `.vs/`, `.qtcreator/`, `.qtc_clangd/`, `bin/`, or `build/`; qmake/project configuration and `app/src/`
+  are authoritative.
 - **Source layout** (under `app/src/`): reusable UI widgets in `UiComponents/` (`ThumbnailWidget`,
   `MediaItemWidget`, `MarkerSlider`, `SortControl`, `SegmentedToggle`, `LabelSidebar`) plus their close UI
   helpers (`LabelVisuals`, `DragGestureHelper`, `LabelMimeType`); top-level windows + dialogs in `Windows/`
@@ -36,8 +50,9 @@ orient, then follow the link for the subsystem you're touching.
   `"Windows/MainWindow.h"`, `"Core/Catalog.h"`, and the few root headers as `"Utils.h"` — regardless of the
   including file's location; submodule headers likewise drop their prefix (`qtutils/widgets/layouts/cflowlayout.h`
   → `"widgets/layouts/cflowlayout.h"`).
-- Don't build/compile here — the toolchain (Qt, compiler) isn't in this environment by design; reason about
-  correctness by inspection and hand off.
+- There is currently no app-level test suite. Don't build/compile here — the toolchain (Qt, compiler) isn't
+  in this environment by design; reason about correctness by inspecting the affected code and reviewing the
+  diff as a separate pass.
 
 ---
 
