@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784062090552,
+  "lastUpdate": 1784070724642,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -4858,6 +4858,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 30,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "aa25c9d186d2a254894e4eb9fda3f468ffa8df69",
+          "message": "Better default folder suggestion",
+          "timestamp": "2026-07-15T02:08:29+03:00",
+          "tree_id": "956d0086a2e8612f2e1963eb489017c9794294ed",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/aa25c9d186d2a254894e4eb9fda3f468ffa8df69"
+        },
+        "date": 1784070722678,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 10926,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 7048,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 967.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 577.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 292,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 30.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 30.5,
             "unit": "KB"
           },
           {
