@@ -13,19 +13,18 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
-#include <QMessageBox>
 #include <QSettings>
 #include <QSpinBox>
 #include <QVBoxLayout>
 
 // ── GeneralSettingsPage ───────────────────────────────────────────────────────
 
-GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent)
+GeneralSettingsPage::GeneralSettingsPage(const QString& rootFolder, QWidget* parent) : CSettingsPage(parent)
 {
 	setWindowTitle(tr("General"));
 
 	QSettings s;
-	m_rootFolder = new QLineEdit(s.value(Settings::RootFolder, Defaults::RootFolder).toString(), this);
+	m_rootFolder = new QLineEdit(rootFolder, this);
 	m_ffmpegPath = new QLineEdit(s.value(Settings::FfmpegPath).toString(), this);
 
 	auto* browseFolder = new QPushButton(tr("Browse..."), this);
@@ -85,19 +84,15 @@ GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent
 void GeneralSettingsPage::acceptSettings()
 {
 	QSettings s;
-	// The scheme is already applied live; persist it here. Done before the root-folder guard so an empty-root
-	// warning doesn't discard the user's confirmed scheme choice.
+	// The scheme is already applied live; persist it here. The root is not an ordinary setting: MainWindow
+	// validates and activates a replacement Library after the dialog has accepted.
 	s.setValue(Settings::ColorScheme, m_schemeToggle->currentIndex());
-
-	const QString root = m_rootFolder->text().trimmed();
-	if (root.isEmpty())
-	{
-		QMessageBox::warning(this, tr("Settings"), tr("Root folder cannot be empty."));
-		return;
-	}
-
-	s.setValue(Settings::RootFolder, root);
 	s.setValue(Settings::FfmpegPath, m_ffmpegPath->text().trimmed());
+}
+
+QString GeneralSettingsPage::requestedRootFolder() const
+{
+	return m_rootFolder->text().trimmed();
 }
 
 // ── EncodingSettingsPage ──────────────────────────────────────────────────────
@@ -165,8 +160,14 @@ void EncodingSettingsPage::acceptSettings()
 
 // ── SettingsDialog ────────────────────────────────────────────────────────────
 
-SettingsDialog::SettingsDialog(QWidget* parent) : CSettingsDialog(parent)
+SettingsDialog::SettingsDialog(const QString& rootFolder, QWidget* parent) : CSettingsDialog(parent)
 {
-	addSettingsPage(new GeneralSettingsPage(this),  tr("General"));
+	m_generalPage = new GeneralSettingsPage(rootFolder, this);
+	addSettingsPage(m_generalPage, tr("General"));
 	addSettingsPage(new EncodingSettingsPage(this), tr("Encoding"));
+}
+
+QString SettingsDialog::requestedRootFolder() const
+{
+	return m_generalPage->requestedRootFolder();
 }

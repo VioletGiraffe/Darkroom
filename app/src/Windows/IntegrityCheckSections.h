@@ -53,7 +53,7 @@ struct ResolvableRow
 class IntegrityCheckSections
 {
 public:
-	IntegrityCheckSections(const CatalogIntegrity::IntegrityReport& report, IntegrityCheckDialog::Callbacks& callbacks,
+	IntegrityCheckSections(const Catalog& catalog, const CatalogIntegrity::IntegrityReport& report, IntegrityCheckDialog::Callbacks& callbacks,
 	                       QWidget* content, QVBoxLayout* contentLayout, QWidget* dialog);
 
 private:
@@ -110,6 +110,7 @@ private:
 	template <class Row>
 	void confirmAndRemoveAll(std::vector<Row>& rows, const QString& title, const QString& questionFmt, const QString& doneFmt);
 
+	const Catalog& m_catalog;
 	IntegrityCheckDialog::Callbacks& m_callbacks;
 	QWidget*     m_dialog;   // parent for message boxes and file pickers
 	QWidget*     m_content;  // the scroll-area content widget rows and headers are parented to
@@ -144,10 +145,10 @@ inline bool ResolvableRow::tryResolve(const QString& successText, const std::fun
 	return true;
 }
 
-inline IntegrityCheckSections::IntegrityCheckSections(const CatalogIntegrity::IntegrityReport& report,
+inline IntegrityCheckSections::IntegrityCheckSections(const Catalog& catalog, const CatalogIntegrity::IntegrityReport& report,
                                                       IntegrityCheckDialog::Callbacks& callbacks,
                                                       QWidget* content, QVBoxLayout* contentLayout, QWidget* dialog)
-	: m_callbacks(callbacks), m_dialog(dialog), m_content(content), m_layout(contentLayout),
+	: m_catalog(catalog), m_callbacks(callbacks), m_dialog(dialog), m_content(content), m_layout(contentLayout),
 	  // One issue per row, drawn as a hairline card (BorderSubtle - a passive separator, not an interactive
 	  // control) rather than the native StyledPanel bevel. One sheet string shared by every row.
 	  m_rowStyle(QStringLiteral("QFrame#integrityRow { border: 1px solid %1; border-radius: %2px; }")
@@ -517,7 +518,7 @@ inline void IntegrityCheckSections::wireSkip(QPushButton* skipButton, Resolvable
 
 inline QString IntegrityCheckSections::browseForSourceVideo(const QString& hint) const
 {
-	const QString startDir = hint.isEmpty() ? Catalog::instance().anySourceDir() : QFileInfo(hint).absolutePath();
+	const QString startDir = hint.isEmpty() ? m_catalog.anySourceDir() : QFileInfo(hint).absolutePath();
 	return QFileDialog::getOpenFileName(m_dialog, QObject::tr("Select source video"), startDir,
 		QObject::tr("Video files (*.mp4 *.mov *.avi *.mkv *.flv);;All files (*)"));
 }

@@ -1,5 +1,6 @@
 #include "UiComponents/LabelSidebar.h"
 #include "Core/Catalog.h"
+#include "Core/Library.h"
 #include "UiComponents/ContentWidthListWidget.h"
 #include "UiComponents/DragGestureHelper.h"
 #include "UiComponents/LabelMimeType.h"
@@ -30,7 +31,7 @@ constexpr LabelId AllLabelId = LabelId::None;
 
 }
 
-LabelSidebar::LabelSidebar(QWidget* parent) : QWidget(parent)
+LabelSidebar::LabelSidebar(Library& library, QWidget* parent) : QWidget(parent), m_library(library)
 {
 	auto* layout = new QVBoxLayout(this);
 	layout->setContentsMargins(6, 6, 6, 6);
@@ -97,7 +98,7 @@ void LabelSidebar::refresh()
 void LabelSidebar::rebuildRows()
 {
 	m_list->clear();
-	Catalog& catalog = Catalog::instance();
+	Catalog& catalog = m_library.catalog();
 	const QHash<LabelId, int> counts = catalog.labelMediaItemCounts();
 	const std::vector<Catalog::Label>& labels = catalog.allLabels();
 

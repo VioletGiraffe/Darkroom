@@ -18,6 +18,7 @@ class QListWidgetItem;
 class QSplitter;
 class QWidget;
 class MediaItemWidget;
+class Library;
 
 // ============================================================================
 // ImportDialog - stage new video and photo files, label them, then import everything labeled in one
@@ -88,7 +89,7 @@ public:
 
 	// suggestedRelocateFolder pre-fills the relocation destination on first use (when
 	// nothing's been persisted yet); see "Source file relocation row" in the .cpp.
-	ImportDialog(Callbacks callbacks, const QString& suggestedRelocateFolder, QWidget* parent = nullptr);
+	ImportDialog(Library& library, Callbacks callbacks, const QString& suggestedRelocateFolder, QWidget* parent = nullptr);
 	~ImportDialog() override;
 
 	// Pre-populates the staging area with the given files and/or folders (a folder is scanned recursively for
@@ -203,6 +204,7 @@ private:
 		QListWidgetItem* item = nullptr;  // the grid item carrying this entry's MediaItemWidget card
 	};
 
+	Library& m_library;
 	Callbacks m_callbacks;
 	std::vector<LabelOption> m_labelOptions;       // cached list: m_provisionalLabels + the Catalog's real labels
 	std::vector<LabelOption> m_provisionalLabels;  // labels minted in-dialog, not in the Catalog until Import materializes them

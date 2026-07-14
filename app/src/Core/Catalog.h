@@ -9,6 +9,7 @@
 #include <QSet>
 #include <QString>
 #include <QStringList>
+#include <QStringView>
 
 #include <vector>
 
@@ -32,14 +33,13 @@
 // path in hand). Everywhere else an item is addressed by the MediaId it already carries; the disk is never
 // walked during normal operation (only the on-demand integrity tool walks it).
 //
-// Single shared instance, GUI-thread only.
+// Owned by Library and borrowed explicitly by its consumers. GUI-thread only.
 class Catalog
 {
 public:
-	static Catalog& instance();
-
 	// Id of the one virtual (folderless) label.
 	static constexpr LabelId BestLabelId = LabelId::Best;
+	static constexpr QStringView PhotosDirectoryName = u"Photos";
 
 	struct Label
 	{
@@ -105,8 +105,9 @@ public:
 	[[nodiscard]] bool isSplitIntoFrames(const MediaId& id) const;
 	// Unknown id -> Video.
 	[[nodiscard]] MediaType mediaType(const MediaId& id) const;
-	// True for a photo tracked in place (catalog-only): label operations never move its file, deleting it
-	// never touches the file, and it has no storage folder - all its labels are stored ids. Unknown id / video -> false.
+	// True for a photo tracked in place: Catalog label/removal operations never touch its file, and it has no
+	// storage folder - all its labels are stored ids. The UI's separate physical Delete action may delete it.
+	// Unknown id / video -> false.
 	[[nodiscard]] bool isReferenced(const MediaId& id) const;
 	// The video's source duration in ms, probed once at import (see Ffmpeg::generatePreviewFrames). -1 when
 	// unknown: an unknown id, a photo, or a video imported before durations were recorded (backfilled lazily
@@ -141,7 +142,7 @@ public:
 	class BatchScope
 	{
 	public:
-		BatchScope() : _writer(MetadataStore::instance().beginBatch()) {}
+		explicit BatchScope(Catalog& catalog) : _writer(catalog._metadataStore.beginBatch()) {}
 		BatchScope(const BatchScope&) = delete;
 		BatchScope& operator=(const BatchScope&) = delete;
 
@@ -229,7 +230,8 @@ public:
 	Catalog& operator=(const Catalog&) = delete;
 
 private:
-	Catalog();
+	friend class LibraryState;
+	Catalog(QString rootFolder, MetadataStore& metadataStore);
 
 	// Registry (labels.json): load/save, and ensuring the labels the current model implies exist.
 	void loadRegistry();
@@ -239,7 +241,8 @@ private:
 	bool ensureFolderLabelExists(const QString& displayName, const QString& color = {});  // returns true if it added the entry
 	[[nodiscard]] LabelId generateLabelId();  // ++_nextLabelId; monotonic, so never collides. Non-const.
 	[[nodiscard]] LabelId ordinaryLabelIdByName(const QString& displayName) const;  // non-virtual displayName match (case-insensitive); None if none
-	[[nodiscard]] static QString registryPath();
+	[[nodiscard]] QString registryPath() const;
+	[[nodiscard]] QString photosRootFolder() const;
 
 	[[nodiscard]] static QString storageFolderNameOf(const QString& folderAbs);  // the storage-folder name (a *video's* storage-label display name)
 	// The label display name the entry's storage location implies: the storage-folder name for a video
@@ -251,8 +254,8 @@ private:
 	// True if the item carries an ordinary (non-virtual) label other than excludedLabelId - the ">= 1
 	// ordinary label" invariant check shared by the relocate/untag refusal paths.
 	[[nodiscard]] bool hasOtherOrdinaryLabel(const MediaId& id, LabelId excludedLabelId) const;
-	[[nodiscard]] static QString relativeFolder(const QString& folderAbs);    // strip rootFolder() prefix for portable storage
-	[[nodiscard]] static QString absoluteFolder(const QString& folderRel);    // re-anchor a stored relative folder under rootFolder()
+	[[nodiscard]] QString relativeFolder(const QString& folderAbs) const;    // strip the Library root prefix for portable storage
+	[[nodiscard]] QString absoluteFolder(const QString& folderRel) const;    // re-anchor a stored relative folder under the Library root
 	[[nodiscard]] QList<LabelId> computeLabelIds(const MediaId& id, const Entry& e) const;  // derived storage-label + stored extras (reads e.folder + e.type)
 	void refreshMediaItemLabels(const MediaId& id);  // recompute one entry's labelIds after a mutation
 
@@ -262,9 +265,11 @@ private:
 	// does nothing if no other ordinary label remains. Never reached by referenced photos (no storage label).
 	void relocateFolderOffLabel(const MediaId& id, LabelId removedLabelId);
 
-	[[nodiscard]] static QList<LabelId> readStoredLabelIds(const MediaId& id);
-	static void writeStoredLabelIds(const MediaId& id, const QList<LabelId>& labelIds);
+	[[nodiscard]] QList<LabelId> readStoredLabelIds(const MediaId& id) const;
+	void writeStoredLabelIds(const MediaId& id, const QList<LabelId>& labelIds);
 
+	const QString          _rootFolder;
+	MetadataStore&         _metadataStore;
 	std::vector<Label>    _labels;                  // registry, display order
 	QHash<MediaId, Entry> _mediaItems;              // the model: MediaId -> per-item facts
 	uint64_t              _nextLabelId = FirstRealLabelId - 1;  // high-water mark; generateLabelId hands out ++this. Seeded to the max loaded id on load.

@@ -1,5 +1,6 @@
 #include "Windows/VideoPlayerWindow.h"
 #include "UiComponents/MarkerSlider.h"
+#include "Core/Library.h"
 #include "Core/MetadataStore.h"
 #include "Settings.h"
 
@@ -34,13 +35,13 @@ enum LoopItemDataRole { LoopStartRole = Qt::UserRole, LoopEndRole = Qt::UserRole
 std::vector<VideoPlayerWindow*> VideoPlayerWindow::_instances;
 
 
-VideoPlayerWindow::VideoPlayerWindow(const QString& videoPath, const MediaId& mediaId, QWidget* parent) : QMainWindow(parent) {
+VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath, const MediaId& mediaId, QWidget* parent)
+	: QMainWindow(parent), _library(library), _mediaId(mediaId)
+{
 	setAttribute(Qt::WA_DeleteOnClose);
 	setWindowTitle(QFileInfo{ videoPath }.completeBaseName());
 
 	_instances.push_back(this);
-	_mediaId = mediaId;
-
 	// Initialize Player & Output
 	_videoWidget = new QVideoWidget(this);
 	_player = new QMediaPlayer(this);
@@ -144,13 +145,13 @@ VideoPlayerWindow::VideoPlayerWindow(const QString& videoPath, const MediaId& me
 			object.insert("name", loopCombo->itemText(i));
 			array.append(object);
 		}
-		MetadataStore::instance().beginBatch().set(_mediaId, u"intervals", array);  // single write; the temporary Writer flushes right here
+		_library.metadataStore().beginBatch().set(_mediaId, u"intervals", array);  // single write; the temporary Writer flushes right here
 	};
 
 	// Load this video's saved loops into the combo without firing the activation handler wired below.
 	{
 		const QSignalBlocker blocker{ loopCombo };
-		const QJsonArray saved = MetadataStore::instance().get(_mediaId, u"intervals").toArray();
+		const QJsonArray saved = _library.metadataStore().get(_mediaId, u"intervals").toArray();
 		for (const QJsonValue& value : saved)
 		{
 			const QJsonObject object = value.toObject();
@@ -325,15 +326,15 @@ void VideoPlayerWindow::restartAll()
 
 void VideoPlayerWindow::closeAll()
 {
-	for (VideoPlayerWindow* win : _instances)
-	{
-		win->close();
-	}
+	// Destroy synchronously so a root switch cannot return to the event loop with players for the old library.
+	const std::vector<VideoPlayerWindow*> instances = _instances;
+	for (VideoPlayerWindow* win : instances)
+		delete win;
 }
 
-void VideoPlayerWindow::createPlayerWindow(const QString& videoPath, QWidget* parent)
+void VideoPlayerWindow::createPlayerWindow(Library& library, const QString& videoPath, QWidget* parent)
 {
-	auto* player = new VideoPlayerWindow(videoPath, MediaId::fromFile(videoPath), parent);
+	auto* player = new VideoPlayerWindow(library, videoPath, MediaId::fromFile(videoPath), parent);
 	player->show();
 }
 

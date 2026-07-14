@@ -1,4 +1,5 @@
 #include "Windows/SourceRelocation.h"
+#include "Core/Library.h"
 #include "Core/MediaId.h"
 #include "Utils.h"
 #include "Windows/VideoPlayerWindow.h"
@@ -45,7 +46,7 @@ class FileCollisionDialog final : public QDialog
 public:
 	enum class Result { Overwrite, Skip, SkipAndDelete, Cancel };
 
-	FileCollisionDialog(const QString& stagedPath, const QString& destPath, bool isDuplicate, QWidget* parent)
+	FileCollisionDialog(Library& library, const QString& stagedPath, const QString& destPath, bool isDuplicate, QWidget* parent)
 		: QDialog(parent)
 	{
 		setWindowTitle(isDuplicate ? tr("Duplicate File Found") : tr("File Already Exists"));
@@ -74,13 +75,18 @@ public:
 			// destroyed as soon as Overwrite/Skip is clicked, which would
 			// otherwise kill an in-progress preview along with it.
 			QWidget* previewParent = parent;
+			Library* const playerLibrary = &library;
 
 			QPushButton* playStaged = new QPushButton(tr("Play Staged File"), this);
-			connect(playStaged, &QPushButton::clicked, this, [previewParent, stagedPath] { VideoPlayerWindow::createPlayerWindow(stagedPath, previewParent); });
+			connect(playStaged, &QPushButton::clicked, this, [playerLibrary, previewParent, stagedPath] {
+				VideoPlayerWindow::createPlayerWindow(*playerLibrary, stagedPath, previewParent);
+			});
 			buttonRow->addWidget(playStaged);
 
 			QPushButton* playExisting = new QPushButton(tr("Play Existing File"), this);
-			connect(playExisting, &QPushButton::clicked, this, [previewParent, destPath] { VideoPlayerWindow::createPlayerWindow(destPath, previewParent); });
+			connect(playExisting, &QPushButton::clicked, this, [playerLibrary, previewParent, destPath] {
+				VideoPlayerWindow::createPlayerWindow(*playerLibrary, destPath, previewParent);
+			});
 			buttonRow->addWidget(playExisting);
 		}
 
@@ -138,7 +144,8 @@ struct RelocationOutcome
 // already-catalogued copy and this item is not imported; "Cancel" additionally
 // keeps it staged. File-operation *failures* fall back to importing from the
 // original path, so an I/O error never silently drops a file the user wanted.
-[[nodiscard]] RelocationOutcome performRelocation(QWidget* dialogParent, const QString& path, Mode mode, const QString& destFolder)
+[[nodiscard]] RelocationOutcome performRelocation(Library& library, QWidget* dialogParent, const QString& path, Mode mode,
+	const QString& destFolder)
 {
 	const QString destPath = destFolder + "/" + QFileInfo(path).fileName();
 	const bool isMove = (mode == Mode::Move);
@@ -156,7 +163,7 @@ struct RelocationOutcome
 	// a genuine duplicate, so the astronomically-rare same-name/same-size/different-content case is still
 	// classified as "files differ". The && short-circuits the byte read when the MediaIds (sizes) differ.
 	const bool isDuplicate = (MediaId::fromFile(path) == MediaId::fromFile(destPath)) && filesAreIdentical(path, destPath);
-	FileCollisionDialog collisionDialog(path, destPath, isDuplicate, dialogParent);
+	FileCollisionDialog collisionDialog(library, path, destPath, isDuplicate, dialogParent);
 	collisionDialog.exec();
 
 	switch (collisionDialog.result())
@@ -186,7 +193,8 @@ struct RelocationOutcome
 
 } // namespace
 
-SourceRelocation::BatchResult SourceRelocation::relocateIfNeeded(QWidget* dialogParent, const QStringList& paths, Mode mode, const QString& destFolder)
+SourceRelocation::BatchResult SourceRelocation::relocateIfNeeded(Library& library, QWidget* dialogParent, const QStringList& paths,
+	Mode mode, const QString& destFolder)
 {
 	if (mode == Mode::LeaveInPlace)
 		return { paths, {} };
@@ -206,7 +214,7 @@ SourceRelocation::BatchResult SourceRelocation::relocateIfNeeded(QWidget* dialog
 	result.toImport.reserve(paths.size());
 	for (const QString& path : paths)
 	{
-		const RelocationOutcome outcome = performRelocation(dialogParent, path, mode, destFolder);
+		const RelocationOutcome outcome = performRelocation(library, dialogParent, path, mode, destFolder);
 		if (!outcome.importPath.isEmpty())
 		{
 			result.toImport.append(outcome.importPath);

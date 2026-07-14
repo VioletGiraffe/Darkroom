@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Core/Library.h"
 #include "Core/LabelId.h"
 #include "Core/MediaId.h"
 #include "Import.h"  // Import::PhotoImportMode / PhotoResult (importPhotoBatch's interface)
@@ -11,6 +12,7 @@
 #include <optional>
 #include <vector>
 
+class Catalog;
 class FrameViewerWindow;
 class LabelSidebar;
 class MediaGrid;
@@ -28,7 +30,7 @@ class SortControl;
 class MainWindow final : public QMainWindow
 {
 public:
-	MainWindow(QWidget* parent = nullptr);
+	explicit MainWindow(Library&& library, QWidget* parent = nullptr);
 	~MainWindow();
 
 protected:
@@ -74,7 +76,7 @@ private:
 	// Without id (nullopt): returns the raw grid selection (may be empty).
 	[[nodiscard]] std::vector<MediaId> effectiveSelection(std::optional<MediaId> id = std::nullopt) const;
 	// Bulleted list of the selection's item names for confirmation dialogs, capped so a huge selection stays readable.
-	[[nodiscard]] static QString bulletedItemNameList(const std::vector<MediaId>& selection);
+	[[nodiscard]] QString bulletedItemNameList(const std::vector<MediaId>& selection) const;
 	// Source-file URLs for the given grid items, handed to MediaGrid to export them when a card is dragged out
 	// (a multi-selection drags every selected file). Missing files (e.g. a referenced item on an unmounted
 	// drive) are skipped.
@@ -124,7 +126,7 @@ private:
 	void checkCatalogIntegrity();
 
 	// Best helpers (Best is a label in the Catalog; these are thin wrappers over it)
-	[[nodiscard]] static bool isInBest(const MediaId& id);
+	[[nodiscard]] bool isInBest(const MediaId& id) const;
 	void toggleBest(const MediaId& id);
 
 	void deleteSelectedItems();
@@ -139,6 +141,12 @@ private:
 	void deleteFolderRecursively(const QString& folderPath);
 
 private:
+	[[nodiscard]] Catalog& libraryCatalog();
+	[[nodiscard]] const Catalog& libraryCatalog() const;
+
+	// Declared first so it outlives the other C++ members; the destructor explicitly deletes Qt children
+	// that borrow it before member destruction begins.
+	Library m_library;
 	LabelSidebar*      m_labelSidebar = nullptr;
 	QLineEdit*         m_nameFilter   = nullptr;
 	SegmentedToggle*   m_mediaTypeFilter = nullptr;  // All / Videos / Photos grid filter

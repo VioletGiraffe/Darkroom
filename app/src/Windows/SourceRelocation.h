@@ -5,6 +5,7 @@
 #include <QStringList>
 
 class QWidget;
+class Library;
 
 // Source-file relocation for the import flow: optionally copy/move each staged source file into a chosen
 // folder as it's imported, so the import proceeds from the new location instead of the original. A name
@@ -32,5 +33,6 @@ namespace SourceRelocation
 	// (rather than once per file) to avoid repeating the same warning for every file. dialogParent hosts the
 	// collision/error dialogs. File-operation *failures* fall back to importing from the original path, so an
 	// I/O error never silently drops a file the user wanted.
-	[[nodiscard]] BatchResult relocateIfNeeded(QWidget* dialogParent, const QStringList& paths, Mode mode, const QString& destFolder);
+	[[nodiscard]] BatchResult relocateIfNeeded(Library& library, QWidget* dialogParent, const QStringList& paths, Mode mode,
+		const QString& destFolder);
 }

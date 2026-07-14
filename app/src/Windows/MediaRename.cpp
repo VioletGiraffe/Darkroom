@@ -14,10 +14,9 @@ namespace {
 
 using MediaRename::Result;
 
-Result renameVideo(const MediaId& oldId, const QString& newFolderPath, QWidget* parent)
+Result renameVideo(Catalog& catalog, const MediaId& oldId, const QString& newFolderPath, QWidget* parent)
 {
 	const QString dialogTitle = QObject::tr("Rename media file");
-	Catalog& catalog = Catalog::instance();
 	const QString oldFolderPath = catalog.folderForMediaItem(oldId);
 	const QString oldSourcePath = catalog.sourcePathForMediaItem(oldId);
 
@@ -68,13 +67,13 @@ Result renameVideo(const MediaId& oldId, const QString& newFolderPath, QWidget* 
 	return { .renamed = true, .oldFolderPath = oldFolderPath, .newFolderPath = newFolderPath };
 }
 
-Result renameVideoInteractive(const MediaId& id, QWidget* parent)
+Result renameVideoInteractive(Catalog& catalog, const MediaId& id, QWidget* parent)
 {
 	// Videos only - the dispatcher routes photos elsewhere. The rename below derives video-shaped paths; on an
 	// owned photo, folderForMediaItem is the SHARED Photos/<label> dir and would pass the exists-check.
-	assert_r(Catalog::instance().mediaType(id) == Catalog::MediaType::Video);
+	assert_r(catalog.mediaType(id) == Catalog::MediaType::Video);
 
-	const QString originalFolderPath = Catalog::instance().folderForMediaItem(id);
+	const QString originalFolderPath = catalog.folderForMediaItem(id);
 
 	// The frame folder must exist
 	if (originalFolderPath.isEmpty() || !QDir(originalFolderPath).exists())
@@ -83,7 +82,7 @@ Result renameVideoInteractive(const MediaId& id, QWidget* parent)
 		return {};
 	}
 
-	const QString oldSourcePath = Catalog::instance().sourcePathForMediaItem(id);
+	const QString oldSourcePath = catalog.sourcePathForMediaItem(id);
 	const bool sourceExists = !oldSourcePath.isEmpty() && QFile::exists(oldSourcePath);
 
 	const QString oldName = QFileInfo(originalFolderPath).fileName();
@@ -137,20 +136,19 @@ Result renameVideoInteractive(const MediaId& id, QWidget* parent)
 	}
 	message += QObject::tr("• Frame folder:\n  %1\n  → %2").arg(originalFolderPath, newFolderPath);
 
-	if (Catalog::instance().mediaItemHasLabel(id, Catalog::BestLabelId))
+	if (catalog.mediaItemHasLabel(id, Catalog::BestLabelId))
 		message += QObject::tr("\n\n• Best label reference will be updated.");
 
 	if (QMessageBox::question(parent, QObject::tr("Rename media file"), message,
 		QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes) != QMessageBox::Yes)
 		return {};
 
-	return renameVideo(id, newFolderPath, parent);
+	return renameVideo(catalog, id, newFolderPath, parent);
 }
 
-Result renamePhoto(const MediaId& oldId, const QString& newSourcePath, QWidget* parent)
+Result renamePhoto(Catalog& catalog, const MediaId& oldId, const QString& newSourcePath, QWidget* parent)
 {
 	const QString title = QObject::tr("Rename photo");
-	Catalog& catalog = Catalog::instance();
 	const QString oldSourcePath = catalog.sourcePathForMediaItem(oldId);
 	const QString folderAbs     = catalog.folderForMediaItem(oldId);  // unchanged by the rename: Photos/<label> (owned) or empty (referenced)
 
@@ -178,12 +176,11 @@ Result renamePhoto(const MediaId& oldId, const QString& newSourcePath, QWidget* 
 	return { .renamed = true };
 }
 
-Result renamePhotoInteractive(const MediaId& id, QWidget* parent)
+Result renamePhotoInteractive(Catalog& catalog, const MediaId& id, QWidget* parent)
 {
 	// A photo has no frame folder; its file IS the item, and its identity is that file's name + size. Renaming
 	// here means renaming just the file's base name in place (owned: inside Photos/<label>; referenced: in the
 	// user's own folder), keeping the extension - never renaming the folder the way the video path does.
-	Catalog& catalog = Catalog::instance();
 	assert_r(catalog.mediaType(id) == Catalog::MediaType::Photo);
 
 	const QString title = QObject::tr("Rename photo");
@@ -226,20 +223,20 @@ Result renamePhotoInteractive(const MediaId& id, QWidget* parent)
 	message += catalog.isReferenced(id)
 		? QObject::tr("• This photo is referenced in place - its file below, outside the library, will be renamed:\n  %1\n  → %2").arg(oldSourcePath, newSourcePath)
 		: QObject::tr("• File:\n  %1\n  → %2").arg(oldSourcePath, newSourcePath);
-	if (Catalog::instance().mediaItemHasLabel(id, Catalog::BestLabelId))
+	if (catalog.mediaItemHasLabel(id, Catalog::BestLabelId))
 		message += QObject::tr("\n\n• Best label reference will be updated.");
 
 	if (QMessageBox::question(parent, title, message, QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes) != QMessageBox::Yes)
 		return {};
 
-	return renamePhoto(id, newSourcePath, parent);
+	return renamePhoto(catalog, id, newSourcePath, parent);
 }
 
 } // namespace
 
-MediaRename::Result MediaRename::renameItemInteractive(const MediaId& id, QWidget* dialogParent)
+MediaRename::Result MediaRename::renameItemInteractive(Catalog& catalog, const MediaId& id, QWidget* dialogParent)
 {
-	if (Catalog::instance().mediaType(id) == Catalog::MediaType::Photo)
-		return renamePhotoInteractive(id, dialogParent);
-	return renameVideoInteractive(id, dialogParent);
+	if (catalog.mediaType(id) == Catalog::MediaType::Photo)
+		return renamePhotoInteractive(catalog, id, dialogParent);
+	return renameVideoInteractive(catalog, id, dialogParent);
 }

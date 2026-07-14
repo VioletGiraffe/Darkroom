@@ -10,6 +10,7 @@
 class QListWidget;
 class QListWidgetItem;
 class SegmentedToggle;
+class Library;
 
 // Left-hand label filter for the main window. Lists every label (color swatch + name + item count) plus an
 // "All" row, lets the user toggle any number of them as an active filter, and offers an AND/OR combine mode.
@@ -19,7 +20,7 @@ class LabelSidebar final : public QWidget
 {
 	Q_OBJECT
 public:
-	explicit LabelSidebar(QWidget* parent = nullptr);
+	explicit LabelSidebar(Library& library, QWidget* parent = nullptr);
 
 	// Rebuilds the rows from the Catalog (labels, order, counts) and drops any active filter ids that no
 	// longer exist. Does not emit filterChanged.
@@ -47,6 +48,7 @@ private:
 	void showRowContextMenu(const QPoint& pos);   // right-click a label row -> rename / set color / delete
 
 private:
+	Library&          m_library;
 	QListWidget*      m_list        = nullptr;   // flat single-column list; rows painted by a custom delegate
 	SegmentedToggle*  m_andOrToggle = nullptr;   // OR / AND combine-mode control (segment 1 == AND)
 	QSet<LabelId>     m_activeLabelIds;   // empty == All (no filter)

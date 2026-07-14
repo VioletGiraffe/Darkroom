@@ -28,7 +28,8 @@ static bool copyPreviewFrames(const QString& srcPreviewDir, const QString& dstPr
 	return copiedAny;
 }
 
-Import::Result Import::importVideo(const QString& videoPath, const QString& storageFolderPath, const QString& stagedPreviewDir, bool overwriteExisting, qint64 stagedDurationMs)
+Import::Result Import::importVideo(Catalog& catalog, const QString& videoPath, const QString& storageFolderPath,
+	const QString& stagedPreviewDir, bool overwriteExisting, qint64 stagedDurationMs)
 {
 	QFileInfo videoInfo(videoPath);
 	if (!videoInfo.exists())
@@ -64,7 +65,7 @@ Import::Result Import::importVideo(const QString& videoPath, const QString& stor
 		durationMs = Ffmpeg::generatePreviewFrames(videoPath, Catalog::previewDirFor(outputFolder), previewFrameCount).durationMs;
 	}
 
-	if (!Catalog::instance().addMediaItem(MediaId::fromFile(videoPath), videoPath, outputFolder, /*splitIntoFrames=*/false, durationMs))
+	if (!catalog.addMediaItem(MediaId::fromFile(videoPath), videoPath, outputFolder, /*splitIntoFrames=*/false, durationMs))
 	{
 		QString message = QObject::tr("An item with the same name and file size is already tracked under a different label:\n%1").arg(videoPath);
 		if (!QDir(outputFolder).removeRecursively())
@@ -75,13 +76,12 @@ Import::Result Import::importVideo(const QString& videoPath, const QString& stor
 	return {};
 }
 
-Import::PhotoResult Import::importPhoto(const QString& photoPath, const QString& labelDisplayName, PhotoImportMode mode)
+Import::PhotoResult Import::importPhoto(Catalog& catalog, const QString& photosRootFolder, const QString& photoPath,
+	const QString& labelDisplayName, PhotoImportMode mode)
 {
 	const QFileInfo photoInfo(photoPath);
 	if (!photoInfo.isFile())
 		return { PhotoStatus::Error, QObject::tr("Photo file does not exist:\n%1").arg(photoPath), {} };
-
-	Catalog& catalog = Catalog::instance();
 
 	if (mode == PhotoImportMode::Reference)
 	{
@@ -98,7 +98,7 @@ Import::PhotoResult Import::importPhoto(const QString& photoPath, const QString&
 	}
 
 	// Owned import: land the file in the label's photo dir, auto-renaming around collisions.
-	const QString destDir = photosRootFolder() + "/" + labelDisplayName;
+	const QString destDir = photosRootFolder + "/" + labelDisplayName;
 	if (!QDir{}.mkpath(destDir))
 		return { PhotoStatus::Error, QObject::tr("Failed to create photo folder:\n%1").arg(destDir), {} };
 

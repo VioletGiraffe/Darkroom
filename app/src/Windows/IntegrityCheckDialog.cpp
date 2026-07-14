@@ -13,21 +13,21 @@
 #include <memory>
 #include <utility>
 
-bool IntegrityCheckDialog::scanAndShowUi(Callbacks callbacks, QWidget* parent)
+bool IntegrityCheckDialog::scanAndShowUi(const Catalog& catalog, const QString& rootFolder, Callbacks callbacks, QWidget* parent)
 {
-	const CatalogIntegrity::IntegrityReport report = CatalogIntegrity::scan();
+	const CatalogIntegrity::IntegrityReport report = CatalogIntegrity::scan(catalog, rootFolder);
 	if (report.isEmpty())
 	{
 		QMessageBox::information(parent, tr("Catalog integrity check"), tr("No issues found - the catalog matches what's on disk."));
 		return false;
 	}
 
-	IntegrityCheckDialog dialog(report, std::move(callbacks), parent);
+	IntegrityCheckDialog dialog(catalog, report, std::move(callbacks), parent);
 	dialog.exec();
 	return true;
 }
 
-IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityReport& report, Callbacks callbacks, QWidget* parent)
+IntegrityCheckDialog::IntegrityCheckDialog(const Catalog& catalog, const CatalogIntegrity::IntegrityReport& report, Callbacks callbacks, QWidget* parent)
 	: QDialog(parent), m_callbacks(std::move(callbacks))
 {
 	setWindowTitle(tr("Catalog Integrity Check"));
@@ -52,7 +52,7 @@ IntegrityCheckDialog::IntegrityCheckDialog(const CatalogIntegrity::IntegrityRepo
 	QVBoxLayout* contentLayout = new QVBoxLayout(content);
 
 	// A member (not a local) because it owns the row state the section button handlers share.
-	m_sections = std::make_unique<IntegrityCheckSections>(report, m_callbacks, content, contentLayout, this);
+	m_sections = std::make_unique<IntegrityCheckSections>(catalog, report, m_callbacks, content, contentLayout, this);
 
 	contentLayout->addStretch(1);
 	scroll->setWidget(content);

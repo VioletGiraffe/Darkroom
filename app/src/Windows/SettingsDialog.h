@@ -3,6 +3,8 @@
 #include "settingsui/csettingsdialog.h"
 #include "settingsui/csettingspage.h"
 
+#include <QString>
+
 class QLineEdit;
 class QSpinBox;
 class SegmentedToggle;
@@ -12,8 +14,9 @@ class SegmentedToggle;
 class GeneralSettingsPage final : public CSettingsPage
 {
 public:
-	explicit GeneralSettingsPage(QWidget* parent = nullptr);
+	GeneralSettingsPage(const QString& rootFolder, QWidget* parent = nullptr);
 	void acceptSettings() override;
+	[[nodiscard]] QString requestedRootFolder() const;
 
 private:
 	QLineEdit*       m_rootFolder    = nullptr;
@@ -44,5 +47,9 @@ private:
 class SettingsDialog final : public CSettingsDialog
 {
 public:
-	explicit SettingsDialog(QWidget* parent = nullptr);
+	SettingsDialog(const QString& rootFolder, QWidget* parent = nullptr);
+	[[nodiscard]] QString requestedRootFolder() const;
+
+private:
+	GeneralSettingsPage* m_generalPage = nullptr;
 };

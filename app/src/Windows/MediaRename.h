@@ -5,6 +5,7 @@
 #include <QString>
 
 class QWidget;
+class Catalog;
 
 // The interactive rename flows for catalog media items. Each flow prompts for the new name, validates it,
 // spells out every resulting change in a confirmation dialog, applies the on-disk rename(s), and re-keys the
@@ -22,5 +23,5 @@ namespace MediaRename
 	};
 
 	// Dispatches to the video- or photo-specific flow by the item's type. dialogParent hosts every prompt.
-	Result renameItemInteractive(const MediaId& id, QWidget* dialogParent);
+	Result renameItemInteractive(Catalog& catalog, const MediaId& id, QWidget* dialogParent);
 }

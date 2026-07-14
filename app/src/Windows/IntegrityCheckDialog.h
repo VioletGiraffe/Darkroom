@@ -53,10 +53,10 @@ public:
 	// Scans the catalog for drift against disk and, if anything was found, shows this dialog so the user can
 	// resolve each finding. Just an information box if the catalog is clean.
 	// Returns true if something was found, false if the catalog is clean (no dialog shown).
-	static bool scanAndShowUi(Callbacks callbacks, QWidget* parent);
+	static bool scanAndShowUi(const Catalog& catalog, const QString& rootFolder, Callbacks callbacks, QWidget* parent);
 
 private:
-	IntegrityCheckDialog(const CatalogIntegrity::IntegrityReport& report, Callbacks callbacks, QWidget* parent);
+	IntegrityCheckDialog(const Catalog& catalog, const CatalogIntegrity::IntegrityReport& report, Callbacks callbacks, QWidget* parent);
 	~IntegrityCheckDialog() override;
 
 	Callbacks m_callbacks;

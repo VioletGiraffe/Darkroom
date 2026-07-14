@@ -9,17 +9,21 @@ All shared `QSettings` keys live in `src/Settings.h`, two namespaces: `Settings:
 `QSettings{}.value(Settings::Foo, Defaults::Foo).toFoo()` — covering the root folder, ffmpeg path, output
 format/quality, playback, and color scheme.
 
-Convenience getters live in **`Utils.h`** when app-wide (`rootFolder()`, `ffmpegPath()`) or as file-local
+Convenience getters live in **`Utils.h`** when truly app-wide (`ffmpegPath()`) or as file-local
 inline helpers in the owning `.cpp` when narrower. A few keys are deliberately **kept out of Settings.h**
 because they're local to one UI/class (preview frame count, card zoom, frame-viewer thumbnail size), read
 directly via inline `QSettings{}`. The `MetadataStore`'s `catalog.json` (see [data-model.md](data-model.md))
-is separate from `QSettings` entirely — that's per-item data, not app configuration.
+is separate from `QSettings` entirely — that's per-item data, not app configuration. Runtime root paths come
+from an explicitly owned/borrowed `Library`, never from `QSettings`; only startup reads the configured root,
+and only a successful `MainWindow` root switch writes it.
 
 ## `SettingsDialog` (`src/Windows/SettingsDialog.h/.cpp`)
 
-Uses `CSettingsDialog`/`CSettingsPage` from `qtutils` (`settingsui/`). Caveat:
-`CSettingsDialog::accept()` runs every page's `acceptSettings()` (returns void) then accepts — so the
-required-root-folder validation only **warns** and skips saving, but the dialog still closes. Color-scheme
+Uses `CSettingsDialog`/`CSettingsPage` from `qtutils` (`settingsui/`). Ordinary page values are persisted by
+`acceptSettings()`. The root field is deliberately different: the page only exposes the requested value;
+after acceptance `MainWindow` asks its stable `Library` member to `setRoot()`, which validates and constructs
+a complete replacement state internally before publishing it, then persists the normalized root.
+Invalid/corrupt candidates leave the current state active. Color-scheme
 radios apply immediately via `setColorScheme()` (and again at startup in `main.cpp`, before `MainWindow`).
 
 ## Theme (`src/Theme/Theme.h/.cpp`)

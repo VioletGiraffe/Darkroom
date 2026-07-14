@@ -6,6 +6,8 @@
 
 #include <vector>
 
+class Catalog;
+
 // The read-only catalog-vs-disk scan and its report vocabulary. The scan (see the state grid above scan() in
 // the .cpp) reasons purely over Catalog's public API plus the on-disk layout; the *resolutions* it feeds
 // (re-import / regenerate-preview / mark-split / relocate / remove) are mutations that live on Catalog and
@@ -70,6 +72,6 @@ struct IntegrityReport
 
 // Walks the catalog model + disk once (only ever on explicit user request, never part of the normal refresh
 // path), looking for the drift the banner above the definition maps. Read-only.
-[[nodiscard]] IntegrityReport scan();
+[[nodiscard]] IntegrityReport scan(const Catalog& catalog, const QString& rootFolder);
 
 } // namespace CatalogIntegrity

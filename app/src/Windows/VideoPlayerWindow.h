@@ -8,20 +8,21 @@
 
 class QMediaPlayer;
 class QVideoWidget;
+class Library;
 
 class VideoPlayerWindow final : public QMainWindow
 {
 public:
 	// mediaId keys the saved loop intervals in MetadataStore; pass the catalog's id for a tracked video, or
 	// MediaId::fromFile(videoPath) for an ad-hoc one (a staging/untracked preview not in the catalog).
-	VideoPlayerWindow(const QString& videoPath, const MediaId& mediaId, QWidget* parent);
+	VideoPlayerWindow(Library& library, const QString& videoPath, const MediaId& mediaId, QWidget* parent);
 	~VideoPlayerWindow() override;
 
 	static void restartAll();
 	static void closeAll();
 
 	// Convenience: opens a self-managing player window for the file as an ad-hoc playback (the MediaId is derived from the file, so an untracked/staged video works too)
-	static void createPlayerWindow(const QString& videoPath, QWidget* parent);
+	static void createPlayerWindow(Library& library, const QString& videoPath, QWidget* parent);
 
 private:
 	void resizeAndMoveWindow();
@@ -32,6 +33,7 @@ private:
 private:
 	static std::vector<VideoPlayerWindow*> _instances;
 
+	Library& _library;
 	MediaId _mediaId; // identity of the played source video; keys its saved loops in MetadataStore
 
 	QMediaPlayer* _player = nullptr;

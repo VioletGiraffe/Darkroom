@@ -4,6 +4,8 @@
 
 #include <QString>
 
+class Catalog;
+
 // The per-item import worker: registers one source video file under a label. UI-free by design -
 // nothing here prompts or reports; every outcome is returned for the caller to present. MainWindow::importVideoBatch
 // is the batch coordinator on top of this and owns all the import UI (the app-wide processing lock, the
@@ -33,7 +35,8 @@ struct Result
 // stagedDurationMs is the duration the Import dialog already probed while staging this video (-1 when unknown, e.g.
 // a direct import that reuses no staged frames); it's recorded on the item, saving a redundant probe. The
 // fresh-extraction fallback probes anyway, so its result supersedes a -1 here.
-[[nodiscard]] Result importVideo(const QString& videoPath, const QString& storageFolderPath, const QString& stagedPreviewDir, bool overwriteExisting, qint64 stagedDurationMs = -1);
+[[nodiscard]] Result importVideo(Catalog& catalog, const QString& videoPath, const QString& storageFolderPath, const QString& stagedPreviewDir,
+	bool overwriteExisting, qint64 stagedDurationMs = -1);
 
 // How a photo enters the library: its file copied or moved into <root>/Photos/<label>/ (owned), or left
 // where it is and merely tracked (referenced).
@@ -64,6 +67,7 @@ struct PhotoResult
 // byte-identical file already at the destination is adopted as-is instead of copied again. Reference mode
 // touches no files: it registers the photo at photoPath with the referenced flag; the caller applies the
 // initial label afterwards (a referenced photo has no storage folder to derive it from).
-[[nodiscard]] PhotoResult importPhoto(const QString& photoPath, const QString& labelDisplayName, PhotoImportMode mode);
+[[nodiscard]] PhotoResult importPhoto(Catalog& catalog, const QString& photosRootFolder, const QString& photoPath,
+	const QString& labelDisplayName, PhotoImportMode mode);
 
 } // namespace Import

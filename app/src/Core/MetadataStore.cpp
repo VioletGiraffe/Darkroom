@@ -1,27 +1,23 @@
 #include "Core/MetadataStore.h"
-#include "Utils.h"
 
 #include <QDir>
 #include <QFile>
 #include <QJsonDocument>
 #include <QSaveFile>
 
+#include <utility>
+
 namespace { constexpr const char* kFileName = "catalog.json"; }
 
-MetadataStore& MetadataStore::instance()
-{
-	static MetadataStore store;
-	return store;
-}
-
-MetadataStore::MetadataStore()
+MetadataStore::MetadataStore(QString rootFolder)
+	: _rootFolder(std::move(rootFolder))
 {
 	load();
 }
 
 QString MetadataStore::filePath() const
 {
-	return rootFolder() + "/" + kFileName;
+	return _rootFolder + "/" + kFileName;
 }
 
 void MetadataStore::load()
@@ -35,7 +31,7 @@ void MetadataStore::load()
 
 void MetadataStore::save() const
 {
-	QDir{}.mkpath(rootFolder()); // the root folder should already exist, but don't fail a write if it doesn't
+	QDir{}.mkpath(_rootFolder); // the root folder should already exist, but don't fail a write if it doesn't
 
 	QSaveFile file{ filePath() };
 	if (!file.open(QIODevice::WriteOnly))

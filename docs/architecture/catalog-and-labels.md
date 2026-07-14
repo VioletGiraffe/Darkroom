@@ -9,10 +9,11 @@ in-memory model, not by walking disk. An item is a **video or a photo** (`Catalo
 `"type"` record field — absent means video, so pre-photos catalogs need no migration): a video's folder is its
 frame folder; an **owned** photo's folder is the `<root>/Photos/<label>` dir its file sits in; a **referenced**
 photo (`"referenced"` field, `Catalog::isReferenced`) is tracked in place — no storage folder at all, every
-label a stored extra, and no label operation or deletion ever touches its file. Where `MetadataStore` is dumb `MediaId`-keyed byte persistence,
+label a stored extra, and catalog label/removal operations never touch its file (the separate physical Delete
+UI action can). Where `MetadataStore` is dumb `MediaId`-keyed byte persistence,
 `Catalog` knows what an item and a label *are*: it owns the **label registry** (`labels.json`), the
 `"labels"` field's id-list (de)serialization, and the model's lifecycle. Callers talk to `Catalog`, never to
-`MetadataStore`, for anything item- or label-related. Meyers singleton, GUI-thread.
+`MetadataStore`, for anything item- or label-related. Owned by `Library` and borrowed explicitly; GUI-thread only.
 
 This replaced the original folder-based organization, where each item belonged to exactly one folder:
 items now carry **labels** (an item can have many; `★ Best` is just another label) and are browsed via dynamic
@@ -52,7 +53,7 @@ the label itself changing identity).
 
 ## Persistence
 
-- **Registry (`labels.json`)** in `rootFolder()`: an ordered `[{id, displayName, color}]`. Seeded on
+- **Registry (`labels.json`)** in the library root: an ordered `[{id, displayName, color}]`. Seeded on
   `rebuildIndex()` — `Best` (pinned first) plus one label per storage folder an item **in the catalog model**
   actually lives in (`ensureBestAndFolderLabels`/`ensureFolderLabelExists`). This is derived from the model,
   not a disk walk, which is why an **empty label needs an explicit `createLabel(displayName)` call** —

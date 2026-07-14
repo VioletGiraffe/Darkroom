@@ -1,6 +1,7 @@
 #include "Windows/ImportDialog.h"
 #include "Core/Catalog.h"
 #include "Core/LabelId.h"
+#include "Core/Library.h"
 #include "Ffmpeg.h"
 #include "UiComponents/ContentWidthListWidget.h"
 #include "UiComponents/DragGestureHelper.h"
@@ -112,16 +113,17 @@ using RelocateMode = SourceRelocation::Mode;
 // entry (clear from staging) from a declined/failed one (leave staged). Deliberately not "tracked under *some*
 // folder": on a name+size collision the id is already tracked elsewhere and the staged copy was refused - a
 // plain "is tracked" check would misreport that as imported, silently dropping the entry's pending labels.
-[[nodiscard]] bool isTrackedUnderLabel(const MediaId& id, const QString& labelName)
+[[nodiscard]] bool isTrackedUnderLabel(const Catalog& catalog, const QString& rootFolder, const MediaId& id, const QString& labelName)
 {
-	const QString expectedFolder = rootFolder() + "/" + labelName + "/" + QFileInfo(id.name()).completeBaseName();
-	return QString::compare(Catalog::instance().folderForMediaItem(id), expectedFolder, Qt::CaseInsensitive) == 0;
+	const QString expectedFolder = rootFolder + "/" + labelName + "/" + QFileInfo(id.name()).completeBaseName();
+	return QString::compare(catalog.folderForMediaItem(id), expectedFolder, Qt::CaseInsensitive) == 0;
 }
 
 } // namespace
 
-ImportDialog::ImportDialog(Callbacks callbacks, const QString& suggestedRelocateFolder, QWidget* parent)
+ImportDialog::ImportDialog(Library& library, Callbacks callbacks, const QString& suggestedRelocateFolder, QWidget* parent)
 	: QDialog(parent)
+	, m_library(library)
 	, m_callbacks(std::move(callbacks))
 {
 	setWindowTitle(tr("Import"));
@@ -345,7 +347,7 @@ void ImportDialog::refreshLabelList()
 		m_labelOptions.push_back(provisional);
 	// Every ordinary Catalog label is a candidate destination - read from the Catalog model (which also
 	// carries each label's color), not from a disk listing.
-	for (const Catalog::Label& label : Catalog::instance().allLabels())
+	for (const Catalog::Label& label : m_library.catalog().allLabels())
 		if (!label.isVirtual())
 			m_labelOptions.push_back(LabelOption{ toString(label.id), label.displayName, label.color });
 
@@ -651,7 +653,7 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 			videoPaths << path;
 			continue;
 		}
-		const QString existingPath = Catalog::instance().findPhotoBySameContent(path);
+		const QString existingPath = m_library.catalog().findPhotoBySameContent(path);
 		if (!existingPath.isEmpty())
 			duplicateLines << tr("%1\n    is already imported as %2").arg(QDir::toNativeSeparators(path), QDir::toNativeSeparators(existingPath));
 		else
@@ -891,7 +893,7 @@ void ImportDialog::previewStagedItem(const MediaId& id)
 	if (isSupportedImageFile(it->path))
 		QDesktopServices::openUrl(QUrl::fromLocalFile(it->path));  // a photo opens in the system image viewer
 	else
-		VideoPlayerWindow::createPlayerWindow(it->path, this);
+		VideoPlayerWindow::createPlayerWindow(m_library, it->path, this);
 }
 
 void ImportDialog::locateStagedSourceFile(const MediaId& id)
@@ -1121,7 +1123,8 @@ void ImportDialog::importVideoGroup(const QString& labelName, const std::vector<
 		stagedDurations.insert(id, entry.durationMs);
 	}
 
-	const SourceRelocation::BatchResult relocated = SourceRelocation::relocateIfNeeded(this, paths, relocateMode, m_relocateFolderEdit->text());
+	const SourceRelocation::BatchResult relocated = SourceRelocation::relocateIfNeeded(
+		m_library, this, paths, relocateMode, m_relocateFolderEdit->text());
 	m_callbacks.addMediaItemsRequested(labelName, relocated.toImport, stagedPreviewDirs, stagedDurations);
 
 	for (const MediaId& id : videoIds)
@@ -1141,7 +1144,7 @@ void ImportDialog::importVideoGroup(const QString& labelName, const std::vector<
 		if (const QString newPath = relocated.relocatedTo.value(entry.path); !newPath.isEmpty())
 			m_staged[id].path = newPath;
 
-		if (!isTrackedUnderLabel(id, labelName))
+		if (!isTrackedUnderLabel(m_library.catalog(), m_library.rootFolder(), id, labelName))
 			continue;  // import declined/failed, or the id collided with an item tracked elsewhere - stays staged with its labels intact
 
 		outcome.succeededIds.push_back(id);
@@ -1206,8 +1209,8 @@ void ImportDialog::runImport()
 	// videos and photos (a photo has no per-item folder whose existence could stand in for it).
 	if (!outcome.bestItems.empty() || !outcome.extraLabelAssignments.empty())
 	{
-		Catalog& catalog = Catalog::instance();
-		Catalog::BatchScope batch;  // one store write for the whole flush instead of one per label
+		Catalog& catalog = m_library.catalog();
+		Catalog::BatchScope batch(catalog);  // one store write for the whole flush instead of one per label
 		for (const MediaId& id : outcome.bestItems)
 			if (catalog.containsMediaItem(id))
 				catalog.addLabel(id, Catalog::BestLabelId);

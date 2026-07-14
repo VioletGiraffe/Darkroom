@@ -2,6 +2,26 @@
 
 [← Back to architecture index](../../ARCHITECTURE.md)
 
+## `Library` is the stable root-bound lifetime
+
+`MainWindow` owns one `Library` as a normal member. The stable public object holds a private `State`; each
+state owns one immutable normalized root, its `MetadataStore`, and its `Catalog`. There is no global active
+pointer and no `Catalog`/`MetadataStore` singleton. Persistent collaborators that span a possible root
+change borrow `Library&` and resolve its current catalog/store when needed. Narrow `Catalog&` or
+`MetadataStore&` borrows are for synchronous operations that cannot span `Library::setRoot()`; modal
+root-bound flows may borrow `Library&` for their entire, switch-blocking lifetime.
+
+Startup uses `Library::load()` to validate and construct the initial state before constructing `MainWindow`.
+A live root change goes through `Library::setRoot()`: it validates the candidate folder and the top-level
+shape of any existing `catalog.json`/`labels.json`, constructs a complete candidate state internally, and
+only then replaces the current state. Failure leaves every current object and path untouched. On success,
+`MainWindow` synchronously closes players and clears the persistent frame viewer, media grid and its pending
+thumbnail work, the label filter, and invalidates queued card mutations before returning to the event loop;
+it then persists the normalized root and rebuilds the view. Settings cannot open while an import/re-export
+loop is pumping events: those loops hold short-lived catalog/store references and batch writers which must
+finish before a state replacement. Do not add a code path that writes `Settings::RootFolder` directly;
+`MainWindow`'s successful switch flow owns that transition.
+
 ## `Catalog` is the authoritative in-memory model
 
 `Catalog` (see [catalog-and-labels.md](catalog-and-labels.md)) holds the media-item set in memory, keyed by
@@ -13,7 +33,7 @@ on-demand integrity tool walks it; see [catalog-and-labels.md](catalog-and-label
 (below) is how the model is *persisted*, not a second source of truth; nothing treats `MetadataStore`'s
 records as the catalog — callers ask `Catalog`.
 
-- `rootFolder()` (configured, default `H:/VideoFrames`) contains one **storage folder per label**, plus the
+- `Library::rootFolder()` (configured, default `H:/VideoFrames`) contains one **storage folder per label**, plus the
   reserved **`Photos/`** tree for owned photos (below).
 - Each storage folder contains **frame folders** — one per imported video — holding the extracted frame
   images. A frame folder is what the UI shows as a card.
@@ -30,7 +50,7 @@ records as the catalog — callers ask `Catalog`.
   field (keyed by `MediaId`) and is indexed by `Catalog`. Toggling Best adds/removes that label; no folder is
   moved.
 - Source video files themselves live wherever the user keeps them (often a single dir located via
-  `Catalog::anySourceDir`), not necessarily under `rootFolder()`.
+  `Catalog::anySourceDir`), not necessarily under the library root.
 
 ---
 
@@ -79,10 +99,11 @@ Stable identity for a **label** — a 64-bit value (`enum class LabelId : uint64
 Single shared store for per-item metadata. Dumb persistence only — it has no notion of what a "label" or a
 "folder" means; `Catalog` is the only caller that interprets its records.
 
-- **Meyers singleton** (`MetadataStore::instance()`), GUI-thread only, no internal locking.
-- Backing file: one **`catalog.json`** in `rootFolder()` (so it travels with the library, e.g. on an
+- **Owned by `Library`**, GUI-thread only, no internal locking. Consumers receive a reference explicitly.
+- Backing file: one **`catalog.json`** in `Library::rootFolder()` (so it travels with the library, e.g. on an
   external drive), keyed by `MediaId::key()`, **one record (JSON object of named fields) per item**.
-  Written atomically via `QSaveFile`, indented for readability. Loaded once at first use.
+  Written atomically via `QSaveFile`, indented for readability. Loaded once when the owning `Library` is
+  constructed.
 - **Field-granular API** (`get`/`set` a single named field, `remove` a whole record) so independent features
   share a record without clobbering each other; the store does read-modify-write internally.
 - `allMediaIds()` reconstructs every recorded item from its key + stored name; `Catalog` enumerates items
@@ -98,7 +119,7 @@ Single shared store for per-item metadata. Dumb persistence only — it has no n
   until the **outermost** live Writer is destroyed (they nest via a depth counter) and happens only if
   something changed — so a multi-field record update made through one Writer reaches disk as a single
   atomic `QSaveFile` write, never as a partially-updated record. A one-off single write is a temporary:
-  `instance().beginBatch().set(...)` flushes at the end of the expression (the player's loop intervals do
+  `store.beginBatch().set(...)` flushes at the end of the expression (the player's loop intervals do
   this). What the Writer can't enforce is loop batching: n mutations without an enclosing batch still write
   n times (O(n²) bytes total) — wrap such loops in a `Catalog::BatchScope` (see
   [catalog-and-labels.md](catalog-and-labels.md)), which simply owns a Writer for its scope. Don't store a
@@ -108,7 +129,5 @@ Single shared store for per-item metadata. Dumb persistence only — it has no n
   `"intervals"`, labels use `"labels"`).
 - Each feature owns its own (de)serialization (`QList<…>` ↔ `QJsonArray`); the store stays a dumb keyed
   JSON-blob store, not a god object.
-- **Root changes require a fresh process.** The records and `Catalog` model are loaded once, but each save
-  resolves its destination from the current `rootFolder()`. Changing that setting does not reload the new
-  library; it redirects subsequent writes of the already-loaded model. Do not continue catalog work after a
-  mid-session root change until the application has restarted (the settings flow does not yet enforce this).
+- The store's root is immutable for its lifetime. Saves use that captured root, so an in-memory record set
+  cannot be redirected by a later setting change; changing roots replaces `Library`'s private state.

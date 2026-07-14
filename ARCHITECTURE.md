@@ -42,7 +42,7 @@ orient, then follow the link for the subsystem you're touching.
   `MediaItemWidget`, `MarkerSlider`, `SortControl`, `SegmentedToggle`, `LabelSidebar`) plus their close UI
   helpers (`LabelVisuals`, `DragGestureHelper`, `LabelMimeType`); top-level windows + dialogs in `Windows/`
   (`MainWindow`, `CompareWindow`, `PhotoCompareWindow`, `FrameViewerWindow`, `VideoPlayerWindow`, the `*Dialog`s); the non-UI core
-  model in `Core/` (`Catalog`, `MetadataStore`, `MediaId`); and the visual theming in `Theme/` (`Theme`,
+  model in `Core/` (`Library`, `Catalog`, `MetadataStore`, `MediaId`); and the visual theming in `Theme/` (`Theme`,
   `Style`). `Settings`, `Utils`, `Ffmpeg`, `Import`, and `main.cpp` stay at the `src/` root.
 - **INCLUDEPATH**: `src` plus the submodules `qtutils`, `cpputils`, `cpp-template-utils`, and
   `magic-alignment/src` (its headers are included unqualified: `"MagicAlignment.h"`). With `src` on the
@@ -63,8 +63,14 @@ not just when reading existing code.
 
 - **`Catalog` is the authoritative in-memory model of the media-item set, keyed by `MediaId`.** It is kept current
   by its own mutation API (`addMediaItem`/`removeMediaItem`/`applyRename`/`addLabel`/...), not by re-deriving from
-  disk on every refresh — disk is only walked once, at the legacy seed. See
+  disk on every refresh — only the on-demand integrity tools walk the library tree. See
   [data-model.md](docs/architecture/data-model.md) and [catalog-and-labels.md](docs/architecture/catalog-and-labels.md).
+- **`Library` is the stable root-bound ownership boundary.** `MainWindow` owns it as a normal member; its
+  private state contains one immutable root, `MetadataStore`, and `Catalog`, constructed and replaced as a
+  unit. `Library::setRoot()` fully loads a candidate before publishing it; failure leaves the current state
+  untouched. Persistent consumers borrow `Library&`, while synchronous operations may borrow its current
+  `Catalog` or `MetadataStore`. There is no global active-library/catalog/store accessor. See
+  [data-model.md](docs/architecture/data-model.md).
 - **A label owns nothing on disk.** The folder an item's frames sit in happens to share a name with one of
   the item's labels — that's a per-item storage detail, never a property stored on the label itself. See
   [catalog-and-labels.md](docs/architecture/catalog-and-labels.md).
@@ -92,9 +98,9 @@ not just when reading existing code.
 ## Subsystems
 
 ### [Data model & identity](docs/architecture/data-model.md)
-The on-disk structure (`rootFolder()`, storage folders, frame folders), the `MediaId` identity scheme, and
-`MetadataStore` — the dumb `MediaId`-keyed persistence layer (with batched-write support) that `Catalog`
-loads itself from and writes through.
+The `Library` lifetime and live root-switch transaction; the on-disk structure (`Library::rootFolder()`, storage
+folders, frame folders); the `MediaId` identity scheme; and `MetadataStore` — the dumb `MediaId`-keyed
+persistence layer (with batched-write support) that `Catalog` loads itself from and writes through.
 
 ### [Catalog & labels](docs/architecture/catalog-and-labels.md)
 `Catalog`: the in-memory media-item-set model plus the label model layered over it. Stable label ids, the

@@ -48,9 +48,8 @@
 
 namespace CatalogIntegrity {
 
-IntegrityReport scan()
+IntegrityReport scan(const Catalog& catalog, const QString& rootFolder)
 {
-	Catalog& catalog = Catalog::instance();
 	IntegrityReport report;
 
 	// Phases 1 + 2 in one pass over the model: record a per-entry issue for anything non-healthy, and collect the
@@ -91,8 +90,8 @@ IntegrityReport scan()
 	// Untracked - on-disk content no entry claims. forEachFolder yields the second level: for a normal label
 	// storage folder that's a video frame folder; for the reserved Photos folder it's a <label> dir whose untracked
 	// units are the image FILES inside (owned photos), not the folder itself.
-	forEachFolder(rootFolder(), [&](const QString& storageFolder, const QString& folderPath) {
-		if (storageFolder.compare(PHOTOS_DIR_NAME, Qt::CaseInsensitive) == 0)
+	forEachFolder(rootFolder, [&](const QString& storageFolder, const QString& folderPath) {
+		if (storageFolder.compare(Catalog::PhotosDirectoryName.toString(), Qt::CaseInsensitive) == 0)
 		{
 			const QString labelName = QFileInfo(folderPath).fileName();
 			// Owned photos may be any importable format (isSupportedImageFile - incl. webp/bmp), not only the frame

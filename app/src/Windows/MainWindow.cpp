@@ -1,5 +1,6 @@
 #include "Windows/MainWindow.h"
 #include "Core/Catalog.h"
+#include "Core/Library.h"
 #include "Windows/CompareWindow.h"
 #include "Windows/PhotoCompareWindow.h"
 #include "Ffmpeg.h"
@@ -107,7 +108,8 @@ inline int     jpegQuality() { return QSettings{}.value(Settings::JpegQuality,  
 inline int     frameStep()   { return QSettings{}.value(Settings::FrameStep,    Defaults::FrameStep).toInt(); }
 inline int     cardImageHeight() { return QSettings{}.value(CARD_IMAGE_HEIGHT_KEY, DEFAULT_CARD_IMAGE_HEIGHT).toInt(); }
 
-MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
+MainWindow::MainWindow(Library&& library, QWidget* parent)
+	: QMainWindow(parent), m_library(std::move(library))
 {
 	setWindowTitle("Darkroom");
 	resize(1500, 800);
@@ -127,8 +129,20 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
 
 MainWindow::~MainWindow()
 {
-	delete m_frameViewer;
 	saveSettings();
+	VideoPlayerWindow::closeAll();
+	delete m_frameViewer;
+	delete takeCentralWidget();  // root-bound child widgets must die before the m_library member
+}
+
+Catalog& MainWindow::libraryCatalog()
+{
+	return m_library.catalog();
+}
+
+const Catalog& MainWindow::libraryCatalog() const
+{
+	return m_library.catalog();
 }
 
 void MainWindow::setupUI()
@@ -141,7 +155,7 @@ void MainWindow::setupUI()
 	rootLayout->setSpacing(0);
 
 	// Left: the label sidebar (filter).
-	m_labelSidebar = new LabelSidebar();
+	m_labelSidebar = new LabelSidebar(m_library);
 	connect(m_labelSidebar, &LabelSidebar::filterChanged, this, &MainWindow::refreshMediaGrid);
 	connect(m_labelSidebar, &LabelSidebar::addLabelRequested, this, &MainWindow::createLabelInteractive);
 	connect(m_labelSidebar, &LabelSidebar::renameLabelRequested, this, &MainWindow::renameLabelInteractive);
@@ -355,9 +369,39 @@ void MainWindow::restoreSettings()
 
 void MainWindow::openSettings()
 {
-	SettingsDialog dialog(this);
-	connect(&dialog, &CSettingsDialog::settingsChanged, this, &MainWindow::refreshLibraryView);
-	dialog.exec();
+	if (m_isProcessing)
+	{
+		QMessageBox::information(this, tr("Busy"), tr("Settings cannot be changed while media processing is in progress."));
+		return;
+	}
+
+	SettingsDialog dialog(m_library.rootFolder(), this);
+	if (dialog.exec() != QDialog::Accepted)
+		return;
+
+	const QString requestedRoot = dialog.requestedRootFolder();
+	if (pathComparisonKey(requestedRoot) != pathComparisonKey(m_library.rootFolder()))
+	{
+		QString error;
+		if (!m_library.setRoot(requestedRoot, &error))
+		{
+			QMessageBox::warning(this, tr("Open library"), error);
+			return;
+		}
+
+		// The state is already replaced, but no event can run between setRoot() and this synchronous cleanup.
+		// Close players before returning to the event loop so an old video's controls cannot write into the new
+		// catalog. Clear the read-only views so they do not continue presenting the previous library.
+		VideoPlayerWindow::closeAll();
+		m_frameViewer->showForFolder({});
+		m_mediaGrid->clear();
+		m_contextMenuTarget.reset();
+		m_labelSidebar->setActiveFilter({}, m_labelSidebar->isAndMode());  // label ids belong to one library
+
+		QSettings{}.setValue(Settings::RootFolder, m_library.rootFolder());
+	}
+
+	refreshLibraryView();
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent* event)
@@ -546,7 +590,7 @@ bool MainWindow::regeneratePreviewFromRealFrames(const QString& folderPath, int 
 
 bool MainWindow::regeneratePreviewFor(const MediaId& id)
 {
-	Catalog& catalog = Catalog::instance();
+	Catalog& catalog = libraryCatalog();
 	const QString folder = catalog.folderForMediaItem(id);
 	const int frameCount = m_previewFrameCountCombo->currentData().toInt();
 
@@ -570,7 +614,7 @@ bool MainWindow::regeneratePreviewFor(const MediaId& id)
 
 std::vector<MediaId> MainWindow::mediaItemsMatchingFilters() const
 {
-	Catalog& catalog = Catalog::instance();
+	const Catalog& catalog = libraryCatalog();
 
 	// The sidebar's active label filter applied to the catalog.
 	const QList<LabelId> activeLabelIds = m_labelSidebar->activeLabelIds();
@@ -606,7 +650,7 @@ std::vector<MediaId> MainWindow::mediaItemsMatchingFilters() const
 
 MediaItemWidget* MainWindow::buildMediaCard(const MediaId& id, bool isBest, const QSize& photoCanvas, const QSize& videoCanvas, int previewFrameCount)
 {
-	Catalog& catalog = Catalog::instance();
+	Catalog& catalog = libraryCatalog();
 	const QString folderPath = catalog.folderForMediaItem(id);
 	const bool isPhoto = catalog.mediaType(id) == Catalog::MediaType::Photo;
 	QStringList previewPaths;
@@ -658,10 +702,13 @@ MediaItemWidget* MainWindow::buildMediaCard(const MediaId& id, bool isBest, cons
 	card->setOnLabelDropped([this, id](const QString& labelId) {
 		const std::vector<MediaId> targets = effectiveSelection(id);
 		const LabelId dropped = labelIdFromString(labelId);  // the mime payload is the id's decimal string
-		QMetaObject::invokeMethod(this, [this, targets, dropped] {
-			Catalog::BatchScope batch;  // one store write for the whole selection instead of one per item
+		const uint64_t libraryGeneration = m_library.generation();
+		QMetaObject::invokeMethod(this, [this, libraryGeneration, targets, dropped] {
+			if (m_library.generation() != libraryGeneration)
+				return;  // the queued card action belonged to the State that has since been replaced
+			Catalog::BatchScope batch(libraryCatalog());  // one store write for the whole selection instead of one per item
 			for (const MediaId& target : targets)
-				Catalog::instance().addLabel(target, dropped);
+				libraryCatalog().addLabel(target, dropped);
 			refreshLibraryView();
 		}, Qt::QueuedConnection);
 	});
@@ -686,7 +733,7 @@ void MainWindow::refreshMediaGrid()
 	// The catalog is the authoritative in-memory model, kept current by its mutations, so the grid reads it
 	// directly - no per-refresh re-derivation. Look up the Best set once: the per-card star state and the
 	// favorites-first sort below share it.
-	Catalog& catalog = Catalog::instance();
+	Catalog& catalog = libraryCatalog();
 	const QSet<MediaId> bestSet = catalog.mediaItemsForLabel(Catalog::BestLabelId);
 
 	GridItem::setSortMode(m_sortControl);
@@ -760,7 +807,7 @@ void MainWindow::resortMediaGrid()
 	if (count == 0)
 		return;
 
-	Catalog& catalog = Catalog::instance();
+	Catalog& catalog = libraryCatalog();
 	const QSet<MediaId> bestSet = catalog.mediaItemsForLabel(Catalog::BestLabelId);
 
 	GridItem::setSortMode(m_sortControl);
@@ -802,7 +849,7 @@ std::vector<MediaId> MainWindow::effectiveSelection(std::optional<MediaId> id) c
 
 QList<QUrl> MainWindow::dragUrlsForItems(const QList<QListWidgetItem*>& items) const
 {
-	Catalog& catalog = Catalog::instance();
+	const Catalog& catalog = libraryCatalog();
 	QList<QUrl> urls;
 	urls.reserve(items.size());
 	for (const QListWidgetItem* item : items)
@@ -814,9 +861,9 @@ QList<QUrl> MainWindow::dragUrlsForItems(const QList<QListWidgetItem*>& items) c
 	return urls;
 }
 
-QString MainWindow::bulletedItemNameList(const std::vector<MediaId>& selection)
+QString MainWindow::bulletedItemNameList(const std::vector<MediaId>& selection) const
 {
-	const Catalog& catalog = Catalog::instance();
+	const Catalog& catalog = libraryCatalog();
 	QString list;
 	constexpr size_t maxListed = 15;
 	for (size_t i = 0; i < std::min(maxListed, selection.size()); ++i)
@@ -837,7 +884,7 @@ void MainWindow::deleteSelectedItems()
 	if (selection.empty())
 		return;
 
-	Catalog& catalog = Catalog::instance();
+	Catalog& catalog = libraryCatalog();
 
 	// What "delete" means per type: a video loses its frame folder and source file; a photo loses its
 	// file ONLY - its folderForMediaItem is the shared Photos/<label> dir, home to sibling photos,
@@ -887,7 +934,7 @@ void MainWindow::deleteSelectedItems()
 		QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
 		return;
 
-	Catalog::BatchScope batch;  // one store write for the whole selection instead of one per item
+	Catalog::BatchScope batch(libraryCatalog());  // one store write for the whole selection instead of one per item
 	for (const MediaId& sel : selection)
 	{
 		const QString sourcePath = catalog.sourcePathForMediaItem(sel);
@@ -917,7 +964,7 @@ void MainWindow::removeSelectedItemsFromLibrary()
 	if (selection.empty())
 		return;
 
-	Catalog& catalog = Catalog::instance();
+	Catalog& catalog = libraryCatalog();
 
 	// Untrack drops the catalog entry only - nothing on disk is touched. The catalog is never re-derived
 	// from a disk walk, so an untracked video's frame folder stays out of the library until the integrity
@@ -944,7 +991,7 @@ void MainWindow::removeSelectedItemsFromLibrary()
 		QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
 		return;
 
-	Catalog::BatchScope batch;  // one store write for the whole selection instead of one per item
+	Catalog::BatchScope batch(libraryCatalog());  // one store write for the whole selection instead of one per item
 	for (const MediaId& sel : selection)
 		catalog.removeMediaItem(sel);
 	// The frame viewer is deliberately left open if it's showing one of these folders - the frames stay on disk.
@@ -974,7 +1021,7 @@ void MainWindow::updateEditActions()
 void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globalPos)
 {
 	m_contextMenuTarget = id;
-	Catalog& catalog = Catalog::instance();
+	Catalog& catalog = libraryCatalog();
 	const std::vector<MediaId> selection = effectiveSelection(id);
 	const QString folderPath = catalog.folderForMediaItem(id);
 	const bool isPhoto = catalog.mediaType(id) == Catalog::MediaType::Photo;
@@ -1004,7 +1051,7 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 		menu.addAction(selection.size() > 1 ? tr("Compare selected") : tr("Inspect"), [this, selection] {
 			QStringList folders;
 			for (const MediaId& sel : selection)
-				folders << Catalog::instance().folderForMediaItem(sel);
+				folders << libraryCatalog().folderForMediaItem(sel);
 			auto* w = new CompareWindow(folders, this);
 			w->setAttribute(Qt::WA_DeleteOnClose);
 			w->show();
@@ -1019,7 +1066,7 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 		menu.addAction(tr("Compare photos"), [this, selection] {
 			QStringList paths;
 			for (const MediaId& sel : selection)
-				paths << Catalog::instance().sourcePathForMediaItem(sel);
+				paths << libraryCatalog().sourcePathForMediaItem(sel);
 			PhotoCompareWindow::showForFiles(paths, this);
 		});
 		menu.addSeparator();
@@ -1038,14 +1085,14 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 		openSourceInSystemApp(id);
 	});
 	menu.addAction(tr("Locate source file"), [this, id] {
-		const QString sourcePath = Catalog::instance().sourcePathForMediaItem(id);
+		const QString sourcePath = libraryCatalog().sourcePathForMediaItem(id);
 		if (sourcePath.isEmpty())
 			QMessageBox::warning(this, tr("Error"), tr("No source file is recorded for this item."));
 		else if (!openInExplorer(sourcePath))
 			reportMissingFile(this, sourcePath);
 	});
-	menu.addAction(tr("Copy source path to clipboard"), [id] {
-		const QString sourcePath = Catalog::instance().sourcePathForMediaItem(id);
+	menu.addAction(tr("Copy source path to clipboard"), [this, id] {
+		const QString sourcePath = libraryCatalog().sourcePathForMediaItem(id);
 		if (!sourcePath.isEmpty())
 			QApplication::clipboard()->setText(QDir::toNativeSeparators(sourcePath));
 	});
@@ -1076,13 +1123,13 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 		labelRows.push_back({ label.displayName, QColor(label.color),
 			LabelVisuals::presenceForCount(haveCount, static_cast<int>(selection.size())),
 			[this, selection, labelId](bool addToAll) {
-				Catalog::BatchScope batch;  // one store write for the whole selection instead of one per item
+				Catalog::BatchScope batch(libraryCatalog());  // one store write for the whole selection instead of one per item
 				for (const MediaId& target : selection)
 				{
 					if (addToAll)
-						Catalog::instance().addLabel(target, labelId);
+						libraryCatalog().addLabel(target, labelId);
 					else
-						Catalog::instance().removeLabel(target, labelId);
+						libraryCatalog().removeLabel(target, labelId);
 				}
 				refreshLibraryView();
 			} });
@@ -1101,20 +1148,20 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 
 void MainWindow::playVideo(const MediaId& id)
 {
-	const QString sourcePath = Catalog::instance().sourcePathForMediaItem(id);
+	const QString sourcePath = libraryCatalog().sourcePathForMediaItem(id);
 	if (!QFile::exists(sourcePath))
 	{
 		reportMissingFile(this, sourcePath);
 		return;
 	}
 
-	auto* playerWindow = new VideoPlayerWindow(sourcePath, id, nullptr);  // hand the player the catalog id directly
+	auto* playerWindow = new VideoPlayerWindow(m_library, sourcePath, id, nullptr);  // hand the player the catalog id directly
 	playerWindow->show();
 }
 
 void MainWindow::openSourceInSystemApp(const MediaId& id)
 {
-	const QString sourcePath = Catalog::instance().sourcePathForMediaItem(id);
+	const QString sourcePath = libraryCatalog().sourcePathForMediaItem(id);
 	if (!QFile::exists(sourcePath))
 	{
 		reportMissingFile(this, sourcePath);
@@ -1148,13 +1195,13 @@ void MainWindow::resplitVideoIntoFrames(const QString& videoFilePath, const QStr
 		const Ffmpeg::PreviewResult result = Ffmpeg::generatePreviewFrames(videoFilePath, Catalog::previewDirFor(outputFolder), m_previewFrameCountCombo->currentData().toInt());
 		// splitVideoIntoFrames just (re-)registered this item; record the duration its probe produced, so a
 		// re-export of a video imported before durations were recorded backfills one (no-op if the probe failed).
-		Catalog::instance().setDurationMs(MediaId::fromFile(videoFilePath), result.durationMs);
+		libraryCatalog().setDurationMs(MediaId::fromFile(videoFilePath), result.durationMs);
 	}
 }
 
 void MainWindow::ensureFramesSplit(const MediaId& id)
 {
-	Catalog& catalog = Catalog::instance();
+	Catalog& catalog = libraryCatalog();
 	if (catalog.isSplitIntoFrames(id))
 		return;
 
@@ -1203,7 +1250,7 @@ void MainWindow::splitVideoIntoFrames(const QString& videoFilePath, const QStrin
 	// ensures the folder label for its storage folder exists. It refuses if another item already owns this id (a
 	// name+size collision) under a different folder - in that case don't leave the just-extracted frames
 	// behind as an untracked duplicate.
-	if (!Catalog::instance().addMediaItem(MediaId::fromFile(videoFilePath), videoFilePath, outputFolder, /*splitIntoFrames=*/true))
+	if (!libraryCatalog().addMediaItem(MediaId::fromFile(videoFilePath), videoFilePath, outputFolder, /*splitIntoFrames=*/true))
 	{
 		QMessageBox::critical(this, tr("Error"),
 			tr("An item with the same name and file size is already tracked under a different label:\n%1").arg(videoFilePath));
@@ -1226,7 +1273,7 @@ void MainWindow::importVideoBatch(QStringList videoPaths, const QString& storage
 
 	// Each extracted video below registers via Catalog::addMediaItem (a couple of store writes); batch them into
 	// one write for the whole call instead of one per video.
-	Catalog::BatchScope batch;
+	Catalog::BatchScope batch(libraryCatalog());
 
 	// Show processing message
 	QMessageBox progressBox(this);
@@ -1253,7 +1300,7 @@ void MainWindow::importVideoBatch(QStringList videoPaths, const QString& storage
 			const MediaId id = MediaId::fromFile(videoPath);
 			const QString stagedPreviewDir = stagedPreviewDirs.value(id);
 			const qint64 stagedDurationMs = stagedDurations.value(id, -1);
-			Import::Result result = Import::importVideo(videoPath, storageFolderPath, stagedPreviewDir, overwriteExisting, stagedDurationMs);
+			Import::Result result = Import::importVideo(libraryCatalog(), videoPath, storageFolderPath, stagedPreviewDir, overwriteExisting, stagedDurationMs);
 			if (result.status == Import::Status::FolderConflict)
 			{
 				// Reached via the "decide one by one" batch choice below (or when two videos in one batch
@@ -1264,7 +1311,7 @@ void MainWindow::importVideoBatch(QStringList videoPaths, const QString& storage
 						tr("Folder already exists:\n%1\n\nOverwrite?").arg(outputFolder),
 						QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes)
 					continue;
-				result = Import::importVideo(videoPath, storageFolderPath, stagedPreviewDir, /*overwriteExisting=*/true, stagedDurationMs);
+				result = Import::importVideo(libraryCatalog(), videoPath, storageFolderPath, stagedPreviewDir, /*overwriteExisting=*/true, stagedDurationMs);
 			}
 			if (result.status == Import::Status::Error)
 				QMessageBox::critical(this, tr("Error"), result.errorMessage);
@@ -1299,18 +1346,18 @@ void MainWindow::importVideoBatch(QStringList videoPaths, const QString& storage
 
 std::vector<Import::PhotoResult> MainWindow::importPhotoBatch(LabelId labelId, const QStringList& photoPaths, Import::PhotoImportMode mode)
 {
-	Catalog& catalog = Catalog::instance();
+	Catalog& catalog = libraryCatalog();
 	const Catalog::Label* label = catalog.labelById(labelId);
 	if (!label || label->isVirtual())
 		return {};  // the label vanished from the catalog mid-session; the caller leaves everything staged
 
-	Catalog::BatchScope batch;  // one store write for the whole batch instead of one per photo
+	Catalog::BatchScope batch(catalog);  // one store write for the whole batch instead of one per photo
 
 	std::vector<Import::PhotoResult> results;
 	results.reserve(photoPaths.size());
 	for (const QString& path : photoPaths)
 	{
-		const Import::PhotoResult result = Import::importPhoto(path, label->displayName, mode);
+		const Import::PhotoResult result = Import::importPhoto(catalog, m_library.photosRootFolder(), path, label->displayName, mode);
 		if (result.status == Import::PhotoStatus::Error)
 			QMessageBox::critical(this, tr("Error"), result.errorMessage);
 		// A referenced photo has no storage folder to derive its first label from - store it explicitly.
@@ -1345,7 +1392,7 @@ void MainWindow::reExportAllVideos()
 		QString folderPath;
 	};
 	std::vector<VideoItem> toReExport;
-	Catalog& catalog = Catalog::instance();
+	Catalog& catalog = libraryCatalog();
 	for (const Catalog::Entry& entry : catalog.mediaItems())
 	{
 		if (entry.type != Catalog::MediaType::Video)
@@ -1365,7 +1412,7 @@ void MainWindow::reExportAllVideos()
 	const auto processingGuard = qScopeGuard([this] { m_isProcessing = false; });
 
 	// Each re-extracted video below re-registers via Catalog::addMediaItem; batch the whole pass into one write.
-	Catalog::BatchScope batch;
+	Catalog::BatchScope batch(catalog);
 
 	QMessageBox progressBox(this);
 	progressBox.setWindowTitle(tr("Re-exporting"));
@@ -1389,21 +1436,22 @@ LabelId MainWindow::createFolderLabel(const QString& name, const QString& color,
 {
 	// "Photos" is reserved for the owned-photo storage dir (<root>/Photos/<label>) - a label storage folder by
 	// that name would intermingle with it. Catalog::renameLabel refuses the same name.
-	if (name.compare(BEST_LABEL_NAME, Qt::CaseInsensitive) == 0 || name.compare(PHOTOS_DIR_NAME, Qt::CaseInsensitive) == 0)
+	if (name.compare(BEST_LABEL_NAME, Qt::CaseInsensitive) == 0 || name.compare(Catalog::PhotosDirectoryName.toString(), Qt::CaseInsensitive) == 0)
 	{
 		QMessageBox::warning(this, tr("Error"), tr("\"%1\" is a reserved name.").arg(name));
 		return {};
 	}
 
-	if (!QDir{}.mkpath(rootFolder() + "/" + name))
+	const QString folderPath = m_library.rootFolder() + "/" + name;
+	if (!QDir{}.mkpath(folderPath))
 	{
-		QMessageBox::warning(this, tr("Error"), tr("Failed to create label:\n%1").arg(rootFolder() + "/" + name));
+		QMessageBox::warning(this, tr("Error"), tr("Failed to create label:\n%1").arg(folderPath));
 		return {};
 	}
 
 	// Register the folder label now: an empty label has no item to derive it from, so the catalog
 	// won't surface it otherwise.
-	const LabelId labelId = Catalog::instance().createLabel(name, color);
+	const LabelId labelId = libraryCatalog().createLabel(name, color);
 
 	if (refreshList)
 		refreshLibraryView();
@@ -1419,7 +1467,7 @@ void MainWindow::createLabelInteractive()
 
 void MainWindow::renameLabelInteractive(LabelId labelId)
 {
-	const Catalog::Label* label = Catalog::instance().labelById(labelId);
+	const Catalog::Label* label = libraryCatalog().labelById(labelId);
 	if (!label)
 		return;
 
@@ -1428,7 +1476,7 @@ void MainWindow::renameLabelInteractive(LabelId labelId)
 	if (!ok || newName.isEmpty() || newName == label->displayName)
 		return;
 
-	if (!Catalog::instance().renameLabel(labelId, newName))
+	if (!libraryCatalog().renameLabel(labelId, newName))
 	{
 		QMessageBox::warning(this, tr("Rename label"),
 			tr("Could not rename to \"%1\". The name may already be in use, or a folder by that name already exists.").arg(newName));
@@ -1439,7 +1487,7 @@ void MainWindow::renameLabelInteractive(LabelId labelId)
 
 void MainWindow::setLabelColorInteractive(LabelId labelId)
 {
-	const Catalog::Label* label = Catalog::instance().labelById(labelId);
+	const Catalog::Label* label = libraryCatalog().labelById(labelId);
 	if (!label)
 		return;
 
@@ -1448,13 +1496,13 @@ void MainWindow::setLabelColorInteractive(LabelId labelId)
 	if (!chosen.isValid())
 		return;   // dialog cancelled
 
-	Catalog::instance().setColor(labelId, chosen.name());   // "#rrggbb"
+	libraryCatalog().setColor(labelId, chosen.name());   // "#rrggbb"
 	refreshLibraryView();
 }
 
 void MainWindow::deleteLabelInteractive(LabelId labelId)
 {
-	Catalog& catalog = Catalog::instance();
+	Catalog& catalog = libraryCatalog();
 	const Catalog::Label* label = catalog.labelById(labelId);
 	if (!label)
 		return;
@@ -1489,7 +1537,7 @@ void MainWindow::openImportDialog(const QStringList& initialStaging)
 	ImportDialog::Callbacks callbacks{
 		.addMediaItemsRequested = [this](const QString& labelName, const QStringList& videoPaths,
 				const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations) {
-			importVideoBatch(videoPaths, rootFolder() + "/" + labelName, stagedPreviewDirs, stagedDurations);
+			importVideoBatch(videoPaths, m_library.rootFolder() + "/" + labelName, stagedPreviewDirs, stagedDurations);
 		},
 		.importPhotosRequested = [this](const QString& labelId, const QStringList& photoPaths, Import::PhotoImportMode mode) {
 			return importPhotoBatch(labelIdFromString(labelId), photoPaths, mode);
@@ -1501,7 +1549,7 @@ void MainWindow::openImportDialog(const QStringList& initialStaging)
 		.viewChanged = [this] { refreshLibraryView(); }
 	};
 
-	ImportDialog dialog(std::move(callbacks), Catalog::instance().anySourceDir(), this);
+	ImportDialog dialog(m_library, std::move(callbacks), libraryCatalog().anySourceDir(), this);
 	if (!initialStaging.isEmpty())
 		dialog.addToStaging(initialStaging);
 	dialog.exec();   // each "Import" inside the dialog already applies its batch synchronously via the callbacks above
@@ -1516,7 +1564,7 @@ void MainWindow::scanForUntrackedFiles()
 {
 	// A media item is "tracked" iff the catalog records it as some item's source path.
 	QSet<QString> tracked;
-	Catalog& catalog = Catalog::instance();
+	Catalog& catalog = libraryCatalog();
 	for (const Catalog::Entry& entry : catalog.mediaItems())
 	{
 		if (!entry.sourcePath.isEmpty())
@@ -1525,7 +1573,7 @@ void MainWindow::scanForUntrackedFiles()
 
 	QSettings settings;
 	constexpr const char* lastFolderKey = "untrackedScan/lastFolder";
-	const QString defaultStartDir = tracked.empty() ? rootFolder() : QFileInfo(*tracked.begin()).absolutePath();
+	const QString defaultStartDir = tracked.empty() ? m_library.rootFolder() : QFileInfo(*tracked.begin()).absolutePath();
 	const QString startDir = settings.value(lastFolderKey, defaultStartDir).toString();
 	const QString dir = QFileDialog::getExistingDirectory(this, tr("Scan folder for untracked media"), startDir);
 	if (dir.isEmpty())
@@ -1551,19 +1599,19 @@ void MainWindow::checkCatalogIntegrity()
 {
 	IntegrityCheckDialog::Callbacks callbacks{
 		.registerRequested = [this](const QString& folderPath, const QString& sourcePath) {
-			return Catalog::instance().addMediaItem(MediaId::fromFile(sourcePath), sourcePath, folderPath, /*splitIntoFrames=*/true);
+			return libraryCatalog().addMediaItem(MediaId::fromFile(sourcePath), sourcePath, folderPath, /*splitIntoFrames=*/true);
 		},
 		.adoptPhotoRequested = [this](const QString& filePath) {
 			// The untracked image already lives in <root>/Photos/<label>/, so adopt it in place as an owned photo
 			// under that label (its parent dir). addPhoto ensures the label exists and refuses a name+size clash.
-			Catalog& catalog = Catalog::instance();
+			Catalog& catalog = libraryCatalog();
 			const QString labelDir = QFileInfo(filePath).absolutePath();
 			return catalog.addPhoto(MediaId::fromFile(filePath), filePath, labelDir, /*referenced=*/false);
 		},
 		.reimportRequested = [this](const MediaId& id) {
 			// Same re-extraction path reExportAllVideos uses for any catalog video, just for this one: clear the
 			// folder, re-run ffmpeg (which also regenerates the preview), and report whether frames actually landed.
-			Catalog& catalog = Catalog::instance();
+			Catalog& catalog = libraryCatalog();
 			const QString folder = catalog.folderForMediaItem(id);
 			resplitVideoIntoFrames(catalog.sourcePathForMediaItem(id), folder, /*preserveExistingPreview=*/false);
 			return !QDir(folder).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty();
@@ -1572,33 +1620,33 @@ void MainWindow::checkCatalogIntegrity()
 			return regeneratePreviewFor(id);
 		},
 		.markSplitRequested = [this](const MediaId& id) {
-			Catalog::instance().markSplitComplete(id);
+			libraryCatalog().markSplitComplete(id);
 			return true;
 		},
 		.removeEntryRequested = [this](const MediaId& id) {
-			Catalog::instance().removeMediaItem(id);
+			libraryCatalog().removeMediaItem(id);
 			return true;
 		},
 		.locatePhotoRequested = [this](const MediaId& id, const QString& newSourcePath) {
 			// Repoint a referenced photo at the file the user located. applyRename carries the record (labels,
 			// referenced flag) to the new identity and refuses an id clash; a referenced photo has no storage
 			// folder, so it stays folder-less (empty newFolderAbs).
-			return Catalog::instance().applyRename(id, MediaId::fromFile(newSourcePath), newSourcePath, /*newFolderAbs=*/QString{});
+			return libraryCatalog().applyRename(id, MediaId::fromFile(newSourcePath), newSourcePath, /*newFolderAbs=*/QString{});
 		},
 	};
 
-	if (IntegrityCheckDialog::scanAndShowUi(std::move(callbacks), this))
+	if (IntegrityCheckDialog::scanAndShowUi(libraryCatalog(), m_library.rootFolder(), std::move(callbacks), this))
 		refreshLibraryView();
 }
 
-bool MainWindow::isInBest(const MediaId& id)
+bool MainWindow::isInBest(const MediaId& id) const
 {
-	return Catalog::instance().mediaItemHasLabel(id, Catalog::BestLabelId);
+	return libraryCatalog().mediaItemHasLabel(id, Catalog::BestLabelId);
 }
 
 void MainWindow::toggleBest(const MediaId& id)
 {
-	Catalog& catalog = Catalog::instance();
+	Catalog& catalog = libraryCatalog();
 	if (catalog.mediaItemHasLabel(id, Catalog::BestLabelId))
 		catalog.removeLabel(id, Catalog::BestLabelId);
 	else
@@ -1627,7 +1675,7 @@ void MainWindow::toggleBest(const MediaId& id)
 
 void MainWindow::renameItemInteractive(const MediaId& id)
 {
-	const MediaRename::Result result = MediaRename::renameItemInteractive(id, this);
+	const MediaRename::Result result = MediaRename::renameItemInteractive(libraryCatalog(), id, this);
 	if (!result.renamed)
 		return;
 

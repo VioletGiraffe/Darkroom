@@ -3,13 +3,15 @@
 #include "Core/MediaId.h"
 
 #include <QJsonObject>
+#include <QString>
 
 #include <vector>
 
-// App-owned per-video metadata that isn't derivable from disk (e.g. playback loop intervals, and
-// later: labels). Persisted as a single JSON document in the root folder, keyed by MediaId, one
+// App-owned per-item metadata that isn't derivable from disk (e.g. playback loop intervals and labels).
+// Persisted as a single JSON document in the root folder, keyed by MediaId, one
 // record (a JSON object of named fields) per item. Field-granular get/set so independent features
-// can share a record without clobbering each other's fields. Single shared instance. All writes go
+// can share a record without clobbering each other's fields. Owned by Library; consumers borrow that
+// instance explicitly. All writes go
 // through a Writer obtained from beginBatch() (see below). GUI-thread only - no internal locking.
 class MetadataStore
 {
@@ -19,7 +21,7 @@ public:
 	// while another is alive just joins its batch), and happens only if something actually changed. So a
 	// multi-field update made through one Writer reaches disk as a single atomic QSaveFile write - never as
 	// a partially-updated record - and an unbatched write is impossible by construction. A one-off single
-	// write can use a temporary: instance().beginBatch().set(...) flushes at the end of the full expression.
+	// write can use a temporary: beginBatch().set(...) flushes at the end of the full expression.
 	// Do not store a Writer beyond the mutation it batches: a long-lived one holds the batch open and defers
 	// all persistence indefinitely.
 	class Writer
@@ -47,8 +49,6 @@ public:
 		MetadataStore& _store;
 	};
 
-	static MetadataStore& instance();
-
 	QJsonValue get(const MediaId& id, QStringView field) const;
 
 	// Every item that has a record, reconstructed from its key (size) and stored "name" (original case).
@@ -61,7 +61,8 @@ public:
 	MetadataStore& operator=(const MetadataStore&) = delete;
 
 private:
-	MetadataStore();
+	friend class LibraryState;
+	explicit MetadataStore(QString rootFolder);
 
 	// The mutations behind Writer's public forwarders - private so every write is forced through a Writer's
 	// batch. Each updates _records immediately and defers the disk write to the batch flush (scheduleSave).
@@ -74,6 +75,7 @@ private:
 	void scheduleSave();  // marks dirty for the outermost Writer's flush (a Writer is always alive during a mutation)
 	QString filePath() const;
 
+	const QString _rootFolder;
 	QJsonObject _records;             // MediaId::key() -> record object
 	int         _batchDepth = 0;      // > 0 while any Writer is alive; only the outermost's destructor flushes
 	bool        _dirty      = false;  // a save was deferred while batching and still needs to be flushed

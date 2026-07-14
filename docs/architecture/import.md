@@ -135,7 +135,7 @@ grid only if `preview/` itself is empty.
 
 ## Other utilities
 
-`Utils.h` (mostly inline free functions): `rootFolder()`, `ffmpegPath()`, `openInExplorer()`,
+`Utils.h` (mostly inline free functions): `ffmpegPath()`, `openInExplorer()`,
 `getSourceFileDate(sourcePath, folderPath)` (prefers a timestamp parsed from the filename —
 `parseTrailingTimestamp` — so it survives moves; falls back to the source file's birth time, then the
 folder's own timestamp as a last resort), `isSupportedVideoFile()` / `isSupportedImageFile()` / `isSupportedMediaFile()` (the last is either kind),
@@ -153,7 +153,8 @@ drops and the untracked/locate scans; pass a per-file predicate — e.g. `isSupp
 
 Import dialog: copy/move source files under a label.
 
-`ImportDialog` reads the `Catalog` directly for lookups (label options, photo-content duplicates, the
+`ImportDialog` borrows its modal lifetime's `Library&` and reads its `Catalog` directly for lookups (label
+options, photo-content duplicates, the
 id-tracking check, random label colors) and calls back into its host (`MainWindow`) only for host-owned
 actions it can't do itself. That is the whole `Callbacks` struct now — four members:
 `addMediaItemsRequested` / `importPhotosRequested` (the import workers, which own the app-wide busy lock and

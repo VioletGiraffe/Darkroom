@@ -45,7 +45,9 @@ Multiple per video, one active at a time (combo + **Save**/**Delete**), persiste
 [data-model.md](data-model.md)) under the `"intervals"` field — a list of `{start, end, name}` objects keyed by
 the played video's `MediaId`. Programmatic combo resets (Clear, Delete) block the selection signal so Delete
 removes only the saved entry and leaves the live loop intact. Interval (de)serialization is owned here, per
-`MetadataStore`'s field-owns-its-format convention.
+`MetadataStore`'s field-owns-its-format convention. Each player borrows the stable `Library&` and resolves
+the current store at the read/write point; after a successful root switch, `MainWindow` closes every player
+synchronously before returning to the event loop so an old video's controls cannot write to the new state.
 
 ## `MarkerSlider` (`src/UiComponents/MarkerSlider.h/.cpp`)
 
