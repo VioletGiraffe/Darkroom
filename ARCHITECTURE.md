@@ -9,8 +9,7 @@ orient, then follow the link for the subsystem you're touching.
 
 > **Keep this file and the linked docs in sync.** When a change alters architecture, a module's behavior, a
 > convention, or the backlog, update the relevant doc in the same change. An out-of-date doc is worse than
-> none — treat the update as part of the work, not an afterthought. General cross-project working
-> principles live in the global `~/.claude/CLAUDE.md`.
+> none - treat the update as part of the work rather than afterthought.
 
 ---
 
