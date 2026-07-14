@@ -411,8 +411,8 @@ void MainWindow::openLibrary()
 		return;
 	}
 
-	QString startFolder = m_library.rootFolder();
-	while (true)
+	QString startFolder = QFileInfo{ m_library.rootFolder() }.absolutePath();
+	for(;;)
 	{
 		const QString requestedRoot = QFileDialog::getExistingDirectory(this, tr("Open library"), libraryPickerStartFolder(startFolder));
 		if (requestedRoot.isEmpty() || pathComparisonKey(requestedRoot) == pathComparisonKey(m_library.rootFolder()))
