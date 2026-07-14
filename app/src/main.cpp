@@ -1,5 +1,4 @@
 #include "Core/IoThreadPool.h"
-#include "Core/Library.h"
 #include "Windows/MainWindow.h"
 #include "Settings.h"
 #include "Theme/Style.h"
@@ -11,12 +10,8 @@
 #include <QDir>
 #include <QIcon>
 #include <QImageReader>
-#include <QMessageBox>
-#include <QObject>
 #include <QSettings>
 #include <QStyleHints>
-
-#include <utility>
 
 #ifndef DARKROOM_VERSION
 #error "DARKROOM_VERSION is not defined; set it in app.pro"
@@ -42,15 +37,10 @@ int main(int argc, char* argv[])
 
 	Style::install();  // app-wide non-stock style; re-applies on a light/dark switch
 
-	QString libraryError;
-	auto library = Library::load(QSettings{}.value(Settings::RootFolder, Defaults::RootFolder).toString(), &libraryError);
-	if (!library)
-	{
-		QMessageBox::critical(nullptr, QObject::tr("Open library"), libraryError);
-		return 1;
-	}
-	MainWindow window(std::move(*library));
-	window.show();
+	auto window = MainWindow::createWithInitialLibrary();
+	if (!window)
+		return 0;
+	window->show();
 
 	const int result = app.exec();
 	IoThreadPool::finishAllThreads();

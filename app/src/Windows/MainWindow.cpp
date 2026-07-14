@@ -108,6 +108,40 @@ inline int     jpegQuality() { return QSettings{}.value(Settings::JpegQuality,  
 inline int     frameStep()   { return QSettings{}.value(Settings::FrameStep,    Defaults::FrameStep).toInt(); }
 inline int     cardImageHeight() { return QSettings{}.value(CARD_IMAGE_HEIGHT_KEY, DEFAULT_CARD_IMAGE_HEIGHT).toInt(); }
 
+namespace {
+
+QString libraryPickerStartFolder(const QString& path)
+{
+	const QFileInfo info(path);
+	if (info.isDir())
+		return info.absoluteFilePath();
+	const QString parent = info.absolutePath();
+	return QDir(parent).exists() ? parent : QDir::homePath();
+}
+
+} // namespace
+
+std::unique_ptr<MainWindow> MainWindow::createWithInitialLibrary(QWidget* parent)
+{
+	QString requestedRoot = QSettings{}.value(Settings::RootFolder, Defaults::RootFolder).toString();
+	while (true)
+	{
+		QString error;
+		auto library = Library::load(requestedRoot, &error);
+		if (library)
+		{
+			QSettings{}.setValue(Settings::RootFolder, library->rootFolder());
+			return std::unique_ptr<MainWindow>(new MainWindow(std::move(*library), parent));
+		}
+
+		QMessageBox::warning(parent, tr("Open library"),
+			tr("Could not open the library:\n\n%1\n\nChoose another library folder.").arg(error));
+		requestedRoot = QFileDialog::getExistingDirectory(parent, tr("Open library"), libraryPickerStartFolder(requestedRoot));
+		if (requestedRoot.isEmpty())
+			return {};
+	}
+}
+
 MainWindow::MainWindow(Library&& library, QWidget* parent)
 	: QMainWindow(parent), m_library(std::move(library))
 {
@@ -292,6 +326,8 @@ void MainWindow::setupMainMenu()
 	setMenuBar(menuBar);
 
 	QMenu* fileMenu = new QMenu(tr("File"), menuBar);
+	fileMenu->addAction(tr("Open library..."), QKeySequence("Ctrl+O"), this, &MainWindow::openLibrary);
+	fileMenu->addSeparator();
 	fileMenu->addAction(tr("Settings..."), QKeySequence("Ctrl+Alt+P"), this, &MainWindow::openSettings);
 	fileMenu->addSeparator();
 	fileMenu->addAction(tr("Exit"), QKeySequence("Ctrl+Q"), this, &QMainWindow::close);
@@ -367,6 +403,49 @@ void MainWindow::restoreSettings()
 	refreshMediaGrid();
 }
 
+void MainWindow::openLibrary()
+{
+	if (m_isProcessing)
+	{
+		QMessageBox::information(this, tr("Busy"), tr("The library cannot be changed while media processing is in progress."));
+		return;
+	}
+
+	QString startFolder = m_library.rootFolder();
+	while (true)
+	{
+		const QString requestedRoot = QFileDialog::getExistingDirectory(this, tr("Open library"), libraryPickerStartFolder(startFolder));
+		if (requestedRoot.isEmpty() || pathComparisonKey(requestedRoot) == pathComparisonKey(m_library.rootFolder()))
+			return;
+
+		QString error;
+		if (switchLibraryTo(requestedRoot, &error))
+			return;
+
+		QMessageBox::warning(this, tr("Open library"), error);
+		startFolder = requestedRoot;
+	}
+}
+
+bool MainWindow::switchLibraryTo(const QString& root, QString* error)
+{
+	if (!m_library.setRoot(root, error))
+		return false;
+
+	// The state is already replaced, but no event can run between setRoot() and this synchronous cleanup.
+	// Close players before returning to the event loop so an old video's controls cannot write into the new
+	// catalog. Clear the read-only views so they do not continue presenting the previous library.
+	VideoPlayerWindow::closeAll();
+	m_frameViewer->showForFolder({});
+	m_mediaGrid->clear();
+	m_contextMenuTarget.reset();
+	m_labelSidebar->setActiveFilter({}, m_labelSidebar->isAndMode());  // label ids belong to one library
+
+	QSettings{}.setValue(Settings::RootFolder, m_library.rootFolder());
+	refreshLibraryView();
+	return true;
+}
+
 void MainWindow::openSettings()
 {
 	if (m_isProcessing)
@@ -375,33 +454,8 @@ void MainWindow::openSettings()
 		return;
 	}
 
-	SettingsDialog dialog(m_library.rootFolder(), this);
-	if (dialog.exec() != QDialog::Accepted)
-		return;
-
-	const QString requestedRoot = dialog.requestedRootFolder();
-	if (pathComparisonKey(requestedRoot) != pathComparisonKey(m_library.rootFolder()))
-	{
-		QString error;
-		if (!m_library.setRoot(requestedRoot, &error))
-		{
-			QMessageBox::warning(this, tr("Open library"), error);
-			return;
-		}
-
-		// The state is already replaced, but no event can run between setRoot() and this synchronous cleanup.
-		// Close players before returning to the event loop so an old video's controls cannot write into the new
-		// catalog. Clear the read-only views so they do not continue presenting the previous library.
-		VideoPlayerWindow::closeAll();
-		m_frameViewer->showForFolder({});
-		m_mediaGrid->clear();
-		m_contextMenuTarget.reset();
-		m_labelSidebar->setActiveFilter({}, m_labelSidebar->isAndMode());  // label ids belong to one library
-
-		QSettings{}.setValue(Settings::RootFolder, m_library.rootFolder());
-	}
-
-	refreshLibraryView();
+	SettingsDialog dialog(this);
+	dialog.exec();
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent* event)

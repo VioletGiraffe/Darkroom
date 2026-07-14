@@ -11,16 +11,21 @@ change borrow `Library&` and resolve its current catalog/store when needed. Narr
 `MetadataStore&` borrows are for synchronous operations that cannot span `Library::setRoot()`; modal
 root-bound flows may borrow `Library&` for their entire, switch-blocking lifetime.
 
-Startup uses `Library::load()` to validate and construct the initial state before constructing `MainWindow`.
-A live root change goes through `Library::setRoot()`: it validates the candidate folder and the top-level
-shape of any existing `catalog.json`/`labels.json`, constructs a complete candidate state internally, and
-only then replaces the current state. Failure leaves every current object and path untouched. On success,
-`MainWindow` synchronously closes players and clears the persistent frame viewer, media grid and its pending
-thumbnail work, the label filter, and invalidates queued card mutations before returning to the event loop;
-it then persists the normalized root and rebuilds the view. Settings cannot open while an import/re-export
-loop is pumping events: those loops hold short-lived catalog/store references and batch writers which must
-finish before a state replacement. Do not add a code path that writes `Settings::RootFolder` directly;
-`MainWindow`'s successful switch flow owns that transition.
+`MainWindow::createWithInitialLibrary()` uses `Library::load()` to try the configured root. If it cannot be
+loaded, it reports the problem and offers a folder picker until the user chooses a valid library or cancels;
+only a valid `Library` is passed to the private `MainWindow` constructor. `main()` therefore neither owns nor
+constructs a library, and an invalid saved path is a recoverable startup condition rather than a hard exit.
+
+File > Open library handles later switching through `Library::setRoot()`: it validates the candidate folder
+and the top-level shape of any existing `catalog.json`/`labels.json`, constructs a complete candidate state
+internally, and only then replaces the current state. Failure leaves every current object and path untouched
+and returns to the picker. On success, `MainWindow` synchronously closes players and clears the persistent
+frame viewer, media grid and its pending thumbnail work, the library-specific label filter, and invalidates
+queued card mutations before returning to the event loop; it then persists the normalized root and rebuilds
+the view. Library switching and Settings are refused while an import/re-export loop is pumping events: those
+loops hold short-lived catalog/store references and batch writers, and their encoding configuration must not
+change mid-batch. Do not add another code path that writes `Settings::RootFolder`; `MainWindow`'s successful
+initial load and switch flow own that setting.
 
 ## `Catalog` is the authoritative in-memory model
 

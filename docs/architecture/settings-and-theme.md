@@ -14,17 +14,15 @@ inline helpers in the owning `.cpp` when narrower. A few keys are deliberately *
 because they're local to one UI/class (preview frame count, card zoom, frame-viewer thumbnail size), read
 directly via inline `QSettings{}`. The `MetadataStore`'s `catalog.json` (see [data-model.md](data-model.md))
 is separate from `QSettings` entirely — that's per-item data, not app configuration. Runtime root paths come
-from an explicitly owned/borrowed `Library`, never from `QSettings`; only startup reads the configured root,
-and only a successful `MainWindow` root switch writes it.
+from an explicitly owned/borrowed `Library`, never from `QSettings`; `MainWindow`'s library-opening workflow
+alone reads and writes the last successfully opened root.
 
 ## `SettingsDialog` (`src/Windows/SettingsDialog.h/.cpp`)
 
 Uses `CSettingsDialog`/`CSettingsPage` from `qtutils` (`settingsui/`). Ordinary page values are persisted by
-`acceptSettings()`. The root field is deliberately different: the page only exposes the requested value;
-after acceptance `MainWindow` asks its stable `Library` member to `setRoot()`, which validates and constructs
-a complete replacement state internally before publishing it, then persists the normalized root.
-Invalid/corrupt candidates leave the current state active. Color-scheme
-radios apply immediately via `setColorScheme()` (and again at startup in `main.cpp`, before `MainWindow`).
+`acceptSettings()`. The General page contains the ffmpeg path and color scheme; library selection belongs to
+File > Open library rather than application preferences. Color-scheme radios apply immediately via
+`setColorScheme()` (and again at startup in `main.cpp`, before `MainWindow`).
 
 ## Theme (`src/Theme/Theme.h/.cpp`)
 

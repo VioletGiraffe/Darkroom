@@ -9,6 +9,7 @@
 #include <QMainWindow>
 #include <QStringList>
 
+#include <memory>
 #include <optional>
 #include <vector>
 
@@ -30,7 +31,9 @@ class SortControl;
 class MainWindow final : public QMainWindow
 {
 public:
-	explicit MainWindow(Library&& library, QWidget* parent = nullptr);
+	// Opens the configured library, offering a folder picker after any load failure. Returns null only when
+	// the user cancels recovery, so main() never needs to know about Library construction or validation.
+	[[nodiscard]] static std::unique_ptr<MainWindow> createWithInitialLibrary(QWidget* parent = nullptr);
 	~MainWindow();
 
 protected:
@@ -39,6 +42,8 @@ protected:
 	void closeEvent(QCloseEvent* event) override;
 
 private:
+	explicit MainWindow(Library&& library, QWidget* parent);
+
 	void setupUI();
 	void setupMainMenu();
 
@@ -134,6 +139,8 @@ private:
 	void renameSelectedItemInteractive();
 	void updateEditActions();
 
+	void openLibrary();
+	[[nodiscard]] bool switchLibraryTo(const QString& root, QString* error);
 	void openSettings();
 	// Runs the interactive rename flow (see MediaRename.h), then refreshes the view and repoints the frame
 	// viewer if it was showing the renamed video's folder.

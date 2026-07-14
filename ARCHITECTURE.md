@@ -68,7 +68,8 @@ not just when reading existing code.
 - **`Library` is the stable root-bound ownership boundary.** `MainWindow` owns it as a normal member; its
   private state contains one immutable root, `MetadataStore`, and `Catalog`, constructed and replaced as a
   unit. `Library::setRoot()` fully loads a candidate before publishing it; failure leaves the current state
-  untouched. Persistent consumers borrow `Library&`, while synchronous operations may borrow its current
+  untouched. `MainWindow` owns both initial-library recovery and later switching; `main()` never handles a
+  `Library`. Persistent consumers borrow `Library&`, while synchronous operations may borrow its current
   `Catalog` or `MetadataStore`. There is no global active-library/catalog/store accessor. See
   [data-model.md](docs/architecture/data-model.md).
 - **A label owns nothing on disk.** The folder an item's frames sit in happens to share a name with one of
@@ -109,8 +110,8 @@ query/mutation API, import lifecycle (`addMediaItem`/`removeMediaItem`/`applyRen
 `BatchScope`), the FS-reconciliation audit findings, the design rationale, and deferred post-v1 polish.
 
 ### [Main window](docs/architecture/main-window.md)
-`MainWindow`'s grid + sidebar layout, the name filter, the All/Videos/Photos media-type switch (and how
-photo cards render), label assignment (context menu + drag-from-sidebar), sidebar label management
+`MainWindow`'s library startup/switching policy, grid + sidebar layout, the name filter, the
+All/Videos/Photos media-type switch (and how photo cards render), label assignment (context menu + drag-from-sidebar), sidebar label management
 (rename/color/delete), the media grid's multi-select implementation (and the regression history behind it),
 and renaming a media item on disk.
 

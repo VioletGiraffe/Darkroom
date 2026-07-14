@@ -5,6 +5,7 @@
 #include "UiComponents/SegmentedToggle.h"
 
 #include <QDialog>
+#include <QDir>
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QGuiApplication>
@@ -19,22 +20,14 @@
 
 // ── GeneralSettingsPage ───────────────────────────────────────────────────────
 
-GeneralSettingsPage::GeneralSettingsPage(const QString& rootFolder, QWidget* parent) : CSettingsPage(parent)
+GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent)
 {
 	setWindowTitle(tr("General"));
 
 	QSettings s;
-	m_rootFolder = new QLineEdit(rootFolder, this);
 	m_ffmpegPath = new QLineEdit(s.value(Settings::FfmpegPath).toString(), this);
 
-	auto* browseFolder = new QPushButton(tr("Browse..."), this);
 	auto* browseFfmpeg = new QPushButton(tr("Browse..."), this);
-
-	connect(browseFolder, &QPushButton::clicked, this, [this] {
-		const QString path = QFileDialog::getExistingDirectory(this, tr("Select root folder"), m_rootFolder->text());
-		if (!path.isEmpty())
-			m_rootFolder->setText(QDir::toNativeSeparators(path));
-	});
 
 	connect(browseFfmpeg, &QPushButton::clicked, this, [this] {
 		const QString path = QFileDialog::getOpenFileName(this, tr("Select ffmpeg executable"),
@@ -43,16 +36,11 @@ GeneralSettingsPage::GeneralSettingsPage(const QString& rootFolder, QWidget* par
 			m_ffmpegPath->setText(QDir::toNativeSeparators(path));
 	});
 
-	auto* folderRow = new QHBoxLayout;
-	folderRow->addWidget(m_rootFolder, 1);
-	folderRow->addWidget(browseFolder);
-
 	auto* ffmpegRow = new QHBoxLayout;
 	ffmpegRow->addWidget(m_ffmpegPath, 1);
 	ffmpegRow->addWidget(browseFfmpeg);
 
 	auto* form = new QFormLayout;
-	form->addRow(tr("Root folder:"), folderRow);
 	form->addRow(tr("ffmpeg path:"), ffmpegRow);
 
 	// Segment order matches Qt::ColorScheme's own values (Unknown/System = 0, Light = 1, Dark = 2), so the
@@ -84,15 +72,9 @@ GeneralSettingsPage::GeneralSettingsPage(const QString& rootFolder, QWidget* par
 void GeneralSettingsPage::acceptSettings()
 {
 	QSettings s;
-	// The scheme is already applied live; persist it here. The root is not an ordinary setting: MainWindow
-	// validates and activates a replacement Library after the dialog has accepted.
+	// The scheme is already applied live; persist it here.
 	s.setValue(Settings::ColorScheme, m_schemeToggle->currentIndex());
 	s.setValue(Settings::FfmpegPath, m_ffmpegPath->text().trimmed());
-}
-
-QString GeneralSettingsPage::requestedRootFolder() const
-{
-	return m_rootFolder->text().trimmed();
 }
 
 // ── EncodingSettingsPage ──────────────────────────────────────────────────────
@@ -160,14 +142,8 @@ void EncodingSettingsPage::acceptSettings()
 
 // ── SettingsDialog ────────────────────────────────────────────────────────────
 
-SettingsDialog::SettingsDialog(const QString& rootFolder, QWidget* parent) : CSettingsDialog(parent)
+SettingsDialog::SettingsDialog(QWidget* parent) : CSettingsDialog(parent)
 {
-	m_generalPage = new GeneralSettingsPage(rootFolder, this);
-	addSettingsPage(m_generalPage, tr("General"));
+	addSettingsPage(new GeneralSettingsPage(this), tr("General"));
 	addSettingsPage(new EncodingSettingsPage(this), tr("Encoding"));
-}
-
-QString SettingsDialog::requestedRootFolder() const
-{
-	return m_generalPage->requestedRootFolder();
 }
