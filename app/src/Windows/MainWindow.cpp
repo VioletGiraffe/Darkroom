@@ -119,6 +119,28 @@ QString libraryPickerStartFolder(const QString& path)
 	return QDir(parent).exists() ? parent : QDir::homePath();
 }
 
+[[nodiscard]] bool deleteFileIfPresent(const QString& filePath)
+{
+	if (filePath.isEmpty())
+		return false;
+
+	const QFileInfo info(filePath);
+	return (!info.exists() && !info.isSymLink()) || QFile::remove(filePath);
+}
+
+[[nodiscard]] bool deleteFolderRecursivelyIfPresent(const QString& folderPath)
+{
+	if (folderPath.isEmpty())
+		return false;
+
+	const QFileInfo info(folderPath);
+	if (!info.exists() && !info.isSymLink())
+		return true;
+	if (!info.isDir())
+		return false;
+	return QDir(folderPath).removeRecursively();
+}
+
 } // namespace
 
 std::unique_ptr<MainWindow> MainWindow::createWithInitialLibrary(QWidget* parent)
@@ -988,28 +1010,51 @@ void MainWindow::deleteSelectedItems()
 		QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
 		return;
 
-	Catalog::BatchScope batch(libraryCatalog());  // one store write for the whole selection instead of one per item
-	for (const MediaId& sel : selection)
+	QStringList failedItems;
 	{
-		const QString sourcePath = catalog.sourcePathForMediaItem(sel);
-		if (catalog.mediaType(sel) == Catalog::MediaType::Photo)
+		Catalog::BatchScope batch(catalog);  // one store write for all entries whose filesystem targets are confirmed gone
+		for (const MediaId& sel : selection)
 		{
-			QFile::remove(sourcePath);
-			catalog.removeMediaItem(sel);
-			continue;
+			const QString sourcePath = catalog.sourcePathForMediaItem(sel);
+			QStringList failedParts;
+			if (catalog.mediaType(sel) == Catalog::MediaType::Photo)
+			{
+				if (!deleteFileIfPresent(sourcePath))
+					failedParts << (sourcePath.isEmpty() ? tr("• Photo file path is missing.") : tr("• Photo file: %1").arg(sourcePath));
+			}
+			else
+			{
+				const QString folderPath = catalog.folderForMediaItem(sel);
+				const bool folderDeleted = deleteFolderRecursivelyIfPresent(folderPath);
+				if (!folderDeleted)
+				{
+					failedParts << (folderPath.isEmpty() ? tr("• Frame folder path is missing.") : tr("• Frame folder: %1").arg(folderPath));
+					if (!sourcePath.isEmpty())
+						failedParts << tr("• Source file not attempted: %1").arg(sourcePath);
+				}
+				else if (!sourcePath.isEmpty() && !deleteFileIfPresent(sourcePath))
+					failedParts << tr("• Source file: %1").arg(sourcePath);
+
+				// A recursive removal may have deleted all or part of what the viewer was showing even when it
+				// ultimately reported failure; do not leave the viewer presenting that stale folder state.
+				if (m_frameViewer->currentFolder() == folderPath)
+					m_frameViewer->showForFolder({});
+			}
+
+			if (failedParts.empty())
+				catalog.removeMediaItem(sel);
+			else
+				failedItems << tr("%1:\n%2").arg(sel.name(), failedParts.join("\n"));
 		}
-
-		const QString folderPath = catalog.folderForMediaItem(sel);
-		deleteFolderRecursively(folderPath);
-		if (!sourcePath.isEmpty())
-			QFile::remove(sourcePath);
-		catalog.removeMediaItem(sel);
-
-		if (m_frameViewer->currentFolder() == folderPath)
-			m_frameViewer->showForFolder({});
 	}
 
 	refreshLibraryView();
+
+	if (!failedItems.empty())
+	{
+		QMessageBox::critical(this, tr("Delete incomplete"),
+			tr("Some items could not be fully deleted. Their catalog records were kept:\n\n%1").arg(failedItems.join("\n\n")));
+	}
 }
 
 void MainWindow::removeSelectedItemsFromLibrary()
@@ -1233,7 +1278,8 @@ void MainWindow::resplitVideoIntoFrames(const QString& videoFilePath, const QStr
 	if (hasPreview)
 		QDir().rename(previewDir, preservedPreviewDir);
 
-	deleteFolderRecursively(outputFolder);
+	if (!deleteFolderRecursivelyIfPresent(outputFolder))
+		QMessageBox::critical(this, tr("Error"), tr("Failed to delete folder: %1").arg(outputFolder));
 	splitVideoIntoFrames(videoFilePath, outputFolder);
 
 	if (hasPreview)
@@ -1737,10 +1783,4 @@ void MainWindow::renameItemInteractive(const MediaId& id)
 	// A video rename moves its frame folder - follow it if the frame viewer was showing that folder.
 	if (!result.oldFolderPath.isEmpty() && m_frameViewer->currentFolder() == result.oldFolderPath && m_frameViewer->isVisible())
 		m_frameViewer->showForFolder(result.newFolderPath);
-}
-
-void MainWindow::deleteFolderRecursively(const QString& folderPath)
-{
-	if (!QDir(folderPath).removeRecursively())
-		QMessageBox::critical(this, tr("Error"), tr("Failed to delete folder: %1").arg(folderPath));
 }

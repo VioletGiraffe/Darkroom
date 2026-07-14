@@ -97,8 +97,12 @@ restyle needs an app-wide styled `QCheckBox`.
   photo" where videos get "Play source video" (both `openSourceInSystemApp`; a video's *double-click* opens
   the built-in player instead). **"Delete" is per-type** (Shift+Del): a video loses its frame folder +
   source file; a photo loses its file (never the shared label dir) — the confirmation message spells out
-  exactly what applies to the selection at hand. **"Remove from library"** (Del) drops the selection from
-  the catalog only (`Catalog::removeMediaItem`) — no file is touched, but the items' catalog metadata
+  exactly what applies to the selection at hand. A required path that is already absent counts as deleted;
+  otherwise the catalog record is removed only after every required deletion succeeds. For a video, the
+  source is attempted only after its frame folder is gone. Any failure retains the record and produces one
+  summary naming each failed component and path, including partial recursive-folder failures. **"Remove from
+  library"** (Del) drops the selection from the catalog only (`Catalog::removeMediaItem`) — no file is touched,
+  but the items' catalog metadata
   (labels incl. Best, saved loops) is discarded; since the catalog is never re-derived from a disk walk,
   an untracked video's frame folder simply stays on disk, surfaced again only by the integrity tool (or a
   re-import of the source). **"Rename"** (F2) renames a single video's frame folder + source file (videos

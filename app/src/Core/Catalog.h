@@ -158,8 +158,8 @@ public:
 	// collision with an existing video, which the caller must not paper over by leaving newly extracted frames
 	// on disk untracked. Re-registering the same id at its current folder (re-export, or a later on-demand
 	// split flipping splitIntoFrames to true) is not a collision and returns true, updating the entry's fields.
-	// removeMediaItem drops an item from the catalog entirely (delete-all), so it doesn't linger as a ghost now
-	// that the catalog - not the disk walk - is the authoritative set.
+	// removeMediaItem only forgets the item; the caller decides whether its files were already deleted or are
+	// deliberately being left behind (Remove from library). The catalog is not re-derived from a disk walk.
 	// durationMs (source length in ms, from the import-time probe) is stored when > 0; pass -1 when unknown to
 	// leave any previously stored duration untouched (a re-registration doesn't erase it).
 	bool addMediaItem(const MediaId& id, const QString& sourcePath, const QString& folderAbs, bool splitIntoFrames, qint64 durationMs = -1);

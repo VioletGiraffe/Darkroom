@@ -138,8 +138,10 @@ that case stays clean.
   `setDurationMs(id, ms)` backfills it onto an already-registered item for the paths that learn the duration
   after the fact — preview regeneration and re-export — and `durationMsForMediaItem(id)` reads it back (`-1`
   for a photo, an unknown id, or a pre-duration import not yet backfilled).
-- **`removeMediaItem(id)`** drops an item from the catalog entirely (used by delete-all and dedup-cleanup), so it
-  doesn't linger as a ghost now that the catalog — not a disk walk — is the authoritative set.
+- **`removeMediaItem(id)`** drops an item from the catalog entirely. The physical Delete flow calls it only
+  after every required file/folder is gone; Remove from library calls it directly because leaving disk
+  content in place is that command's explicit purpose. The catalog — not a disk walk — is the authoritative
+  item set, so callers must make that distinction before removing the record.
 - **`applyRename(oldId, newId, newSourcePath, newFolderAbs)`** — the rename counterpart to `addMediaItem`:
   carries the whole `MetadataStore` record (loop intervals, labels incl. Best) from `oldId` to `newId`
   (`MetadataStore::rekey`), then records the new source path + frame folder. `oldId == newId` is allowed (the

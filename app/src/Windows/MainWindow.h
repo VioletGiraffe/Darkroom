@@ -145,7 +145,6 @@ private:
 	// Runs the interactive rename flow (see MediaRename.h), then refreshes the view and repoints the frame
 	// viewer if it was showing the renamed video's folder.
 	void renameItemInteractive(const MediaId& id);
-	void deleteFolderRecursively(const QString& folderPath);
 
 private:
 	[[nodiscard]] Catalog& libraryCatalog();
