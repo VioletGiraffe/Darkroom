@@ -77,10 +77,11 @@ not just when reading existing code.
   before calling the swap done. See
   [main-window.md](docs/architecture/main-window.md#media-grid--multi-select) for the multi-select
   regression this caught once already.
-- **All background disk reads go through `Core/IoThreadPool`** — the process-wide serial I/O executor
-  (a single worker thread, so parallel loads can't seek-thrash a spinning disk). Post the file read there
-  (`enqueue`, optionally tagged so an owner's destructor can `retire()` its tasks), and hand the CPU-bound
-  decode to a compute pool. See the two-stage read→decode pattern in
+- **All background disk reads go through `Core/IoThreadPool`** — the process-wide I/O router. Fast internal
+  random-access storage gets a bounded 2–6-worker pool; slow, external, network, or unclassified storage
+  shares one serial worker so parallel loads cannot seek-thrash a spinning disk. Post the file read there
+  (`enqueue`, optionally tagged so an owner's destructor can `retire()` its tasks), and hand CPU-bound
+  decoding to a compute pool. See the two-stage read→decode pattern in
   [media-widgets.md](docs/architecture/media-widgets.md#loading).
 - **Language/framework coding conventions live in [guidelines.md](docs/guidelines.md)** — assertions
   (`assert_r`, never `<cassert>`), containers (`std::vector` over `QList`), identity (`MediaId` over path),

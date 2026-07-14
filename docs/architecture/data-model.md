@@ -108,5 +108,7 @@ Single shared store for per-item metadata. Dumb persistence only — it has no n
   `"intervals"`, labels use `"labels"`).
 - Each feature owns its own (de)serialization (`QList<…>` ↔ `QJsonArray`); the store stays a dumb keyed
   JSON-blob store, not a god object.
-- Caveat: `rootFolder()` is read once at singleton init; changing the root folder mid-session leaves the
-  store pointing at the original (a root change is treated as needing a fresh start anyway).
+- **Root changes require a fresh process.** The records and `Catalog` model are loaded once, but each save
+  resolves its destination from the current `rootFolder()`. Changing that setting does not reload the new
+  library; it redirects subsequent writes of the already-loaded model. Do not continue catalog work after a
+  mid-session root change until the application has restarted (the settings flow does not yet enforce this).

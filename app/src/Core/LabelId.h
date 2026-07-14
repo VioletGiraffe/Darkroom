@@ -4,20 +4,18 @@
 
 #include <cstdint>
 
-// A label's stable identity - a 64-bit value, never a string: label ids are only ever compared and stored,
-// never parsed or human-authored. The reserved low range [0, 1000] is for special/virtual labels (currently
-// just Best); real, folder-backed labels are minted at random across [1001, UINT64_MAX] (Catalog::generateLabelId).
+// A label's stable identity. The reserved low range [0, 1000] is for special/virtual labels (currently just
+// Best); Catalog mints real, folder-backed ids monotonically from 1001, seeding its counter from the largest
+// persisted id so the next value is unused.
 //
 // Serialization boundaries (see Catalog / LabelSidebar / MainWindow):
-//   - JSON (labels.json + each item's metadata membership array): the id's *decimal-string* form (toString /
-//     labelIdFromString). Storing it as a JSON *number* would be lossy - QJsonValue's integer is qint64, so the
-//     top half of the u64 range wouldn't round-trip; a decimal string is exact for the whole range.
+//   - JSON (labels.json + each item's metadata membership array): an integer-valued JSON number.
 //   - QSettings (the sidebar's saved filter): the native quint64 (toUInt64 / labelIdFromUInt64).
 //   - QVariant item-data roles (LabelSidebar rows): stored/read directly via QVariant::fromValue / value<LabelId>().
 //
-// The string-based UI layer (the ImportDialog staging list) carries ids in their decimal-string form and
-// layers its own namespacing over that string space - the provisional "new:<n>" placeholders for not-yet-created
-// labels. Those are never a LabelId until Import materializes them in the Catalog.
+// String-only UI boundaries (label drag MIME data and ImportDialog staging) use the decimal form below.
+// ImportDialog layers provisional "new:<n>" placeholders over that string space; they are not LabelIds until
+// the label is materialized in Catalog.
 enum class LabelId : uint64_t
 {
 	None = 0,   // no / invalid label
@@ -31,7 +29,7 @@ inline constexpr uint64_t FirstRealLabelId = 1001;
 [[nodiscard]] inline uint64_t toUInt64(LabelId id) noexcept { return static_cast<uint64_t>(id); }
 [[nodiscard]] inline LabelId  labelIdFromUInt64(uint64_t value) noexcept { return static_cast<LabelId>(value); }
 
-// Decimal-string form for JSON storage and for handing an id to the string-based UI layer.
+// Decimal-string form for string-only UI and MIME boundaries.
 [[nodiscard]] inline QString toString(LabelId id) { return QString::number(toUInt64(id)); }
 
 // Parses the decimal-string form; None on empty or non-numeric input.

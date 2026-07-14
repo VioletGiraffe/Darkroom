@@ -1012,8 +1012,8 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 		menu.addSeparator();
 	}
 
-	// PhotoCompareWindow: synchronized zoom/pan over the photo files themselves - offered for a small
-	// all-photo selection (2..4; a bigger grid stops being a useful comparison).
+	// PhotoCompareWindow: synchronized zoom/pan over the photo files themselves - offered for any all-photo
+	// selection of at least two; its shared entry point caps the comparison at 50.
 	if (selectionAllPhotos && selection.size() >= 2)
 	{
 		menu.addAction(tr("Compare photos"), [this, selection] {

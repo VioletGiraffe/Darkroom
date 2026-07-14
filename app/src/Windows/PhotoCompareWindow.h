@@ -20,7 +20,7 @@ class PhotoComparePane;
 class SegmentedToggle;
 struct AlignmentTransform;
 
-// N-way (2..4) photo comparison in a square grid of panes. All panes share ONE zoom+pan view, while each
+// N-way photo comparison (up to 50 images) in a near-square grid of panes. All panes share ONE zoom+pan view, while each
 // photo additionally carries its own alignment transform (a similarity: uniform scale + rotation + offset)
 // mapping it into the shared "subject" space - so photos of the same subject at different zoom/crop/rotation/
 // resolution can be brought to the same apparent scale first, then compared under synchronized navigation.
@@ -56,8 +56,8 @@ struct AlignmentTransform;
 class PhotoCompareWindow final : public QWidget
 {
 public:
-	// photoPaths: the photo files to compare (2..4 make sense; any count works; empty opens the window in
-	// its drop-target state - the Tools menu route). Paths that fail to load are dropped with a warning.
+	// photoPaths: the photo files to compare; empty opens the window in its drop-target state (the Tools menu
+	// route). Entry points cap a comparison at 50; paths that fail to load are omitted.
 	explicit PhotoCompareWindow(const QStringList& photoPaths, QWidget* parent = nullptr);
 	~PhotoCompareWindow() override;
 

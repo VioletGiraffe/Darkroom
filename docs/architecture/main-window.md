@@ -73,9 +73,10 @@ restyle needs an app-wide styled `QCheckBox`.
   cards.
 - `showMediaItemContextMenu()` — multi-select-aware right-click menu. **Per-type entries**: Inspect /
   "Compare selected" (`CompareWindow` is frame-folder based) is offered only when nothing in the selection is
-  a photo; "Compare photos" (`PhotoCompareWindow` — see [playback.md](playback.md)) is offered for an
-  all-photo selection of 2–4, fed the source file paths (missing files filtered out, <2 remaining → warning);
-  the same window also opens empty from Tools → "Compare photos..." and is populated by dropping image files;
+  a photo; "Compare photos" (`PhotoCompareWindow` — see [playback.md](playback.md)) is offered for any
+  all-photo selection of at least two, fed the source file paths (missing files filtered out, <2 remaining →
+  warning, remaining paths capped at 50); the same window also opens empty from Tools → "Compare photos..."
+  and accepts dropped image files or recursively scanned folders;
   "Open in Explorer" (the item's folder) and "Rename media file" are videos-only — a photo's
   `folderForMediaItem` is the shared `Photos/<label>` dir, or nothing when referenced; photos get "Open
   photo" where videos get "Play source video" (both `openSourceInSystemApp`; a video's *double-click* opens

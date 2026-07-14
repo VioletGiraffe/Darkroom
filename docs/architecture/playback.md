@@ -58,10 +58,11 @@ painting.
 
 ## `PhotoCompareWindow` (`src/Windows/PhotoCompareWindow.h/.cpp`)
 
-N-way (2..4, gated in `MainWindow`'s context menu for all-photo selections; also openable empty from
-Tools → "Compare photos...") photo comparison in a square grid of equally sized panes, maximized by default.
-Photos can be added at any time by dropping image files onto the window — the pane grid is rebuilt on every
-count change, and each added photo is default-aligned against the current reference. Each pane has a context
+N-way photo comparison in a near-square grid of equally sized panes, maximized by default. `MainWindow` offers
+it for any all-photo selection of at least two; `showForFiles` filters missing paths and caps the comparison at
+50. It is also openable empty from Tools → "Compare photos...". Photos can be added by dropping image files or
+whole folders (scanned recursively); the same 50-image cap applies, the pane grid is rebuilt on every count
+change, and each added photo is default-aligned against the current reference. Each pane has a context
 menu: open the photo's containing folder in Explorer, or make the photo the reference (the reference pane is
 outlined in yellow). Its core mechanism is **two separate transform layers**:
 
