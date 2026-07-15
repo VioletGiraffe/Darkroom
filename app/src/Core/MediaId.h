@@ -25,10 +25,7 @@ public:
 	// Canonical key for use as a map / JSON key. Folds the name's case so matching is case-insensitive.
 	QString key() const;
 
-	bool operator==(const MediaId& other) const
-	{
-		return _size == other._size && _name.compare(other._name, Qt::CaseInsensitive) == 0;
-	}
+	bool operator==(const MediaId& other) const;
 
 private:
 	QString _name;       // original file name, kept for display; identity compares it case-insensitively

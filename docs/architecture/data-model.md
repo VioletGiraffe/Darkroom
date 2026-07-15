@@ -82,7 +82,9 @@ Stable identity for a media item's **source file** = its file name (matched case
 - `MediaId::fromFile(path)` — `QFileInfo` stat only (no content read): `name()` = original filename (kept
   for display), `size()` = byte size. Invalid (`isValid()==false`, `size==-1`) for a missing file.
 - `key()` — canonical map/JSON key, `"<size>:<lowercased-name>"`. `operator==`/`qHash` compare size +
-  case-insensitive name, consistent with `key()`.
+  case-insensitive name through the same private `nameForMatching()` fold that `key()` uses, so QHash's
+  "equal implies equal hash" holds by construction rather than by two call sites happening to agree. That
+  fold stays `toLower()` because `key()` is persisted — a different one would orphan existing records.
 - **Derived, never assigned** — recomputed from the file on demand, so there's no file→id registry to keep
   in sync (the de-sync trap a synthetic/stored id would have). This is why it can exist before a catalog.
 - **Survives moves for free** (path isn't part of identity) — moving a frame folder (e.g. a `Catalog`
