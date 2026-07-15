@@ -16,13 +16,19 @@ user cancels. It constructs the window only with a valid `Library`, keeping both
 member free of empty/optional states.
 
 File > Open library (`Ctrl+O`) owns live switching. It asks `Library::setRoot()` to validate and fully load the
-requested root internally; failure reports the error without disturbing the current state and returns to the
+requested root internally; `setRoot()` first flushes the current library, so a persistent save failure also
+blocks replacement. Failure reports the error without disturbing the current state and returns to the
 picker. On success it synchronously destroys player windows, clears the persistent frame viewer, grid and
 pending card work, and the library-specific label filter before returning to the event loop, persists the
 normalized root, and rebuilds the sidebar/grid. The sidebar borrows the stable `Library&`, so it needs no
 replacement/rebinding. Library switching and Settings are refused while `m_isProcessing`: import/re-export
 pumps events while holding a catalog batch, and settings changes partway through that work could also give
 one batch mixed encoding behavior.
+
+`Library` also routes the first failed `catalog.json` or `labels.json` flush to MainWindow. The window queues
+the warning out of the RAII writer destructor, then offers Retry or Keep working; dirty state remains in memory
+in the latter case. Closing retries both stores and requires an explicit Discard choice before it will close
+with unsaved changes.
 
 ## Media-type switch
 

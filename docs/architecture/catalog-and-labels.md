@@ -195,7 +195,9 @@ Best/extra-label flush.
   const pre-flight (relocate/untag counts + whether anything would be orphaned) used by the confirmation
   dialog and to refuse orphaning up front with a clear message before any mutation happens.
 
-All registry mutations persist `labels.json`.
+All registry mutations schedule an atomic `labels.json` save through the shared checked JSON writer. A
+failed save leaves the registry dirty and retryable and is aggregated by `Library` with metadata-store
+failures; see [data-model.md](data-model.md#json-loadsave-failure-policy).
 
 ### Label-name and path safety
 

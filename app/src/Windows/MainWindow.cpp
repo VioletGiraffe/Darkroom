@@ -28,9 +28,11 @@
 #include "aboutdialog/caboutdialog.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
+#include <QAbstractButton>
 #include <QAbstractItemView>
 #include <QApplication>
 #include <QClipboard>
+#include <QCloseEvent>
 #include <QColor>
 #include <QColorDialog>
 #include <QComboBox>
@@ -169,6 +171,7 @@ MainWindow::MainWindow(Library&& library, QWidget* parent)
 	m_frameViewer = new FrameViewerWindow();
 
 	setupUI();
+	m_library.setPersistenceFailureHandler([this] { schedulePersistenceFailureWarning(); });
 
 	// The one initial grid build is deliberately deferred to restoreSettings() below (queued): it applies the
 	// persisted label filter and calls refreshMediaGrid() once. Building here too would construct every card
@@ -180,6 +183,7 @@ MainWindow::MainWindow(Library&& library, QWidget* parent)
 
 MainWindow::~MainWindow()
 {
+	m_library.setPersistenceFailureHandler({});
 	saveSettings();
 	VideoPlayerWindow::closeAll();
 	delete m_frameViewer;
@@ -463,6 +467,29 @@ bool MainWindow::switchLibraryTo(const QString& root, QString* error)
 	return true;
 }
 
+void MainWindow::schedulePersistenceFailureWarning()
+{
+	if (m_persistenceWarningQueued)
+		return;
+	m_persistenceWarningQueued = true;
+	QMetaObject::invokeMethod(this, [this] {
+		m_persistenceWarningQueued = false;
+		QString error = m_library.pendingPersistenceError();
+		while (!error.isEmpty())
+		{
+			QMessageBox message(QMessageBox::Critical, tr("Library save failed"),
+				tr("Some library changes are still in memory but could not be saved."),
+				QMessageBox::Retry | QMessageBox::Ok, this);
+			message.setInformativeText(error);
+			message.button(QMessageBox::Ok)->setText(tr("Keep working"));
+			if (message.exec() != QMessageBox::Retry)
+				return;
+			if (m_library.flushPendingWrites(&error))
+				return;
+		}
+	}, Qt::QueuedConnection);
+}
+
 void MainWindow::openSettings()
 {
 	if (m_isProcessing)
@@ -503,6 +530,24 @@ void MainWindow::dropEvent(QDropEvent* event)
 void MainWindow::closeEvent(QCloseEvent* event)
 {
 	VideoPlayerWindow::closeAll();
+	QString error;
+	while (!m_library.flushPendingWrites(&error))
+	{
+		QMessageBox message(QMessageBox::Critical, tr("Library save failed"),
+			tr("The library still has unsaved changes. Closing now will discard them."),
+			QMessageBox::Retry | QMessageBox::Discard | QMessageBox::Cancel, this);
+		message.setInformativeText(error);
+		message.setDefaultButton(QMessageBox::Cancel);
+		const int choice = message.exec();
+		if (choice == QMessageBox::Retry)
+			continue;
+		if (choice != QMessageBox::Discard)
+		{
+			event->ignore();
+			return;
+		}
+		break;
+	}
 	QMainWindow::closeEvent(event);
 }
 

@@ -16,9 +16,10 @@ loaded, it reports the problem and offers a folder picker until the user chooses
 only a valid `Library` is passed to the private `MainWindow` constructor. `main()` therefore neither owns nor
 constructs a library, and an invalid saved path is a recoverable startup condition rather than a hard exit.
 
-File > Open library handles later switching through `Library::setRoot()`: it validates the candidate folder
-and the top-level shape of any existing `catalog.json`/`labels.json`, constructs a complete candidate state
-internally, and only then replaces the current state. Failure leaves every current object and path untouched
+File > Open library handles later switching through `Library::setRoot()`: it first flushes the current state,
+then reads and validates the candidate's `catalog.json`/`labels.json` into objects, constructs a complete
+candidate state from those same objects, and only then replaces the current state. Failure leaves every
+current object and path untouched
 and returns to the picker. On success, `MainWindow` synchronously closes players and clears the persistent
 frame viewer, media grid and its pending thumbnail work, the library-specific label filter, and invalidates
 queued card mutations before returning to the event loop; it then persists the normalized root and rebuilds
@@ -107,8 +108,8 @@ Single shared store for per-item metadata. Dumb persistence only — it has no n
 - **Owned by `Library`**, GUI-thread only, no internal locking. Consumers receive a reference explicitly.
 - Backing file: one **`catalog.json`** in `Library::rootFolder()` (so it travels with the library, e.g. on an
   external drive), keyed by `MediaId::key()`, **one record (JSON object of named fields) per item**.
-  Written atomically via `QSaveFile`, indented for readability. Loaded once when the owning `Library` is
-  constructed.
+  Written atomically via `QSaveFile`, indented for readability. `Library` reads it once and passes the
+  validated object into `MetadataStore`; there is no second permissive parse in the store.
 - **Field-granular API** (`get`/`set` a single named field, `remove` a whole record) so independent features
   share a record without clobbering each other; the store does read-modify-write internally.
 - `allMediaIds()` reconstructs every recorded item from its key + stored name; `Catalog` enumerates items
@@ -123,7 +124,9 @@ Single shared store for per-item metadata. Dumb persistence only — it has no n
   batch sees fresh data — `rebuildIndex` relies on this mid-`renameLabel`), but the disk write is deferred
   until the **outermost** live Writer is destroyed (they nest via a depth counter) and happens only if
   something changed — so a multi-field record update made through one Writer reaches disk as a single
-  atomic `QSaveFile` write, never as a partially-updated record. A one-off single write is a temporary:
+  atomic `QSaveFile` write, never as a partially-updated record. The shared `JsonPersistence` writer checks
+  parent-folder creation, open, the exact byte count, and commit. A failed flush leaves `_dirty` set and
+  retains the error for retry instead of declaring success. A one-off single write is a temporary:
   `store.beginBatch().set(...)` flushes at the end of the expression (the player's loop intervals do
   this). What the Writer can't enforce is loop batching: n mutations without an enclosing batch still write
   n times (O(n²) bytes total) — wrap such loops in a `Catalog::BatchScope` (see
@@ -136,3 +139,19 @@ Single shared store for per-item metadata. Dumb persistence only — it has no n
   JSON-blob store, not a god object.
 - The store's root is immutable for its lifetime. Saves use that captured root, so an in-memory record set
   cannot be redirected by a later setting change; changing roots replaces `Library`'s private state.
+
+## JSON load/save failure policy
+
+`Core/JsonPersistence` is the one file-level JSON boundary for both `catalog.json` and `labels.json`.
+`readObject` distinguishes a missing file (valid new-library state) from read failure, malformed JSON, a
+non-object root, or a missing/wrong required top-level field. Parse diagnostics include the byte offset.
+`Library` additionally validates every label entry's required field types and id uniqueness before Catalog
+construction, because Catalog reconstructs that registry and startup may immediately seed and rewrite it.
+The validated objects are moved directly into `MetadataStore`/`Catalog`, closing the former
+validate-then-reparse gap that could collapse malformed data to an empty object and overwrite it.
+
+Both stores retain failed writes as dirty state and expose their pending errors through `Library`.
+`MainWindow` receives a failure callback but queues the dialog, so no RAII writer destructor presents UI or
+throws. The dialog offers an immediate retry or continued in-memory work. `Library::setRoot()` flushes before
+replacing state; window close retries and requires an explicit Discard choice before unsaved state can be
+lost. A new/candidate library whose initial seeded `labels.json` cannot be saved is rejected before publish.

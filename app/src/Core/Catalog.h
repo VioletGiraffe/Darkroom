@@ -5,12 +5,15 @@
 #include "Core/MetadataStore.h"  // BatchScope holds a MetadataStore::Writer by value
 
 #include <QHash>
+#include <QJsonObject>
 #include <QList>
 #include <QSet>
 #include <QString>
 #include <QStringList>
 #include <QStringView>
 
+#include <functional>
+#include <utility>
 #include <vector>
 
 // The logical label model for the library. A label is a first-class object with a stable id (so renaming
@@ -241,11 +244,14 @@ public:
 
 private:
 	friend class LibraryState;
-	Catalog(QString rootFolder, MetadataStore& metadataStore);
+	Catalog(QString rootFolder, MetadataStore& metadataStore, const QJsonObject& registry);
 
 	// Registry (labels.json): load/save, and ensuring the labels the current model implies exist.
-	void loadRegistry();
-	void saveRegistry() const;
+	void loadRegistry(const QJsonObject& registry);
+	void saveRegistry();
+	[[nodiscard]] bool flushPendingRegistrySave(QString* error = nullptr);
+	[[nodiscard]] const QString& pendingRegistrySaveError() const { return _pendingRegistrySaveError; }
+	void setPersistenceFailureHandler(std::function<void()> handler) { _persistenceFailureHandler = std::move(handler); }
 	void ensureBestAndFolderLabels();                          // add any missing: Best + one folder-backed label per storage folder an item lives in
 	bool ensureBestLabelExists();                              // returns true if it added the entry
 	bool ensureFolderLabelExists(const QString& displayName, const QString& color = {});  // returns true if it added the entry
@@ -283,4 +289,7 @@ private:
 	std::vector<Label>    _labels;                  // registry, display order
 	QHash<MediaId, Entry> _mediaItems;              // the model: MediaId -> per-item facts
 	uint64_t              _nextLabelId = FirstRealLabelId - 1;  // high-water mark; generateLabelId hands out ++this. Seeded to the max loaded id on load.
+	bool                  _registryDirty = false;
+	QString               _pendingRegistrySaveError;
+	std::function<void()> _persistenceFailureHandler;
 };

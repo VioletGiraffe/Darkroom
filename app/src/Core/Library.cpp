@@ -1,63 +1,73 @@
 #include "Core/Library.h"
 #include "Core/Catalog.h"
+#include "Core/JsonPersistence.h"
 #include "Core/MetadataStore.h"
 
 #include <QDir>
-#include <QFile>
 #include <QFileInfo>
-#include <QJsonDocument>
+#include <QJsonArray>
 #include <QJsonObject>
-#include <QJsonParseError>
+#include <QJsonValue>
 #include <QObject>
+#include <QSet>
+#include <QStringList>
 
+#include <limits>
 #include <optional>
 #include <utility>
 
 namespace {
+
+struct LoadedLibraryData
+{
+	QString rootFolder;
+	QJsonObject metadataRecords;
+	QJsonObject labelRegistry;
+};
 
 [[nodiscard]] QString normalizedRoot(const QString& root)
 {
 	return QDir(QDir::cleanPath(QDir::fromNativeSeparators(root.trimmed()))).absolutePath();
 }
 
-[[nodiscard]] bool validateJsonObject(const QString& path, const QString& requiredArrayField, QString* error)
+[[nodiscard]] QString labelRegistryValidationError(const QString& path, const QJsonObject& registry)
 {
-	if (!QFileInfo::exists(path))
-		return true;
+	QSet<qint64> labelIds;
+	const QJsonArray labels = registry.value(QStringLiteral("labels")).toArray();
+	for (int index = 0; index < labels.size(); ++index)
+	{
+		if (!labels[index].isObject())
+			return QObject::tr("Invalid label registry:\n%1\n\nEntry %2 must be a JSON object.")
+				.arg(QDir::toNativeSeparators(path)).arg(index + 1);
 
-	QFile file(path);
-	if (!file.open(QIODevice::ReadOnly))
-	{
-		if (error)
-			*error = QObject::tr("Could not read:\n%1\n\n%2").arg(QDir::toNativeSeparators(path), file.errorString());
-		return false;
-	}
+		const QJsonObject label = labels[index].toObject();
+		const QJsonValue idValue = label.value(QStringLiteral("id"));
+		if (!idValue.isDouble())
+			return QObject::tr("Invalid label registry:\n%1\n\nEntry %2 must contain a numeric 'id'.")
+				.arg(QDir::toNativeSeparators(path)).arg(index + 1);
+		const qint64 idFromLowDefault = idValue.toInteger(std::numeric_limits<qint64>::min());
+		const qint64 idFromHighDefault = idValue.toInteger(std::numeric_limits<qint64>::max());
+		if (idFromLowDefault != idFromHighDefault)
+			return QObject::tr("Invalid label registry:\n%1\n\nEntry %2 must contain an integer 'id'.")
+				.arg(QDir::toNativeSeparators(path)).arg(index + 1);
+		if (!label.value(QStringLiteral("displayName")).isString())
+			return QObject::tr("Invalid label registry:\n%1\n\nEntry %2 must contain a string 'displayName'.")
+				.arg(QDir::toNativeSeparators(path)).arg(index + 1);
+		const QJsonValue color = label.value(QStringLiteral("color"));
+		if (!color.isUndefined() && !color.isString())
+			return QObject::tr("Invalid label registry:\n%1\n\nEntry %2 has a non-string 'color'.")
+				.arg(QDir::toNativeSeparators(path)).arg(index + 1);
 
-	QJsonParseError parseError;
-	const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parseError);
-	if (parseError.error != QJsonParseError::NoError)
-	{
-		if (error)
-			*error = QObject::tr("Invalid library file:\n%1\n\n%2").arg(QDir::toNativeSeparators(path), parseError.errorString());
-		return false;
+		const qint64 id = idFromLowDefault;
+		if (labelIds.contains(id))
+			return QObject::tr("Invalid label registry:\n%1\n\nEntry %2 repeats label id %3.")
+				.arg(QDir::toNativeSeparators(path)).arg(index + 1).arg(id);
+		labelIds.insert(id);
 	}
-	if (!document.isObject())
-	{
-		if (error)
-			*error = QObject::tr("Invalid library file:\n%1\n\nThe top level must be a JSON object.").arg(QDir::toNativeSeparators(path));
-		return false;
-	}
-	if (!requiredArrayField.isEmpty() && !document.object().value(requiredArrayField).isArray())
-	{
-		if (error)
-			*error = QObject::tr("Invalid library file:\n%1\n\nThe '%2' field is missing or is not an array.")
-				.arg(QDir::toNativeSeparators(path), requiredArrayField);
-		return false;
-	}
-	return true;
+	return {};
 }
 
-[[nodiscard]] std::optional<QString> validatedRoot(const QString& root, QString* error)
+[[nodiscard]] std::optional<LoadedLibraryData> loadLibraryData(const QString& root, QString* error)
 {
 	if (error)
 		error->clear();
@@ -84,11 +94,30 @@ namespace {
 		return std::nullopt;
 	}
 
-	if (!validateJsonObject(normalized + "/catalog.json", {}, error)
-		|| !validateJsonObject(normalized + "/labels.json", QStringLiteral("labels"), error))
+	JsonPersistence::ObjectReadResult metadata = JsonPersistence::readObject(normalized + "/catalog.json");
+	if (!metadata.success)
+	{
+		if (error)
+			*error = metadata.error;
 		return std::nullopt;
+	}
+	const QString labelsPath = normalized + "/labels.json";
+	JsonPersistence::ObjectReadResult labels = JsonPersistence::readObject(labelsPath, u"labels");
+	if (!labels.success)
+	{
+		if (error)
+			*error = labels.error;
+		return std::nullopt;
+	}
+	const QString labelsValidationError = labelRegistryValidationError(labelsPath, labels.object);
+	if (!labelsValidationError.isEmpty())
+	{
+		if (error)
+			*error = labelsValidationError;
+		return std::nullopt;
+	}
 
-	return normalized;
+	return LoadedLibraryData{ normalized, std::move(metadata.object), std::move(labels.object) };
 }
 
 } // namespace
@@ -96,9 +125,45 @@ namespace {
 class LibraryState
 {
 public:
-	explicit LibraryState(QString root)
-		: rootFolder(std::move(root)), metadataStore(rootFolder), catalog(rootFolder, metadataStore)
+	explicit LibraryState(LoadedLibraryData data)
+		: rootFolder(std::move(data.rootFolder))
+		, metadataStore(rootFolder, std::move(data.metadataRecords))
+		, catalog(rootFolder, metadataStore, data.labelRegistry)
 	{
+	}
+
+	[[nodiscard]] bool flushPendingWrites(QString* error)
+	{
+		QString metadataError;
+		QString registryError;
+		const bool metadataSaved = metadataStore.flushPendingSave(&metadataError);
+		const bool registrySaved = catalog.flushPendingRegistrySave(&registryError);
+		if (error)
+		{
+			QStringList errors;
+			if (!metadataSaved)
+				errors << metadataError;
+			if (!registrySaved)
+				errors << registryError;
+			*error = errors.join("\n\n");
+		}
+		return metadataSaved && registrySaved;
+	}
+
+	[[nodiscard]] QString pendingPersistenceError() const
+	{
+		QStringList errors;
+		if (!metadataStore.pendingSaveError().isEmpty())
+			errors << metadataStore.pendingSaveError();
+		if (!catalog.pendingRegistrySaveError().isEmpty())
+			errors << catalog.pendingRegistrySaveError();
+		return errors.join("\n\n");
+	}
+
+	void setPersistenceFailureHandler(std::function<void()> handler)
+	{
+		metadataStore.setPersistenceFailureHandler(handler);
+		catalog.setPersistenceFailureHandler(std::move(handler));
 	}
 
 private:
@@ -109,29 +174,56 @@ private:
 	Catalog catalog;
 };
 
-std::optional<Library> Library::load(const QString& root, QString* error)
+namespace {
+
+[[nodiscard]] std::unique_ptr<LibraryState> loadLibraryState(const QString& root, QString* error)
 {
-	std::optional<QString> normalized = validatedRoot(root, error);
-	if (!normalized)
-		return std::nullopt;
-	return Library(std::move(*normalized));
+	std::optional<LoadedLibraryData> data = loadLibraryData(root, error);
+	if (!data)
+		return {};
+
+	auto state = std::make_unique<LibraryState>(std::move(*data));
+	QString saveError;
+	if (!state->flushPendingWrites(&saveError))
+	{
+		if (error)
+			*error = QObject::tr("The library was read, but its initial state could not be saved:\n\n%1").arg(saveError);
+		return {};
+	}
+	return state;
 }
 
-Library::Library(QString root)
-	: m_state(std::make_unique<LibraryState>(std::move(root)))
+} // namespace
+
+std::optional<Library> Library::load(const QString& root, QString* error)
 {
+	std::unique_ptr<LibraryState> state = loadLibraryState(root, error);
+	if (!state)
+		return std::nullopt;
+	return Library(std::move(state));
 }
+
+Library::Library(std::unique_ptr<LibraryState> state)
+	: m_state(std::move(state))
+{}
 
 Library::Library(Library&&) noexcept = default;
 Library::~Library() = default;
 
 bool Library::setRoot(const QString& root, QString* error)
 {
-	std::optional<QString> normalized = validatedRoot(root, error);
-	if (!normalized)
+	QString currentSaveError;
+	if (!flushPendingWrites(&currentSaveError))
+	{
+		if (error)
+			*error = QObject::tr("The current library still has unsaved changes and cannot be replaced:\n\n%1").arg(currentSaveError);
 		return false;
+	}
 
-	auto replacement = std::make_unique<LibraryState>(std::move(*normalized));
+	std::unique_ptr<LibraryState> replacement = loadLibraryState(root, error);
+	if (!replacement)
+		return false;
+	replacement->setPersistenceFailureHandler(m_persistenceFailureHandler);
 	m_state = std::move(replacement);
 	++m_generation;
 	return true;
@@ -165,4 +257,22 @@ MetadataStore& Library::metadataStore()
 const MetadataStore& Library::metadataStore() const
 {
 	return m_state->metadataStore;
+}
+
+bool Library::flushPendingWrites(QString* error)
+{
+	return m_state->flushPendingWrites(error);
+}
+
+QString Library::pendingPersistenceError() const
+{
+	return m_state->pendingPersistenceError();
+}
+
+void Library::setPersistenceFailureHandler(std::function<void()> handler)
+{
+	m_persistenceFailureHandler = std::move(handler);
+	m_state->setPersistenceFailureHandler(m_persistenceFailureHandler);
+	if (m_persistenceFailureHandler && !pendingPersistenceError().isEmpty())
+		m_persistenceFailureHandler();
 }

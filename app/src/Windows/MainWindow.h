@@ -141,6 +141,7 @@ private:
 
 	void openLibrary();
 	[[nodiscard]] bool switchLibraryTo(const QString& root, QString* error);
+	void schedulePersistenceFailureWarning();
 	void openSettings();
 	// Runs the interactive rename flow (see MediaRename.h), then refreshes the view and repoints the frame
 	// viewer if it was showing the renamed video's folder.
@@ -174,4 +175,5 @@ private:
 
 	// Guards against re-entering the frame-extraction loops (which pump events) from a new drop or menu action while one is already running.
 	bool m_isProcessing = false;
+	bool m_persistenceWarningQueued = false;
 };

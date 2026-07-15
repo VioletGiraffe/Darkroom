@@ -72,6 +72,11 @@ not just when reading existing code.
   `Library`. Persistent consumers borrow `Library&`, while synchronous operations may borrow its current
   `Catalog` or `MetadataStore`. There is no global active-library/catalog/store accessor. See
   [data-model.md](docs/architecture/data-model.md).
+- **Persistent JSON is read and written through one checked path.** Library loading distinguishes absent files
+  from unreadable, malformed, or schema-invalid files and passes the validated objects directly into the
+  model - loaders never parse them a second time. Atomic writes check directory creation, open, full byte
+  count, and commit; a failure keeps the affected store dirty, is reported asynchronously by `MainWindow`,
+  and blocks silent state loss on library switch or close. See [data-model.md](docs/architecture/data-model.md).
 - **A label owns nothing on disk.** The folder an item's frames sit in happens to share a name with one of
   the item's labels — that's a per-item storage detail, never a property stored on the label itself. See
   [catalog-and-labels.md](docs/architecture/catalog-and-labels.md).

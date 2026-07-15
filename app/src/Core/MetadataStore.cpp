@@ -1,44 +1,49 @@
 #include "Core/MetadataStore.h"
+#include "Core/JsonPersistence.h"
 
-#include <QDir>
-#include <QFile>
-#include <QJsonDocument>
-#include <QSaveFile>
+#include <QDebug>
 
 #include <utility>
 
 namespace { constexpr const char* kFileName = "catalog.json"; }
 
-MetadataStore::MetadataStore(QString rootFolder)
-	: _rootFolder(std::move(rootFolder))
-{
-	load();
-}
+MetadataStore::MetadataStore(QString rootFolder, QJsonObject records)
+	: _rootFolder(std::move(rootFolder)), _records(std::move(records))
+{}
 
 QString MetadataStore::filePath() const
 {
 	return _rootFolder + "/" + kFileName;
 }
 
-void MetadataStore::load()
+QString MetadataStore::writeRecords() const
 {
-	QFile file{ filePath() };
-	if (!file.open(QIODevice::ReadOnly))
-		return; // No store yet - start empty; it gets created on the first save.
-
-	_records = QJsonDocument::fromJson(file.readAll()).object();
+	return JsonPersistence::writeObject(filePath(), _records);
 }
 
-void MetadataStore::save() const
+bool MetadataStore::flushPendingSave(QString* error)
 {
-	QDir{}.mkpath(_rootFolder); // the root folder should already exist, but don't fail a write if it doesn't
+	if (error)
+		error->clear();
+	if (!_dirty)
+		return true;
 
-	QSaveFile file{ filePath() };
-	if (!file.open(QIODevice::WriteOnly))
-		return;
+	const QString saveError = writeRecords();
+	if (saveError.isEmpty())
+	{
+		_dirty = false;
+		_pendingSaveError.clear();
+		return true;
+	}
 
-	file.write(QJsonDocument{ _records }.toJson(QJsonDocument::Indented));
-	file.commit();
+	const bool firstFailure = _pendingSaveError.isEmpty();
+	_pendingSaveError = saveError;
+	if (error)
+		*error = saveError;
+	qWarning() << "MetadataStore: save failed:" << saveError;
+	if (firstFailure && _persistenceFailureHandler)
+		_persistenceFailureHandler();
+	return false;
 }
 
 // Reject only a nameless (default-constructed) identity - it has no usable key(). Everything with a name
@@ -93,10 +98,7 @@ MetadataStore::Writer::Writer(MetadataStore& store)
 MetadataStore::Writer::~Writer()
 {
 	if (--_store._batchDepth == 0 && _store._dirty)
-	{
-		_store._dirty = false;
-		_store.save();
-	}
+		static_cast<void>(_store.flushPendingSave());
 }
 
 void MetadataStore::Writer::set(const MediaId& id, QStringView field, const QJsonValue& value)

@@ -5,6 +5,8 @@
 #include <QJsonObject>
 #include <QString>
 
+#include <functional>
+#include <utility>
 #include <vector>
 
 // App-owned per-item metadata that isn't derivable from disk (e.g. playback loop intervals and labels).
@@ -17,11 +19,12 @@ class MetadataStore
 {
 public:
 	// The one write path, RAII-scoped: a write applies to the in-memory records immediately, but the disk
-	// write is deferred until the *outermost* live Writer is destroyed (they nest freely - a Writer created
+	// write attempt is deferred until the *outermost* live Writer is destroyed (they nest freely - a Writer created
 	// while another is alive just joins its batch), and happens only if something actually changed. So a
 	// multi-field update made through one Writer reaches disk as a single atomic QSaveFile write - never as
-	// a partially-updated record - and an unbatched write is impossible by construction. A one-off single
-	// write can use a temporary: beginBatch().set(...) flushes at the end of the full expression.
+	// a partially-updated record. A failed attempt leaves the store dirty for retry; an unbatched write is
+	// impossible by construction. A one-off write can use a temporary: beginBatch().set(...) flushes at the
+	// end of the full expression.
 	// Do not store a Writer beyond the mutation it batches: a long-lived one holds the batch open and defers
 	// all persistence indefinitely.
 	class Writer
@@ -62,7 +65,7 @@ public:
 
 private:
 	friend class LibraryState;
-	explicit MetadataStore(QString rootFolder);
+	explicit MetadataStore(QString rootFolder, QJsonObject records);
 
 	// The mutations behind Writer's public forwarders - private so every write is forced through a Writer's
 	// batch. Each updates _records immediately and defers the disk write to the batch flush (scheduleSave).
@@ -70,8 +73,10 @@ private:
 	void remove(const MediaId& id);
 	void rekey(const MediaId& oldId, const MediaId& newId);
 
-	void load();
-	void save() const;
+	[[nodiscard]] QString writeRecords() const;
+	[[nodiscard]] bool flushPendingSave(QString* error = nullptr);
+	[[nodiscard]] const QString& pendingSaveError() const { return _pendingSaveError; }
+	void setPersistenceFailureHandler(std::function<void()> handler) { _persistenceFailureHandler = std::move(handler); }
 	void scheduleSave();  // marks dirty for the outermost Writer's flush (a Writer is always alive during a mutation)
 	QString filePath() const;
 
@@ -79,4 +84,6 @@ private:
 	QJsonObject _records;             // MediaId::key() -> record object
 	int         _batchDepth = 0;      // > 0 while any Writer is alive; only the outermost's destructor flushes
 	bool        _dirty      = false;  // a save was deferred while batching and still needs to be flushed
+	QString               _pendingSaveError;
+	std::function<void()> _persistenceFailureHandler;
 };

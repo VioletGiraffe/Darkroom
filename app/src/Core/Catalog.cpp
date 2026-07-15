@@ -1,4 +1,5 @@
 #include "Core/Catalog.h"
+#include "Core/JsonPersistence.h"
 #include "Core/MetadataStore.h"
 #include "Theme/Theme.h"
 #include "Utils.h"
@@ -9,12 +10,10 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
-#include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
 #include <QObject>
 #include <QRandomGenerator>
-#include <QSaveFile>
 
 #include <utility>
 
@@ -67,10 +66,10 @@ namespace
 	}
 }
 
-Catalog::Catalog(QString rootFolder, MetadataStore& metadataStore)
+Catalog::Catalog(QString rootFolder, MetadataStore& metadataStore, const QJsonObject& registry)
 	: _rootFolder(std::move(rootFolder)), _metadataStore(metadataStore)
 {
-	loadRegistry();  // labels.json
+	loadRegistry(registry);  // labels.json
 	rebuildIndex();  // build the in-memory model from the store (and seed Best + folder labels)
 }
 
@@ -86,28 +85,32 @@ QString Catalog::photosRootFolder() const
 	return _rootFolder + "/" + PhotosDirectoryName.toString();
 }
 
-void Catalog::loadRegistry()
+void Catalog::loadRegistry(const QJsonObject& registry)
 {
 	_labels.clear();
-
-	QFile file{ registryPath() };
-	if (!file.open(QIODevice::ReadOnly))
-		return;
-
-	const QJsonArray labelArray = QJsonDocument::fromJson(file.readAll()).object().value(kLabelsField.toString()).toArray();
+	const QJsonArray labelArray = registry.value(kLabelsField.toString()).toArray();
 	for (const QJsonValue& v : labelArray)
 	{
 		const QJsonObject o = v.toObject();
-		if (!o.value("id").isDouble())
-			continue;  // ids are JSON numbers; skip a malformed entry rather than mint a None-id label
 		const LabelId id = labelIdFromUInt64(static_cast<uint64_t>(o.value("id").toInteger()));
 		_nextLabelId = qMax(_nextLabelId, toUInt64(id));  // keep the counter ahead of every id already in use
 		_labels.push_back(Label{ id, o.value("displayName").toString(), o.value("color").toString() });
 	}
 }
 
-void Catalog::saveRegistry() const
+void Catalog::saveRegistry()
 {
+	_registryDirty = true;
+	static_cast<void>(flushPendingRegistrySave());
+}
+
+bool Catalog::flushPendingRegistrySave(QString* error)
+{
+	if (error)
+		error->clear();
+	if (!_registryDirty)
+		return true;
+
 	QJsonArray arr;
 	for (const Label& l : _labels)
 	{
@@ -121,12 +124,22 @@ void Catalog::saveRegistry() const
 	QJsonObject root;
 	root.insert(kLabelsField.toString(), arr);
 
-	QDir{}.mkpath(_rootFolder);
-	QSaveFile file{ registryPath() };
-	if (!file.open(QIODevice::WriteOnly))
-		return;
-	file.write(QJsonDocument{ root }.toJson(QJsonDocument::Indented));
-	file.commit();
+	const QString saveError = JsonPersistence::writeObject(registryPath(), root);
+	if (saveError.isEmpty())
+	{
+		_registryDirty = false;
+		_pendingRegistrySaveError.clear();
+		return true;
+	}
+
+	const bool firstFailure = _pendingRegistrySaveError.isEmpty();
+	_pendingRegistrySaveError = saveError;
+	if (error)
+		*error = saveError;
+	qWarning() << "Catalog: labels registry save failed:" << saveError;
+	if (firstFailure && _persistenceFailureHandler)
+		_persistenceFailureHandler();
+	return false;
 }
 
 void Catalog::ensureBestAndFolderLabels()
