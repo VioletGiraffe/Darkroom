@@ -600,7 +600,7 @@ bool Catalog::applyRename(const MediaId& oldId, const MediaId& newId, const QStr
 	return true;
 }
 
-// --- Integrity resolution (the mutations the read-only CatalogIntegrity scan feeds) ----------------------
+// --- Split state -----------------------------------------------------------------------------------------
 
 void Catalog::markSplitComplete(const MediaId& id)
 {

@@ -26,6 +26,7 @@
 #include "Shortcuts.h"
 
 #include "aboutdialog/caboutdialog.h"
+#include "assert/advanced_assert.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
 #include <QAbstractButton>
@@ -61,6 +62,7 @@
 #include <QStyledItemDelegate>
 #include <QTimer>
 #include <QUrl>
+#include <QUuid>
 #include <QVBoxLayout>
 
 #include <QScopeGuard>
@@ -803,8 +805,8 @@ MediaItemWidget* MainWindow::buildMediaCard(const MediaId& id, bool isBest, cons
 	if (!isPhoto)  // the frame viewer browses a video's frame folder; a photo has no frames, so no middle-click
 	{
 		card->setOnMiddleButtonClick([this, id, folderPath] {
-			ensureFramesSplit(id);  // transparently runs the full split first, if this video hasn't had one yet
-			m_frameViewer->showForFolder(folderPath);
+			if (ensureFramesSplit(id))  // transparently runs the full split first, if this video hasn't had one yet
+				m_frameViewer->showForFolder(folderPath);
 		});
 	}
 	card->setOnMouseWheelCallback([this](int steps) { zoomCards(steps); });
@@ -1310,51 +1312,92 @@ void MainWindow::openSourceInSystemApp(const MediaId& id)
 	QDesktopServices::openUrl(QUrl::fromLocalFile(sourcePath));
 }
 
-void MainWindow::resplitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder, bool preserveExistingPreview)
+bool MainWindow::resplitVideoIntoFrames(const MediaId& id, bool preserveExistingPreview)
 {
-	const QString previewDir = Catalog::previewDirFor(outputFolder);
-	const QString preservedPreviewDir = outputFolder + "_preview_preserve";
-	const bool hasPreview = preserveExistingPreview && QDir(previewDir).exists();
-	if (hasPreview)
-		QDir().rename(previewDir, preservedPreviewDir);
+	Catalog& catalog = libraryCatalog();
+	assert_and_return_r(catalog.containsMediaItem(id), false);
+	const QString videoFilePath = catalog.sourcePathForMediaItem(id);
+	const QString outputFolder = catalog.folderForMediaItem(id);
+	assert_and_return_r(!outputFolder.isEmpty(), false);  // QDir("") addresses the working directory
+	const bool hadExistingFolder = QDir(outputFolder).exists();
+	const QString preservedFolder = hadExistingFolder
+		? QFileInfo(outputFolder).dir().filePath(".darkroom-resplit-" + QUuid::createUuid().toString(QUuid::Id128))
+		: QString{};
 
-	if (!deleteFolderRecursivelyIfPresent(outputFolder))
-		QMessageBox::critical(this, tr("Error"), tr("Failed to delete folder: %1").arg(outputFolder));
-	splitVideoIntoFrames(videoFilePath, outputFolder);
-
-	if (hasPreview)
+	if (hadExistingFolder && !QDir{}.rename(outputFolder, preservedFolder))
 	{
-		QDir{}.mkpath(outputFolder);
-		QDir().rename(preservedPreviewDir, previewDir);
+		QMessageBox::critical(this, tr("Error"), tr("Failed to preserve the existing frame folder before replacing it:\n%1").arg(outputFolder));
+		return false;
 	}
-	else if (!QDir(outputFolder).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty())
+
+	// Until commit, every exit discards the candidate folder and restores the complete previous one. Keeping
+	// the backup beside the original makes both the initial move and rollback same-filesystem directory renames.
+	auto rollback = qScopeGuard([&] {
+		if (!deleteFolderRecursivelyIfPresent(outputFolder))
+		{
+			QString message = tr("Failed to discard the replacement frame folder:\n%1").arg(outputFolder);
+			if (hadExistingFolder)
+				message += "\n\n" + tr("The previous frame folder remains preserved at:\n%1").arg(preservedFolder);
+			QMessageBox::critical(this, tr("Error"), message);
+			return;
+		}
+
+		if (hadExistingFolder && !QDir{}.rename(preservedFolder, outputFolder))
+		{
+			QMessageBox::critical(this, tr("Error"),
+				tr("Failed to restore the previous frame folder.\n\nPreserved folder:\n%1\n\nOriginal location:\n%2")
+					.arg(preservedFolder).arg(outputFolder));
+		}
+	});
+
+	if (!splitVideoIntoFrames(videoFilePath, outputFolder))
+		return false;
+
+	const QString preservedPreviewDir = Catalog::previewDirFor(preservedFolder);
+	const bool hasPreviewToPreserve = preserveExistingPreview && hadExistingFolder && QDir(preservedPreviewDir).exists();
+	if (hasPreviewToPreserve)
 	{
-		// Not preserving an old preview (re-export/reimport want a fresh one) - regenerate it now, but only
-		// if the full split actually produced real frames; a failed split already wiped outputFolder via
-		// splitVideoIntoFrames's own cleanup, and a preview over no real content would be misleading.
+		if (!QDir{}.rename(preservedPreviewDir, Catalog::previewDirFor(outputFolder)))
+		{
+			QMessageBox::critical(this, tr("Error"),
+				tr("Failed to carry the existing preview into the new frame folder.\n\nPreserved folder:\n%1\n\nNew folder:\n%2")
+					.arg(preservedFolder).arg(outputFolder));
+			return false;
+		}
+	}
+	else
+	{
 		const Ffmpeg::PreviewResult result = Ffmpeg::generatePreviewFrames(videoFilePath, Catalog::previewDirFor(outputFolder), m_previewFrameCountCombo->currentData().toInt());
-		// splitVideoIntoFrames just (re-)registered this item; record the duration its probe produced, so a
-		// re-export of a video imported before durations were recorded backfills one (no-op if the probe failed).
-		libraryCatalog().setDurationMs(MediaId::fromFile(videoFilePath), result.durationMs);
+		catalog.setDurationMs(id, result.durationMs);  // backfill videos imported before durations were recorded; no-op if the probe failed
 	}
+
+	rollback.dismiss();  // the new real frames plus either preserved or freshly attempted preview are now authoritative
+	catalog.markSplitComplete(id);
+
+	if (hadExistingFolder && !deleteFolderRecursivelyIfPresent(preservedFolder))
+	{
+		QMessageBox::warning(this, tr("Cleanup incomplete"),
+			tr("The new frames are ready, but the previous frame folder could not be completely removed:\n%1").arg(preservedFolder));
+	}
+	return true;
 }
 
-void MainWindow::ensureFramesSplit(const MediaId& id)
+bool MainWindow::ensureFramesSplit(const MediaId& id)
 {
 	Catalog& catalog = libraryCatalog();
 	if (catalog.isSplitIntoFrames(id))
-		return;
+		return true;
 
 	// The folder already holds preview/ frames from import, freshly generated and still valid - preserve
-	// them across the wipe rather than redoing that work (unlike re-export/reimport, nothing changed that
-	// would make them stale).
-	resplitVideoIntoFrames(catalog.sourcePathForMediaItem(id), catalog.folderForMediaItem(id), /*preserveExistingPreview=*/true);
+	// them across the replacement rather than redoing that work (unlike re-export/reimport, nothing changed
+	// that would make them stale).
+	return resplitVideoIntoFrames(id, /*preserveExistingPreview=*/true);
 }
 
-void MainWindow::splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder)
+bool MainWindow::splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder)
 {
 	// The ffmpeg invocation itself lives in the Ffmpeg module; this wrapper only supplies the settings-derived
-	// options, renders the outcome, and - on success - registers the video in the catalog.
+	// options and renders the outcome. The caller publishes the successful candidate in the catalog.
 	const Ffmpeg::SplitOptions options{ .tiff = useTiff(), .jpegQuality = jpegQuality(), .frameStep = frameStep() };
 	const Ffmpeg::SplitResult result = Ffmpeg::splitVideoIntoFrames(videoFilePath, outputFolder, options);
 
@@ -1365,37 +1408,25 @@ void MainWindow::splitVideoIntoFrames(const QString& videoFilePath, const QStrin
 		break;
 	case Status::SourceMissing:
 		reportMissingFile(this, videoFilePath);
-		return;
+		return false;
 	case Status::FolderCreateFailed:
 		QMessageBox::critical(this, tr("Error"), tr("Failed to create output folder:\n%1").arg(outputFolder));
-		return;
+		return false;
 	case Status::StartFailed:
 		QMessageBox::critical(this, tr("Error"), tr("Failed to start FFMPEG process, check that it's present in PATH or configured in Settings.\nConfigured path: %1").arg(ffmpegPath()));
-		return;
+		return false;
 	case Status::TimedOut:
 		QMessageBox::critical(this, tr("Error"), tr("FFMPEG process timeout (5 minutes)"));
-		return;
+		return false;
 	case Status::ExtractionFailed:
 		QMessageBox::critical(this, tr("Error"),
 			tr("FFMPEG failed with exit code %1\n\nError output:\n%2").arg(result.exitCode).arg(result.errorOutput));
-		return;
+		return false;
 	case Status::NoFrames:
 		QMessageBox::warning(this, tr("Warning"), tr("No frames were extracted from:\n%1").arg(videoFilePath));
-		return;
+		return false;
 	}
-
-	// Register the video in the catalog now that extraction has actually produced frames - doing it only on
-	// success avoids leaving "tracked" but empty/partial folders behind when ffmpeg fails partway through.
-	// The source file is present here, so its MediaId is real; addMediaItem persists the source path + folder and
-	// ensures the folder label for its storage folder exists. It refuses if another item already owns this id (a
-	// name+size collision) under a different folder - in that case don't leave the just-extracted frames
-	// behind as an untracked duplicate.
-	if (!libraryCatalog().addMediaItem(MediaId::fromFile(videoFilePath), videoFilePath, outputFolder, /*splitIntoFrames=*/true))
-	{
-		QMessageBox::critical(this, tr("Error"),
-			tr("An item with the same name and file size is already tracked under a different label:\n%1").arg(videoFilePath));
-		QDir(outputFolder).removeRecursively();
-	}
+	return true;
 }
 
 void MainWindow::importVideoBatch(QStringList videoPaths, const QString& storageFolderPath, const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations)
@@ -1533,20 +1564,15 @@ void MainWindow::reExportAllVideos()
 	if (confirm != QMessageBox::Yes)
 		return;
 
-	// Collect all (videoPath, folderPath) pairs across all label storage folders
-	struct VideoItem {
-		QString videoPath;
-		QString folderPath;
-	};
-	std::vector<VideoItem> toReExport;
+	std::vector<MediaId> toReExport;
 	Catalog& catalog = libraryCatalog();
-	for (const Catalog::Entry& entry : catalog.mediaItems())
+	for (const auto& [id, entry] : catalog.mediaItems().asKeyValueRange())
 	{
 		if (entry.type != Catalog::MediaType::Video)
-			continue;  // a photo has no frames to re-export - and its "folder" is the shared Photos/<label> dir, which resplit would wipe
+			continue;  // a photo has no frames to re-export - and its "folder" is the shared Photos/<label> dir, which resplit would replace
 
 		if (!entry.sourcePath.isEmpty() && QFile::exists(entry.sourcePath))
-			toReExport.push_back({ entry.sourcePath, entry.folder });
+			toReExport.push_back(id);
 	}
 
 	if (toReExport.empty())
@@ -1558,7 +1584,7 @@ void MainWindow::reExportAllVideos()
 	m_isProcessing = true;
 	const auto processingGuard = qScopeGuard([this] { m_isProcessing = false; });
 
-	// Each re-extracted video below re-registers via Catalog::addMediaItem; batch the whole pass into one write.
+	// Batch split-state and duration backfills across the whole pass into one metadata write.
 	Catalog::BatchScope batch(catalog);
 
 	QMessageBox progressBox(this);
@@ -1572,8 +1598,7 @@ void MainWindow::reExportAllVideos()
 		progressBox.setText(tr("Re-exporting video %1/%2...").arg(i + 1).arg(total));
 		QApplication::processEvents();
 
-		const auto& [videoPath, folderPath] = toReExport[i];
-		resplitVideoIntoFrames(videoPath, folderPath, /*preserveExistingPreview=*/false);
+		static_cast<void>(resplitVideoIntoFrames(toReExport[i], /*preserveExistingPreview=*/false));
 	}
 
 	refreshMediaGrid();
@@ -1755,12 +1780,8 @@ void MainWindow::checkCatalogIntegrity()
 			return catalog.addPhoto(MediaId::fromFile(filePath), filePath, labelDir, /*referenced=*/false);
 		},
 		.reimportRequested = [this](const MediaId& id) {
-			// Same re-extraction path reExportAllVideos uses for any catalog video, just for this one: clear the
-			// folder, re-run ffmpeg (which also regenerates the preview), and report whether frames actually landed.
-			Catalog& catalog = libraryCatalog();
-			const QString folder = catalog.folderForMediaItem(id);
-			resplitVideoIntoFrames(catalog.sourcePathForMediaItem(id), folder, /*preserveExistingPreview=*/false);
-			return !QDir(folder).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty();
+			// Same transactional replacement path reExportAllVideos uses, just for this catalog item.
+			return resplitVideoIntoFrames(id, /*preserveExistingPreview=*/false);
 		},
 		.regeneratePreviewRequested = [this](const MediaId& id) {
 			return regeneratePreviewFor(id);

@@ -4,49 +4,45 @@
 
 ## Full frame extraction — on-demand, not at import
 
-`MainWindow::splitVideoIntoFrames` extracts a video's complete real frame set. It's never called during
-import anymore (see "Import: preview frames only" below) — only by `ensureFramesSplit` (the first time
-the user opens the frame viewer on a video that hasn't been split yet), `reExportAllVideos`, and the
-integrity tool's ghost-reimport, the latter two via the `resplitVideoIntoFrames` wrapper described below.
+`MainWindow::splitVideoIntoFrames` extracts a candidate complete real frame set. It's never called during
+import anymore (see "Import: preview frames only" below) — `resplitVideoIntoFrames` uses it for the first
+on-demand split, Re-export all, and the integrity tool's ghost-reimport.
 `reExportAllVideos` skips photo entries when collecting its worklist — a photo has no frames, and its
-"folder" is the shared `Photos/<label>` dir, which the wipe-and-re-extract pattern would destroy.
+"folder" is the shared `Photos/<label>` dir, which frame-folder replacement would destroy.
 - The raw ffmpeg invocation lives in `Ffmpeg::splitVideoIntoFrames` (the module owns *all* ffmpeg calls now);
   `MainWindow::splitVideoIntoFrames` is a thin wrapper that passes the settings-derived options, maps the
-  returned `SplitResult` to a dialog, and registers the video on success. It runs ffmpeg synchronously,
+  returned `SplitResult` to a dialog, and returns whether candidate extraction succeeded. It runs ffmpeg synchronously,
   freezing the UI during extraction — decided not worth making async (see
   [backlog](../../ARCHITECTURE.md#improvement-backlog)). Frame stepping (keep every Nth frame) and the
   user-configured full-split JPEG quality apply here; preview frames (below) are separate, with their own
   fixed quality.
-- On success, registers the video via `Catalog::addMediaItem(..., /*splitIntoFrames=*/true)` — only once frames
-  actually exist, so a failed/partial run never leaves a "tracked" but empty folder behind. On an id collision
-  it deletes the just-extracted frames rather than leave an untracked duplicate (collision/upsert rules live
-  in [catalog-and-labels.md](catalog-and-labels.md#import-lifecycle)).
+- Only `resplitVideoIntoFrames` publishes success via `Catalog::markSplitComplete`, after the new folder and
+  its preview policy have reached the transaction's commit point. Extraction itself never mutates the catalog.
 
 `MainWindow::ensureFramesSplit(id)` is the *only* place that triggers a full split on demand: if
-`!Catalog::isSplitIntoFrames(id)`, it resolves the video's source path/folder and calls
-`resplitVideoIntoFrames(..., /*preserveExistingPreview=*/true)`. Wired into the grid card's middle-click
-handler, right before it opens `FrameViewerWindow` — opening the viewer is what "pays for" a video's full
-split. Deliberately not wired into `CompareWindow`: triggering a synchronous multi-second extraction from a
+`!Catalog::isSplitIntoFrames(id)`, it calls `resplitVideoIntoFrames(id, /*preserveExistingPreview=*/true)`.
+Wired into the grid card's middle-click handler, right before it opens `FrameViewerWindow` — opening the
+viewer is what "pays for" a video's full split, and a failed split no longer opens it. Deliberately not wired
+into `CompareWindow`: triggering a synchronous multi-second extraction from a
 side-effect of a multi-select action was judged too easy to hit by accident; a not-yet-split video there
 just shows whatever "no image" state an empty frame list already produces.
 
-`MainWindow::resplitVideoIntoFrames(videoFilePath, outputFolder, preserveExistingPreview)` wraps the "wipe
-the folder and re-extract" pattern used by `ensureFramesSplit`, `reExportAllVideos`, and the integrity
-tool's ghost-reimport. All three delete `outputFolder` wholesale before re-splitting; since the permanent
-`preview/` subfolder (above) lives inside that same folder, a plain delete would destroy it too, and the
-grid card would render nothing (an INVISIBLE finding for the integrity tool) until it was regenerated.
-`preserveExistingPreview` picks between two ways of avoiding that:
-- **`true`** (`ensureFramesSplit` only) — `preview/` is still fresh from import, nothing changed that
-  would make it stale, so it's not worth regenerating: the wrapper renames it out to a sibling folder before
-  the delete and back after the re-split completes (success or failure), surviving untouched.
-- **`false`** (`reExportAllVideos`, ghost-reimport) — the caller explicitly wants a clean start (re-export
-  may follow a settings change; a ghost's frames disappeared for an unknown reason), so the old `preview/` is
-  simply deleted along with everything else, and a fresh one is regenerated via `Ffmpeg::generatePreviewFrames` once
-  the real split has produced at least one real frame (skipped on a failed split, which already leaves
-  `outputFolder` empty via `splitVideoIntoFrames`'s own cleanup — regenerating a preview over no real content
-  would be misleading).
+`MainWindow::resplitVideoIntoFrames(id, preserveExistingPreview)` transactionally replaces an existing frame
+folder. It resolves the source/output paths from the stable catalog id, renames the complete old folder to a
+unique sibling, extracts the candidate at the original path, and keeps a scope-guarded rollback armed until
+the candidate is usable. Any extraction or preview-transfer failure removes the candidate and renames the
+complete old folder back. Failed initial preservation aborts untouched; failed rollback or post-commit backup
+cleanup reports the exact recovery path. The same-parent rename is cheap, but the old and new frame sets coexist
+during extraction; low peak disk usage is not a design goal.
 
-Neither path is used by `Import::importVideo`'s own overwrite-existing-folder path, which can be wiping a stale
+`preserveExistingPreview` controls the candidate's preview before commit:
+- **`true`** (`ensureFramesSplit` only) — `preview/` is still fresh from import, nothing changed that
+  would make it stale, so the wrapper moves it from the preserved old folder into the successful candidate.
+- **`false`** (`reExportAllVideos`, ghost-reimport) — the caller explicitly wants a clean start (re-export
+  may follow a settings change; a ghost's frames disappeared for an unknown reason), so a fresh one is generated
+  via `Ffmpeg::generatePreviewFrames`. A requested preserved preview that does not exist takes this same fallback.
+
+Neither path is used by `Import::importVideo`'s own overwrite-existing-folder path, which can be replacing a stale
 folder left behind by a completely different prior video — there's no related `preview/` worth preserving or
 regenerating-in-place there; it just goes through the normal import flow from scratch.
 

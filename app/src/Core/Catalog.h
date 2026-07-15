@@ -230,13 +230,8 @@ public:
 	// message), or if a relocation was blocked (e.g. a name collision) so a folder still names the label.
 	bool deleteLabel(LabelId labelId);
 
-	// --- Integrity resolution --------------------------------------------------------------------------------
-	// The read-only catalog-vs-disk scan and its report types live in CatalogIntegrity (Core/CatalogIntegrity.h).
-	// The method below is the mutation that scan feeds - it belongs here because only Catalog can touch the
-	// model and persist.
-
-	// Integrity resolution for the STALE case: marks a video as fully split when its real frames exist on disk
-	// but the entry was still flagged preview-only. No-op on an unknown id or one already marked split. Persists.
+	// Marks a video as fully split after a successful extraction, or when the integrity scan finds real frames
+	// behind a stale preview-only flag. No-op on an unknown id or one already marked split. Persists.
 	void markSplitComplete(const MediaId& id);
 
 	Catalog(const Catalog&) = delete;

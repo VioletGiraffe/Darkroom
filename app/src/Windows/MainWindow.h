@@ -86,16 +86,16 @@ private:
 	// (a multi-selection drags every selected file). Missing files (e.g. a referenced item on an unmounted
 	// drive) are skipped.
 	[[nodiscard]] QList<QUrl> dragUrlsForItems(const QList<QListWidgetItem*>& items) const;
-	void splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder);
-	// Wipes and fully re-extracts an already-tracked video's frames. preserveExistingPreview controls what
-	// happens to its preview/ subfolder across that wipe: true carries the existing one through unchanged
-	// (used by ensureFramesSplit, whose preview/ is still fresh from import); false regenerates a fresh
-	// one from the new real frames once the split succeeds (used by reExportAllVideos and the integrity
-	// tool's ghost reimport, where the old preview/ may be stale or the source content may have changed).
-	void resplitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder, bool preserveExistingPreview);
+	// Extracts a candidate full frame set and reports ffmpeg failures; touches neither the catalog nor any
+	// existing frame folder (resplitVideoIntoFrames moves that folder aside first).
+	[[nodiscard]] bool splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder);
+	// Transactionally replaces an already-tracked video's frame folder. The old folder stays under a unique
+	// sibling name until extraction succeeds, then either contributes its existing preview/ or is discarded
+	// after a fresh preview is generated. A pre-commit failure restores the complete old folder.
+	[[nodiscard]] bool resplitVideoIntoFrames(const MediaId& id, bool preserveExistingPreview);
 	// If id hasn't had its full frame set extracted yet, does so now (synchronously, same as a normal split).
-	// Called right before opening the frame viewer on a card - the one and only on-demand split trigger.
-	void ensureFramesSplit(const MediaId& id);
+	// Called right before opening the frame viewer on a card; false means the viewer must not be opened.
+	[[nodiscard]] bool ensureFramesSplit(const MediaId& id);
 	// Rebuilds <folder>/preview from the video's own real frames (plain copy, no ffmpeg, no source needed).
 	// Returns false and touches nothing when there are no real frames to sample. Used by the integrity tool's
 	// INVISIBLE recovery (regeneratePreviewFor).
