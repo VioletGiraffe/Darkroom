@@ -103,15 +103,11 @@ void CCrashHandler::setCommitId(std::string_view commit_id)
 
 #else
 
-CCrashHandler::CCrashHandler(std::function<void(const char*)>)
+CCrashHandler::CCrashHandler(std::function<void(const wchar_t*)>)
 {
 }
 
 CCrashHandler::~CCrashHandler()
-{
-}
-
-void CCrashHandler::setReportAllExceptions(bool /*reportAllExceptions*/)
 {
 }
 
@@ -123,7 +119,7 @@ void CCrashHandler::setWriteFullMemoryDump(bool /*writeFullDump*/)
 {
 }
 
-void CCrashHandler::setMinidumpsStorageFolderPath(QString /*folderForDumps*/)
+void CCrashHandler::setMinidumpsStorageFolderPath(std::filesystem::path /*folder*/)
 {
 }
 
