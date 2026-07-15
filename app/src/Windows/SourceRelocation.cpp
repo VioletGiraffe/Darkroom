@@ -22,7 +22,7 @@ using SourceRelocation::Mode;
 // the file at srcPath so the caller can still import it from there.
 [[nodiscard]] QString copyOrMove(QWidget* dialogParent, const QString& srcPath, const QString& destPath, bool isMove)
 {
-	const bool ok = isMove ? QFile::rename(srcPath, destPath) : QFile::copy(srcPath, destPath);
+	const bool ok = isMove ? QFile{ srcPath }.rename(destPath) : QFile::copy(srcPath, destPath);
 	if (!ok)
 	{
 		QMessageBox::warning(dialogParent, QObject::tr("Error"), QObject::tr("Failed to %1:\n%2\nto:\n%3")

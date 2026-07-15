@@ -133,7 +133,7 @@ Import::PhotoResult Import::importPhoto(Catalog& catalog, const QString& labelPh
 	if (!adoptExisting)
 	{
 		const bool isMove = mode == PhotoImportMode::Move;
-		if (!(isMove ? QFile::rename(photoPath, destPath) : QFile::copy(photoPath, destPath)))
+		if (!(isMove ? QFile{ photoPath }.rename(destPath) : QFile::copy(photoPath, destPath)))
 			return { PhotoStatus::Error, QObject::tr("Failed to %1:\n%2\nto:\n%3")
 				.arg(isMove ? QObject::tr("move") : QObject::tr("copy"), photoPath, destPath), {} };
 	}
@@ -145,7 +145,7 @@ Import::PhotoResult Import::importPhoto(Catalog& catalog, const QString& labelPh
 		if (!adoptExisting)
 		{
 			if (mode == PhotoImportMode::Move)
-				QFile::rename(destPath, photoPath);
+				QFile{ destPath }.rename(photoPath);
 			else
 				QFile::remove(destPath);
 		}
