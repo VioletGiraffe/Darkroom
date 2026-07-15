@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784112011054,
+  "lastUpdate": 1784112485239,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -5188,6 +5188,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .text",
             "value": 601.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 298,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 31,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 31,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "6a51ba6f8bbd97a99869cd62561570c344f78122",
+          "message": "Using member QFile{name}.rename(newName) instead of static function because only the former promises copy on rename between file systems (volumes)",
+          "timestamp": "2026-07-15T13:44:43+03:00",
+          "tree_id": "38e9ce9bf534845f70f08e50e49c782fa69057f9",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/6a51ba6f8bbd97a99869cd62561570c344f78122"
+        },
+        "date": 1784112483408,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 11375,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 7054,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 999,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 602,
             "unit": "KB"
           },
           {
