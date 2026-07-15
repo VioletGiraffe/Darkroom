@@ -90,8 +90,9 @@ error boxes, view refresh), driven from the Import dialog via the `importPhotosR
 mode: **Copy/Move** land the file in `<root>/Photos/<label>/` (created lazily), **"leave in place" means
 Reference** — the file is tracked where it is and the catalog entry is marked referenced
 (`Catalog::addPhoto`, see [catalog-and-labels.md](catalog-and-labels.md)).
-Move uses `QFile`'s member `rename()`: it takes the cheap native rename path on one filesystem and performs
-Qt's copy/remove fallback across filesystems, restoring the source-only state if that fallback cannot finish.
+Owned-photo Move uses `QFile`'s member `rename()`: it takes the cheap native rename path on one filesystem
+and performs Qt's copy/remove fallback across filesystems, restoring the source-only state if that fallback
+cannot finish.
 
 - **Owned import auto-rename**: the destination name is chosen so that both the file path and the name+size
   `MediaId` are free — one rename (`name_2.ext`, `name_3.ext`, ...) resolves a disk collision and a catalog
@@ -166,7 +167,8 @@ the progress modal), `createLabelRequested` (shared with the sidebar's create-la
 be callbacks are done in-dialog now (below). Source-file relocation — copy/move into a chosen folder, with
 the interactive same-name collision dialog — lives in its own **`SourceRelocation`** module
 (`src/Windows/SourceRelocation.h/.cpp`), entry point `SourceRelocation::relocateIfNeeded`; `FileCollisionDialog`
-and `performRelocation` are internal to it.
+and `performRelocation` are internal to it. Its Move path uses the same member `QFile::rename()` operation and
+therefore has the same cross-filesystem fallback and restoration guarantee as owned-photo Move.
 
 ### Duplicate detection
 
