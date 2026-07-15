@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784110030067,
+  "lastUpdate": 1784112011054,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -5109,6 +5109,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Lines of code (libs)",
             "value": 7048,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 998.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 601.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 298,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 31,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 31,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "7280839a37ec19b278550294c7950a87415ad33c",
+          "message": "NaturalSort case sensitivity bug fixed",
+          "timestamp": "2026-07-15T13:36:24+03:00",
+          "tree_id": "e8f5974118ee2f1eddb29a758327c3070b3106e5",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/7280839a37ec19b278550294c7950a87415ad33c"
+        },
+        "date": 1784112000303,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 11375,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 7054,
             "unit": "LOC"
           },
           {
