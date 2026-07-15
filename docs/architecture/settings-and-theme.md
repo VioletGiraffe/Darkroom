@@ -21,8 +21,10 @@ alone reads and writes the last successfully opened root.
 
 Uses `CSettingsDialog`/`CSettingsPage` from `qtutils` (`settingsui/`). Ordinary page values are persisted by
 `acceptSettings()`. The General page contains the ffmpeg path and color scheme; library selection belongs to
-File > Open library rather than application preferences. Color-scheme radios apply immediately via
-`setColorScheme()` (and again at startup in `main.cpp`, before `MainWindow`).
+File > Open library rather than application preferences. The ffmpeg field is optional — its placeholder shows what
+an empty setting resolves to (`autoDetectedFfmpegPath()`, see [import.md](import.md)), or says so when nothing was
+found. Color-scheme radios apply immediately via `setColorScheme()` (and again at startup in `main.cpp`, before
+`MainWindow`).
 
 ## Theme (`src/Theme/Theme.h/.cpp`)
 

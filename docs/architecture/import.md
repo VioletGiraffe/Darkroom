@@ -135,10 +135,11 @@ grid only if `preview/` itself is empty.
 
 ## Other utilities
 
-`Utils.h` (mostly inline free functions): `ffmpegPath()` (configured setting → beside the app → PATH → macOS
-Homebrew/MacPorts dirs, since a Finder-launched app's PATH holds neither; empty when nothing has it, which callers
-hand to `QProcess` unguarded), `revealInFileManager()` (+ its companion `revealInFileManagerActionText()` for menu
-labels — Explorer/Finder/freedesktop-ShowItems per platform),
+`Utils.h` (mostly inline free functions): `ffmpegPath()` (the configured setting when it names an existing file, else
+`autoDetectedFfmpegPath()` — beside the app → PATH → macOS Homebrew/MacPorts dirs, since a Finder-launched app's PATH
+holds neither; empty when nothing has it, which callers hand to `QProcess` unguarded. The two are split because the
+Settings placeholder needs the detected path *without* the setting shadowing it), `revealInFileManager()` (+ its
+companion `revealInFileManagerActionText()` for menu labels — Explorer/Finder/freedesktop-ShowItems per platform),
 `getSourceFileDate(sourcePath, folderPath)` (prefers a timestamp parsed from the filename —
 `parseTrailingTimestamp` — so it survives moves; falls back to the source file's birth time, then the
 folder's own timestamp as a last resort), `isSupportedVideoFile()` / `isSupportedImageFile()` / `isSupportedMediaFile()` (the last is either kind),

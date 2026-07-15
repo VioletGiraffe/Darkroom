@@ -256,12 +256,8 @@ void reportMissingFile(QWidget* parent, const QString& path)
 	QMessageBox::warning(parent, QObject::tr("File not found"), QObject::tr("This file or folder no longer exists:\n") + path);
 }
 
-QString ffmpegPath()
+QString autoDetectedFfmpegPath()
 {
-	const QString configured = QSettings{}.value(Settings::FfmpegPath).toString();
-	if (!configured.isEmpty() && QFile::exists(configured))
-		return configured;
-
 	const QString executableName = QStringLiteral("ffmpeg");
 
 	// Beside the app first: that's the precedence Windows gives a local binary when handed a bare name. On macOS
@@ -286,4 +282,10 @@ QString ffmpegPath()
 #else
 	return {};
 #endif
+}
+
+QString ffmpegPath()
+{
+	const QString configured = QSettings{}.value(Settings::FfmpegPath).toString();
+	return (!configured.isEmpty() && QFile::exists(configured)) ? configured : autoDetectedFfmpegPath();
 }

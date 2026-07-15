@@ -3,6 +3,7 @@
 #include "Theme/Style.h"
 #include "Theme/Theme.h"
 #include "UiComponents/SegmentedToggle.h"
+#include "Utils.h"
 
 #include <QDialog>
 #include <QDir>
@@ -27,11 +28,22 @@ GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent
 	QSettings s;
 	m_ffmpegPath = new QLineEdit(s.value(Settings::FfmpegPath).toString(), this);
 
+	// What leaving the field empty resolves to. Deliberately not ffmpegPath(): with a path configured it answers with
+	// that, which is the one thing a placeholder must not echo.
+	const QString detectedFfmpeg = autoDetectedFfmpegPath();
+	m_ffmpegPath->setPlaceholderText(detectedFfmpeg.isEmpty()
+		? tr("Not found - set the path to the ffmpeg binary")
+		: tr("Auto-detected: %1").arg(QDir::toNativeSeparators(detectedFfmpeg)));
+
 	auto* browseFfmpeg = new QPushButton(tr("Browse..."), this);
 
 	connect(browseFfmpeg, &QPushButton::clicked, this, [this] {
-		const QString path = QFileDialog::getOpenFileName(this, tr("Select ffmpeg executable"),
-			m_ffmpegPath->text(), tr("Executables (*.exe);;All files (*)"));
+#ifdef Q_OS_WIN
+		const QString filter = tr("Executables (*.exe);;All files (*)");
+#else
+		const QString filter = tr("All files (*)");   // nothing to filter on: Unix executables carry no extension
+#endif
+		const QString path = QFileDialog::getOpenFileName(this, tr("Select ffmpeg executable"), m_ffmpegPath->text(), filter);
 		if (!path.isEmpty())
 			m_ffmpegPath->setText(QDir::toNativeSeparators(path));
 	});
