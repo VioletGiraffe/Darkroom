@@ -10,7 +10,7 @@ Separate top-level `QWidget` (`Qt::Window`), persistent — reused, not destroye
 - `currentFolder()` — used by `MainWindow` to update it on rename (see [main-window.md](main-window.md)).
 - Ctrl+scroll resizes thumbnails (persisted, see [media-widgets.md](media-widgets.md#card-preview-sizing--zoom-ctrlwheel));
   Esc closes (`QShortcut`).
-- Context menu (open in explorer, copy path) is local; thumbnail drag is intrinsic to `ThumbnailWidget` (see
+- Context menu (reveal in file manager, copy path) is local; thumbnail drag is intrinsic to `ThumbnailWidget` (see
   [media-widgets.md](media-widgets.md)).
 - Uses `CFlowLayout` (`qtutils`) for its thumbnail grid — the one remaining consumer of that layout, since
   it needs a plain non-selectable flow grid (unlike `MainWindow`'s grid, which needs the native multi-select

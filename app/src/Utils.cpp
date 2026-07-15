@@ -2,6 +2,7 @@
 #include "Settings.h"
 
 #include <QByteArray>
+#include <QCoreApplication>
 #include <QCursor>
 #include <QDateTime>
 #include <QDir>
@@ -13,13 +14,13 @@
 #include <QProcess>
 #include <QRegularExpression>
 #include <QSettings>
+#include <QStandardPaths>
 #include <QStringList>
 #include <QUrl>
 #include <QWidget>
 
 // QtDBus is linked on these platforms only (see app.pro), for revealInFileManager.
 #if !defined Q_OS_WIN && !defined Q_OS_MACOS
-#include <QCoreApplication>
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QDBusPendingCall>
@@ -258,5 +259,31 @@ void reportMissingFile(QWidget* parent, const QString& path)
 QString ffmpegPath()
 {
 	const QString configured = QSettings{}.value(Settings::FfmpegPath).toString();
-	return (configured.isEmpty() || !QFile::exists(configured)) ? "ffmpeg" : configured;
+	if (!configured.isEmpty() && QFile::exists(configured))
+		return configured;
+
+	const QString executableName = QStringLiteral("ffmpeg");
+
+	// Beside the app first: that's the precedence Windows gives a local binary when handed a bare name. On macOS
+	// applicationDirPath() points inside the bundle (Darkroom.app/Contents/MacOS), so climb out of it - a
+	// hand-placed binary sits next to Darkroom.app, not within it.
+#ifdef Q_OS_MACOS
+	const QString appDir = QDir::cleanPath(QCoreApplication::applicationDirPath() + "/../../..");
+#else
+	const QString appDir = QCoreApplication::applicationDirPath();
+#endif
+	if (const QString besideApp = QStandardPaths::findExecutable(executableName, { appDir }); !besideApp.isEmpty())
+		return besideApp;
+
+	if (const QString onPath = QStandardPaths::findExecutable(executableName); !onPath.isEmpty())
+		return onPath;
+
+#ifdef Q_OS_MACOS
+	// A Finder-launched app inherits launchd's minimal PATH, so a Homebrew or MacPorts ffmpeg that runs fine from a
+	// terminal is invisible to the PATH search above. Compiled out elsewhere rather than handed an empty directory
+	// list, which findExecutable would answer by searching PATH a second time.
+	return QStandardPaths::findExecutable(executableName, { "/opt/homebrew/bin", "/usr/local/bin", "/opt/local/bin" });
+#else
+	return {};
+#endif
 }

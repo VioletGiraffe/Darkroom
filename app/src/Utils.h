@@ -105,4 +105,8 @@ void forEachFolder(const QString& root, F&& callback)
 // "the source file is gone" path reports identically and always tells the user which path is missing.
 void reportMissingFile(QWidget* parent, const QString& path);
 
+// Absolute path of the ffmpeg binary to run, or empty when it can't be found at all: the configured setting when it
+// names an existing file, else the first hit beside the app, on PATH, or - macOS only - where Homebrew and MacPorts
+// install (a Finder-launched app's PATH holds neither). An empty return needs no guarding at the call site: QProcess
+// reports it as FailedToStart, which the Ffmpeg module already surfaces as StartFailed.
 [[nodiscard]] QString ffmpegPath();

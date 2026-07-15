@@ -1413,8 +1413,13 @@ bool MainWindow::splitVideoIntoFrames(const QString& videoFilePath, const QStrin
 		QMessageBox::critical(this, tr("Error"), tr("Failed to create output folder:\n%1").arg(outputFolder));
 		return false;
 	case Status::StartFailed:
-		QMessageBox::critical(this, tr("Error"), tr("Failed to start FFMPEG process, check that it's present in PATH or configured in Settings.\nConfigured path: %1").arg(ffmpegPath()));
+	{
+		const QString ffmpeg = ffmpegPath();
+		QMessageBox::critical(this, tr("Error"), ffmpeg.isEmpty()
+			? tr("FFMPEG was not found. Install it, or set the path to the binary in Settings.")
+			: tr("Failed to start the FFMPEG process at:\n%1").arg(ffmpeg));
 		return false;
+	}
 	case Status::TimedOut:
 		QMessageBox::critical(this, tr("Error"), tr("FFMPEG process timeout (5 minutes)"));
 		return false;
