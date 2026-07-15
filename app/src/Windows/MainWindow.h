@@ -22,6 +22,7 @@ class QAction;
 class QComboBox;
 class QLineEdit;
 class QListWidgetItem;
+class QMenu;
 class QTimer;
 class QUrl;
 class QWidget;
@@ -140,7 +141,18 @@ private:
 	void updateEditActions();
 
 	void openLibrary();
+	// Switches to an entry of the Library menu's recent list. The entry is never checked for existence up front
+	// (see recentLibraries) - a stale one simply fails the switch and reports it, keeping its place in the list
+	// so that re-plugging the drive is enough to make it work again.
+	void openRecentLibrary(const QString& root);
 	[[nodiscard]] bool switchLibraryTo(const QString& root, QString* error);
+	// switchLibraryTo, reporting a failure to the user. Returns whether the switch happened.
+	bool switchLibraryToOrReport(const QString& root);
+	// True (having said so) while a frame-extraction loop is pumping events: it holds catalog/store references
+	// and a batch writer across the loop, none of which may outlive a root change.
+	[[nodiscard]] bool refuseLibraryChangeWhileProcessing();
+	// Refills the Library menu's recent entries; wired to its aboutToShow.
+	void rebuildRecentLibraryActions();
 	void schedulePersistenceFailureWarning();
 	void openSettings();
 	// Runs the interactive rename flow (see MediaRename.h), then refreshes the view and repoints the frame
@@ -172,6 +184,9 @@ private:
 	QAction* m_deleteAction = nullptr;
 	QAction* m_removeFromLibraryAction = nullptr;
 	QAction* m_renameAction = nullptr;
+
+	QMenu* m_libraryMenu = nullptr;
+	std::vector<QAction*> m_recentLibraryActions;  // the menu's recent entries, held so each rebuild can drop the previous set
 
 	// Guards against re-entering the frame-extraction loops (which pump events) from a new drop or menu action while one is already running.
 	bool m_isProcessing = false;

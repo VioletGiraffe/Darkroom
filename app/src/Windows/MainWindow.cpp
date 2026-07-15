@@ -58,6 +58,7 @@
 #include <QSettings>
 #include <QShortcut>
 #include <QSplitter>
+#include <QStandardPaths>
 #include <QStyleOptionViewItem>
 #include <QStyledItemDelegate>
 #include <QTimer>
@@ -118,6 +119,32 @@ QString libraryPickerStartFolder(const QString& path)
 	return QDir(parent).exists() ? parent : QDir::homePath();
 }
 
+constexpr int MAX_RECENT_LIBRARIES = 8;
+
+// Recently opened library roots, newest first. Every entry got here from Library::rootFolder() and is therefore
+// already lexically normalized, so entries compare as plain strings and this list never touches the filesystem.
+// That is deliberate: an entry may name an unplugged drive or a dead network share, where a stat can stall for
+// seconds - and this list is read every time the Library menu opens.
+[[nodiscard]] QStringList recentLibraries()
+{
+	return QSettings{}.value(Settings::RecentLibraries).toStringList();
+}
+
+// The one place that records a library as the current one: persists its root and moves it to the front of the
+// recent list. The startup load and every later switch go through here, so nothing else writes RootFolder.
+void recordCurrentLibrary(const QString& root)
+{
+	QSettings settings;
+	settings.setValue(Settings::RootFolder, root);
+
+	QStringList recents = settings.value(Settings::RecentLibraries).toStringList();
+	recents.removeIf([&root](const QString& entry) { return entry.compare(root, Qt::CaseInsensitive) == 0; });
+	recents.prepend(root);
+	if (recents.size() > MAX_RECENT_LIBRARIES)
+		recents.resize(MAX_RECENT_LIBRARIES);
+	settings.setValue(Settings::RecentLibraries, recents);
+}
+
 [[nodiscard]] bool deleteFileIfPresent(const QString& filePath)
 {
 	if (filePath.isEmpty())
@@ -144,19 +171,18 @@ QString libraryPickerStartFolder(const QString& path)
 
 std::unique_ptr<MainWindow> MainWindow::createWithInitialLibrary(QWidget* parent)
 {
-	QString requestedRoot = QSettings{}.value(Settings::RootFolder, Defaults::RootFolder).toString();
-	while (true)
+	QString requestedRoot = QSettings{}.value(Settings::RootFolder, QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)).toString();
+	for(;;)
 	{
 		QString error;
 		auto library = Library::load(requestedRoot, &error);
 		if (library)
 		{
-			QSettings{}.setValue(Settings::RootFolder, library->rootFolder());
+			recordCurrentLibrary(library->rootFolder());
 			return std::unique_ptr<MainWindow>(new MainWindow(std::move(*library), parent));
 		}
 
-		QMessageBox::warning(parent, tr("Open library"),
-			tr("Could not open the library:\n\n%1\n\nChoose another library folder.").arg(error));
+		QMessageBox::warning(parent, tr("Open library"), tr("Could not open the library:\n\n%1\n\nChoose another library folder.").arg(error));
 		requestedRoot = QFileDialog::getExistingDirectory(parent, tr("Open library"), libraryPickerStartFolder(requestedRoot));
 		if (requestedRoot.isEmpty())
 			return {};
@@ -349,11 +375,16 @@ void MainWindow::setupMainMenu()
 	setMenuBar(menuBar);
 
 	QMenu* fileMenu = new QMenu(tr("File"), menuBar);
-	fileMenu->addAction(tr("Open library..."), QKeySequence("Ctrl+O"), this, &MainWindow::openLibrary);
-	fileMenu->addSeparator();
 	fileMenu->addAction(tr("Settings..."), QKeySequence("Ctrl+Alt+P"), this, &MainWindow::openSettings);
 	fileMenu->addSeparator();
 	fileMenu->addAction(tr("Exit"), QKeySequence("Ctrl+Q"), this, &QMainWindow::close);
+
+	m_libraryMenu = new QMenu(tr("Library"), menuBar);
+	m_libraryMenu->addAction(tr("Open library..."), QKeySequence("Ctrl+O"), this, &MainWindow::openLibrary);
+	m_libraryMenu->addSeparator();
+	// Everything below the separator is the recent list, refilled on each open so that neither it nor its
+	// current-library marker can go stale after a switch.
+	connect(m_libraryMenu, &QMenu::aboutToShow, this, &MainWindow::rebuildRecentLibraryActions);
 
 	QMenu* editMenu = new QMenu(tr("Edit"), menuBar);
 	m_deleteAction = editMenu->addAction(tr("Delete"), QKeySequence(Shortcuts::DeleteFile), this, &MainWindow::deleteSelectedItems);
@@ -384,6 +415,7 @@ void MainWindow::setupMainMenu()
 	});
 
 	menuBar->addMenu(fileMenu);
+	menuBar->addMenu(m_libraryMenu);
 	menuBar->addMenu(editMenu);
 	menuBar->addMenu(toolsMenu);
 	menuBar->addMenu(helpMenu);
@@ -426,13 +458,29 @@ void MainWindow::restoreSettings()
 	refreshMediaGrid();
 }
 
+bool MainWindow::refuseLibraryChangeWhileProcessing()
+{
+	if (!m_isProcessing)
+		return false;
+
+	QMessageBox::information(this, tr("Busy"), tr("The library cannot be changed while media processing is in progress."));
+	return true;
+}
+
+bool MainWindow::switchLibraryToOrReport(const QString& root)
+{
+	QString error;
+	if (switchLibraryTo(root, &error))
+		return true;
+
+	QMessageBox::warning(this, tr("Open library"), error);
+	return false;
+}
+
 void MainWindow::openLibrary()
 {
-	if (m_isProcessing)
-	{
-		QMessageBox::information(this, tr("Busy"), tr("The library cannot be changed while media processing is in progress."));
+	if (refuseLibraryChangeWhileProcessing())
 		return;
-	}
 
 	QString startFolder = QFileInfo{ m_library.rootFolder() }.absolutePath();
 	for(;;)
@@ -441,12 +489,44 @@ void MainWindow::openLibrary()
 		if (requestedRoot.isEmpty() || pathComparisonKey(requestedRoot) == pathComparisonKey(m_library.rootFolder()))
 			return;
 
-		QString error;
-		if (switchLibraryTo(requestedRoot, &error))
+		if (switchLibraryToOrReport(requestedRoot))
 			return;
-
-		QMessageBox::warning(this, tr("Open library"), error);
 		startFolder = requestedRoot;
+	}
+}
+
+void MainWindow::openRecentLibrary(const QString& root)
+{
+	if (refuseLibraryChangeWhileProcessing())
+		return;
+
+	switchLibraryToOrReport(root);
+}
+
+void MainWindow::rebuildRecentLibraryActions()
+{
+	qDeleteAll(m_recentLibraryActions);
+	m_recentLibraryActions.clear();
+
+	const QString currentRoot = m_library.rootFolder();
+	int number = 0;
+	for (const QString& root : recentLibraries())
+	{
+		QString display = QDir::toNativeSeparators(root);
+		display.replace('&', QLatin1String("&&"));   // an & in the path would otherwise be eaten as a mnemonic
+
+		QAction* action = m_libraryMenu->addAction(QString("&%1  %2").arg(++number).arg(display),
+			this, [this, root] { openRecentLibrary(root); });
+
+		// The current library is listed for orientation but not offered: re-selecting it would run a full
+		// reload, closing players and clearing the grid to arrive back where we already are.
+		if (root.compare(currentRoot, Qt::CaseInsensitive) == 0)
+		{
+			action->setCheckable(true);
+			action->setChecked(true);
+			action->setEnabled(false);
+		}
+		m_recentLibraryActions.push_back(action);
 	}
 }
 
@@ -464,7 +544,7 @@ bool MainWindow::switchLibraryTo(const QString& root, QString* error)
 	m_contextMenuTarget.reset();
 	m_labelSidebar->setActiveFilter({}, m_labelSidebar->isAndMode());  // label ids belong to one library
 
-	QSettings{}.setValue(Settings::RootFolder, m_library.rootFolder());
+	recordCurrentLibrary(m_library.rootFolder());
 	refreshLibraryView();
 	return true;
 }

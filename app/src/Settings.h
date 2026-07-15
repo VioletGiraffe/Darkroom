@@ -5,6 +5,7 @@
 
 namespace Settings {
 	constexpr const char* RootFolder    = "settings/rootFolder";
+	constexpr const char* RecentLibraries = "settings/recentLibraries";  // QStringList of library roots, newest first
 	constexpr const char* FfmpegPath    = "settings/ffmpegPath";
 	constexpr const char* UseTiff       = "settings/useTiff";
 	constexpr const char* JpegQuality   = "settings/jpegQuality";
@@ -17,7 +18,6 @@ namespace Settings {
 }
 
 namespace Defaults {
-	constexpr const char* RootFolder   = "H:/VideoFrames";
 	constexpr bool        UseTiff      = false;
 	constexpr int         JpegQuality  = 1; // 1 = best quality, 31 = worst
 	constexpr int         FrameStep    = 3; // 1 = every frame, 3 = every 3rd
