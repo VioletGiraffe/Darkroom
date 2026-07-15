@@ -154,8 +154,8 @@ void FrameViewerWindow::showThumbnailContextMenu(const QPoint& pos)
 		return;
 
 	QMenu menu;
-	menu.addAction(tr("Open in Explorer"), [senderWidget, this] {
-		if (const QString path = senderWidget->filePath(); !openInExplorer(path))
+	menu.addAction(revealInFileManagerActionText(), [senderWidget, this] {
+		if (const QString path = senderWidget->filePath(); !revealInFileManager(path))
 			reportMissingFile(this, path);
 	});
 	menu.addAction(tr("Copy file path"), [senderWidget] {

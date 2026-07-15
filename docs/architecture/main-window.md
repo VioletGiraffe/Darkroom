@@ -98,10 +98,11 @@ restyle needs an app-wide styled `QCheckBox`.
   all-photo selection of at least two, fed the source file paths (missing files filtered out, <2 remaining →
   warning, remaining paths capped at 50); the same window also opens empty from Tools → "Compare photos..."
   and accepts dropped image files or recursively scanned folders;
-  "Open in Explorer" (the item's folder) and "Rename media file" are videos-only — a photo's
-  `folderForMediaItem` is the shared `Photos/<label>` dir, or nothing when referenced; photos get "Open
-  photo" where videos get "Play source video" (both `openSourceInSystemApp`; a video's *double-click* opens
-  the built-in player instead). **"Delete" is per-type** (Shift+Del): a video loses its frame folder +
+  the reveal-in-file-manager action (the item's folder; platform-worded via `revealInFileManagerActionText`)
+  and "Rename media file" are videos-only — a photo's `folderForMediaItem` is the shared `Photos/<label>`
+  dir, or nothing when referenced; photos get "Open photo" where videos get "Play source video" (both
+  `openSourceInSystemApp`; a video's *double-click* opens the built-in player instead). **"Delete" is
+  per-type** (Shift+Del): a video loses its frame folder +
   source file; a photo loses its file (never the shared label dir) — the confirmation message spells out
   exactly what applies to the selection at hand. A required path that is already absent counts as deleted;
   otherwise the catalog record is removed only after every required deletion succeeds. For a video, the

@@ -1217,8 +1217,8 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 	// folder of its own to open - "Locate source file" below is how to reach the photo itself.
 	if (!isPhoto)
 	{
-		menu.addAction(tr("Open in Explorer"), [folderPath, this] {
-			if (!openInExplorer(folderPath))
+		menu.addAction(revealInFileManagerActionText(), [folderPath, this] {
+			if (!revealInFileManager(folderPath))
 				reportMissingFile(this, folderPath);
 		});
 	}
@@ -1229,7 +1229,7 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 		const QString sourcePath = libraryCatalog().sourcePathForMediaItem(id);
 		if (sourcePath.isEmpty())
 			QMessageBox::warning(this, tr("Error"), tr("No source file is recorded for this item."));
-		else if (!openInExplorer(sourcePath))
+		else if (!revealInFileManager(sourcePath))
 			reportMissingFile(this, sourcePath);
 	});
 	menu.addAction(tr("Copy source path to clipboard"), [this, id] {

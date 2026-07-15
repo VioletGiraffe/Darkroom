@@ -17,6 +17,16 @@
 #include <QUrl>
 #include <QWidget>
 
+// QtDBus is linked on these platforms only (see app.pro), for revealInFileManager.
+#if !defined Q_OS_WIN && !defined Q_OS_MACOS
+#include <QCoreApplication>
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusPendingCall>
+#include <QDBusPendingCallWatcher>
+#include <QDesktopServices>
+#endif
+
 #include <functional>
 
 void saveWindowGeometry(QWidget* w, const QString& key)
@@ -194,15 +204,50 @@ QDateTime getSourceFileDate(const QString& sourcePath, const QString& folderPath
 	return birth.isValid() ? birth : folderInfo.lastModified();
 }
 
-bool openInExplorer(const QString& path)
+bool revealInFileManager(const QString& path)
 {
 	const QFileInfo fi{ path };
 	if (!fi.exists())
 		return false;
 
-	const QStringList param{ "/select,", QDir::toNativeSeparators(fi.canonicalFilePath()) };
-	QProcess::startDetached("explorer.exe", param);
+	const QString canonicalPath = fi.canonicalFilePath();
+
+#if defined Q_OS_WIN
+	QProcess::startDetached("explorer.exe", { "/select,", QDir::toNativeSeparators(canonicalPath) });
+#elif defined Q_OS_MACOS
+	QProcess::startDetached("open", { "-R", canonicalPath });
+#else
+	// The only interface that selects the item instead of merely opening its folder; Nautilus/Dolphin/Nemo/Caja/Thunar
+	// implement it, and the name is D-Bus-activatable, so this also starts a file manager that isn't running yet.
+	// Raw method call: QDBusInterface's constructor would spend a blocking introspection round-trip first.
+	QDBusMessage showItems = QDBusMessage::createMethodCall("org.freedesktop.FileManager1", "/org/freedesktop/FileManager1",
+	                                                        "org.freedesktop.FileManager1", "ShowItems");
+	showItems.setArguments({ QStringList{ QUrl::fromLocalFile(canonicalPath).toString() }, QString{} });
+
+	// Async: that activation can take seconds, which a blocking call() would spend with the UI frozen. qApp parents the
+	// watcher (bounding its life if no reply comes) and is the connect context, putting the GUI-thread-only openUrl on
+	// the main thread.
+	const QUrl folderUrl = QUrl::fromLocalFile(fi.isDir() ? canonicalPath : fi.absolutePath());
+	auto* watcher = new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(showItems), qApp);
+	QObject::connect(watcher, &QDBusPendingCallWatcher::finished, qApp, [folderUrl](QDBusPendingCallWatcher* self) {
+		if (self->isError())
+			QDesktopServices::openUrl(folderUrl);
+		self->deleteLater();
+	});
+#endif
+
 	return true;
+}
+
+QString revealInFileManagerActionText()
+{
+#if defined Q_OS_WIN
+	return QObject::tr("Open in Explorer");
+#elif defined Q_OS_MACOS
+	return QObject::tr("Reveal in Finder");
+#else
+	return QObject::tr("Show in file manager");
+#endif
 }
 
 void reportMissingFile(QWidget* parent, const QString& path)

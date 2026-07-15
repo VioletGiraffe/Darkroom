@@ -372,7 +372,7 @@ void PhotoComparePane::contextMenuEvent(QContextMenuEvent* event)
 	const int index = photoIndex();
 	QMenu menu;
 	menu.addAction(tr("Open containing folder"), [this, index] {
-		if (const QString path = m_owner.m_photos[index].filePath; !openInExplorer(path))
+		if (const QString path = m_owner.m_photos[index].filePath; !revealInFileManager(path))
 			reportMissingFile(this, path);
 	});
 	QAction* makeReference = menu.addAction(tr("Make this the reference image"), [this, index] {

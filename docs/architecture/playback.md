@@ -65,7 +65,7 @@ it for any all-photo selection of at least two; `showForFiles` filters missing p
 50. It is also openable empty from Tools → "Compare photos...". Photos can be added by dropping image files or
 whole folders (scanned recursively); the same 50-image cap applies, the pane grid is rebuilt on every count
 change, and each added photo is default-aligned against the current reference. Each pane has a context
-menu: open the photo's containing folder in Explorer, or make the photo the reference (the reference pane is
+menu: reveal the photo in the file manager, or make the photo the reference (the reference pane is
 outlined in yellow). Its core mechanism is **two separate transform layers**:
 
 - **One shared view** (zoom + pan, in widget coordinates — equal pane sizes are what make the same widget

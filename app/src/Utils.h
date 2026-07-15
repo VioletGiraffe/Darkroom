@@ -91,7 +91,15 @@ void forEachFolder(const QString& root, F&& callback)
 // both the source path (from the catalog) and the frame folder for the last-resort fallback.
 [[nodiscard]] QDateTime getSourceFileDate(const QString& sourcePath, const QString& folderPath);
 
-[[nodiscard]] bool openInExplorer(const QString& path);
+// Shows `path` in the platform's file manager, selected within its parent folder: Explorer's /select, Finder's
+// Reveal, the freedesktop ShowItems call. Returns false - having done nothing - only when `path` doesn't exist, so
+// a false return always means exactly that (what every caller reports via reportMissingFile). Launching the file
+// manager is best-effort past that point and deliberately not folded into the return value.
+[[nodiscard]] bool revealInFileManager(const QString& path);
+
+// Menu text for a revealInFileManager action, in the platform's own idiom. Only for call sites that name the file
+// manager; wordings that don't ("Locate source file") work everywhere as-is and shouldn't use this.
+[[nodiscard]] QString revealInFileManagerActionText();
 
 // Modal warning that names a file the app expected to find but didn't. Centralizes the one wording so every
 // "the source file is gone" path reports identically and always tells the user which path is missing.

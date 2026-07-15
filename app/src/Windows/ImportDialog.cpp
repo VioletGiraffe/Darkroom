@@ -916,7 +916,7 @@ void ImportDialog::locateStagedSourceFile(const MediaId& id)
 	if (it == m_staged.constEnd())
 		return;
 
-	if (!openInExplorer(it->path))
+	if (!revealInFileManager(it->path))
 		reportMissingFile(this, it->path);
 }
 

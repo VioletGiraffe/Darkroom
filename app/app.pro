@@ -85,6 +85,10 @@ mac*{
 	QMAKE_POST_LINK = cp -f -p $${DESTDIR}/*.dylib $${DESTDIR}/$${TARGET}.app/Contents/MacOS/ || true
 }
 
+linux*|freebsd{
+	QT += dbus   # revealInFileManager() talks to org.freedesktop.FileManager1 here (Utils.cpp)
+}
+
 ###################################################
 #      Generic stuff for Linux and Mac
 ###################################################
