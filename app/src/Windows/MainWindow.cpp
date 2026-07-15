@@ -169,29 +169,34 @@ void recordCurrentLibrary(const QString& root)
 
 } // namespace
 
-std::unique_ptr<MainWindow> MainWindow::createWithInitialLibrary(QWidget* parent)
+bool MainWindow::loadInitialLibrary()
 {
 	QString requestedRoot = QSettings{}.value(Settings::RootFolder, QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)).toString();
 	for(;;)
 	{
 		QString error;
-		auto library = Library::load(requestedRoot, &error);
-		if (library)
+		if (m_library.setRoot(requestedRoot, &error))
 		{
-			recordCurrentLibrary(library->rootFolder());
-			return std::unique_ptr<MainWindow>(new MainWindow(std::move(*library), parent));
+			recordCurrentLibrary(m_library.rootFolder());
+			return true;
 		}
 
-		QMessageBox::warning(parent, tr("Open library"), tr("Could not open the library:\n\n%1\n\nChoose another library folder.").arg(error));
-		requestedRoot = QFileDialog::getExistingDirectory(parent, tr("Open library"), libraryPickerStartFolder(requestedRoot));
+		// Parented to nullptr, not to this: the window is mid-construction and unshown, so it would only give
+		// these dialogs a garbage position to centre on.
+		QMessageBox::warning(nullptr, tr("Open library"), tr("Could not open the library:\n\n%1\n\nChoose another library folder.").arg(error));
+		requestedRoot = QFileDialog::getExistingDirectory(nullptr, tr("Open library"), libraryPickerStartFolder(requestedRoot));
 		if (requestedRoot.isEmpty())
-			return {};
+			return false;
 	}
 }
 
-MainWindow::MainWindow(Library&& library, QWidget* parent)
-	: QMainWindow(parent), m_library(std::move(library))
+MainWindow::MainWindow(QWidget* parent)
+	: QMainWindow(parent)
 {
+	// Before anything else, and before any early return: everything below borrows the library for its lifetime.
+	if (!loadInitialLibrary())
+		return;
+
 	setWindowTitle("Darkroom");
 	resize(1500, 800);
 	setAcceptDrops(true);
@@ -211,6 +216,9 @@ MainWindow::MainWindow(Library&& library, QWidget* parent)
 
 MainWindow::~MainWindow()
 {
+	if (!m_library.isLoaded())
+		return;  // the constructor stopped at a cancelled library picker: nothing was built, nothing to save
+
 	m_library.setPersistenceFailureHandler({});
 	saveSettings();
 	VideoPlayerWindow::closeAll();

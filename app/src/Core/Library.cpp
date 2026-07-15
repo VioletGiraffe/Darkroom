@@ -3,6 +3,8 @@
 #include "Core/JsonPersistence.h"
 #include "Core/MetadataStore.h"
 
+#include "assert/advanced_assert.h"
+
 #include <QDir>
 #include <QFileInfo>
 #include <QJsonArray>
@@ -195,19 +197,8 @@ namespace {
 
 } // namespace
 
-std::optional<Library> Library::load(const QString& root, QString* error)
-{
-	std::unique_ptr<LibraryState> state = loadLibraryState(root, error);
-	if (!state)
-		return std::nullopt;
-	return Library(std::move(state));
-}
-
-Library::Library(std::unique_ptr<LibraryState> state)
-	: m_state(std::move(state))
-{}
-
-Library::Library(Library&&) noexcept = default;
+// Both defaulted here, not in the header: LibraryState is incomplete there, and ~unique_ptr needs it complete.
+Library::Library() = default;
 Library::~Library() = default;
 
 bool Library::setRoot(const QString& root, QString* error)
@@ -229,8 +220,11 @@ bool Library::setRoot(const QString& root, QString* error)
 	return true;
 }
 
+// The accessors below are reachable only once the owner has loaded the library (see isLoaded), so an empty
+// state here is a programming error rather than a case to handle - assert and let the deref speak.
 const QString& Library::rootFolder() const
 {
+	assert_r(m_state);
 	return m_state->rootFolder;
 }
 
@@ -241,38 +235,45 @@ QString Library::photosRootFolder() const
 
 Catalog& Library::catalog()
 {
+	assert_r(m_state);
 	return m_state->catalog;
 }
 
 const Catalog& Library::catalog() const
 {
+	assert_r(m_state);
 	return m_state->catalog;
 }
 
 MetadataStore& Library::metadataStore()
 {
+	assert_r(m_state);
 	return m_state->metadataStore;
 }
 
 const MetadataStore& Library::metadataStore() const
 {
+	assert_r(m_state);
 	return m_state->metadataStore;
 }
 
+// An empty library has nothing to flush - and saying so is what lets setRoot() below load the first root
+// through the same path as every later one.
 bool Library::flushPendingWrites(QString* error)
 {
-	return m_state->flushPendingWrites(error);
+	return m_state ? m_state->flushPendingWrites(error) : true;
 }
 
 QString Library::pendingPersistenceError() const
 {
-	return m_state->pendingPersistenceError();
+	return m_state ? m_state->pendingPersistenceError() : QString{};
 }
 
 void Library::setPersistenceFailureHandler(std::function<void()> handler)
 {
 	m_persistenceFailureHandler = std::move(handler);
-	m_state->setPersistenceFailureHandler(m_persistenceFailureHandler);
+	if (m_state)
+		m_state->setPersistenceFailureHandler(m_persistenceFailureHandler);
 	if (m_persistenceFailureHandler && !pendingPersistenceError().isEmpty())
 		m_persistenceFailureHandler();
 }

@@ -9,7 +9,6 @@
 #include <QMainWindow>
 #include <QStringList>
 
-#include <memory>
 #include <optional>
 #include <vector>
 
@@ -32,10 +31,13 @@ class SortControl;
 class MainWindow final : public QMainWindow
 {
 public:
-	// Opens the configured library, offering a folder picker after any load failure. Returns null only when
-	// the user cancels recovery, so main() never needs to know about Library construction or validation.
-	[[nodiscard]] static std::unique_ptr<MainWindow> createWithInitialLibrary(QWidget* parent = nullptr);
+	// Loads the library before building anything (the sidebar and grid borrow it for their whole lives), asking
+	// for another folder after each failure. Cancelling that leaves the window UNBUILT: nothing but
+	// isLibraryLoaded() and destruction is valid on it, so main() must ask before showing it.
+	explicit MainWindow(QWidget* parent = nullptr);
 	~MainWindow();
+
+	[[nodiscard]] bool isLibraryLoaded() const { return m_library.isLoaded(); }
 
 protected:
 	void dragEnterEvent(QDragEnterEvent* event) override;
@@ -43,7 +45,9 @@ protected:
 	void closeEvent(QCloseEvent* event) override;
 
 private:
-	explicit MainWindow(Library&& library, QWidget* parent);
+	// The startup half of the library flow: configured root first, then a picker after each failure until one
+	// loads. False = the user cancelled. Loads through setRoot(), the same call a later switch uses.
+	[[nodiscard]] bool loadInitialLibrary();
 
 	void setupUI();
 	void setupMainMenu();

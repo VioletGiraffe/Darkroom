@@ -67,9 +67,13 @@ not just when reading existing code.
   [data-model.md](docs/architecture/data-model.md) and [catalog-and-labels.md](docs/architecture/catalog-and-labels.md).
 - **`Library` is the stable root-bound ownership boundary.** `MainWindow` owns it as a normal member; its
   private state contains one immutable root, `MetadataStore`, and `Catalog`, constructed and replaced as a
-  unit. `Library::setRoot()` fully loads a candidate before publishing it; failure leaves the current state
-  untouched. `MainWindow` owns both initial-library recovery and later switching (the **Library** menu: open a
-  root, or pick one of the recent ones); `main()` never handles a `Library`. Persistent consumers borrow `Library&`, while synchronous operations may borrow its current
+  unit. The object itself is immovable and never rebuilt, so collaborators can borrow it for life.
+  **`Library::setRoot()` is its only loader** — first root and later switches alike: it fully loads a candidate
+  before publishing it, and failure leaves the current state untouched. A default-constructed `Library` is
+  empty, which exists so `MainWindow` can hold it as a plain member and load it in its constructor before
+  building any UI. `MainWindow` owns both initial-library recovery and later switching (the **Library** menu:
+  open a root, or pick one of the recent ones); `main()` never handles a `Library`. Persistent consumers borrow
+  `Library&`, while synchronous operations may borrow its current
   `Catalog` or `MetadataStore`. There is no global active-library/catalog/store accessor. See
   [data-model.md](docs/architecture/data-model.md).
 - **Persistent JSON is read and written through one checked path.** Library loading distinguishes absent files

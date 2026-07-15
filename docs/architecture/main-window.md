@@ -10,10 +10,14 @@ The window owns a stable `Library` member, the sidebar, the toolbar controls (na
 media-type switch, frames-per-card density combo, sort control), the card grid, and a persistent
 `FrameViewerWindow` (reused, not recreated).
 
-`MainWindow::createWithInitialLibrary()` owns startup library selection. It first tries the configured root;
-on failure it reports the validation error and repeatedly offers a folder picker until a library loads or the
-user cancels. It constructs the window only with a valid `Library`, keeping both `main()` and the normal
-member free of empty/optional states.
+The **constructor** owns startup library selection, and does it before building anything: `loadInitialLibrary()`
+tries the configured root, then reports each validation error and offers a folder picker until a library loads
+or the user cancels. Loading first is not stylistic — `setupUI()` hands the sidebar a `Library&` it keeps for
+life, so there is no window to build without one. Cancelling leaves the window unbuilt and `main()` drops it
+after asking `isLibraryLoaded()`; the destructor returns early for the same reason. The library loads through
+`Library::setRoot()` — the same call a later switch uses (see [data-model.md](data-model.md)), so startup has
+no parallel load path of its own. Its startup dialogs are deliberately parented to `nullptr`: the window is
+still under construction and unshown, and would only give them a garbage position to centre on.
 
 Library > Open library (`Ctrl+O`) owns live switching. It asks `Library::setRoot()` to validate and fully load the
 requested root internally; `setRoot()` first flushes the current library, so a persistent save failure also

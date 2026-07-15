@@ -37,10 +37,10 @@ int main(int argc, char* argv[])
 
 	Style::install();  // app-wide non-stock style; re-applies on a light/dark switch
 
-	auto window = MainWindow::createWithInitialLibrary();
-	if (!window)
-		return 0;
-	window->show();
+	MainWindow window;
+	if (!window.isLibraryLoaded())
+		return 0;  // the user cancelled the library picker; the window was never built
+	window.show();
 
 	const int result = app.exec();
 	IoThreadPool::finishAllThreads();

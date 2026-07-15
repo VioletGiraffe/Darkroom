@@ -5,16 +5,29 @@
 ## `Library` is the stable root-bound lifetime
 
 `MainWindow` owns one `Library` as a normal member. The stable public object holds a private `State`; each
-state owns one immutable normalized root, its `MetadataStore`, and its `Catalog`. There is no global active
+state owns one immutable normalized root, its `MetadataStore`, and its `Catalog`. The object is **immovable**
+(every copy/move operation is deleted) and never rebuilt — only its `State` is replaced — which is what lets
+collaborators hold a `Library&` for their whole lives. There is no global active
 pointer and no `Catalog`/`MetadataStore` singleton. Persistent collaborators that span a possible root
 change borrow `Library&` and resolve its current catalog/store when needed. Narrow `Catalog&` or
 `MetadataStore&` borrows are for synchronous operations that cannot span `Library::setRoot()`; modal
 root-bound flows may borrow `Library&` for their entire, switch-blocking lifetime.
 
-`MainWindow::createWithInitialLibrary()` uses `Library::load()` to try the configured root. If it cannot be
-loaded, it reports the problem and offers a folder picker until the user chooses a valid library or cancels;
-only a valid `Library` is passed to the private `MainWindow` constructor. `main()` therefore neither owns nor
-constructs a library, and an invalid saved path is a recoverable startup condition rather than a hard exit.
+**`setRoot()` is the only way to load a library** — the first root and every later one take the identical
+path. A default-constructed `Library` is *empty* (its `State` is simply null): only `setRoot()`,
+`isLoaded()`, `flushPendingWrites()` and `pendingPersistenceError()` are valid on it, the flush pair
+answering "nothing to do" so that `setRoot()`'s flush-before-replace step works on the very first load too.
+Every other accessor asserts rather than inventing a value, because the owner is expected to load before
+building anything that borrows the library. That empty state exists for exactly one reason: it lets the owner
+declare `Library` as a plain member and load it in its own constructor, with no factory, no `std::optional`,
+and no second load path to keep in step.
+
+`MainWindow`'s constructor loads the library **first, before building any UI** — the sidebar and grid borrow
+it for their lifetimes, so there is nothing to build without one. It tries the configured root, then reports
+each failure and offers a folder picker until one loads. Cancelling leaves the window *unbuilt*: `main()`
+asks `isLibraryLoaded()` and drops it instead of showing an empty shell, and `~MainWindow` returns early
+because nothing was constructed to unwind. An invalid saved path is therefore a recoverable startup
+condition rather than a hard exit.
 
 Library > Open library handles later switching through `Library::setRoot()`: it first flushes the current state,
 then reads and validates the candidate's `catalog.json`/`labels.json` into objects, constructs a complete
