@@ -357,17 +357,10 @@ sources) defer to this tool for actual reconciliation.
 
 ## Deferred polish (post-v1)
 
-Two items originally deferred out of the labels feature's v1 scope to keep it tight; the first is now in
-progress:
+One item remains deferred out of the labels feature's v1 scope:
 
-1. **App-wide restyle to match the planning mockup.** **In progress (started 2026-06-27).** The mockup at
-   [`docs/mockups/main-window-sidebar.html`](../mockups/main-window-sidebar.html) is the visual reference.
-   Landed so far: the card footer ([media-widgets.md](media-widgets.md)); the central `Style` sheet +
-   `SegmentedToggle` ([settings-and-theme.md](settings-and-theme.md)); and the sidebar restyle
-   ([main-window.md](main-window.md), "LabelSidebar structure"). The non-functional roadmap and styling
-   backlog (next up: the sort popover) are tracked in out-of-repo memory, per the memory-vs-repo split.
-2. **Named label chips on cards with drag-out removal.** v1 shows labels on an item card as simple colored
-   dots/chips (`LabelDotStrip`, see [media-widgets.md](media-widgets.md)), display-only, removed via the
-   context-menu "Labels" checklist. v-next: show larger chips bearing the label name, and let the user
-   remove a label by *dragging the chip off the card* — an explicit gesture chosen over a plain click to
-   guard against an accidental destructive misclick.
+- **Named label chips on cards with drag-out removal.** v1 shows labels on an item card as simple colored
+  dots/chips (`LabelDotStrip`, see [media-widgets.md](media-widgets.md)), display-only, removed via the
+  context-menu "Labels" checklist. v-next: show larger chips bearing the label name, and let the user
+  remove a label by *dragging the chip off the card* — an explicit gesture chosen over a plain click to
+  guard against an accidental destructive misclick.

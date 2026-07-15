@@ -68,8 +68,8 @@ not just when reading existing code.
 - **`Library` is the stable root-bound ownership boundary.** `MainWindow` owns it as a normal member; its
   private state contains one immutable root, `MetadataStore`, and `Catalog`, constructed and replaced as a
   unit. `Library::setRoot()` fully loads a candidate before publishing it; failure leaves the current state
-  untouched. `MainWindow` owns both initial-library recovery and later switching; `main()` never handles a
-  `Library`. Persistent consumers borrow `Library&`, while synchronous operations may borrow its current
+  untouched. `MainWindow` owns both initial-library recovery and later switching (the **Library** menu: open a
+  root, or pick one of the recent ones); `main()` never handles a `Library`. Persistent consumers borrow `Library&`, while synchronous operations may borrow its current
   `Catalog` or `MetadataStore`. There is no global active-library/catalog/store accessor. See
   [data-model.md](docs/architecture/data-model.md).
 - **Persistent JSON is read and written through one checked path.** Library loading distinguishes absent files

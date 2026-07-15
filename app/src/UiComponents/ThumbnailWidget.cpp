@@ -35,7 +35,7 @@ static constexpr int THUMBNAIL_LABEL_HEIGHT = 20;
 // trigger a decode (and disk read) for something the user isn't looking at. See paintEvent.
 static constexpr int LOAD_DWELL_MS = 100;
 
-// Shared control block for one thumbnail load, split across two stages (read on the single I/O thread, decode on
+// Shared control block for one thumbnail load, split across two stages (read on the I/O pool, decode on
 // the CPU pool). It's held by a shared_ptr so it outlives the widget when a stage is still running: the widget's
 // destructor disarms it (below) rather than deleting it, and each stage re-checks m_disarmed before touching the
 // widget. m_parent/m_target/m_disarmed are guarded by m_mutex (disarm() flips them from the GUI thread while a
@@ -352,7 +352,10 @@ void ThumbnailWidget::scheduleRender()
 		? QSize(m_maxSize.width(), qMax(1, m_maxSize.height() - 2 * filmStripBandHeight(m_maxSize.height())))
 		: m_maxSize;
 	m_job->m_dpr = m_renderDpr;
-	IoThreadPool::enqueue(m_sourcePaths.value(0), [job = m_job] { readStage(job); });   // stage 1 (read) on the I/O pool; it posts stage 2 (decode) to the CPU pool
+	// Stage 1 (read) on the I/O pool; it posts stage 2 (decode) to the CPU pool. Deliberately untagged: retire()
+	// blocks, so tagging this to retire from ~ThumbnailWidget would serialize a whole grid's teardown on in-flight
+	// reads. The disarm model above is what makes the destructor cheap here - keep it.
+	IoThreadPool::enqueue(m_sourcePaths.value(0), [job = m_job] { readStage(job); });
 }
 
 void ThumbnailWidget::setOnMouseWheelCallback(std::function<void(int)> handler)

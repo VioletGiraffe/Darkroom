@@ -138,6 +138,21 @@ Implementation notes:
   image coordinates, so navigating doesn't disturb them).
 - The view re-fits on every pane resize (first show, maximize, later window resizes) **until the user first
   navigates**; after that resizes leave the view alone.
+- **Loading is asynchronous and two-stage**, per the app-wide I/O rule (see
+  [ARCHITECTURE.md](../../ARCHITECTURE.md)): the reads run on `Core/IoThreadPool` as one tagged task, each
+  handing its bytes to a decode on the window's own `CWorkerThreadPool` (`m_workerPool`, sized to leave the GUI
+  thread a core); the decode that completes the batch posts `applyLoadedPhotoBatch`, so the ordered batch lands
+  on the GUI thread in one go. **One batch at a time** — `m_loadBatch` is non-null while a load is in flight and
+  `dragEnterEvent` denies drops meanwhile (chosen over a pool busy-query API). Closing mid-load aborts the batch
+  (pending decodes become no-ops) and retires the read task by tag, so the read loop is provably gone before the
+  pool member joins.
+- The same `m_workerPool` also backs **auto-align**, parallel both across photos and within each `alignImages`
+  call (the library takes a pool parameter and owns no threads of its own). The nesting is deadlock-free because
+  `parallelFor`'s caller drains the range too, and it self-balances: a two-photo compare gives the inner fit
+  every core, while many photos saturate the outer loop and each inner call runs inline. The result is
+  bit-identical to a serial run — no cross-thread floating-point reductions — so alignment stays idempotent. The
+  pool is **window-local on purpose**, living and dying with the window; promote it to an app-wide pool only if
+  a third consumer appears.
 - Photos that fail to load are skipped at load time (constructor batch and dropped files alike) with a
   `qWarning` (so all downstream code can assume every pane has a valid image); the alignment itself is
   transient, but three things persist across sessions: window geometry, the "Ignore rotation" option, and the

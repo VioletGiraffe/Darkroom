@@ -163,11 +163,13 @@ The render is **not** started at construction. The first `paintEvent` arms a sho
 if the card is still visible when it fires — so a grid (which paints only its visible cards) never loads
 off-screen ones, and a fast scroll loads nothing it doesn't come to rest on.
 
-A load runs in two stages: the **file read** on one process-wide I/O thread (`Core/IoThreadPool`, a hidden
-single-thread pool) so a spinning disk isn't seek-thrashed by parallel reads, then the **decode** on the shared
-CPU pool so it fans across cores without blocking the next read. The decode reads straight to the target size
-(`QImageReader::setScaledSize` — a reduced-scale libjpeg decode for JPEG), far cheaper than a full decode plus
-downscale and free of the aliasing that a single large downscale caused; it also applies EXIF orientation.
+A load runs in two stages: the **file read** through `Core/IoThreadPool`, which routes the task by the storage
+medium under its path — a fast random-access volume gets a small parallel pool, while a slow, external, network,
+or unclassifiable one shares a single worker so a spinning disk isn't seek-thrashed by parallel reads — then the
+**decode** on the shared CPU pool so it fans across cores without blocking the next read. The decode reads
+straight to the target size (`QImageReader::setScaledSize` — a reduced-scale libjpeg decode for JPEG), far
+cheaper than a full decode plus downscale and free of the aliasing that a single large downscale caused; it also
+applies EXIF orientation.
 
 Cards are built parentless and reparented later, so the device-pixel-ratio isn't reliable until the widget is on
 its real screen — another reason the render lives in `paintEvent`, which captures the correct DPR and re-renders

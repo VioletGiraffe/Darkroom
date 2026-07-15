@@ -16,7 +16,7 @@ loaded, it reports the problem and offers a folder picker until the user chooses
 only a valid `Library` is passed to the private `MainWindow` constructor. `main()` therefore neither owns nor
 constructs a library, and an invalid saved path is a recoverable startup condition rather than a hard exit.
 
-File > Open library handles later switching through `Library::setRoot()`: it first flushes the current state,
+Library > Open library handles later switching through `Library::setRoot()`: it first flushes the current state,
 then reads and validates the candidate's `catalog.json`/`labels.json` into objects, constructs a complete
 candidate state from those same objects, and only then replaces the current state. Failure leaves every
 current object and path untouched
@@ -25,8 +25,10 @@ frame viewer, media grid and its pending thumbnail work, the library-specific la
 queued card mutations before returning to the event loop; it then persists the normalized root and rebuilds
 the view. Library switching and Settings are refused while an import/re-export loop is pumping events: those
 loops hold short-lived catalog/store references and batch writers, and their encoding configuration must not
-change mid-batch. Do not add another code path that writes `Settings::RootFolder`; `MainWindow`'s successful
-initial load and switch flow own that setting.
+change mid-batch. Do not add another code path that writes `Settings::RootFolder`: `MainWindow`'s
+`recordCurrentLibrary()` is its single writer, persisting the root and the recent-library entry together so the
+two cannot drift (see [main-window.md](main-window.md)). Both the successful initial load and the switch flow
+record a library through it.
 
 ## `Catalog` is the authoritative in-memory model
 

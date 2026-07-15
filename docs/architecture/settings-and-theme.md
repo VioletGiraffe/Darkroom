@@ -21,7 +21,7 @@ alone reads and writes the last successfully opened root.
 
 Uses `CSettingsDialog`/`CSettingsPage` from `qtutils` (`settingsui/`). Ordinary page values are persisted by
 `acceptSettings()`. The General page contains the ffmpeg path and color scheme; library selection belongs to
-File > Open library rather than application preferences. The ffmpeg field is optional — its placeholder shows what
+the Library menu rather than application preferences. The ffmpeg field is optional — its placeholder shows what
 an empty setting resolves to (`autoDetectedFfmpegPath()`, see [import.md](import.md)), or says so when nothing was
 found. Color-scheme radios apply immediately via `setColorScheme()` (and again at startup in `main.cpp`, before
 `MainWindow`).
@@ -127,8 +127,8 @@ looks QSS can't (per-row colours, segmented controls) add custom painting — `L
 A reusable segmented control: mutually-exclusive segments in one rounded pill, the selected one filled with
 `AccentBg` + `AccentText` text, hairline separators, hover feedback. API mirrors a checkable control —
 `currentIndex()`, `setCurrentIndex()` (**silent**, for restoring persisted state without re-triggering work),
-and `currentChanged(int)` (emitted **only** on user clicks). Drives the sidebar's OR/AND combine mode; built
-reusable for the planned sort popover's field/direction toggles.
+and `currentChanged(int)` (emitted **only** on user clicks). Drives the sidebar's OR/AND combine mode and the
+`SortControl` popover's field/direction toggles (see [main-window.md](main-window.md)).
 
 ### Icons (`src/Theme/Icons.h/.cpp`)
 

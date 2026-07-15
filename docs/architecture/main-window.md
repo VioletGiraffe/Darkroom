@@ -15,7 +15,7 @@ on failure it reports the validation error and repeatedly offers a folder picker
 user cancels. It constructs the window only with a valid `Library`, keeping both `main()` and the normal
 member free of empty/optional states.
 
-File > Open library (`Ctrl+O`) owns live switching. It asks `Library::setRoot()` to validate and fully load the
+Library > Open library (`Ctrl+O`) owns live switching. It asks `Library::setRoot()` to validate and fully load the
 requested root internally; `setRoot()` first flushes the current library, so a persistent save failure also
 blocks replacement. Failure reports the error without disturbing the current state and returns to the
 picker. On success it synchronously destroys player windows, clears the persistent frame viewer, grid and
@@ -24,6 +24,29 @@ normalized root, and rebuilds the sidebar/grid. The sidebar borrows the stable `
 replacement/rebinding. Library switching and Settings are refused while `m_isProcessing`: import/re-export
 pumps events while holding a catalog batch, and settings changes partway through that work could also give
 one batch mixed encoding behavior.
+
+## The Library menu and its recent list
+
+The **Library** menu holds `Open library...` plus the recently opened roots (`Settings::RecentLibraries`,
+newest first, capped at 8) as numbered quick-switch entries. Both paths converge on the same
+`switchLibraryTo()`, so a recent entry gets the identical validate-load-replace transaction and the identical
+busy refusal.
+
+Two properties are deliberate and worth preserving:
+
+- **The recent list never touches the filesystem.** Its entries are `Library::rootFolder()` values, and that
+  normalization is purely lexical, so entries are compared as plain strings — no `pathComparisonKey()` (it
+  calls `canonicalFilePath()`). A recent library may well sit on an unplugged drive or a dead network share,
+  and stat-ing one of those can stall for seconds *every time the menu opens*. The cost of not checking is
+  that a stale entry looks live until clicked, at which point the normal switch failure reports it; the entry
+  keeps its place, so re-plugging the drive is enough to make it work again.
+- **The entries are rebuilt on `aboutToShow`**, so neither the list nor its current-library marker can go
+  stale after a switch. The current library is listed checked-and-disabled: visible for orientation, but not
+  re-selectable, since switching to it would run a full reload only to arrive back where it started.
+
+`recordCurrentLibrary()` is the **single writer** of `Settings::RootFolder` — it persists the root and pushes
+the recent entry together, and both the startup load and `switchLibraryTo()` call it. Record a library as
+current *only* through it; that is what keeps the two settings from drifting apart.
 
 `Library` also routes the first failed `catalog.json` or `labels.json` flush to MainWindow. The window queues
 the warning out of the RAII writer destructor, then offers Retry or Keep working; dirty state remains in memory
