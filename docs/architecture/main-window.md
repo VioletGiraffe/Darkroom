@@ -12,7 +12,11 @@ media-type switch, frames-per-card density combo, sort control), the card grid, 
 
 The **constructor** owns startup library selection, and does it before building anything: `loadInitialLibrary()`
 tries the configured root, then reports each validation error and offers a folder picker until a library loads
-or the user cancels. Loading first is not stylistic — `setupUI()` hands the sidebar a `Library&` it keeps for
+or the user cancels. On the **first run** there is no configured root — `Settings::RootFolder` is written only by
+`recordCurrentLibrary()` after a load succeeds — so rather than silently create a library under Documents,
+`chooseFirstRunLibraryFolder()` shows a welcome prompt offering a suggested `Documents\Darkroom`, a
+custom-folder picker, or Quit; the chosen path then feeds the same recovery loop, and quitting leaves the
+window unbuilt exactly like a cancelled picker. Loading first is not stylistic — `setupUI()` hands the sidebar a `Library&` it keeps for
 life, so there is no window to build without one. Cancelling leaves the window unbuilt and `main()` drops it
 after asking `isLibraryLoaded()`; the destructor returns early for the same reason. The library loads through
 `Library::setRoot()` — the same call a later switch uses (see [data-model.md](data-model.md)), so startup has

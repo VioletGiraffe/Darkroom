@@ -53,6 +53,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QPushButton>
 #include <QScrollBar>
 #include <QSet>
 #include <QSettings>
@@ -119,6 +120,33 @@ QString libraryPickerStartFolder(const QString& path)
 	return QDir(parent).exists() ? parent : QDir::homePath();
 }
 
+// First run on this system: no library has ever been recorded. Ask where the library should live rather than
+// silently materializing one under Documents. Returns the chosen root, or empty if the user chose to quit.
+// Parented to nullptr for the same reason as the recovery dialogs in loadInitialLibrary(): the window is
+// mid-construction and unshown, so it has no meaningful position for these to centre on.
+[[nodiscard]] QString chooseFirstRunLibraryFolder()
+{
+	QString documents = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+	if (documents.isEmpty())
+		documents = QDir::homePath();
+	const QString suggested = QDir(documents).filePath(QStringLiteral("Darkroom"));
+
+	QMessageBox box(QMessageBox::Information, QObject::tr("Welcome to Darkroom"),
+		QObject::tr("Darkroom keeps your photos, extracted frames and catalog together in one library folder.\n\n"
+			"Suggested location:\n%1\n\nUse this folder, or choose a different one.").arg(QDir::toNativeSeparators(suggested)));
+	QPushButton* useSuggested = box.addButton(QObject::tr("Use This Folder"), QMessageBox::AcceptRole);
+	QPushButton* chooseOther  = box.addButton(QObject::tr("Choose Folder..."), QMessageBox::ActionRole);
+	box.addButton(QObject::tr("Quit"), QMessageBox::RejectRole);
+	box.setDefaultButton(useSuggested);
+	box.exec();
+
+	if (box.clickedButton() == useSuggested)
+		return suggested;
+	if (box.clickedButton() == chooseOther)  // the picker itself may still be cancelled, yielding an empty path (quit)
+		return QFileDialog::getExistingDirectory(nullptr, QObject::tr("Choose library folder"), libraryPickerStartFolder(suggested));
+	return {};  // Quit, Escape, or the dialog was closed
+}
+
 constexpr int MAX_RECENT_LIBRARIES = 8;
 
 // Recently opened library roots, newest first. Every entry got here from Library::rootFolder() and is therefore
@@ -171,7 +199,21 @@ void recordCurrentLibrary(const QString& root)
 
 bool MainWindow::loadInitialLibrary()
 {
-	QString requestedRoot = QSettings{}.value(Settings::RootFolder, QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation)).toString();
+	QSettings settings;
+	QString requestedRoot;
+	if (settings.contains(Settings::RootFolder))
+	{
+		requestedRoot = settings.value(Settings::RootFolder).toString();
+	}
+	else
+	{
+		// First run: RootFolder is written only by recordCurrentLibrary() after a successful load, so its absence
+		// reliably means no library was ever opened. Ask where it should live instead of defaulting silently.
+		requestedRoot = chooseFirstRunLibraryFolder();
+		if (requestedRoot.isEmpty())
+			return false;  // the user chose to quit rather than pick a location
+	}
+
 	for(;;)
 	{
 		QString error;

@@ -24,7 +24,9 @@ and no second load path to keep in step.
 
 `MainWindow`'s constructor loads the library **first, before building any UI** — the sidebar and grid borrow
 it for their lifetimes, so there is nothing to build without one. It tries the configured root, then reports
-each failure and offers a folder picker until one loads. Cancelling leaves the window *unbuilt*: `main()`
+each failure and offers a folder picker until one loads. On the first run there is no configured root, so it
+prompts for a location (suggesting `Documents\Darkroom`) instead of defaulting to Documents silently.
+Cancelling leaves the window *unbuilt*: `main()`
 asks `isLibraryLoaded()` and drops it instead of showing an empty shell, and `~MainWindow` returns early
 because nothing was constructed to unwind. An invalid saved path is therefore a recoverable startup
 condition rather than a hard exit.
