@@ -275,3 +275,80 @@ TEST_CASE("A mutated library reloads to an identical state", "[catalog][persiste
 	REQUIRE(reloaded.setRoot(f.tempDir.path()));
 	REQUIRE(dumpCatalog(reloaded.catalog()) == dumpCatalog(catalog));
 }
+
+TEST_CASE("findPhotoBySameContent: same-size photos are byte-compared, the rest skipped", "[catalog]")
+{
+	LibraryFixture f;
+	Catalog& catalog = f.library.catalog();
+
+	const QString photosBeta = f.root + "/Photos/Beta";
+	REQUIRE(QDir{}.mkpath(photosBeta));
+	const QString storedPath = photosBeta + "/Stored.png";
+	writeTextFile(storedPath, "0123456789");  // 10 bytes
+	const MediaId photo = MediaId::fromFile(storedPath);
+	REQUIRE(catalog.addPhoto(photo, storedPath, photosBeta, false));
+
+	// A byte-identical file under a different name is the same content re-encountered.
+	const QString identical = f.root + "/copy.png";
+	writeTextFile(identical, "0123456789");
+	REQUIRE(catalog.findPhotoBySameContent(identical) == storedPath);
+
+	// Same size clears the gate but the byte compare rejects it - the case that catches a broken gate or
+	// a broken compare masking each other.
+	const QString sameSizeOtherBytes = f.root + "/other.png";
+	writeTextFile(sameSizeOtherBytes, "9876543210");  // 10 bytes, different content
+	REQUIRE(catalog.findPhotoBySameContent(sameSizeOtherBytes).isEmpty());
+
+	// A different size never reaches the byte compare.
+	const QString differentSize = f.root + "/short.png";
+	writeTextFile(differentSize, "012");
+	REQUIRE(catalog.findPhotoBySameContent(differentSize).isEmpty());
+}
+
+TEST_CASE("removeLabel: a relocation blocked by a name collision leaves the item untouched", "[catalog]")
+{
+	LibraryFixture f;
+	Catalog& catalog = f.library.catalog();
+
+	SECTION("a video's frame folder")
+	{
+		const MediaId video = f.addVideo("Clip.mp4", 1000, "Alpha");  // <root>/Alpha/Clip
+		catalog.addLabel(video, f.beta);
+		// A different item (same name, different size -> different id) already occupies the destination basename.
+		f.addVideo("Clip.mp4", 2000, "Beta");  // <root>/Beta/Clip
+
+		catalog.removeLabel(video, f.alpha);  // would relocate Alpha/Clip -> Beta/Clip, which exists -> refused
+
+		REQUIRE(catalog.folderForMediaItem(video) == f.root + "/Alpha/Clip");
+		REQUIRE(catalog.mediaItemHasLabel(video, f.alpha));
+		REQUIRE(catalog.mediaItemHasLabel(video, f.beta));
+		REQUIRE(QDir(f.root + "/Alpha/Clip").exists());
+		REQUIRE(QDir(f.root + "/Beta/Clip").exists());
+		requireRebuildStable(catalog);
+	}
+
+	SECTION("an owned photo's file")
+	{
+		const QString photosAlpha = f.root + "/Photos/Alpha";
+		const QString photosBeta  = f.root + "/Photos/Beta";
+		REQUIRE(QDir{}.mkpath(photosAlpha));
+		REQUIRE(QDir{}.mkpath(photosBeta));
+		const QString aPath = photosAlpha + "/pic.png";
+		const QString bPath = photosBeta + "/pic.png";
+		writeTextFile(aPath, "aaaa");
+		writeTextFile(bPath, "bbbbbb");  // same name, different size -> different id
+		const MediaId photo = MediaId::fromFile(aPath);
+		REQUIRE(catalog.addPhoto(photo, aPath, photosAlpha, false));
+		catalog.addLabel(photo, f.beta);
+		REQUIRE(catalog.addPhoto(MediaId::fromFile(bPath), bPath, photosBeta, false));
+
+		catalog.removeLabel(photo, f.alpha);  // would relocate to Photos/Beta/pic.png, which exists -> refused
+
+		REQUIRE(catalog.folderForMediaItem(photo) == photosAlpha);
+		REQUIRE(catalog.sourcePathForMediaItem(photo) == aPath);
+		REQUIRE(catalog.mediaItemHasLabel(photo, f.alpha));
+		REQUIRE(QFileInfo::exists(aPath));
+		REQUIRE(QFileInfo::exists(bPath));
+		requireRebuildStable(catalog);
+	}
+}

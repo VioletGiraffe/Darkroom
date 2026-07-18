@@ -42,7 +42,10 @@ SOURCES += \
 	MediaIdTests.cpp \
 	PersistenceTests.cpp \
 	CatalogTests.cpp \
+	CatalogIntegrityTests.cpp \
+	UtilsTests.cpp \
 	../app/src/Core/Catalog.cpp \
+	../app/src/Core/CatalogIntegrity.cpp \
 	../app/src/Core/JsonPersistence.cpp \
 	../app/src/Core/Library.cpp \
 	../app/src/Core/MediaId.cpp \

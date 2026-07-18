@@ -55,10 +55,13 @@ orient, then follow the link for the subsystem you're touching.
   `Utils.cpp` directly and runs on every CI platform — so the disk-touching tests double as case-sensitivity
   coverage on Linux. The suite deliberately targets *silent* breakage, not UI (which daily use self-detects):
   stored-format backward compatibility (golden fixtures in `tests/PersistenceTests.cpp` — extend them when the
-  schema evolves, never weaken), `MediaId` case-folding/hash/key invariants, and `Catalog` mutation logic
-  (relocation, collision guards, the last-ordinary-label invariant), with `requireRebuildStable()` asserting
-  after mutations that the in-memory model matches a fresh `rebuildIndex()` re-derivation. Test files are
-  listed explicitly in `tests.pro` (no glob) — register new ones there.
+  schema evolves, never weaken), `MediaId` case-folding/hash/key invariants, `Catalog` mutation logic
+  (relocation incl. the collision-refusal guards, the last-ordinary-label invariant, photo content-dedup),
+  the case-insensitive frame-file listing the Linux leg exists to protect (`tests/UtilsTests.cpp`), and the
+  catalog-vs-disk integrity scan's verdict grid (`tests/CatalogIntegrityTests.cpp`), with
+  `requireRebuildStable()` asserting after mutations that the in-memory model matches a fresh
+  `rebuildIndex()` re-derivation. Test files are listed explicitly in `tests.pro` (no glob) — register new
+  ones there.
 - Don't build/compile here — the toolchain (Qt, compiler) isn't
   in this environment by design; reason about correctness by inspecting the affected code and reviewing the
   diff as a separate pass.
