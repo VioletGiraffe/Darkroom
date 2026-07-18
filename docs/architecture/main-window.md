@@ -331,3 +331,27 @@ Photos rename differently because a photo *is* its file (no frame folder): `rena
 extension, then re-key identity through the same `Catalog::applyRename`. A missing source file is refused (a
 photo with no file has nothing to rename). The context-menu label is "Rename photo" for photos, "Rename media
 file" for videos.
+
+## Logging & diagnostics
+
+Qt's diagnostic stream (`qDebug`/`qInfo`/`qWarning`/`qCritical`/`qFatal`) is captured into an in-memory log and
+surfaced under **Help → Show log**. `main()` installs a `QtMessageHandler` **before** constructing `QApplication`
+— so platform/plugin warnings emitted during its construction are caught too — formats each message as
+`[Level] message (file:line)`, forwards it to the sink, then chains to the previous (default) handler so the
+normal stderr output is preserved. The crash handler's own `qInfo` therefore lands in the log as well.
+
+The sink is qtutils' **`CLoggerInMemory`**, reached through the `loggerInstance<CLoggerInMemory>()` singleton.
+That accessor is a function-local static inside a function template, so it names **one object program-wide**:
+`main()`'s handler (the writer) and the viewer (the reader) hit the same instance with no plumbing between them.
+The handler runs on whatever thread logged — `IoThreadPool` workers included — so thread-safety lives in the
+sink (a `std::mutex` guarding its entries), not in the handler, and the sink is designed as exactly this kind of
+global multi-thread sink.
+
+**`LogViewerDialog`** (`src/Windows/LogViewerDialog.h/.cpp`) is the viewer: a read-only monospaced
+`QPlainTextEdit` with Refresh and Copy. Refresh re-reads `contents()`, so entries logged by background threads
+while it is open appear on demand, newest at the bottom. No `Q_OBJECT` — member `tr()` needs none (see
+[guidelines.md](../guidelines.md)).
+
+The log is **memory-only and uncapped** for now: there is deliberately no file sink yet and no size bound. A
+ring-buffer cap in `CLoggerInMemory` or a file sink is the obvious extension if a long session's warning volume
+ever matters.

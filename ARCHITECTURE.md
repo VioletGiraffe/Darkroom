@@ -136,7 +136,7 @@ query/mutation API, import lifecycle (`addMediaItem`/`removeMediaItem`/`applyRen
 `MainWindow`'s library startup/switching policy, grid + sidebar layout, the name filter, the
 All/Videos/Photos media-type switch (and how photo cards render), label assignment (context menu + drag-from-sidebar), sidebar label management
 (rename/color/delete), the media grid's multi-select implementation (and the regression history behind it),
-and renaming a media item on disk.
+renaming a media item on disk, and the in-memory Qt-message log + Help → Show log viewer.
 
 ### [Media item card & thumbnail widgets](docs/architecture/media-widgets.md)
 `MediaItemWidget` (the grid card: label drop target, label dots, no longer a drag source),

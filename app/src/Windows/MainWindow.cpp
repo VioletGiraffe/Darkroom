@@ -10,6 +10,7 @@
 #include "UiComponents/LabelSidebar.h"
 #include "UiComponents/LabelVisuals.h"
 #include "Windows/ImportDialog.h"
+#include "Windows/LogViewerDialog.h"
 #include "Windows/MediaRename.h"
 #include "UiComponents/SegmentedToggle.h"
 #include "Windows/SettingsDialog.h"
@@ -460,6 +461,10 @@ void MainWindow::setupMainMenu()
 	toolsMenu->addAction(tr("Re-export all videos"), QKeySequence("Ctrl+Shift+E"), this, &MainWindow::reExportAllVideos);
 
 	QMenu* helpMenu = new QMenu(tr("Help"), menuBar);
+	helpMenu->addAction(tr("Show log..."), this, [this] {
+		LogViewerDialog(this).exec();
+	});
+	helpMenu->addSeparator();
 	helpMenu->addAction(tr("About Darkroom..."), this, [this] {
 		CAboutDialog(QApplication::applicationVersion(), this).exec();
 	});
