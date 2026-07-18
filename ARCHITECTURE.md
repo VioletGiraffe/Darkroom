@@ -50,7 +50,16 @@ orient, then follow the link for the subsystem you're touching.
   `"Windows/MainWindow.h"`, `"Core/Catalog.h"`, and the few root headers as `"Utils.h"` — regardless of the
   including file's location; submodule headers likewise drop their prefix (`qtutils/widgets/layouts/cflowlayout.h`
   → `"widgets/layouts/cflowlayout.h"`).
-- There is currently no app-level test suite. Don't build/compile here — the toolchain (Qt, compiler) isn't
+- **Tests**: `tests/tests.pro` (a `SUBDIRS` sibling of the app) builds `DarkroomTests`, a Catch2 console app
+  (single-header `cpp-template-utils/3rdparty/catch2/catch.hpp`) that compiles the `Core/` sources plus
+  `Utils.cpp` directly and runs on every CI platform — so the disk-touching tests double as case-sensitivity
+  coverage on Linux. The suite deliberately targets *silent* breakage, not UI (which daily use self-detects):
+  stored-format backward compatibility (golden fixtures in `tests/PersistenceTests.cpp` — extend them when the
+  schema evolves, never weaken), `MediaId` case-folding/hash/key invariants, and `Catalog` mutation logic
+  (relocation, collision guards, the last-ordinary-label invariant), with `requireRebuildStable()` asserting
+  after mutations that the in-memory model matches a fresh `rebuildIndex()` re-derivation. Test files are
+  listed explicitly in `tests.pro` (no glob) — register new ones there.
+- Don't build/compile here — the toolchain (Qt, compiler) isn't
   in this environment by design; reason about correctness by inspecting the affected code and reviewing the
   diff as a separate pass.
 

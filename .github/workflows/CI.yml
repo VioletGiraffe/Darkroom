@@ -93,11 +93,13 @@ jobs:
         %QT_ROOT_DIR%\bin\qmake.exe -tp vc -r || exit /b 1
         msbuild /t:Build /p:Configuration=Release;PlatformToolset=v143 || exit /b 1
 
+        bin\release\DarkroomTests.exe || exit /b 1
+
         @echo on
         set STAGING_DIR=dist
         RMDIR /S /Q %STAGING_DIR%
         mkdir %STAGING_DIR%
-        copy /y bin\release\*.exe "%STAGING_DIR%\" >nul
+        copy /y bin\release\Darkroom.exe "%STAGING_DIR%\" >nul
         FOR %%p IN (%STAGING_DIR%\*.exe) DO %QT_ROOT_DIR%\bin\windeployqt.exe --dir %STAGING_DIR% --force --release --no-translations --no-system-d3d-compiler --no-system-dxc-compiler --no-opengl-sw --skip-plugin-types networkinformation --skip-plugin-types tls %%p
 
         del  %STAGING_DIR%\dxil.dll >nul
@@ -164,6 +166,7 @@ jobs:
         clang --version
         $QT_ROOT_DIR/bin/qmake -r
         make -j
+        ./bin/release/DarkroomTests
 
     - name: Linux
       if: startsWith(matrix.os, 'ubuntu')
@@ -175,6 +178,7 @@ jobs:
 
         $QT_ROOT_DIR/bin/qmake -r
         make -j
+        ./bin/release/DarkroomTests
 
     - name: Archive Installer
       if: success() && startsWith(matrix.os, 'windows')
