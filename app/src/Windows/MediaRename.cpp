@@ -14,6 +14,19 @@ namespace {
 
 using MediaRename::Result;
 
+// Whether a rename changing only the letter case of the name may proceed: yes on a case-insensitive filesystem
+// (Windows, macOS), where it keeps the same file; refused with a warning on a case-sensitive one, where the case
+// variant is a genuinely different path and case-variant siblings are not supported.
+bool caseOnlyRenameAllowed([[maybe_unused]] QWidget* parent, [[maybe_unused]] const QString& title)
+{
+#if defined Q_OS_WIN || defined Q_OS_MACOS
+	return true;
+#else
+	QMessageBox::warning(parent, title, QObject::tr("Changing only the letter case of the name is not supported on a case-sensitive file system."));
+	return false;
+#endif
+}
+
 Result renameVideo(Catalog& catalog, const MediaId& oldId, const QString& newFolderPath, QWidget* parent)
 {
 	const QString dialogTitle = QObject::tr("Rename media file");
@@ -100,9 +113,14 @@ Result renameVideoInteractive(Catalog& catalog, const MediaId& id, QWidget* pare
 		return {};
 	}
 
-	// Make sure the destination folder does not already exist
+	const bool caseChangeOnly = newName.compare(oldName, Qt::CaseInsensitive) == 0;
+	if (caseChangeOnly && !caseOnlyRenameAllowed(parent, QObject::tr("Rename media file")))
+		return {};
+
+	// Make sure the destination folder does not already exist. A case-only rename keeps the same folder, so
+	// its target "existing" is not a collision.
 	const QString newFolderPath = parentPath + "/" + newName;
-	if (QDir(newFolderPath).exists())
+	if (!caseChangeOnly && QDir(newFolderPath).exists())
 	{
 		QMessageBox::warning(parent, QObject::tr("Rename media file"), QObject::tr("A folder with that name already exists:\n%1").arg(newFolderPath));
 		return {};
@@ -115,8 +133,8 @@ Result renameVideoInteractive(Catalog& catalog, const MediaId& id, QWidget* pare
 		const QFileInfo oldSourceInfo{ oldSourcePath };
 		newSourcePath = oldSourceInfo.absolutePath() + "/" + newName + "." + oldSourceInfo.suffix();
 
-		// Make sure we would not overwrite a different existing file
-		if (sourceExists && QFile::exists(newSourcePath))
+		// Make sure we would not overwrite a different existing file (a case-only rename keeps the same file)
+		if (!caseChangeOnly && sourceExists && QFile::exists(newSourcePath))
 		{
 			QMessageBox::warning(parent, QObject::tr("Rename media file"), QObject::tr("A file with that name already exists:\n%1").arg(newSourcePath));
 			return {};
@@ -208,12 +226,16 @@ Result renamePhotoInteractive(Catalog& catalog, const MediaId& id, QWidget* pare
 		return {};
 	}
 
+	const bool caseChangeOnly = newBaseName.compare(oldBaseName, Qt::CaseInsensitive) == 0;
+	if (caseChangeOnly && !caseOnlyRenameAllowed(parent, title))
+		return {};
+
 	const QString newFileName   = suffix.isEmpty() ? newBaseName : newBaseName + "." + suffix;
 	const QString newSourcePath = oldInfo.absolutePath() + "/" + newFileName;
 
 	// Refuse to clobber a different file already at the destination. A pure case change reuses the same file on a
-	// case-insensitive filesystem, so it is allowed through.
-	if (newSourcePath.compare(oldSourcePath, Qt::CaseInsensitive) != 0 && QFile::exists(newSourcePath))
+	// case-insensitive filesystem (the only kind that lets it through), so it is exempt.
+	if (!caseChangeOnly && QFile::exists(newSourcePath))
 	{
 		QMessageBox::warning(parent, title, QObject::tr("A file with that name already exists:\n%1").arg(newSourcePath));
 		return {};

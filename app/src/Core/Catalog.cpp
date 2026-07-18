@@ -587,7 +587,7 @@ bool Catalog::applyRename(const MediaId& oldId, const MediaId& newId, const QStr
 	}
 
 	MetadataStore::Writer writer = _metadataStore.beginBatch();  // one atomic disk write for the re-key + field updates
-	writer.rekey(oldId, newId);  // no-op when ids are equal; carries loop intervals + labels to the new identity
+	writer.rekey(oldId, newId);  // carries loop intervals + labels to the new identity; on a case-only rename just records the new name spelling
 	writer.set(newId, kSourcePathField, newSourcePath);
 	writer.set(newId, kFolderField, relativeFolder(newFolderAbs));
 
@@ -822,7 +822,10 @@ bool Catalog::renameLabel(LabelId labelId, const QString& newDisplayName, QStrin
 		return fail(QObject::tr("The label's storage path is not safely contained within the library."));
 	const bool haveStorageFolder = QDir(oldFolder).exists();
 	const bool havePhotoDir         = QDir(oldPhotoDir).exists();
-	if ((haveStorageFolder && QFileInfo::exists(newFolder)) || (havePhotoDir && QFileInfo::exists(newPhotoDir)))
+	// A case-only rename keeps the same folders on a case-insensitive filesystem - finding the targets already
+	// present is expected there, not a collision (QFile::rename itself handles a case-only folder rename fine).
+	const bool caseChangeOnly = newName.compare(oldName, Qt::CaseInsensitive) == 0;
+	if (!caseChangeOnly && ((haveStorageFolder && QFileInfo::exists(newFolder)) || (havePhotoDir && QFileInfo::exists(newPhotoDir))))
 	{
 		qWarning() << "Catalog: cannot rename" << oldName << "to" << newName << "- a folder by that name already exists";
 		return fail(QObject::tr("A folder for label '%1' already exists.").arg(newName));
@@ -849,6 +852,8 @@ bool Catalog::renameLabel(LabelId labelId, const QString& newDisplayName, QStrin
 	{
 		if (storageLabelNameOf(*it).compare(oldName, Qt::CaseInsensitive) != 0)
 			continue;
+		if (it->type == MediaType::Photo ? !havePhotoDir : !haveStorageFolder)
+			continue;  // the dir this item lives under was not found (and thus not renamed) - rewriting its stored paths would point at a folder that does not exist
 		if (it->type == MediaType::Photo)
 		{
 			// An owned photo's folder is the renamed dir itself, and its source file sits inside it.

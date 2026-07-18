@@ -136,7 +136,11 @@ std::vector<MediaId> MetadataStore::allMediaIds() const
 
 void MetadataStore::rekey(const MediaId& oldId, const MediaId& newId)
 {
-	if (!oldId.isValid() || !newId.isValid() || oldId == newId || !_records.contains(oldId.key()))
+	if (!oldId.isValid() || !newId.isValid() || !_records.contains(oldId.key()))
+		return;
+	// operator== folds case, so equal ids alone are not enough to bail: a case-only rename must still pass
+	// through to update the record's original-case "name".
+	if (oldId == newId && oldId.name() == newId.name())
 		return;
 
 	QJsonObject record = _records.take(oldId.key()).toObject();
