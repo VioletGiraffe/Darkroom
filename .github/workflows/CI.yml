@@ -27,7 +27,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest]
+        include:
+          - os: windows-latest
+            qt_arch: win64_msvc2022_64
+          - os: ubuntu-latest
+            qt_arch: linux_gcc_64
+          - os: macos-latest
+            qt_arch: clang_64
 
     steps:
     - name: Checkout
@@ -68,7 +74,7 @@ jobs:
       with:
         version: 6.10.*
         target: desktop
-        arch: 'win64_msvc2022_64'
+        arch: ${{ matrix.qt_arch }}
         archives: 'qtbase icu qtsvg'
         modules: 'qtimageformats qtmultimedia'
         cache: 'true'
@@ -154,7 +160,6 @@ jobs:
 
     - name: Mac
       if: startsWith(matrix.os, 'macos')
-      working-directory: ${{env.GITHUB_WORKSPACE}}
       run: |
         clang --version
         $QT_ROOT_DIR/bin/qmake -r
@@ -162,9 +167,8 @@ jobs:
 
     - name: Linux
       if: startsWith(matrix.os, 'ubuntu')
-      working-directory: ${{env.GITHUB_WORKSPACE}}
       run: |
-        sudo apt update -y; sudo apt install -qq gcc-14 g++-14
+        sudo apt update -y; sudo apt install -qq gcc-14 g++-14 libgl1-mesa-dev
         sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 50
         sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 50
         g++ --version
