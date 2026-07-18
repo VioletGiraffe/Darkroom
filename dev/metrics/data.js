@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784132199459,
+  "lastUpdate": 1784395996775,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -5671,6 +5671,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .text",
             "value": 612.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 300.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 31,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 31.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "7d63f871542bb251fd034de9c7610e3656640259",
+          "message": "listFrameImageFiles() helper to work around extension case issues on Linux and centralize the solution",
+          "timestamp": "2026-07-18T20:29:57+03:00",
+          "tree_id": "9678739295394603b8e8b78d414062a1daa04e60",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/7d63f871542bb251fd034de9c7610e3656640259"
+        },
+        "date": 1784395994370,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 11566,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 7180,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1014,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 614,
             "unit": "KB"
           },
           {
