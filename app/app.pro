@@ -10,12 +10,18 @@ QMAKE_TARGET_COPYRIGHT   = Copyright (C) 2026 VioletGiraffe
 
 QT = core gui widgets multimedia multimediawidgets svg
 
-CONFIG += strict_c++ c++latest
+CONFIG += strict_c++
 CONFIG -= flat
 
 mac* | linux* | freebsd {
 	CONFIG(release, debug|release):CONFIG *= Release optimize_full
 	CONFIG(debug, debug|release):CONFIG *= Debug
+}
+
+exists(../global.pri){
+	include(../global.pri)
+} else {
+	CONFIG += c++2b
 }
 
 Release:OUTPUT_DIR=release/
@@ -71,9 +77,6 @@ win*{
 	DEFINES += WIN32_LEAN_AND_MEAN NOMINMAX _SCL_SECURE_NO_WARNINGS
 
 	Debug:QMAKE_LFLAGS += /DEBUG:FASTLINK /INCREMENTAL
-
-	Release:QMAKE_CXXFLAGS += /GL
-	Release:QMAKE_LFLAGS += /DEBUG:FULL /OPT:REF /OPT:ICF /TIME /LTCG:INCREMENTAL
 
 	LIBS += -lUser32
 	RC_ICONS = res/icon.ico
