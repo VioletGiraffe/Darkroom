@@ -53,8 +53,13 @@ void clearStuckHoverIfCursorLeft(QWidget* w);
 // QChar (isNull()) for a clean name. For validating user-typed names in the rename flows.
 [[nodiscard]] QChar invalidFilenameChar(const QString& name);
 
-// Name filters (for QDir::entryList) matching the frame image files this app produces/reads.
+// Glob filters matching the frame image files this app produces/reads - for QFileDialog filter strings.
 extern const QStringList IMAGE_FILE_FILTERS;
+
+// The frame image files directly inside dir (same formats as IMAGE_FILE_FILTERS), name-sorted. Use this for
+// directory scans instead of entryList(IMAGE_FILE_FILTERS): it suffix-matches case-insensitively, so ".JPG"
+// files are found on a case-sensitive filesystem too.
+[[nodiscard]] QStringList listFrameImageFiles(const QDir& dir);
 
 // Full paths of the files under `directory` satisfying `filterPredicate` - its immediate children when `recursive`
 // is false, the whole subtree when true. Order is filesystem-defined; sort at the call site when it matters. The

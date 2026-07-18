@@ -81,8 +81,8 @@ IntegrityReport scan(const Catalog& catalog, const QString& rootFolder)
 		issue.sourcePath        = entry.sourcePath;
 		issue.sourcePresent     = !entry.sourcePath.isEmpty() && QFileInfo::exists(entry.sourcePath);
 		issue.splitComplete     = entry.splitIntoFrames;
-		issue.realFramesPresent = !QDir(entry.folder).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty();
-		issue.previewPresent    = !QDir(Catalog::previewDirFor(entry.folder)).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty();
+		issue.realFramesPresent = !listFrameImageFiles(QDir(entry.folder)).isEmpty();
+		issue.previewPresent    = !listFrameImageFiles(QDir(Catalog::previewDirFor(entry.folder))).isEmpty();
 		if (!issue.healthy())
 			report.issues.push_back(issue);
 	}
@@ -105,7 +105,7 @@ IntegrityReport scan(const Catalog& catalog, const QString& rootFolder)
 		}
 		if (knownFolders.contains(pathComparisonKey(folderPath)))
 			return;
-		if (QDir(folderPath).entryList(IMAGE_FILE_FILTERS, QDir::Files).isEmpty())
+		if (listFrameImageFiles(QDir(folderPath)).isEmpty())
 			return;  // an empty/junk dir, not a video the catalog is missing
 		report.untracked.push_back({ folderPath });
 	});

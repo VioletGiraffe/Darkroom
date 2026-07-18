@@ -783,7 +783,7 @@ bool nameMatchesFilter(const QString& name, const QString& query)
 bool MainWindow::regeneratePreviewFromRealFrames(const QString& folderPath, int frameCount)
 {
 	QDir folderDir(folderPath);
-	const QStringList realFrames = folderDir.entryList(IMAGE_FILE_FILTERS, QDir::Files, QDir::Name);
+	const QStringList realFrames = listFrameImageFiles(folderDir);
 	if (realFrames.isEmpty())
 		return false;
 
@@ -871,7 +871,7 @@ MediaItemWidget* MainWindow::buildMediaCard(const MediaId& id, bool isBest, cons
 		// Video cards always render from the permanent preview/ subfolder, never the real frame folder
 		// directly - this is what lets a not-yet-split video (no real frames yet) still show a real thumbnail.
 		QDir previewDir(Catalog::previewDirFor(folderPath));
-		const QStringList imageFiles = previewDir.entryList(IMAGE_FILE_FILTERS, QDir::Files, QDir::Name);
+		const QStringList imageFiles = listFrameImageFiles(previewDir);
 		if (imageFiles.isEmpty())
 			return nullptr;  // preview/ missing or empty (externally deleted folder, or preview generation failed outright) - don't show a frameless ghost card
 

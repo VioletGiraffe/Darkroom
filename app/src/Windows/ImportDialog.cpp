@@ -568,7 +568,7 @@ MediaItemWidget* ImportDialog::buildStagedCard(const MediaId& id, const QString&
 		canvasSize.setWidth(MediaItemWidget::videoCanvasWidthForTiling(STAGED_CARD_IMAGE_HEIGHT, frameCount, m_stagedGrid->spacing()));
 		previewPaths.clear();
 		const QDir previewDir(tempPreviewDir);
-		for (const QString& file : previewDir.entryList(IMAGE_FILE_FILTERS, QDir::Files, QDir::Name))
+		for (const QString& file : listFrameImageFiles(previewDir))
 			previewPaths << previewDir.filePath(file);
 	}
 

@@ -105,7 +105,7 @@ void FrameViewerWindow::refreshDisplay()
 		return;
 	}
 
-	const QStringList imageFiles = dir.entryList(IMAGE_FILE_FILTERS, QDir::Files, QDir::Name);
+	const QStringList imageFiles = listFrameImageFiles(dir);
 	if (imageFiles.isEmpty())
 	{
 		showInstruction(tr("No images found in this folder"));

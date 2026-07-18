@@ -18,7 +18,7 @@
 static bool copyPreviewFrames(const QString& srcPreviewDir, const QString& dstPreviewDir)
 {
 	const QDir src{ srcPreviewDir };
-	const QStringList frames = src.entryList(IMAGE_FILE_FILTERS, QDir::Files);
+	const QStringList frames = listFrameImageFiles(src);
 	if (frames.isEmpty() || !QDir{}.mkpath(dstPreviewDir))
 		return false;
 

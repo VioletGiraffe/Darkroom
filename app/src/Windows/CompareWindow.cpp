@@ -21,10 +21,9 @@ CompareWindow::CompareWindow(const QStringList& folderPaths, QWidget* parent) : 
 	resize(1200, COMPARE_CELL_HEIGHT + 60);
 
 	// Collect sorted frame lists for each folder.
-	const QStringList& imageFilters = IMAGE_FILE_FILTERS;
 	for (const QString& folder : folderPaths) {
 		QDir dir(folder);
-		QStringList files = dir.entryList(imageFilters, QDir::Files, QDir::Name);
+		QStringList files = listFrameImageFiles(dir);
 		// Prepend the full path so ThumbnailWidget can load them directly.
 		for (QString& f : files)
 			f = dir.filePath(f);

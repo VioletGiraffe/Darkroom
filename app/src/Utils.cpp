@@ -162,7 +162,24 @@ QChar invalidFilenameChar(const QString& name)
 	return {};
 }
 
-const QStringList IMAGE_FILE_FILTERS { "*.jpg", "*.jpeg", "*.tif", "*.tiff", "*.png" };
+// Lowercase; listFrameImageFiles matches against these case-insensitively.
+static const QStringList FRAME_IMAGE_SUFFIXES { "jpg", "jpeg", "tif", "tiff", "png" };
+
+const QStringList IMAGE_FILE_FILTERS = [] {
+	QStringList globs;
+	for (const QString& suffix : FRAME_IMAGE_SUFFIXES)
+		globs << "*." + suffix;
+	return globs;
+}();
+
+QStringList listFrameImageFiles(const QDir& dir)
+{
+	// Not entryList(IMAGE_FILE_FILTERS): QDir name filters match case-sensitively on a case-sensitive
+	// filesystem and would miss e.g. ".JPG" files there.
+	QStringList files = dir.entryList(QDir::Files, QDir::Name);
+	files.removeIf([](const QString& fileName) { return !FRAME_IMAGE_SUFFIXES.contains(QFileInfo(fileName).suffix().toLower()); });
+	return files;
+}
 
 QDateTime parseTrailingTimestamp(const QString& text)
 {
