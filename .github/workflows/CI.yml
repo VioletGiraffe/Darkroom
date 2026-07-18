@@ -85,15 +85,42 @@ jobs:
       with:
         arch: x64
 
-    - name: Windows
+    - name: Linux - install toolchain
+      if: startsWith(matrix.os, 'ubuntu')
+      run: |
+        sudo apt update -y; sudo apt install -qq gcc-14 g++-14 libgl1-mesa-dev
+        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 50
+        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 50
+        g++ --version
+
+    - name: Build tests (Windows)
       if: startsWith(matrix.os, 'windows')
       shell: cmd
       run: |
         %QT_ROOT_DIR%\bin\qmake.exe -v
         %QT_ROOT_DIR%\bin\qmake.exe -tp vc -r || exit /b 1
-        msbuild /t:Build /p:Configuration=Release;PlatformToolset=v143 || exit /b 1
+        msbuild /t:DarkroomTests /p:Configuration=Release;PlatformToolset=v143 || exit /b 1
 
-        bin\release\DarkroomTests.exe || exit /b 1
+    - name: Build tests (Unix)
+      if: ${{ !startsWith(matrix.os, 'windows') }}
+      run: |
+        $QT_ROOT_DIR/bin/qmake -r CONFIG+=release
+        make -j sub-tests
+
+    - name: Run tests (Windows)
+      if: startsWith(matrix.os, 'windows')
+      shell: cmd
+      run: bin\release\DarkroomTests.exe
+
+    - name: Run tests (Unix)
+      if: ${{ !startsWith(matrix.os, 'windows') }}
+      run: ./bin/release/DarkroomTests
+
+    - name: Build app (Windows)
+      if: ${{ !cancelled() && startsWith(matrix.os, 'windows') }}
+      shell: cmd
+      run: |
+        msbuild /t:Darkroom /p:Configuration=Release;PlatformToolset=v143 || exit /b 1
 
         @echo on
         set STAGING_DIR=dist
@@ -106,6 +133,10 @@ jobs:
         del  %STAGING_DIR%\dxcompiler.dll >nul
 
         "%programfiles(x86)%\Inno Setup 6\iscc" installer.iss
+
+    - name: Build app (Unix)
+      if: ${{ !cancelled() && !startsWith(matrix.os, 'windows') }}
+      run: make -j sub-app
 
     - name: .exe file size
       if: startsWith(matrix.os, 'windows')
@@ -159,26 +190,6 @@ jobs:
         # Don't treat a change as a regression
         comment-on-alert: false
         fail-on-alert: false
-
-    - name: Mac
-      if: startsWith(matrix.os, 'macos')
-      run: |
-        clang --version
-        $QT_ROOT_DIR/bin/qmake -r
-        make -j
-        ./bin/release/DarkroomTests
-
-    - name: Linux
-      if: startsWith(matrix.os, 'ubuntu')
-      run: |
-        sudo apt update -y; sudo apt install -qq gcc-14 g++-14 libgl1-mesa-dev
-        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 50
-        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 50
-        g++ --version
-
-        $QT_ROOT_DIR/bin/qmake -r
-        make -j
-        ./bin/release/DarkroomTests
 
     - name: Archive Installer
       if: success() && startsWith(matrix.os, 'windows')
