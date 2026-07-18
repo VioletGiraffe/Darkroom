@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784418902024,
+  "lastUpdate": 1784418991562,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -6213,6 +6213,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Lines of code (libs)",
             "value": 7184,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1027,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 619,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 307,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 31,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 32,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "8424cb10ea67694d2d0f69d1fa1dca334d5d1b8f",
+          "message": "subrepos updated",
+          "timestamp": "2026-07-19T02:52:44+03:00",
+          "tree_id": "642ac63c1ab9f253b747addbe2139dcc3317ed45",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/8424cb10ea67694d2d0f69d1fa1dca334d5d1b8f"
+        },
+        "date": 1784418989797,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 11678,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 7194,
             "unit": "LOC"
           },
           {
