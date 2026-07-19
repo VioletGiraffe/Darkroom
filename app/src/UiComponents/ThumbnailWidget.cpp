@@ -91,8 +91,7 @@ namespace {
 				QByteArray& bytes = m_bytes[static_cast<size_t>(i)];   // non-const: QBuffer wraps a QByteArray*, so it can't be a const ref
 				QBuffer buffer(&bytes);
 				buffer.open(QIODevice::ReadOnly);
-				// The suffix is only a hint (that plugin is tried first); content detection remains the fallback
-				QImageReader reader(&buffer, QFileInfo(job.m_paths[i]).suffix().toLower().toUtf8());
+				QImageReader reader(&buffer); // Do not provide a format hint, that suppresses detection by contents
 				reader.setAutoTransform(true);
 
 				const QSize rawSize = reader.size();   // header only, no full decode

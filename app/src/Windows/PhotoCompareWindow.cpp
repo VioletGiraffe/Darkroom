@@ -596,8 +596,7 @@ void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
 				if (!batch->abort)
 				{
 					QBuffer buffer(&fileBytes);
-					// The suffix is only a hint (that plugin is tried first); content detection remains the fallback
-					QImageReader reader(&buffer, QFileInfo(batch->paths[i]).suffix().toLower().toUtf8());
+					QImageReader reader(&buffer);  // Do not provide a format hint, that suppresses detection by contents
 					reader.setAutoTransform(true);  // apply the EXIF orientation
 					QImage& image = batch->images[static_cast<size_t>(i)];
 					image = reader.read();
