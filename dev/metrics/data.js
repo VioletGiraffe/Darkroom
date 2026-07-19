@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784418991562,
+  "lastUpdate": 1784467777138,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -6272,6 +6272,75 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/VioletGiraffe/Darkroom/commit/8424cb10ea67694d2d0f69d1fa1dca334d5d1b8f"
         },
         "date": 1784418989797,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 11678,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 7194,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1027,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 619,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 307,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 31,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 32,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "f51797a18bd5729b212aca303af3679bf0be731f",
+          "message": "Loading images with a wrong extension fixed",
+          "timestamp": "2026-07-19T16:25:31+03:00",
+          "tree_id": "52efcc997225e3331aef76898c9b223f63b45d6a",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/f51797a18bd5729b212aca303af3679bf0be731f"
+        },
+        "date": 1784467774003,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
