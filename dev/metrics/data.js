@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784590819552,
+  "lastUpdate": 1784591742162,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -6583,6 +6583,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 32,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "c2376ac7df755edb849e5a3f7912a74c3497ad0c",
+          "message": "Interruptable import job",
+          "timestamp": "2026-07-21T02:52:01+03:00",
+          "tree_id": "86b1095f9a0df721b4c176425b5a4fb7e5214899",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/c2376ac7df755edb849e5a3f7912a74c3497ad0c"
+        },
+        "date": 1784591740403,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 11738,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 7917,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1035,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 625,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 308.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 31,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 32.5,
             "unit": "KB"
           },
           {
