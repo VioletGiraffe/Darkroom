@@ -144,14 +144,17 @@ private:
 	void renameSelectedItemInteractive();
 	void updateEditActions();
 
-	void openLibrary();
+	enum class LibraryPickerMode { Open, CreateNew };
+	// Asks for a library folder and switches to it, re-asking until the user succeeds or cancels. CreateNew
+	// differs only in rejecting a folder that already holds a library, and in the wording of its dialogs.
+	void pickAndSwitchLibrary(LibraryPickerMode mode);
 	// Switches to an entry of the Library menu's recent list. The entry is never checked for existence up front
 	// (see recentLibraries) - a stale one simply fails the switch and reports it, keeping its place in the list
 	// so that re-plugging the drive is enough to make it work again.
 	void openRecentLibrary(const QString& root);
 	[[nodiscard]] bool switchLibraryTo(const QString& root, QString* error);
-	// switchLibraryTo, reporting a failure to the user. Returns whether the switch happened.
-	bool switchLibraryToOrReport(const QString& root);
+	// switchLibraryTo, reporting a failure under the given dialog title. Returns whether the switch happened.
+	bool switchLibraryToOrReport(const QString& root, const QString& dialogTitle);
 	// True (having said so) while a frame-extraction loop is pumping events: it holds catalog/store references
 	// and a batch writer across the loop, none of which may outlive a root change.
 	[[nodiscard]] bool refuseLibraryChangeWhileProcessing();

@@ -29,6 +29,11 @@ public:
 	// directory and initial label registry are created here, and failing to save that registry fails the load.
 	[[nodiscard]] bool setRoot(const QString& root, QString* error = nullptr);
 
+	// Whether the folder has already been used as a library root. setRoot() does not care - a fresh folder is a
+	// valid new library - so this exists for callers that must tell "create a new library here" apart from
+	// "adopt the library that is already here".
+	[[nodiscard]] static bool holdsLibrary(const QString& folder);
+
 	// False until the first setRoot() succeeds. The accessors below assert on an empty Library rather than
 	// inventing a value, so ask this only where "no library yet" is genuinely reachable - i.e. at startup.
 	[[nodiscard]] bool isLoaded() const { return m_state != nullptr; }

@@ -431,7 +431,8 @@ void MainWindow::setupMainMenu()
 	fileMenu->addAction(tr("Exit"), QKeySequence("Ctrl+Q"), this, &QMainWindow::close);
 
 	m_libraryMenu = new QMenu(tr("Library"), menuBar);
-	m_libraryMenu->addAction(tr("Open library..."), QKeySequence("Ctrl+O"), this, &MainWindow::openLibrary);
+	m_libraryMenu->addAction(tr("Open library..."), QKeySequence("Ctrl+O"), this, [this] { pickAndSwitchLibrary(LibraryPickerMode::Open); });
+	m_libraryMenu->addAction(tr("Create new library..."), this, [this] { pickAndSwitchLibrary(LibraryPickerMode::CreateNew); });
 	m_libraryMenu->addSeparator();
 	// Everything below the separator is the recent list, refilled on each open so that neither it nor its
 	// current-library marker can go stale after a switch.
@@ -522,31 +523,45 @@ bool MainWindow::refuseLibraryChangeWhileProcessing()
 	return true;
 }
 
-bool MainWindow::switchLibraryToOrReport(const QString& root)
+bool MainWindow::switchLibraryToOrReport(const QString& root, const QString& dialogTitle)
 {
 	QString error;
 	if (switchLibraryTo(root, &error))
 		return true;
 
-	QMessageBox::warning(this, tr("Open library"), error);
+	QMessageBox::warning(this, dialogTitle, error);
 	return false;
 }
 
-void MainWindow::openLibrary()
+void MainWindow::pickAndSwitchLibrary(LibraryPickerMode mode)
 {
 	if (refuseLibraryChangeWhileProcessing())
 		return;
 
+	const bool creating = mode == LibraryPickerMode::CreateNew;
+	const QString title = creating ? tr("Create new library") : tr("Open library");
 	QString startFolder = QFileInfo{ m_library.rootFolder() }.absolutePath();
 	for(;;)
 	{
-		const QString requestedRoot = QFileDialog::getExistingDirectory(this, tr("Open library"), libraryPickerStartFolder(startFolder));
-		if (requestedRoot.isEmpty() || pathComparisonKey(requestedRoot) == pathComparisonKey(m_library.rootFolder()))
-			return;
-
-		if (switchLibraryToOrReport(requestedRoot))
+		const QString requestedRoot = QFileDialog::getExistingDirectory(this, title, libraryPickerStartFolder(startFolder));
+		if (requestedRoot.isEmpty())
 			return;
 		startFolder = requestedRoot;
+
+		// Creating over an existing library would open it instead, leaving a supposedly new library full of media
+		// the user never put there. This catches the current library's own folder too.
+		if (creating && Library::holdsLibrary(requestedRoot))
+		{
+			QMessageBox::warning(this, title,
+				tr("This folder already holds a library:\n\n%1\n\nUse Open library to open it, or pick another folder for the new one.")
+					.arg(QDir::toNativeSeparators(requestedRoot)));
+			continue;
+		}
+		if (!creating && pathComparisonKey(requestedRoot) == pathComparisonKey(m_library.rootFolder()))
+			return;
+
+		if (switchLibraryToOrReport(requestedRoot, title))
+			return;
 	}
 }
 
@@ -555,7 +570,7 @@ void MainWindow::openRecentLibrary(const QString& root)
 	if (refuseLibraryChangeWhileProcessing())
 		return;
 
-	switchLibraryToOrReport(root);
+	switchLibraryToOrReport(root, tr("Open library"));
 }
 
 void MainWindow::rebuildRecentLibraryActions()

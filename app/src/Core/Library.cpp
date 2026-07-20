@@ -32,6 +32,11 @@ struct LoadedLibraryData
 	return QDir(QDir::cleanPath(QDir::fromNativeSeparators(root.trimmed()))).absolutePath();
 }
 
+// The two files a library root is made of - written by MetadataStore and Catalog respectively, both on the
+// first successful load, which is why either one already marks a folder as taken.
+[[nodiscard]] QString metadataFilePath(const QString& root) { return root + "/catalog.json"; }
+[[nodiscard]] QString labelRegistryFilePath(const QString& root) { return root + "/labels.json"; }
+
 [[nodiscard]] QString labelRegistryValidationError(const QString& path, const QJsonObject& registry)
 {
 	QSet<qint64> labelIds;
@@ -96,14 +101,14 @@ struct LoadedLibraryData
 		return std::nullopt;
 	}
 
-	JsonPersistence::ObjectReadResult metadata = JsonPersistence::readObject(normalized + "/catalog.json");
+	JsonPersistence::ObjectReadResult metadata = JsonPersistence::readObject(metadataFilePath(normalized));
 	if (!metadata.success)
 	{
 		if (error)
 			*error = metadata.error;
 		return std::nullopt;
 	}
-	const QString labelsPath = normalized + "/labels.json";
+	const QString labelsPath = labelRegistryFilePath(normalized);
 	JsonPersistence::ObjectReadResult labels = JsonPersistence::readObject(labelsPath, u"labels");
 	if (!labels.success)
 	{
@@ -200,6 +205,15 @@ namespace {
 // Both defaulted here, not in the header: LibraryState is incomplete there, and ~unique_ptr needs it complete.
 Library::Library() = default;
 Library::~Library() = default;
+
+bool Library::holdsLibrary(const QString& folder)
+{
+	if (folder.trimmed().isEmpty())
+		return false;
+
+	const QString normalized = normalizedRoot(folder);
+	return QFileInfo::exists(metadataFilePath(normalized)) || QFileInfo::exists(labelRegistryFilePath(normalized));
+}
 
 bool Library::setRoot(const QString& root, QString* error)
 {

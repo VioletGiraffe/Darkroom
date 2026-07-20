@@ -23,7 +23,8 @@ after asking `isLibraryLoaded()`; the destructor returns early for the same reas
 no parallel load path of its own. Its startup dialogs are deliberately parented to `nullptr`: the window is
 still under construction and unshown, and would only give them a garbage position to centre on.
 
-Library > Open library (`Ctrl+O`) owns live switching. It asks `Library::setRoot()` to validate and fully load the
+Library > Open library (`Ctrl+O`) and Library > Create new library share `pickAndSwitchLibrary()` and own live
+switching. It asks `Library::setRoot()` to validate and fully load the
 requested root internally; `setRoot()` first flushes the current library, so a persistent save failure also
 blocks replacement. Failure reports the error without disturbing the current state and returns to the
 picker. On success it synchronously destroys player windows, clears the persistent frame viewer, grid and
@@ -35,10 +36,15 @@ one batch mixed encoding behavior.
 
 ## The Library menu and its recent list
 
-The **Library** menu holds `Open library...` plus the recently opened roots (`Settings::RecentLibraries`,
-newest first, capped at 8) as numbered quick-switch entries. Both paths converge on the same
-`switchLibraryTo()`, so a recent entry gets the identical validate-load-replace transaction and the identical
-busy refusal.
+The **Library** menu holds `Open library...` and `Create new library...` plus the recently opened roots
+(`Settings::RecentLibraries`, newest first, capped at 8) as numbered quick-switch entries. All paths converge on
+the same `switchLibraryTo()`, so a recent entry gets the identical validate-load-replace transaction and the
+identical busy refusal.
+
+`Create new library` needs no separate creation step — `setRoot()` already treats a missing root and missing
+JSON files as a valid new library and materializes them. It differs from `Open library` only in rejecting a
+folder that `Library::holdsLibrary()` reports as taken, which is what keeps "create" from silently adopting an
+existing catalog; the folder itself is created through the picker's own new-folder button.
 
 Two properties are deliberate and worth preserving:
 
