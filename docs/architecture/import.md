@@ -123,6 +123,14 @@ concurrency is deliberately thread-free — each ffmpeg is its own OS process, s
 and are waited on, all on the calling thread. A video whose probe fails is skipped (its destination left empty),
 and a progress callback reports completions for the staging dialog's counter.
 
+The batch is **interruptible**: it takes a `const std::atomic<bool>&` the caller sets from another thread, polled
+between the slices its process waits are broken into (so a cancel lands in ~100 ms rather than after the running
+ffmpeg). Cancelling kills the in-flight processes, starts no further ones, and returns `Cancelled` for every job
+that hadn't already finished cleanly — the ones that *had* keep their `Ok` result, so cancelling never throws away
+work already paid for. `Cancelled` is deliberately distinct from the failure statuses: it says "you stopped this",
+not "this file is broken". Partial frames from a killed extraction are left in the destination folder for the
+caller to remove — the engine still owns no cleanup policy.
+
 `preview/` is a permanent, separate store once created: a later real `splitVideoIntoFrames` run never deletes
 or rewrites it (it only ever lists/writes files directly in `outputFolder`, never recursing into `preview/`),
 and `CatalogIntegrity::scan`'s ghost verdict is guarded by `splitIntoFrames` specifically so a video that's
@@ -210,8 +218,12 @@ concrete label via `ensureLabelForFolderName` (reuse an existing same-name label
 — see below) and pre-assigns it as the file's first (destination) label; a file dropped loose, outside any
 folder, stages unlabeled as before. It then extracts a temporary preview per new
 video path (deduplicated by `MediaId` first — see "Duplicate detection" above) into a per-video temp dir via the
-batch `Ffmpeg::generatePreviewFrames`, so several videos are processed
-at once behind a modal progress box. A staged *photo* skips all of that: its card decodes the file directly
+batch `Ffmpeg::generatePreviewFrames`, so several videos are processed at once. That batch runs on a
+`CInterruptableThread` while a modal `QProgressDialog` holds the GUI thread's event loop, which is what makes
+staging **cancellable** — the Cancel button sets the thread's flag, the dialog stays up until the killed ffmpeg
+processes have been reaped, and the videos whose previews did finish are still staged. A cancelled video's temp
+dir is removed right there, since it never becomes a staged entry and `unstage()` would never reach it.
+A staged *photo* skips all of that: its card decodes the file directly
 (no temp dir — `StagedEntry::tempPreviewDir` stays empty, and the temp-dir cleanup paths guard on that, since
 `QDir("")` would name the working directory), it double-clicks into the system image viewer rather than the
 built-in player, and it stages instantly. Frame count is the same `Settings::PreviewFrameCount` the main grid uses

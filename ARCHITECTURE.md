@@ -112,7 +112,9 @@ not just when reading existing code.
   shares one serial worker so parallel loads cannot seek-thrash a spinning disk. Post the file read there
   (`enqueue`, optionally tagged so an owner's destructor can `retire()` its tasks), and hand CPU-bound
   decoding to a compute pool. See the two-stage read→decode pattern in
-  [media-widgets.md](docs/architecture/media-widgets.md#loading).
+  [media-widgets.md](docs/architecture/media-widgets.md#loading). Long-running work that is *not* a disk read
+  belongs on its own thread instead: the Import dialog's preview batch supervises ffmpeg processes for minutes,
+  and parking that on the serial pool would stall every thumbnail read on the same volume behind it.
 - **Language/framework coding conventions live in [guidelines.md](docs/guidelines.md)** — assertions
   (`assert_r`, never `<cassert>`), containers (`std::vector` over `QList`), identity (`MediaId` over path),
   dialog flush via `done()`, natural sorting, `tr()` i18n, and QSS gotchas. Read before writing new code.

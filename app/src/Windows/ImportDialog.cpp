@@ -18,6 +18,8 @@
 #include "Windows/PhotoCompareWindow.h"
 #include "Windows/VideoPlayerWindow.h"
 
+#include "threading/cinterruptablethread.h"
+
 #include <QAbstractItemView>
 #include <QAction>
 #include <QApplication>
@@ -44,6 +46,7 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QProgressDialog>
 #include <QPushButton>
 #include <QSettings>
 #include <QSplitter>
@@ -52,6 +55,7 @@
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <atomic>
 
 namespace {
 
@@ -555,7 +559,8 @@ void ImportDialog::updateAllCardLabelDots()
 
 void ImportDialog::addToStaging(const QStringList& paths)
 {
-	// Deferred so the dialog can paint before stageMediaItems() blocks on ffmpeg preview extraction.
+	// Deferred because stageMediaItems() runs its own modal progress dialog, which must not open before this
+	// dialog is itself up and running its event loop.
 	QMetaObject::invokeMethod(this, [this, paths] { stageMediaItems(paths); }, Qt::QueuedConnection);
 }
 
@@ -733,24 +738,59 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 	for (const QString& path : videoPaths)
 		jobs.push_back({ path, uniqueTempPreviewDir() });
 
-	QMessageBox progressBox(this);
-	progressBox.setWindowTitle(tr("Staging"));
-	progressBox.setStandardButtons(QMessageBox::NoButton);
-	progressBox.setModal(true);
-	progressBox.setText(tr("Generating preview %1/%2...").arg(0).arg(jobs.size()));
-	progressBox.show();
-	QApplication::processEvents();  // paint the dialog before the batch blocks this thread
+	QProgressDialog progress(tr("Generating preview %1/%2...").arg(0).arg(jobs.size()), tr("Cancel"), 0, static_cast<int>(jobs.size()), this);
+	progress.setWindowTitle(tr("Staging"));
+	progress.setModal(true);
+	progress.setMinimumDuration(0);  // extracting even one preview is never instant, so don't sit invisible for the default delay
+	// Closing is driven by the batch actually stopping, not by the counter or the Cancel button: after a cancel
+	// the dialog has to stay up until the killed ffmpeg processes have been reaped.
+	progress.setAutoClose(false);
+	progress.setAutoReset(false);
 
-	// Each result carries the duration the probe read, stashed on the staged entry so import records it without
-	// probing the same file again.
-	const std::vector<Ffmpeg::PreviewResult> results = Ffmpeg::generatePreviewFrames(jobs, frameCount, PREVIEW_EXTRACTION_CONCURRENCY,
-		[&](int done, int total) {
-			progressBox.setText(tr("Generating preview %1/%2...").arg(done).arg(total));
-			QApplication::processEvents();
-		});
+	// The batch runs off the GUI thread so the dialog above stays live while it does; the thread's cancellation
+	// flag is what the Cancel button sets, and Ffmpeg polls it between wait slices. `results` is written by the
+	// thread and only read after join() below.
+	std::vector<Ffmpeg::PreviewResult> results;
+	CInterruptableThread previewThread{ "preview-extraction" };
+
+	connect(&progress, &QProgressDialog::canceled, this, [&] {
+		previewThread.requestCancellation();
+		progress.setLabelText(tr("Cancelling..."));
+	});
+
+	previewThread.start([&](const std::atomic<bool>& cancelled) {
+		// Each result carries the duration the probe read, stashed on the staged entry so import records it
+		// without probing the same file again.
+		results = Ffmpeg::generatePreviewFrames(jobs, frameCount, PREVIEW_EXTRACTION_CONCURRENCY, cancelled,
+			[&](int done, int total) {
+				QMetaObject::invokeMethod(&progress, [&progress, &previewThread, done, total] {
+					// A job that happened to finish just as Cancel was pressed must not put the old text back.
+					if (previewThread.cancellationRequested())
+						return;
+					progress.setValue(done);
+					progress.setLabelText(tr("Generating preview %1/%2...").arg(done).arg(total));
+				}, Qt::QueuedConnection);
+			});
+		QMetaObject::invokeMethod(&progress, [&progress] { progress.accept(); }, Qt::QueuedConnection);
+	});
+
+	progress.exec();
+
+	// exec() returns by any of four routes: the batch finishing (accept() above), the Cancel button, Esc, or the
+	// window's close button. Requesting cancellation for all of them uniformly is what bounds the join(), and the
+	// join is what makes `results` safe to read.
+	previewThread.requestCancellation();
+	previewThread.join();
 
 	for (size_t i = 0; i < jobs.size(); ++i)
-		stageCard(jobs[i].videoFilePath, jobs[i].destinationFolder, results[i].durationMs);
+	{
+		// A cancelled job never becomes a card, so nothing would ever clean up its scratch dir - unstage() only
+		// reaches staged entries. Whatever frames ffmpeg had written before the kill go with it.
+		if (results[i].status == Ffmpeg::PreviewResult::Status::Cancelled)
+			QDir(jobs[i].destinationFolder).removeRecursively();
+		else
+			stageCard(jobs[i].videoFilePath, jobs[i].destinationFolder, results[i].durationMs);
+	}
 }
 
 void ImportDialog::unstage(const MediaId& id)

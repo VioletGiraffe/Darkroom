@@ -2,6 +2,7 @@
 
 #include <QString>
 
+#include <atomic>
 #include <functional>
 #include <vector>
 
@@ -23,7 +24,7 @@ struct PreviewJob
 // Per-job outcome. durationMs is the source video's duration in ms, read from the probe that precedes
 // extraction (see generatePreviewFrames) - so it is valid (> 0) whenever the probe succeeded, which includes
 // the ExtractionFailed case: a caller can still record the duration even when no frames were written. It stays
-// -1 (unknown) only when the probe never ran or found no duration (FolderCreateFailed / ProbeFailed).
+// -1 (unknown) only when the probe never ran or found no duration (FolderCreateFailed / ProbeFailed / Cancelled).
 struct PreviewResult
 {
 	enum class Status
@@ -32,6 +33,7 @@ struct PreviewResult
 		FolderCreateFailed, // destinationFolder couldn't be created; nothing ran
 		ProbeFailed,        // ffmpeg couldn't read the input / no parseable duration (typically a corrupt file)
 		ExtractionFailed,   // duration probed fine, but the frame-extraction ffmpeg exited non-zero or was killed
+		Cancelled,          // never started, or killed mid-run, because cancellation was requested - not a failure
 	};
 
 	Status status     = Status::Ok;
@@ -50,12 +52,18 @@ struct PreviewResult
 // Returns one PreviewResult per job, in jobs order (result[i] describes jobs[i]). Best-effort in that a failed
 // job never aborts the batch: its status/duration are reported for the caller to act on or ignore, not enforced.
 //
-// onProgress, if set, is invoked on the calling thread as each job reaches its terminal state (extracted or
-// skipped), with (completedJobs, totalJobs) where totalJobs == jobs.size(); use it to drive UI. Because the
-// call blocks the calling thread for the whole batch, a UI callback should pump events itself if it wants
-// the display to update mid-batch.
+// Setting `cancelled` (from another thread - the call blocks its own for the whole batch) stops the batch: the
+// running ffmpeg processes are killed instead of waited out, no further ones are started, and every job that
+// didn't already finish cleanly comes back Cancelled. A job that did finish keeps its Ok result, so the caller
+// can keep the work already paid for. Cancelled jobs leave whatever partial frames ffmpeg had written in their
+// destinationFolder - the caller owns that cleanup.
+//
+// onProgress, if set, is invoked as each job reaches its terminal state (extracted or skipped), with
+// (completedJobs, totalJobs) where totalJobs == jobs.size(); use it to drive UI. It runs on the calling thread,
+// which is not the GUI thread if the caller followed the cancellation contract above - so a UI callback must
+// marshal to the GUI thread rather than touching widgets directly.
 [[nodiscard]] std::vector<PreviewResult> generatePreviewFrames(const std::vector<PreviewJob>& jobs, int frameCount, int maxConcurrentProcesses,
-	const std::function<void(int completedJobs, int totalJobs)>& onProgress = {});
+	const std::atomic<bool>& cancelled, const std::function<void(int completedJobs, int totalJobs)>& onProgress = {});
 
 // Single-video convenience: the batch form with one job run one process at a time, returning its lone
 // PreviewResult. Used by the import and re-split paths, which handle a single video.

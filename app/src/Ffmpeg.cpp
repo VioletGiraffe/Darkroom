@@ -19,25 +19,32 @@ constexpr int kPreviewFrameJpegQuality = 5;
 // aspect ratio - see the -vf scale argument below); upscaling a smaller source is fine, these are thumbnails.
 constexpr int kPreviewFrameHeight = 360;
 
-// Waits for a process to finish, killing it if it overruns so a stuck ffmpeg (e.g. on a corrupt file) never
-// lingers past the QProcess it was spawned from - important here since a batch can spawn many at once.
-void waitForFinishedOrKill(QProcess& process, int timeoutMs)
+// Waits for a process to finish, killing it if it overruns or if cancellation is requested, so a stuck ffmpeg
+// (e.g. on a corrupt file) never lingers past the QProcess it was spawned from - important here since a batch
+// can spawn many at once.
+void waitForFinishedOrKill(QProcess& process, int timeoutMs, const std::atomic<bool>& cancelled)
 {
-	if (!process.waitForFinished(timeoutMs))
-	{
-		process.kill();
-		process.waitForFinished();  // reap the killed process rather than leaving it orphaned
-	}
+	// Waited in slices rather than one blocking call so that a cancellation is acted on within a slice, instead
+	// of after however long this process still had to run.
+	constexpr int sliceMs = 100;
+	for (int remainingMs = timeoutMs; remainingMs > 0 && !cancelled; remainingMs -= sliceMs)
+		if (process.waitForFinished(qMin(sliceMs, remainingMs)))
+			return;
+
+	process.kill();
+	process.waitForFinished();  // reap the killed process rather than leaving it orphaned
 }
 
 // Runs `count` operations in windows of up to `concurrency` concurrent QProcess, all on the calling thread -
 // the parallelism is the OS running the ffmpeg processes at once, not threads. For each operation in a
 // window, start(index, process) launches it without waiting; once the whole window is started,
 // finish(index, process) is called per operation (in start order) to wait on and consume its result.
+// Cancellation stops further windows from starting; the current window is still finished through, because
+// that is what kills and reaps its processes (see waitForFinishedOrKill) rather than leaving them running.
 template <typename StartFn, typename FinishFn>
-void runInProcessWindows(int count, int concurrency, StartFn&& start, FinishFn&& finish)
+void runInProcessWindows(int count, int concurrency, const std::atomic<bool>& cancelled, StartFn&& start, FinishFn&& finish)
 {
-	for (int windowStart = 0; windowStart < count; windowStart += concurrency)
+	for (int windowStart = 0; windowStart < count && !cancelled; windowStart += concurrency)
 	{
 		const int windowCount = qMin(concurrency, count - windowStart);
 
@@ -63,11 +70,11 @@ void startDurationProbe(QProcess& probe, const QString& videoFilePath)
 
 // Consumes a probe started by startDurationProbe. Returns the video duration in ms, or -1 if ffmpeg couldn't
 // be run or its output didn't contain a parseable duration.
-qint64 parseProbedDurationMs(QProcess& probe)
+qint64 parseProbedDurationMs(QProcess& probe, const std::atomic<bool>& cancelled)
 {
 	if (!probe.waitForStarted())
 		return -1;
-	waitForFinishedOrKill(probe, 30000);
+	waitForFinishedOrKill(probe, 30000, cancelled);
 
 	const QString stderrOutput = probe.readAllStandardError();
 	static const QRegularExpression re(R"(Duration:\s*(\d+):(\d+):(\d+\.\d+))");
@@ -123,7 +130,7 @@ QStringList buildExtractionArguments(const QString& videoFilePath, const QString
 namespace Ffmpeg {
 
 std::vector<PreviewResult> generatePreviewFrames(const std::vector<PreviewJob>& jobs, int frameCount, int maxConcurrentProcesses,
-	const std::function<void(int, int)>& onProgress)
+	const std::atomic<bool>& cancelled, const std::function<void(int, int)>& onProgress)
 {
 	const int total = static_cast<int>(jobs.size());
 	std::vector<PreviewResult> results(total);   // one per job, jobs order; default { Ok, -1 } refined below
@@ -132,8 +139,11 @@ std::vector<PreviewResult> generatePreviewFrames(const std::vector<PreviewJob>& 
 
 	const int concurrency = qMax(1, maxConcurrentProcesses);
 
+	// Reaching a terminal state is tracked per job, not just counted: whatever the cancellation cut short is
+	// exactly what never got here, and is marked Cancelled once both passes are done.
 	int completed = 0;
-	const auto reportOneCompleted = [&] { ++completed; if (onProgress) onProgress(completed, total); };
+	std::vector<bool> reachedTerminalState(total, false);
+	const auto reportCompleted = [&](int i) { reachedTerminalState[i] = true; ++completed; if (onProgress) onProgress(completed, total); };
 
 	// Pass 1: probe each job's duration and build its extraction arguments, up to `concurrency` probes at
 	// once. A job whose destination folder can't be created (FolderCreateFailed) or whose duration can't be
@@ -141,7 +151,7 @@ std::vector<PreviewResult> generatePreviewFrames(const std::vector<PreviewJob>& 
 	// now, so it never enters pass 2 and the extraction windows there stay packed with only good jobs.
 	std::vector<bool> probeStarted(total, false);
 	std::vector<QStringList> extractionArguments(total);
-	runInProcessWindows(total, concurrency,
+	runInProcessWindows(total, concurrency, cancelled,
 		[&](int i, QProcess& probe) {
 			if (!QDir{}.mkpath(jobs[i].destinationFolder))
 				return;  // leaves probeStarted[i] false -> FolderCreateFailed in finish
@@ -152,14 +162,16 @@ std::vector<PreviewResult> generatePreviewFrames(const std::vector<PreviewJob>& 
 			if (!probeStarted[i])
 			{
 				results[i].status = PreviewResult::Status::FolderCreateFailed;
-				reportOneCompleted();
+				reportCompleted(i);
 				return;
 			}
-			const qint64 durationMs = parseProbedDurationMs(probe);
+			const qint64 durationMs = parseProbedDurationMs(probe, cancelled);
+			if (cancelled)
+				return;  // pass 2 will not run, so even a duration that came back is of no use: leave the job Cancelled
 			if (durationMs <= 0)
 			{
 				results[i].status = PreviewResult::Status::ProbeFailed;
-				reportOneCompleted();  // best-effort: leave this job's destination empty rather than guessing seek points
+				reportCompleted(i);  // best-effort: leave this job's destination empty rather than guessing seek points
 			}
 			else
 			{
@@ -177,7 +189,7 @@ std::vector<PreviewResult> generatePreviewFrames(const std::vector<PreviewJob>& 
 		if (!extractionArguments[i].isEmpty())
 			jobsToExtract.push_back(i);
 
-	runInProcessWindows(static_cast<int>(jobsToExtract.size()), concurrency,
+	runInProcessWindows(static_cast<int>(jobsToExtract.size()), concurrency, cancelled,
 		[&](int k, QProcess& extract) {
 			extract.start(ffmpegPath(), extractionArguments[jobsToExtract[k]]);
 		},
@@ -185,20 +197,29 @@ std::vector<PreviewResult> generatePreviewFrames(const std::vector<PreviewJob>& 
 			bool extracted = false;
 			if (extract.waitForStarted())
 			{
-				waitForFinishedOrKill(extract, 60000);
+				waitForFinishedOrKill(extract, 60000, cancelled);
 				extracted = extract.exitStatus() == QProcess::NormalExit && extract.exitCode() == 0;
 			}
 			if (!extracted)
+			{
+				if (cancelled)
+					return;  // killed by the cancellation rather than broken: Cancelled, not ExtractionFailed
 				results[jobsToExtract[k]].status = PreviewResult::Status::ExtractionFailed;
-			reportOneCompleted();
+			}
+			reportCompleted(jobsToExtract[k]);
 		});
+
+	for (int i = 0; i < total; ++i)
+		if (!reachedTerminalState[i])
+			results[i].status = PreviewResult::Status::Cancelled;
 
 	return results;
 }
 
 PreviewResult generatePreviewFrames(const QString& videoFilePath, const QString& destinationFolder, int frameCount)
 {
-	return generatePreviewFrames({ PreviewJob{ videoFilePath, destinationFolder } }, frameCount, /*maxConcurrentProcesses*/ 1).front();
+	static const std::atomic<bool> neverCancelled{ false };  // nothing can reach this call to cancel it: it blocks its caller start to finish
+	return generatePreviewFrames({ PreviewJob{ videoFilePath, destinationFolder } }, frameCount, /*maxConcurrentProcesses*/ 1, neverCancelled).front();
 }
 
 SplitResult splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder, const SplitOptions& options)
