@@ -47,7 +47,6 @@
 #include <QPushButton>
 #include <QSettings>
 #include <QSplitter>
-#include <QThread>
 #include <QUrl>
 #include <QUuid>
 #include <QVBoxLayout>
@@ -64,6 +63,11 @@ constexpr int STAGED_CARD_IMAGE_HEIGHT = 120;
 // The label list hugs its content width (ContentWidthListWidget) but is capped here so a pathologically long
 // label name can't grow the pane without bound - past this the row elides instead.
 constexpr int LABEL_LIST_MAX_WIDTH = 300;
+
+// How many preview extractions run at once when staging a drop of several videos. Each is its own ffmpeg
+// process which already threads internally, so a low number leaves the machine responsive and keeps disk
+// reads from thrashing between sources.
+constexpr int PREVIEW_EXTRACTION_CONCURRENCY = 2;
 
 // A fresh, unique scratch directory for one staged video's temp preview frames.
 QString uniqueTempPreviewDir()
@@ -737,10 +741,9 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 	progressBox.show();
 	QApplication::processEvents();  // paint the dialog before the batch blocks this thread
 
-	// Extract previews for several videos concurrently - each ffmpeg is its own OS process. Half the cores
-	// leaves headroom for ffmpeg's own internal threading and for the UI. Each result carries the duration the
-	// probe read, stashed on the staged entry so import records it without probing the same file again.
-	const std::vector<Ffmpeg::PreviewResult> results = Ffmpeg::generatePreviewFrames(jobs, frameCount, qMax(1, QThread::idealThreadCount() / 3),
+	// Each result carries the duration the probe read, stashed on the staged entry so import records it without
+	// probing the same file again.
+	const std::vector<Ffmpeg::PreviewResult> results = Ffmpeg::generatePreviewFrames(jobs, frameCount, PREVIEW_EXTRACTION_CONCURRENCY,
 		[&](int done, int total) {
 			progressBox.setText(tr("Generating preview %1/%2...").arg(done).arg(total));
 			QApplication::processEvents();
