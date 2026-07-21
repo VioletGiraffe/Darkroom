@@ -13,10 +13,11 @@
 // IntegrityCheckDialog - shows what CatalogIntegrity::scan found (untracked frame folders, untracked photo
 // files, broken video entries, and photos whose source file is missing) and lets the user resolve each one:
 // register an untracked folder against its source; add an untracked photo to the catalog; per broken video,
-// re-import / regenerate preview / mark-fully-split / remove; per missing photo, locate the moved file
-// (referenced only) or remove. Each section that admits a uniform batch also carries a blanket action over its
-// rows - add all untracked photos; re-import / regenerate / remove all broken videos; locate (search a folder
-// recursively and relink by identity) / remove all missing photos - each a loop over the same per-row callbacks.
+// per broken video, locate a moved source / re-import / regenerate preview / mark-fully-split / remove; per
+// missing photo, locate the moved file (referenced only) or remove. Each section that admits a uniform batch also
+// carries a blanket action over its rows - add all untracked photos; locate / re-import / regenerate / remove all
+// broken videos; locate (search a folder recursively and relink by identity) / remove all missing photos - each a
+// loop over the same per-row callbacks.
 // All UI logic lives behind the static scanAndShowUi() entry point - the dialog frame here, the sections' rows
 // and handlers in IntegrityCheckSections.h - MainWindow only supplies the callbacks that actually touch the
 // Catalog/disk.
@@ -43,6 +44,10 @@ public:
 		std::function<bool(const MediaId& id)> regeneratePreviewRequested;
 		// Marks a video as fully split when its real frames exist but the entry was still flagged preview-only. STALE.
 		std::function<bool(const MediaId& id)> markSplitRequested;
+		// Repoints a video whose source file moved/unmounted at a newly-located file, leaving its frame folder
+		// untouched; returns whether it succeeded - refused on an id clash with a different tracked item (via
+		// Catalog::applyRename). The source-missing counterpart of locatePhotoRequested.
+		std::function<bool(const MediaId& id, const QString& newSourcePath)> locateSourceRequested;
 		// Drops an entry from the catalog outright; always succeeds.
 		std::function<bool(const MediaId& id)> removeEntryRequested;
 		// Repoints a referenced photo (whose source file moved) at a newly-located file; returns whether it

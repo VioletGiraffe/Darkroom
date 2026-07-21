@@ -1945,6 +1945,13 @@ void MainWindow::checkCatalogIntegrity()
 			libraryCatalog().markSplitComplete(id);
 			return true;
 		},
+		.locateSourceRequested = [this](const MediaId& id, const QString& newSourcePath) {
+			// Repoint a video whose source moved. Only the source path changes - the frame folder lives under the
+			// library and stays put, so carry the entry's current folder through unchanged. applyRename re-keys to
+			// the located file's identity (same file moved -> same id) and refuses an id clash with another item.
+			Catalog& catalog = libraryCatalog();
+			return catalog.applyRename(id, MediaId::fromFile(newSourcePath), newSourcePath, catalog.folderForMediaItem(id));
+		},
 		.removeEntryRequested = [this](const MediaId& id) {
 			libraryCatalog().removeMediaItem(id);
 			return true;

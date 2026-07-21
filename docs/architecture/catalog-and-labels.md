@@ -338,8 +338,12 @@ The scan reports four kinds of drift, each with its own resolution:
   user adds it to the catalog in one click (adopted in place as an owned photo under that label) or skips it.
   No browse step: the file is self-contained and already sits in the library tree.
 - **Broken video entry** — a tracked video whose on-disk product (preview frames and/or real frames) no
-  longer matches what the catalog records → resolved by re-import, preview regeneration, marking it fully
-  split, or removal, depending on which verdicts hold (the banner maps verdict → available resolution).
+  longer matches what the catalog records → resolved by locating a moved source, re-import, preview
+  regeneration, marking it fully split, or removal, depending on which verdicts hold (the banner maps verdict →
+  available resolution). **Locate source** (offered whenever the source is missing) mirrors the referenced-photo
+  Locate: browse to the moved file, repointing the entry through `applyRename` while its frame folder stays put.
+  It's the precondition for Re-import when the source is gone — a relinked ghost stays a ghost until the next
+  scan surfaces it with Re-import enabled.
 - **Missing photo** — a tracked photo whose source file is gone; a photo is source-only, so that's its whole
   failure mode (owned → LOST, referenced → GONE). A referenced photo offers **Locate** (browse to the moved
   file, repointing the entry through `applyRename`) plus Remove/Skip; an owned photo, which lives in the
@@ -347,10 +351,12 @@ The scan reports four kinds of drift, each with its own resolution:
 
 `IntegrityCheckDialog::scanAndShowUi` is the one static entry point; the dialog frame itself is thin,
 delegating the per-finding rows and their handlers — plus the per-section blanket actions ("Add all",
-"Re-import all", "Remove all", ...) — to a private `IntegrityCheckSections` helper (`IntegrityCheckSections.h`,
-included only by the dialog's `.cpp`). `MainWindow` only supplies the resolution callbacks that actually touch
-the `Catalog`/disk, including the manual "browse" paths (an untracked folder's source video, a moved
-referenced photo). The catalog-vs-disk drift scenarios described above (ghost / invisible cards, missing
+"Locate all", "Re-import all", "Remove all", ...) — to a private `IntegrityCheckSections` helper
+(`IntegrityCheckSections.h`, included only by the dialog's `.cpp`). The two "Locate all" batches (moved source
+videos, missing referenced photos) share one identity-matching driver, `locateAllByIdentity`: index a chosen
+folder's files by `MediaId` (name + size), then relink each still-open row to the file carrying its identity.
+`MainWindow` only supplies the resolution callbacks that actually touch the `Catalog`/disk, including the manual
+"browse" paths (an untracked folder's source video, a moved video source, a moved referenced photo). The catalog-vs-disk drift scenarios described above (ghost / invisible cards, missing
 sources) defer to this tool for actual reconciliation.
 
 ---
