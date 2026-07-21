@@ -29,6 +29,14 @@ private:
 	void resizeAndMoveWindow();
 	void togglePlayPause();
 
+	// Frame extraction (the video widget's right-click menu): the frame at timestampMs is written either into a
+	// user-chosen folder, or imported into the library as an owned photo.
+	void showContextMenu(const QPoint& globalPos);
+	void extractFrameToLibrary(qint64 timestampMs);
+	void extractFrameToFolder(qint64 timestampMs, const QString& folder);
+	// The shared extraction step: runs ffmpeg, reports any failure. Returns the written file's path, empty on failure.
+	[[nodiscard]] QString extractFrameInto(qint64 timestampMs, const QString& destinationFolder);
+
 	bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
@@ -36,6 +44,7 @@ private:
 
 	Library& _library;
 	MediaId _mediaId; // identity of the played source video; keys its saved loops in MetadataStore
+	const QString _videoPath;
 
 	QMediaPlayer* _player = nullptr;
 	QAudioOutput* _audioOutput = nullptr;

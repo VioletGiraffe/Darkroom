@@ -11,6 +11,11 @@ orient, then follow the link for the subsystem you're touching.
 > convention, or the backlog, update the relevant doc in the same change. An out-of-date doc is worse than
 > none - treat the update as part of the work rather than afterthought.
 
+> **These docs stay at the architecture/design level — structure, rationale, and invariants, not
+> implementation.** Describe how the pieces fit and *why*; leave the line-by-line *how* to the code, which is
+> its own authoritative and always-current source. The one exception is a non-obvious gotcha worth knowing
+> before reading the code. Detail that merely restates the implementation goes stale the moment the code moves.
+
 ---
 
 ## Quick-start workflow

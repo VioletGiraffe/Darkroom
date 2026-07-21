@@ -18,6 +18,16 @@ Built-in player (`QMediaPlayer` + `QVideoWidget` + `QAudioOutput`) for the doubl
 static list of open instances (app-wide restart/close) and auto-tiles each window into screen thirds once the
 video size is known. Offers an A–B loop plus multiple saved loops per video.
 
+### Frame extraction
+
+Right-clicking the video (`Ffmpeg::extractFrame`) extracts the frame at the clicked moment (left click stays
+play/pause) to one of three destinations: the library, a picked folder, or a repeat of whichever ran last
+(persisted). The library path lands it as an **owned photo** under the configurable "Extracted" label via
+`Import::importPhoto(Move)`, reusing photo import's dedup/collision handling; extraction goes to a temp dir
+under the library root (not system temp) so that move is a same-drive rename. Frames deliberately never go
+into the video's frame folder — a regenerable artifact a re-split wipes wholesale. Untracked (staging-preview)
+videos work too; the main window does not yet refresh when a frame lands.
+
 ### Saved loops
 
 Persisted via `MetadataStore` (see [data-model.md](data-model.md)) under the `"intervals"` field — a list of

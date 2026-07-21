@@ -1,4 +1,5 @@
 #include "Utils.h"
+#include "Ffmpeg.h"
 #include "Settings.h"
 
 #include <QByteArray>
@@ -271,6 +272,40 @@ QString revealInFileManagerActionText()
 void reportMissingFile(QWidget* parent, const QString& path)
 {
 	QMessageBox::warning(parent, QObject::tr("File not found"), QObject::tr("This file or folder no longer exists:\n") + path);
+}
+
+void reportFfmpegFailure(QWidget* parent, const Ffmpeg::SplitResult& result, const QString& videoFilePath, const QString& outputTarget)
+{
+	using Status = Ffmpeg::SplitResult::Status;
+	switch (result.status)
+	{
+	case Status::Ok:
+		break;
+	case Status::SourceMissing:
+		reportMissingFile(parent, videoFilePath);
+		break;
+	case Status::FolderCreateFailed:
+		QMessageBox::critical(parent, QObject::tr("Error"), QObject::tr("Failed to create output folder:\n%1").arg(outputTarget));
+		break;
+	case Status::StartFailed:
+	{
+		const QString ffmpeg = ffmpegPath();
+		QMessageBox::critical(parent, QObject::tr("Error"), ffmpeg.isEmpty()
+			? QObject::tr("FFMPEG was not found. Install it, or set the path to the binary in Settings.")
+			: QObject::tr("Failed to start the FFMPEG process at:\n%1").arg(ffmpeg));
+		break;
+	}
+	case Status::TimedOut:
+		QMessageBox::critical(parent, QObject::tr("Error"), QObject::tr("The FFMPEG process timed out and was terminated."));
+		break;
+	case Status::ExtractionFailed:
+		QMessageBox::critical(parent, QObject::tr("Error"),
+			QObject::tr("FFMPEG failed with exit code %1\n\nError output:\n%2").arg(result.exitCode).arg(result.errorOutput));
+		break;
+	case Status::NoFrames:
+		QMessageBox::warning(parent, QObject::tr("Warning"), QObject::tr("No frames were extracted from:\n%1").arg(videoFilePath));
+		break;
+	}
 }
 
 QString autoDetectedFfmpegPath()

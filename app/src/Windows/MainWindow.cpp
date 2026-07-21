@@ -1550,35 +1550,9 @@ bool MainWindow::splitVideoIntoFrames(const QString& videoFilePath, const QStrin
 	// options and renders the outcome. The caller publishes the successful candidate in the catalog.
 	const Ffmpeg::SplitOptions options{ .tiff = useTiff(), .jpegQuality = jpegQuality(), .frameStep = frameStep() };
 	const Ffmpeg::SplitResult result = Ffmpeg::splitVideoIntoFrames(videoFilePath, outputFolder, options);
-
-	using Status = Ffmpeg::SplitResult::Status;
-	switch (result.status)
+	if (!result.ok())
 	{
-	case Status::Ok:
-		break;
-	case Status::SourceMissing:
-		reportMissingFile(this, videoFilePath);
-		return false;
-	case Status::FolderCreateFailed:
-		QMessageBox::critical(this, tr("Error"), tr("Failed to create output folder:\n%1").arg(outputFolder));
-		return false;
-	case Status::StartFailed:
-	{
-		const QString ffmpeg = ffmpegPath();
-		QMessageBox::critical(this, tr("Error"), ffmpeg.isEmpty()
-			? tr("FFMPEG was not found. Install it, or set the path to the binary in Settings.")
-			: tr("Failed to start the FFMPEG process at:\n%1").arg(ffmpeg));
-		return false;
-	}
-	case Status::TimedOut:
-		QMessageBox::critical(this, tr("Error"), tr("FFMPEG process timeout (5 minutes)"));
-		return false;
-	case Status::ExtractionFailed:
-		QMessageBox::critical(this, tr("Error"),
-			tr("FFMPEG failed with exit code %1\n\nError output:\n%2").arg(result.exitCode).arg(result.errorOutput));
-		return false;
-	case Status::NoFrames:
-		QMessageBox::warning(this, tr("Warning"), tr("No frames were extracted from:\n%1").arg(videoFilePath));
+		reportFfmpegFailure(this, result, videoFilePath, outputFolder);
 		return false;
 	}
 	return true;

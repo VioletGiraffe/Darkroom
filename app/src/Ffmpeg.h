@@ -6,10 +6,10 @@
 #include <functional>
 #include <vector>
 
-// Thin wrapper over invoking the ffmpeg binary (see Utils.h's ffmpegPath()). Two operations, both pure - they
+// Thin wrapper over invoking the ffmpeg binary (see Utils.h's ffmpegPath()). Three operations, all pure - they
 // run ffmpeg and report the outcome, leaving all UI and catalog updates to the caller: pulling a handful of
-// evenly-spaced still frames for a card preview (generatePreviewFrames), and extracting every frame of a video
-// into a folder (splitVideoIntoFrames).
+// evenly-spaced still frames for a card preview (generatePreviewFrames), extracting every frame of a video
+// into a folder (splitVideoIntoFrames), and extracting the single frame at a timestamp (extractFrame).
 namespace Ffmpeg {
 
 // One video's preview-extraction request: pull evenly-spaced frames from videoFilePath into
@@ -106,5 +106,12 @@ struct SplitResult
 // is removed, so a failed split leaves no debris. Returns the outcome; touches neither UI nor catalog - the
 // caller renders the result and registers the video.
 [[nodiscard]] SplitResult splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder, const SplitOptions& options);
+
+// Extracts the single frame at timestampMs into outputFilePath (parent folder created if needed), with one
+// blocking ffmpeg process. The format follows the file's extension - ".tif" = TIFF, anything else JPEG at
+// jpegQuality - with the same encoder options as splitVideoIntoFrames, so an extracted frame matches split
+// output. On failure any partial output file is removed; the folder is left alone (it may be a user-chosen
+// destination holding other files). Reuses SplitResult; frameCount is 1 on success.
+[[nodiscard]] SplitResult extractFrame(const QString& videoFilePath, qint64 timestampMs, const QString& outputFilePath, int jpegQuality);
 
 } // namespace Ffmpeg

@@ -110,6 +110,12 @@ void forEachFolder(const QString& root, F&& callback)
 // "the source file is gone" path reports identically and always tells the user which path is missing.
 void reportMissingFile(QWidget* parent, const QString& path);
 
+namespace Ffmpeg { struct SplitResult; }
+
+// Modal rendering of a failed Ffmpeg::splitVideoIntoFrames / extractFrame outcome, one wording per status.
+// outputTarget is the folder the extraction was writing into, named in the folder-creation failure. No-op on Ok.
+void reportFfmpegFailure(QWidget* parent, const Ffmpeg::SplitResult& result, const QString& videoFilePath, const QString& outputTarget);
+
 // Absolute path of the ffmpeg binary to run, or empty when it can't be found at all: the configured setting when it
 // names an existing file, else autoDetectedFfmpegPath(). An empty return needs no guarding at the call site:
 // QProcess reports it as FailedToStart, which the Ffmpeg module already surfaces as StartFailed.

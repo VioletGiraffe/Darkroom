@@ -14,6 +14,10 @@ namespace Settings {
 	constexpr const char* PauseOnSeek  = "VideoPlayer/PauseOnSeek";
 	constexpr const char* Volume       = "VideoPlayer/Volume"; // UI slider position, 0..100 (perceptual)
 	constexpr const char* Muted        = "VideoPlayer/Muted";
+	constexpr const char* LastFrameExtractionMode   = "VideoPlayer/LastFrameExtractionMode";   // "library" or "folder"; unset = no extraction done yet
+	constexpr const char* LastFrameExtractionFolder = "VideoPlayer/LastFrameExtractionFolder";
+	// Label receiving frames extracted to the library from the player. No settings UI - editable in the settings file.
+	constexpr const char* ExtractedLabelName        = "settings/extractedLabelName";
 	constexpr const char* ColorScheme  = "settings/colorScheme";
 	// Shared (not just MainWindow's) since ImportDialog's staged cards mirror it too.
 	constexpr const char* PreviewFrameCount = "mainWindow/previewFrameCount";
@@ -27,5 +31,6 @@ namespace Defaults {
 	constexpr int         Volume       = 100; // full, on the 0..100 UI scale
 	constexpr bool        Muted        = false;
 	constexpr int         ColorScheme  = 0; // Qt::ColorScheme::Unknown = follow system
+	constexpr const char* ExtractedLabelName = "Extracted";
 	constexpr int         PreviewFrameCount = 4;
 }

@@ -1,14 +1,21 @@
 #include "Windows/VideoPlayerWindow.h"
 #include "UiComponents/MarkerSlider.h"
+#include "Core/Catalog.h"
 #include "Core/Library.h"
 #include "Core/MetadataStore.h"
 #include "Theme/Icons.h"
+#include "Ffmpeg.h"
+#include "Import.h"
 #include "Settings.h"
+#include "Utils.h"
 
 #include <QAudio>
 #include <QAudioOutput>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QCursor>
+#include <QDir>
+#include <QFileDialog>
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QHBoxLayout>
@@ -16,13 +23,18 @@
 #include <QJsonObject>
 #include <QLabel>
 #include <QMediaPlayer>
+#include <QMenu>
+#include <QMessageBox>
+#include <QMouseEvent>
 #include <QPushButton>
 #include <QSettings>
 #include <QScreen>
 #include <QShortcut>
 #include <QSlider>
+#include <QTemporaryDir>
 #include <QTime>
 #include <QTimer>
+#include <QToolTip>
 #include <QUrl>
 #include <QVBoxLayout>
 #include <QVideoSink>
@@ -33,13 +45,17 @@
 namespace {
 // Item-data roles under which a saved-loop combo entry stores its interval endpoints (ms).
 enum LoopItemDataRole { LoopStartRole = Qt::UserRole, LoopEndRole = Qt::UserRole + 1 };
+
+// Settings::LastFrameExtractionMode values.
+constexpr const char* ExtractToLibraryMode = "library";
+constexpr const char* ExtractToFolderMode  = "folder";
 }
 
 std::vector<VideoPlayerWindow*> VideoPlayerWindow::_instances;
 
 
 VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath, const MediaId& mediaId, QWidget* parent)
-	: QMainWindow(parent), _library(library), _mediaId(mediaId)
+	: QMainWindow(parent), _library(library), _mediaId(mediaId), _videoPath(videoPath)
 {
 	setAttribute(Qt::WA_DeleteOnClose);
 	setWindowTitle(QFileInfo{ videoPath }.completeBaseName());
@@ -444,12 +460,122 @@ void VideoPlayerWindow::togglePlayPause()
 
 bool VideoPlayerWindow::eventFilter(QObject* watched, QEvent* event)
 {
-	// Pause/play on mouse button click
+	// Left click pauses/plays, right click offers frame extraction
 	if (event->type() == QEvent::MouseButtonRelease)
 	{
-		togglePlayPause();
+		const auto* mouseEvent = static_cast<const QMouseEvent*>(event);
+		if (mouseEvent->button() == Qt::LeftButton)
+			togglePlayPause();
+		else if (mouseEvent->button() == Qt::RightButton)
+			showContextMenu(mouseEvent->globalPosition().toPoint());
 		return true; // Consume the event so it doesn't propagate to the widget
 	}
 
 	return QMainWindow::eventFilter(watched, event);
+}
+
+void VideoPlayerWindow::showContextMenu(const QPoint& globalPos)
+{
+	// Captured at click time: playback may keep running while the menu is open, and the frame the user
+	// right-clicked is the one they mean.
+	const qint64 timestampMs = _player->position();
+
+	QMenu menu(this);
+	menu.addAction(tr("Extract frame and import to library"), this, [this, timestampMs] { extractFrameToLibrary(timestampMs); });
+	menu.addAction(tr("Extract frame to folder..."), this, [this, timestampMs] {
+		const QString folder = QFileDialog::getExistingDirectory(this, tr("Extract frame to folder"),
+			QSettings{}.value(Settings::LastFrameExtractionFolder).toString());
+		if (!folder.isEmpty())
+			extractFrameToFolder(timestampMs, folder);
+	});
+
+	// The repeat action replays the last extraction verbatim - same destination, no picker - and shows that
+	// destination in its text so the target is never a surprise.
+	const QString lastMode   = QSettings{}.value(Settings::LastFrameExtractionMode).toString();
+	const QString lastFolder = QSettings{}.value(Settings::LastFrameExtractionFolder).toString();
+	if (lastMode == ExtractToLibraryMode)
+		menu.addAction(tr("Extract frame → library"), this, [this, timestampMs] { extractFrameToLibrary(timestampMs); });
+	else if (lastMode == ExtractToFolderMode && !lastFolder.isEmpty())
+		menu.addAction(tr("Extract frame → %1").arg(QDir::toNativeSeparators(lastFolder)), this,
+			[this, timestampMs, lastFolder] { extractFrameToFolder(timestampMs, lastFolder); });
+	else
+		menu.addAction(tr("Extract frame (last used)"))->setEnabled(false);
+
+	menu.exec(globalPos);
+}
+
+QString VideoPlayerWindow::extractFrameInto(qint64 timestampMs, const QString& destinationFolder)
+{
+	// Format and quality follow the full-split settings, so a player-extracted frame matches split output.
+	const bool tiff       = QSettings{}.value(Settings::UseTiff, Defaults::UseTiff).toBool();
+	const int jpegQuality = QSettings{}.value(Settings::JpegQuality, Defaults::JpegQuality).toInt();
+
+	// The timestamp in the name makes each extracted instant a distinct file (and MediaId); dots instead of
+	// colons because Windows forbids colons in file names.
+	const QString timestampText = QTime::fromMSecsSinceStartOfDay(static_cast<int>(timestampMs)).toString("h.mm.ss.zzz");
+	const QString filePath = destinationFolder + '/' + QFileInfo{ _videoPath }.completeBaseName() + ' ' + timestampText + (tiff ? ".tif" : ".jpg");
+
+	const Ffmpeg::SplitResult result = Ffmpeg::extractFrame(_videoPath, timestampMs, filePath, jpegQuality);
+	if (!result.ok())
+	{
+		reportFfmpegFailure(this, result, _videoPath, destinationFolder);
+		return {};
+	}
+	return filePath;
+}
+
+void VideoPlayerWindow::extractFrameToFolder(qint64 timestampMs, const QString& folder)
+{
+	const QString filePath = extractFrameInto(timestampMs, folder);
+	if (filePath.isEmpty())
+		return;
+
+	QSettings settings;
+	settings.setValue(Settings::LastFrameExtractionMode, ExtractToFolderMode);
+	settings.setValue(Settings::LastFrameExtractionFolder, folder);
+	QToolTip::showText(QCursor::pos(), tr("Frame saved:\n%1").arg(QDir::toNativeSeparators(filePath)), this);
+}
+
+void VideoPlayerWindow::extractFrameToLibrary(qint64 timestampMs)
+{
+	Catalog& catalog = _library.catalog();
+
+	const QString labelName = QSettings{}.value(Settings::ExtractedLabelName, Defaults::ExtractedLabelName).toString();
+	QString error;
+	const LabelId labelId = catalog.createLabel(labelName, {}, &error);
+	if (labelId == LabelId::None)
+	{
+		QMessageBox::critical(this, tr("Error"), tr("Failed to create the \"%1\" label:\n%2").arg(labelName, error));
+		return;
+	}
+
+	const QString photoFolder = catalog.photoFolderForLabel(labelId);
+	if (photoFolder.isEmpty())
+	{
+		QMessageBox::critical(this, tr("Error"), tr("The \"%1\" label has no usable photo folder.").arg(labelName));
+		return;
+	}
+
+	// Extract into a temp dir under the library root rather than the system temp, so the Move below is a
+	// same-drive rename, never a cross-drive copy.
+	QTemporaryDir tempDir(_library.rootFolder() + "/.extract-XXXXXX");
+	if (!tempDir.isValid())
+	{
+		QMessageBox::critical(this, tr("Error"), tr("Failed to create a temporary folder in the library:\n%1").arg(tempDir.errorString()));
+		return;
+	}
+
+	const QString extractedPath = extractFrameInto(timestampMs, tempDir.path());
+	if (extractedPath.isEmpty())
+		return;
+
+	const Import::PhotoResult result = Import::importPhoto(catalog, photoFolder, extractedPath, Import::PhotoImportMode::Move);
+	if (result.status != Import::PhotoStatus::Success)
+	{
+		QMessageBox::critical(this, tr("Error"), tr("Failed to import the extracted frame:\n%1").arg(result.errorMessage));
+		return;
+	}
+
+	QSettings{}.setValue(Settings::LastFrameExtractionMode, ExtractToLibraryMode);
+	QToolTip::showText(QCursor::pos(), tr("Frame imported into the library under \"%1\"").arg(labelName), this);
 }

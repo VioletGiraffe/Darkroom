@@ -2,6 +2,7 @@
 #include "Utils.h"
 
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QProcess>
 #include <QRegularExpression>
@@ -352,6 +353,81 @@ SplitResult splitVideoIntoFrames(const QString& videoFilePath, const QString& ou
 	}
 
 	result.frameCount = frameCount;
+	return result;
+}
+
+SplitResult extractFrame(const QString& videoFilePath, qint64 timestampMs, const QString& outputFilePath, int jpegQuality)
+{
+	SplitResult result;
+
+	if (!QFileInfo::exists(videoFilePath))
+	{
+		result.status = SplitResult::Status::SourceMissing;
+		return result;
+	}
+
+	if (!QDir{}.mkpath(QFileInfo{ outputFilePath }.absolutePath()))
+	{
+		result.status = SplitResult::Status::FolderCreateFailed;
+		return result;
+	}
+
+	// Unlike splitVideoIntoFrames' folder wipe, only the (possibly partial) output file is removed on failure -
+	// the folder may be a user-chosen destination holding other files.
+	const auto cleanupAfterFailure = [&outputFilePath] { QFile::remove(outputFilePath); };
+
+	QStringList arguments;
+	arguments << "-y"
+		// -ss before -i: a keyframe-index seek, then decode up to the exact timestamp (see
+		// buildExtractionArguments) - frame-accurate without decoding the whole stream.
+		<< "-ss" << QString::number(timestampMs / 1000.0, 'f', 3)
+		<< "-i" << QDir::toNativeSeparators(videoFilePath)
+		<< "-map" << "0:v:0"
+		<< "-frames:v" << "1"
+		<< "-filter:v" << "format=pix_fmts=rgb24";
+
+	// Same per-format encoder options as splitVideoIntoFrames (see the comment there).
+	if (outputFilePath.endsWith(".tif", Qt::CaseInsensitive))
+		arguments << "-compression_algo" << "deflate";
+	else
+		arguments << "-qscale:v" << QString::number(jpegQuality);
+	arguments << QDir::toNativeSeparators(outputFilePath);
+
+	QProcess process;
+	process.start(ffmpegPath(), arguments);
+
+	if (!process.waitForStarted())
+	{
+		result.status = SplitResult::Status::StartFailed;
+		return result;
+	}
+
+	if (!process.waitForFinished(60000)) // generous for a seek + single-frame decode
+	{
+		process.kill();
+		process.waitForFinished();  // reap the killed process rather than leaving it orphaned
+		cleanupAfterFailure();
+		result.status = SplitResult::Status::TimedOut;
+		return result;
+	}
+
+	if (process.exitCode() != 0)
+	{
+		result.exitCode    = process.exitCode();
+		result.errorOutput = process.readAllStandardError() + "\n" + process.readAllStandardOutput();
+		cleanupAfterFailure();
+		result.status = SplitResult::Status::ExtractionFailed;
+		return result;
+	}
+
+	// A timestamp at/past the end of the stream makes ffmpeg exit cleanly having written nothing.
+	if (!QFileInfo::exists(outputFilePath))
+	{
+		result.status = SplitResult::Status::NoFrames;
+		return result;
+	}
+
+	result.frameCount = 1;
 	return result;
 }
 
