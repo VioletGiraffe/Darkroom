@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784593575993,
+  "lastUpdate": 1784594393307,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -6706,6 +6706,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .text",
             "value": 625.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 308.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 31,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 32.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "3cf23d0494419a1cc6b053f1356083c377e5a7ff",
+          "message": "Refusing to stage already imported videos",
+          "timestamp": "2026-07-21T03:35:29+03:00",
+          "tree_id": "35737abd596828f8dece301de9004c7382b02830",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/3cf23d0494419a1cc6b053f1356083c377e5a7ff"
+        },
+        "date": 1784594390764,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 11762,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 7917,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1036,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 626,
             "unit": "KB"
           },
           {
