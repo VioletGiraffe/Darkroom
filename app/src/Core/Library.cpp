@@ -5,6 +5,7 @@
 
 #include "assert/advanced_assert.h"
 
+#include <QDebug>
 #include <QDir>
 #include <QFileInfo>
 #include <QJsonArray>
@@ -231,6 +232,7 @@ bool Library::setRoot(const QString& root, QString* error)
 	replacement->setPersistenceFailureHandler(m_persistenceFailureHandler);
 	m_state = std::move(replacement);
 	++m_generation;
+	qInfo() << "Library: opened, catalog folder" << QDir::toNativeSeparators(m_state->rootFolder);
 	return true;
 }
 
