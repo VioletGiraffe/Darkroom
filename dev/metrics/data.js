@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784671989325,
+  "lastUpdate": 1784675178089,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -7204,6 +7204,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 33.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "49f16620f6187f36614b43ec2a7fbf607c6cc56d",
+          "message": "VideoPlayerWindow: better auto-placement on the screen",
+          "timestamp": "2026-07-22T02:02:11+03:00",
+          "tree_id": "1be4c219714601ee88a7f509b2c487b2f0fa025f",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/49f16620f6187f36614b43ec2a7fbf607c6cc56d"
+        },
+        "date": 1784675175671,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 12239,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 7917,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1070.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 651,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 316,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 32.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 33,
             "unit": "KB"
           },
           {
