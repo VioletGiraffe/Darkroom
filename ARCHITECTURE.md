@@ -137,7 +137,7 @@ persistence layer (with batched-write support) that `Catalog` loads itself from 
 `Catalog`: the in-memory media-item-set model plus the label model layered over it. Stable label ids, the
 `labels.json` registry, the folder-reconciliation model (exactly 3 touch points), the `MediaId`-anchored
 query/mutation API, import lifecycle (`addMediaItem`/`removeMediaItem`/`applyRename`, the duplicate-id guard,
-`BatchScope`), the FS-reconciliation audit findings, the design rationale, and deferred post-v1 polish.
+`BatchScope`), label-name/path safety, the design rationale, and the on-demand integrity tool.
 
 ### [Main window](docs/architecture/main-window.md)
 `MainWindow`'s library startup/switching policy, grid + sidebar layout, the name filter, the

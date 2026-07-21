@@ -712,6 +712,10 @@ void MainWindow::closeEvent(QCloseEvent* event)
 	QMainWindow::closeEvent(event);
 }
 
+// Grid THEN sidebar - and deliberately two calls, never one folded into refreshMediaGrid(): a label click emits the
+// sidebar's filterChanged -> refreshMediaGrid, so refreshing the sidebar from inside refreshMediaGrid() would
+// clear()+rebuild the sidebar's list from within its own click signal -> use-after-free on the item being processed.
+// Cost of the split: toggling Best leaves the sidebar's Best count stale by one until the next structural refresh (accepted).
 void MainWindow::refreshLibraryView()
 {
 	refreshMediaGrid();          // rebuilds the card grid from the (already-current) catalog model
