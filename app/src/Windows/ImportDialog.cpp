@@ -663,29 +663,29 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 	if (newPaths.isEmpty())
 		return;
 
-	// Photos split off from videos here: they need no ffmpeg preview (the card decodes the file directly),
-	// but each is first checked against the already-imported photos for byte-identical content (matched by
-	// size, any name - catches renamed duplicates), so a dup is flagged before it can be labeled at all.
+	// Split photos from videos, dropping anything already in the library so it's never staged or labeled. The
+	// "already imported" test differs by identity model: a photo is matched by content (findPhotoBySameContent
+	// byte-compares it against every imported photo of its size, any name - catching renames), a video by its
+	// name+size MediaId (exactly what addMediaItem would refuse at registration; videos carry no content hash).
+	// Both lookups return the tracked source path, empty when the file isn't in the library yet.
 	QStringList videoPaths;
 	QStringList photoPaths;
 	QStringList duplicateLines;
 	for (const QString& path : newPaths)
 	{
-		if (!isSupportedImageFile(path))
-		{
-			videoPaths << path;
-			continue;
-		}
-		const QString existingPath = m_library.catalog().findPhotoBySameContent(path);
+		const bool isPhoto = isSupportedImageFile(path);
+		const QString existingPath = isPhoto
+			? m_library.catalog().findPhotoBySameContent(path)
+			: m_library.catalog().sourcePathForMediaItem(MediaId::fromFile(path));
 		if (!existingPath.isEmpty())
 			duplicateLines << tr("%1\n    is already imported as %2").arg(QDir::toNativeSeparators(path), QDir::toNativeSeparators(existingPath));
 		else
-			photoPaths << path;
+			(isPhoto ? photoPaths : videoPaths) << path;
 	}
 
 	if (!duplicateLines.isEmpty())
 		QMessageBox::information(this, tr("Already imported"),
-			tr("Not staged - a photo with identical content is already in the library:\n\n%1").arg(duplicateLines.join("\n\n")));
+			tr("Not staged - already in the library:\n\n%1").arg(duplicateLines.join("\n\n")));
 
 	// Resolve each staged file's folder label to a concrete id (reusing an existing label or minting a provisional
 	// one) and surface the new provisional labels, before the slower video preview extraction below. Only files

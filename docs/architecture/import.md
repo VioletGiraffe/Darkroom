@@ -186,10 +186,14 @@ therefore has the same cross-filesystem fallback and restoration guarantee as ow
 ### Duplicate detection
 
 Four independent layers, at different points and catching different things:
-- **Photo content duplicate at staging** (`stageMediaItems` → `Catalog::findPhotoBySameContent`, a direct
-  Catalog call): a dropped photo is byte-compared against every already-imported photo of the same byte size, *regardless of
-  name* — this is what catches renamed duplicates. A hit is reported and not staged at all. Videos have no
-  equivalent (their identity checks below are name+size-gated); photo-only by design.
+- **Already-in-library at staging** (`stageMediaItems`, direct Catalog calls): every dropped file is tested
+  against the current library before it can be staged or labeled, each media type by its own identity — a photo by
+  content (`Catalog::findPhotoBySameContent` byte-compares it against every imported photo of the same byte size,
+  *regardless of name*, so it catches renamed duplicates), a video by its name+size `MediaId`
+  (`Catalog::sourcePathForMediaItem` returns the tracked source path, empty when untracked — videos carry no content
+  hash, so this is the same name+size identity `addMediaItem` enforces below). A hit is reported once, in a single
+  "Already imported" box, and not staged. This is the UX early-catch; the registration refusal below stays the
+  authoritative backstop for anything that reaches import anyway.
 - **Same-identity file at staging** (`stageMediaItems()`): a dropped file whose `MediaId` matches an
   already-staged entry (or another file in the same drop) is byte-compared against it — identical content is
   a re-drop of the same file, skipped silently; different content is refused with a warning naming both
