@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784591742162,
+  "lastUpdate": 1784593575993,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -6637,6 +6637,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .text",
             "value": 625,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 308.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 31,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 32.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "1e3d27a3687a692c782468d273fb9bf4bd86f524",
+          "message": "Ffmpeg::runInProcessWindows(): only 1 ffmpeg instance for large files",
+          "timestamp": "2026-07-21T03:20:17+03:00",
+          "tree_id": "3c1cdeecf7507a827473f9f47bf8bbb4f105d266",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/1e3d27a3687a692c782468d273fb9bf4bd86f524"
+        },
+        "date": 1784593572968,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 11762,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 7917,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1035.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 625.5,
             "unit": "KB"
           },
           {
