@@ -19,9 +19,11 @@
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QHBoxLayout>
+#include <QInputDialog>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMediaPlayer>
 #include <QMenu>
 #include <QMessageBox>
@@ -42,10 +44,20 @@
 #include <QWheelEvent>
 
 #include <algorithm>
+#include <optional>
 
 namespace {
-// Item-data roles under which a saved-loop combo entry stores its interval endpoints (ms).
-enum LoopItemDataRole { LoopStartRole = Qt::UserRole, LoopEndRole = Qt::UserRole + 1 };
+// Item-data roles under which a saved-loop combo entry stores its interval endpoints (ms) and optional name.
+enum LoopItemDataRole { LoopStartRole = Qt::UserRole, LoopEndRole = Qt::UserRole + 1, LoopNameRole = Qt::UserRole + 2 };
+
+// A saved loop's dropdown label: optional name first, then the start as a clock time and the duration as
+// fractional seconds to 1 digit (e.g. "warmup   0:12 + 2.3s").
+QString formatLoopLabel(qint64 startMs, qint64 endMs, const QString& name)
+{
+	const QString start = QTime::fromMSecsSinceStartOfDay(static_cast<int>(startMs)).toString(startMs >= 3600000 ? "h:mm:ss" : "m:ss");
+	const QString times = start + " + " + QString::number((endMs - startMs) / 1000.0, 'f', 1) + "s";
+	return name.isEmpty() ? times : name + "   " + times;
+}
 
 // Settings::LastFrameExtractionMode values.
 constexpr const char* ExtractToLibraryMode = "library";
@@ -173,8 +185,10 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	loopCombo->setToolTip(tr("Saved loops for this video"));
 	loopCombo->addItem(tr("No loop")); // index 0: placeholder for "no saved loop selected"
 	auto* saveLoopButton = new QPushButton(tr("Save"), this);
+	auto* renameLoopButton = new QPushButton(tr("Rename"), this);
 	auto* deleteLoopButton = new QPushButton(tr("Delete"), this);
 	saveLoopButton->setToolTip(tr("Save the current loop for this video"));
+	renameLoopButton->setToolTip(tr("Rename the selected saved loop"));
 	deleteLoopButton->setToolTip(tr("Delete the selected saved loop"));
 
 	// Shared helpers. Capture widget pointers by value - safe, they're parented to this and outlive the ctor.
@@ -193,14 +207,12 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 		setLoopStartButton->setChecked(false);
 		setLoopEndButton->setChecked(false);
 	};
-	const auto addIntervalItem = [loopCombo](qint64 start, qint64 end) {
-		const auto fmt = [](qint64 ms) {
-			return QTime::fromMSecsSinceStartOfDay(static_cast<int>(ms)).toString(ms >= 3600000 ? "h:mm:ss" : "m:ss");
-		};
-		loopCombo->addItem(fmt(start) + " - " + fmt(end));
+	const auto addIntervalItem = [loopCombo](qint64 start, qint64 end, const QString& name) {
+		loopCombo->addItem(formatLoopLabel(start, end, name));
 		const int index = loopCombo->count() - 1;
 		loopCombo->setItemData(index, start, LoopStartRole);
 		loopCombo->setItemData(index, end, LoopEndRole);
+		loopCombo->setItemData(index, name, LoopNameRole);
 		return index;
 	};
 	const auto persistIntervals = [this, loopCombo] {
@@ -210,10 +222,18 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 			QJsonObject object;
 			object.insert("start", loopCombo->itemData(i, LoopStartRole).toLongLong());
 			object.insert("end", loopCombo->itemData(i, LoopEndRole).toLongLong());
-			object.insert("name", loopCombo->itemText(i));
+			object.insert("name", loopCombo->itemData(i, LoopNameRole).toString());
 			array.append(object);
 		}
 		_library.metadataStore().beginBatch().set(_mediaId, u"intervals", array);  // single write; the temporary Writer flushes right here
+	};
+	// Optional-name prompt shared by save-new and rename; nullopt only when cancelled (empty string = unnamed).
+	const auto promptLoopName = [this](const QString& title, const QString& initial) -> std::optional<QString> {
+		bool ok = false;
+		const QString name = QInputDialog::getText(this, title, tr("Loop name (optional):"), QLineEdit::Normal, initial, &ok).trimmed();
+		if (!ok)
+			return std::nullopt;
+		return name;
 	};
 
 	// Load this video's saved loops into the combo without firing the activation handler wired below.
@@ -223,7 +243,7 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 		for (const QJsonValue& value : saved)
 		{
 			const QJsonObject object = value.toObject();
-			addIntervalItem(object.value("start").toInteger(), object.value("end").toInteger());
+			addIntervalItem(object.value("start").toInteger(), object.value("end").toInteger(), object.value("name").toString());
 		}
 	}
 
@@ -253,10 +273,13 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 		activateLoop(loopCombo->itemData(index, LoopStartRole).toLongLong(),
 		             loopCombo->itemData(index, LoopEndRole).toLongLong());
 	});
-	connect(saveLoopButton, &QPushButton::clicked, this, [this, loopCombo, addIntervalItem, persistIntervals] {
+	connect(saveLoopButton, &QPushButton::clicked, this, [this, loopCombo, addIntervalItem, persistIntervals, promptLoopName] {
 		if (_loopStart < 0 || _loopEnd <= _loopStart)
 			return; // nothing valid to save
-		const int index = addIntervalItem(_loopStart, _loopEnd);
+		const std::optional<QString> name = promptLoopName(tr("Save loop"), {});
+		if (!name)
+			return; // cancelled
+		const int index = addIntervalItem(_loopStart, _loopEnd, *name);
 		persistIntervals();
 		loopCombo->setCurrentIndex(index); // reflect the saved loop as the active selection
 	});
@@ -269,6 +292,20 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 		const QSignalBlocker blocker{ loopCombo };
 		loopCombo->removeItem(index);
 		loopCombo->setCurrentIndex(0);
+		persistIntervals();
+	});
+
+	connect(renameLoopButton, &QPushButton::clicked, this, [loopCombo, promptLoopName, persistIntervals] {
+		const int index = loopCombo->currentIndex();
+		if (index <= 0)
+			return; // "No loop" selected - nothing to rename
+		const std::optional<QString> name = promptLoopName(tr("Rename loop"), loopCombo->itemData(index, LoopNameRole).toString());
+		if (!name)
+			return; // cancelled
+		const qint64 start = loopCombo->itemData(index, LoopStartRole).toLongLong();
+		const qint64 end   = loopCombo->itemData(index, LoopEndRole).toLongLong();
+		loopCombo->setItemText(index, formatLoopLabel(start, end, *name));
+		loopCombo->setItemData(index, *name, LoopNameRole);
 		persistIntervals();
 	});
 
@@ -294,6 +331,7 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	loopLayout->addWidget(clearLoopButton);
 	loopLayout->addWidget(loopCombo, 1);
 	loopLayout->addWidget(saveLoopButton);
+	loopLayout->addWidget(renameLoopButton);
 	loopLayout->addWidget(deleteLoopButton);
 
 	connect(speedCombo, &QComboBox::currentIndexChanged, this, [this, speedCombo](int index) {
