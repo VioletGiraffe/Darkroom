@@ -24,7 +24,7 @@ constexpr int kPreviewFrameHeight = 360;
 // and running two of those together thrashes disk and CPU, whereas small clips only gain from packing. The batch
 // is usually fed small clips, so this rarely trips - it just keeps the occasional large source from dragging the
 // others down. Tuned by eye; easy to revisit.
-constexpr qint64 kSoloExtractionAboveBytes = 50LL * 1024 * 1024;
+constexpr qint64 kSoloExtractionAboveBytes = 500LL * 1024 * 1024;
 
 // Waits for a process to finish, killing it if it overruns or if cancellation is requested, so a stuck ffmpeg
 // (e.g. on a corrupt file) never lingers past the QProcess it was spawned from - important here since a batch
@@ -117,22 +117,26 @@ std::vector<qint64> pickEvenlySpacedTimestampsMs(qint64 durationMs, int frameCou
 // frames.
 QStringList buildExtractionArguments(const QString& videoFilePath, const QString& previewFolder, const std::vector<qint64>& timestampsMs)
 {
-	QStringList arguments;
-	arguments << "-i" << QDir::toNativeSeparators(videoFilePath)
-		<< "-an" << "-sn" << "-dn" // No audio, no subtitles, no data
-		<< "-y"; // Overwrite output files without asking
+	const QString nativeVideoPath = QDir::toNativeSeparators(videoFilePath);
 
-	// One ffmpeg invocation, multiple "-ss T -frames:v 1 output" output groups: ffmpeg seeks per-output on
-	// the same already-open input rather than spawning N processes or fully decoding the video.
+	QStringList arguments;
+	arguments << "-y";
+
+	// The same file is opened once per timestamp: -ss is only a real (keyframe-index) seek when it precedes -i. As an
+	// output option it decodes and discards everything from the start of the stream instead.
+	for (const qint64 timestampMs : timestampsMs)
+		arguments << "-ss" << QString::number(timestampMs / 1000.0, 'f', 3) << "-i" << nativeVideoPath;
+
 	for (int i = 0; i < static_cast<int>(timestampsMs.size()); ++i)
 	{
 		const QString outputPath = previewFolder + QString("/%1.jpg").arg(i + 1, 4, 10, QChar('0'));
-		arguments << "-ss" << QString::number(timestampsMs[i] / 1000.0, 'f', 3)
+		arguments << "-map" << QString("%1:v:0").arg(i)
 			<< "-frames:v" << "1"
 			<< "-vf" << QString("scale=-2:%1").arg(kPreviewFrameHeight)
 			<< "-qscale:v" << QString::number(kPreviewFrameJpegQuality)
 			<< QDir::toNativeSeparators(outputPath);
 	}
+
 	return arguments;
 }
 
@@ -204,8 +208,10 @@ std::vector<PreviewResult> generatePreviewFrames(const std::vector<PreviewJob>& 
 	std::vector<int> jobsToExtract;
 	jobsToExtract.reserve(total);
 	for (int i = 0; i < total; ++i)
+	{
 		if (!extractionArguments[i].isEmpty())
 			jobsToExtract.push_back(i);
+	}
 
 	std::vector<int> extractionWindows;
 	int packed = 0;  // small jobs gathered for the current window but not yet emitted
