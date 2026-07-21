@@ -44,7 +44,9 @@
 #include <QWheelEvent>
 
 #include <algorithm>
+#include <limits>
 #include <optional>
+#include <stdint.h>
 
 namespace {
 // Item-data roles under which a saved-loop combo entry stores its interval endpoints (ms) and optional name.
@@ -465,50 +467,74 @@ void VideoPlayerWindow::createPlayerWindow(Library& library, const QString& vide
 
 void VideoPlayerWindow::resizeAndMoveWindow()
 {
-	QSize s = _videoWidget->videoSink()->videoSize();
-	s.setWidth(qBound(300, s.width(), 1280));
-	s.setHeight(qBound(200, s.height(), 720));
-	// Temporarily force the layout to accommodate the exact video size
-	_videoWidget->setMinimumSize(s);
-	updateGeometry();
+	if (_windowPlacementDone)
+		return;
+
+	const QSize sourceVideoSize = _videoWidget->videoSink()->videoSize();
+	if (!sourceVideoSize.isValid())
+		return;
+	_windowPlacementDone = true;
+
+	QScreen* const targetScreen = screen() ? screen() : QGuiApplication::primaryScreen();
+	const QRect available = targetScreen ? targetScreen->availableGeometry() : QRect(0, 0, 1600, 900);
+
+	QSize targetVideoSize = sourceVideoSize;
+	if (targetVideoSize.width() > 1280 || targetVideoSize.height() > 720)
+		targetVideoSize.scale(QSize(1280, 720), Qt::KeepAspectRatio);
+	targetVideoSize = targetVideoSize.expandedTo(QSize(300, 200));
+
+	_videoWidget->setMinimumSize(targetVideoSize);
 	adjustSize();
 
-	QScreen* screen = QGuiApplication::primaryScreen();
-	const QRect screenRect = screen ? screen->availableGeometry() : QRect(0, 0, 1600, 900);
-	const int thirdWidth = screenRect.width() / 3;
-
-	// Scan actual window positions to see which zones are occupied
-	size_t occupiedZones[3]{ 0, 0, 0 };
-
-	for (VideoPlayerWindow* win : _instances)
+	const QSize frameOverhead(qMax(0, frameSize().width() - _videoWidget->width()),
+	                          qMax(0, frameSize().height() - _videoWidget->height()));
+	const QSize videoAreaLimit(qMax(1, qMin(1280, available.width() - frameOverhead.width())),
+	                           qMax(1, qMin(720, available.height() - frameOverhead.height())));
+	if (targetVideoSize.width() > videoAreaLimit.width() || targetVideoSize.height() > videoAreaLimit.height())
 	{
-		if (win == this)
-			continue; // Skip myself
+		targetVideoSize = sourceVideoSize.scaled(videoAreaLimit, Qt::KeepAspectRatio);
+		_videoWidget->setMinimumSize(targetVideoSize);
+		adjustSize();
+	}
+	_videoWidget->setMinimumSize(0, 0);
 
-		// Find which third of the screen this window's center is currently in
-		const int centerX = win->geometry().center().x() - screenRect.x();
-		if (centerX < thirdWidth)
-			occupiedZones[0] += 1;
-		else if (centerX < thirdWidth * 2)
-			occupiedZones[1] += 1;
-		else
-			occupiedZones[2] += 1;
+	if (frameSize().width() > available.width() || frameSize().height() > available.height())
+	{
+		const QSize decorationSize = frameSize() - size();
+		resize(qMax(1, available.width() - decorationSize.width()), qMax(1, available.height() - decorationSize.height()));
 	}
 
-	// Find the least occupied zone
-	int targetZone = 1; // Prefer center
-	if (occupiedZones[0] + occupiedZones[1] + occupiedZones[2] != 0)
-		targetZone = std::ranges::min_element(occupiedZones) - std::begin(occupiedZones);
+	constexpr int preferredZoneOrder[]{ 1, 0, 2 };  // center wins ties, followed by left and right
+	QRect bestFrame;
+	int64_t leastOverlap = std::numeric_limits<int64_t>::max();
+	for (const int zone : preferredZoneOrder)
+	{
+		QRect candidateFrame(QPoint(), frameSize());
+		const int anchorX = available.left() + available.width() * (zone * 2 + 1) / 6;
+		candidateFrame.moveCenter(QPoint(anchorX, available.center().y()));
+		candidateFrame.moveLeft(qBound(available.left(), candidateFrame.left(),
+		                               qMax(available.left(), available.right() - candidateFrame.width() + 1)));
+		candidateFrame.moveTop(qBound(available.top(), candidateFrame.top(),
+		                              qMax(available.top(), available.bottom() - candidateFrame.height() + 1)));
 
-	// Position the window in the center of the target zone.
-	// Calculate X to center the window inside its designated third
-	const int targetX = screenRect.left() + (targetZone * thirdWidth) + qMax(0, thirdWidth - s.width()) / 2;
-	// Center vertically on the screen
-	const int targetY = screenRect.top() + qMax(0, screenRect.height() - s.height()) / 2;
-	move(targetX, targetY);
+		int64_t overlapArea = 0;
+		for (VideoPlayerWindow* win : _instances)
+		{
+			if (win == this || !win->isVisible() || win->isMinimized() || win->screen() != targetScreen)
+				continue;
+			const QRect overlap = candidateFrame.intersected(win->frameGeometry());
+			if (!overlap.isEmpty())
+				overlapArea += static_cast<int64_t>(overlap.width()) * overlap.height();
+		}
 
-	// Immediately* drop the constraint
-	QTimer::singleShot(150, this, [this]() { _videoWidget->setMinimumSize(0, 0); });
+		if (overlapArea < leastOverlap)
+		{
+			leastOverlap = overlapArea;
+			bestFrame = candidateFrame;
+		}
+	}
+
+	move(bestFrame.topLeft());
 }
 
 void VideoPlayerWindow::togglePlayPause()

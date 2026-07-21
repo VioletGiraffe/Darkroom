@@ -55,6 +55,7 @@ private:
 	QAudioOutput* _audioOutput = nullptr;
 	QVideoWidget* _videoWidget = nullptr;
 	QSlider* _volumeSlider = nullptr;
+	bool _windowPlacementDone = false;
 	bool _pauseOnSeek = true;
 	bool _wasPlayingBeforeSeek = false;
 
