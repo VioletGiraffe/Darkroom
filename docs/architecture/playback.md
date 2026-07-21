@@ -4,50 +4,27 @@
 
 ## `FrameViewerWindow` (`src/Windows/FrameViewerWindow.h/.cpp`)
 
-Separate top-level `QWidget` (`Qt::Window`), persistent — reused, not destroyed on close.
-- `showForFolder(path)` — sets folder, refreshes thumbnails, only `show()/raise()/activateWindow()` when
-  path is non-empty (guards against popping an empty window).
-- `currentFolder()` — used by `MainWindow` to update it on rename (see [main-window.md](main-window.md)).
-- Ctrl+scroll resizes thumbnails (persisted, see [media-widgets.md](media-widgets.md#card-preview-sizing--zoom-ctrlwheel));
-  Esc closes (`QShortcut`).
-- Context menu (reveal in file manager, copy path) is local; thumbnail drag is intrinsic to `ThumbnailWidget` (see
-  [media-widgets.md](media-widgets.md)).
-- Uses `CFlowLayout` (`qtutils`) for its thumbnail grid — the one remaining consumer of that layout, since
-  it needs a plain non-selectable flow grid (unlike `MainWindow`'s grid, which needs the native multi-select
-  that `CFlowLayout` doesn't provide — see [main-window.md](main-window.md#media-grid--multi-select)).
+Persistent per-folder thumbnail popup (top-level `QWidget`, reused not destroyed on close). `MainWindow` drives
+it — updates its folder on rename via `currentFolder()` (see [main-window.md](main-window.md)). Uses `CFlowLayout`
+(`qtutils`) — its last consumer, since it needs a plain non-selectable flow grid, unlike `MainWindow`'s grid
+which needs the native multi-select `CFlowLayout` lacks (see
+[main-window.md](main-window.md#media-grid--multi-select)).
 
 ---
 
 ## `VideoPlayerWindow` (`src/Windows/VideoPlayerWindow.h/.cpp`) + `MarkerSlider`
 
-Built-in player (`QMediaPlayer` + `QVideoWidget` + `QAudioOutput`), used for the double-click-to-play path. Keeps
-a static list of open instances (for app-wide restart/close) and auto-tiles each window into screen thirds once
-the video size is known.
-
-### Seek behavior
-
-Mouse drag and keyboard arrow seeks take different paths: arrows don't fire the slider's press/release
-signals, so they're handled on value-change (gated so only a real keyboard seek, not slider tracking, acts).
-Position updates from the player block the slider's signals while the user isn't dragging, to avoid a
-seek/update feedback loop.
-
-### A–B loop
-
-A live loop is held as a start/end pair (ms, unset = -1); playback seeks back to the start once it passes the
-end, active only when both are set and the range is forward (an inverted/partial range just shows its markers,
-inert). It coexists with whole-file looping. Loop controls live on their **own row** to keep the seek row
-uncluttered: **A / B / Clear** set/clear the endpoints at the current position (A/B checkable for "is set"
-feedback); keyboard `[` / `]` mirror set-A/set-B.
+Built-in player (`QMediaPlayer` + `QVideoWidget` + `QAudioOutput`) for the double-click-to-play path. Keeps a
+static list of open instances (app-wide restart/close) and auto-tiles each window into screen thirds once the
+video size is known. Offers an A–B loop plus multiple saved loops per video.
 
 ### Saved loops
 
-Multiple per video, one active at a time (combo + **Save**/**Delete**), persisted via `MetadataStore` (see
-[data-model.md](data-model.md)) under the `"intervals"` field — a list of `{start, end, name}` objects keyed by
-the played video's `MediaId`. Programmatic combo resets (Clear, Delete) block the selection signal so Delete
-removes only the saved entry and leaves the live loop intact. Interval (de)serialization is owned here, per
-`MetadataStore`'s field-owns-its-format convention. Each player borrows the stable `Library&` and resolves
-the current store at the read/write point; after a successful root switch, `MainWindow` closes every player
-synchronously before returning to the event loop so an old video's controls cannot write to the new state.
+Persisted via `MetadataStore` (see [data-model.md](data-model.md)) under the `"intervals"` field — a list of
+`{start, end, name}` objects keyed by the played video's `MediaId`; (de)serialization owned here per the
+field-owns-its-format convention. Each player borrows the stable `Library&` and resolves the store at the
+read/write point; after a root switch `MainWindow` closes every player synchronously before returning to the
+event loop, so an old video's controls cannot write the new library's state.
 
 ## `MarkerSlider` (`src/UiComponents/MarkerSlider.h/.cpp`)
 
@@ -62,11 +39,10 @@ painting.
 
 N-way photo comparison in a near-square grid of equally sized panes, maximized by default. `MainWindow` offers
 it for any all-photo selection of at least two; `showForFiles` filters missing paths and caps the comparison at
-50. It is also openable empty from Tools → "Compare photos...". Photos can be added by dropping image files or
-whole folders (scanned recursively); the same 50-image cap applies, the pane grid is rebuilt on every count
-change, and each added photo is default-aligned against the current reference. Each pane has a context
-menu: reveal the photo in the file manager, or make the photo the reference (the reference pane is
-outlined in yellow). Its core mechanism is **two separate transform layers**:
+50 (the same cap applies to photos added later by dropping image files or whole folders, each default-aligned
+against the current reference). Also openable empty from Tools → "Compare photos...". A pane's context menu can
+make its photo the reference (the reference pane is outlined in yellow). Its core mechanism is **two separate
+transform layers**:
 
 - **One shared view** (zoom + pan, in widget coordinates — equal pane sizes are what make the same widget
   position show the same subject point in every pane): wheel zooms all panes around the cursor, drag pans all.
@@ -90,12 +66,9 @@ Three ways to set the alignment:
   small-angle only (a few degrees — horizon-correction grade; a larger real rotation fails honestly); a
   notable corrected angle is surfaced in the hint bar, being the one component with no manual-adjustment
   gesture. The bottom bar's **"Ignore rotation"** checkbox removes the rotation degree of freedom from the
-  fit itself (`AlignmentOptions::fitRotation`) — scale and offset are re-derived by the constrained least
-  squares rather than by zeroing a jointly-fitted angle — for pairs whose apparent rotation is spurious
-  (e.g. depth parallax reading as a slight tilt). The per-patch evidence is drawn on the panes as true-footprint squares (accent = used in the fit,
-  dashed accent = used via a coarser-level match only, orange = matched well but disagrees with the fit:
-  locally moved content, parallax, red = no match) until the next alignment; per-photo stats (resolution,
-  alignment parameters, confidence/coarse scores, align-call runtime) live in each pane's corner caption.
+  fit — scale and offset are re-derived by the constrained least squares rather than by zeroing a
+  jointly-fitted angle — for pairs whose apparent rotation is spurious (e.g. depth parallax reading as a
+  slight tilt).
   An optional **align region** (Shift+drag; one subject-space rect drawn dashed in every pane; Shift+click
   clears; persists across aligns and reference folds) restricts the alignment evidence to that region — the
   tool for scenes where no global alignment exists (depth parallax between focus-stack slices, locally moved
@@ -113,31 +86,20 @@ subject space rebases to its pixel coordinates, and only the other photos move t
 
 Comparison modes over the aligned set:
 
-- **Flicker** (hold `1`..`N`, capped at 9): every pane temporarily renders that photo under the shared view
-  (accent frame + the corner caption flag the override) — with aligned photos, the fastest way to spot
-  differences.
-- **Difference** (`D` / the Normal—Difference toggle at the toolbar's right): every pane except the
-  reference's renders as the per-channel |photo − reference| (the reference drawn first, the photo composited
-  over it with `QPainter::CompositionMode_Difference`); a region only one of the two covers differences
-  against the matte, i.e. reads as (nearly) unchanged.
-- **Full view** (the bottom slider; `Left`/`Right` step it): a single pane covering the whole grid area shows
-  the photo at the slider's position, so scrubbing the slider is a full-size flicker; held digit keys still
-  override; `Esc` returns to the grid. Viewport switches keep the subject point at the center fixed once the
-  user has navigated (an untouched view just re-fits).
+- **Flicker** — hold `1`..`N` (capped at 9) to render that photo in every pane under the shared view; with
+  aligned photos, the fastest way to spot differences.
+- **Difference** (`D`) — every pane except the reference's renders as the per-channel |photo − reference|, so
+  regions that match go dark and only real differences stand out.
+- **Full view** — the bottom slider (`Left`/`Right` steps it) shows one photo full-size across the whole grid,
+  so scrubbing it is a full-size flicker; `Esc` returns to the grid.
 
 Implementation notes:
 - The pane widget (`PhotoComparePane`) is defined **in the .cpp** — it's a pure viewport; all state (images,
   mip chains, alignment, view, calibration points) lives in the window, reached via friendship. No `Q_OBJECT`
   on either class (direct calls, no signals).
-- **Minification quality**: panes paint through a lazily built halving mip chain
-  (`QImage::scaled(..., SmoothTransformation)` per level), picking the level that keeps the painter's live
-  bilinear pass at ≤2× reduction — the same minification-aliasing lesson as `ThumbnailWidget`'s pre-resample
-  fix, adapted for continuous zoom.
-- **Click-vs-drag** on a pane: a press starts drag tracking, a sub-threshold release is a click — that's how
-  calibration points are placed, keeping pan/zoom fully available *while* calibrating (points are stored in
-  image coordinates, so navigating doesn't disturb them).
-- The view re-fits on every pane resize (first show, maximize, later window resizes) **until the user first
-  navigates**; after that resizes leave the view alone.
+- **Minification quality**: panes paint through a halving mip chain rather than scaling the source in one live
+  pass — the same minification-aliasing lesson as `ThumbnailWidget`'s pre-resample fix, adapted for continuous
+  zoom.
 - **Loading is asynchronous and two-stage**, per the app-wide I/O rule (see
   [ARCHITECTURE.md](../../ARCHITECTURE.md)): the reads run on `Core/IoThreadPool` as one tagged task, each
   handing its bytes to a decode on the window's own `CWorkerThreadPool` (`m_workerPool`, sized to leave the GUI
@@ -153,15 +115,9 @@ Implementation notes:
   bit-identical to a serial run — no cross-thread floating-point reductions — so alignment stays idempotent. The
   pool is **window-local on purpose**, living and dying with the window; promote it to an app-wide pool only if
   a third consumer appears.
-- Photos that fail to load are skipped at load time (constructor batch and dropped files alike) with a
-  `qWarning` (so all downstream code can assume every pane has a valid image); the alignment itself is
-  transient, but three things persist across sessions: window geometry, the "Ignore rotation" option, and the
-  align region. The latter two use window-local `QSettings` keys defined in the `.cpp` (not app-wide, so kept
-  out of `Settings.h`); the region is stored as fractions of the reference frame, so it restores regardless of
-  the images' resolution and is re-anchored to the current reference on open.
-- **`R` — reset to first-open layout**: every photo drops back to its default alignment (the current
-  reference is kept — its role and subject-space anchoring survive), the align region clears, the view
-  re-fits, and difference/flicker/full-view/calibration modes are dropped — everything except the persisted
-  "Ignore rotation" option. The default-alignment math lives in one place (`setDefaultAlignment`, reused by
-  the initial load) over `referenceSubjectRect()`, the single rotation-0 mapping of the reference image into
-  subject space (also used by the view fit and the region persistence).
+- The alignment is transient, but three things persist across sessions: window geometry, the "Ignore
+  rotation" option, and the align region. The latter two use window-local `QSettings` keys defined in the
+  `.cpp` (deliberately not in `Settings.h`); the region is stored as fractions of the reference frame, so it
+  restores at any resolution and re-anchors to the current reference on open.
+- **`R`** resets every photo to its default alignment and drops the align region and all comparison modes,
+  keeping only the current reference and the persisted "Ignore rotation" option.
