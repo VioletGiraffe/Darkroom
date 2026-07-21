@@ -7,6 +7,7 @@
 
 #include <QHash>
 #include <QMainWindow>
+#include <QSet>
 #include <QStringList>
 
 #include <optional>
@@ -61,6 +62,22 @@ private:
 	// system image viewer for a photo (after checking the file exists).
 	void openSourceInSystemApp(const MediaId& id);
 	void refreshMediaGrid();
+	// Hold the user's place in the grid across a rebuild (which clears the QListWidget, resetting its scrollbar
+	// to the top) and across restarts (persisted in save/restoreSettings): topAnchorKey is the MediaId key of the
+	// top-most visible card, scrollGridToAnchorKey scrolls that card back to the top if it's still present.
+	[[nodiscard]] QString topAnchorKey() const;
+	void scrollGridToAnchorKey(const QString& anchorKey);
+	// The grid view state captured before a rebuild and reapplied after it, all keyed by MediaId so it survives
+	// the item churn: the scroll anchor plus the selection and keyboard-anchor current item. Selection is
+	// preserved across refreshes only - saveSettings persists just the scroll anchor across restarts.
+	struct GridViewState
+	{
+		QString       scrollAnchorKey;
+		QSet<QString> selectedKeys;
+		QString       currentKey;
+	};
+	[[nodiscard]] GridViewState captureGridViewState() const;
+	void restoreGridViewState(const GridViewState& state);
 	// The media items the structural (grid-rebuilding) filters select: the sidebar's label filter (AND/OR)
 	// plus the header's All/Videos/Photos switch. The name filter is deliberately absent here - it's a
 	// view-level hide/show over the already-built cards (applyNameFilter).

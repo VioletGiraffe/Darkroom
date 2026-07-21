@@ -47,6 +47,7 @@
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QInputDialog>
+#include <QItemSelectionModel>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -500,6 +501,7 @@ void MainWindow::saveSettings()
 		activeIds << static_cast<qulonglong>(toUInt64(id));
 	QSettings{}.setValue("mainWindow/activeLabelIds", activeIds);
 	QSettings{}.setValue("mainWindow/labelsAndMode", m_labelSidebar->isAndMode());
+	QSettings{}.setValue("mainWindow/scrollAnchor", topAnchorKey());
 }
 
 void MainWindow::restoreSettings()
@@ -512,6 +514,13 @@ void MainWindow::restoreSettings()
 	const bool andMode = QSettings{}.value("mainWindow/labelsAndMode", false).toBool();
 	m_labelSidebar->setActiveFilter(activeIds, andMode);  // silent; the grid refresh below applies it
 	refreshMediaGrid();
+
+	// Restore the persisted scroll position, deferred one turn: the grid's wrapped layout only reaches its final
+	// column count once the post-show resize events drain, and scrollToItem needs that final layout to land on the
+	// right row.
+	const QString scrollAnchorKey = QSettings{}.value("mainWindow/scrollAnchor").toString();
+	if (!scrollAnchorKey.isEmpty())
+		QMetaObject::invokeMethod(this, [this, scrollAnchorKey] { scrollGridToAnchorKey(scrollAnchorKey); }, Qt::QueuedConnection);
 }
 
 bool MainWindow::refuseLibraryChangeWhileProcessing()
@@ -987,6 +996,7 @@ MediaItemWidget* MainWindow::buildMediaCard(const MediaId& id, bool isBest, cons
 
 void MainWindow::refreshMediaGrid()
 {
+	const GridViewState viewState = captureGridViewState();  // selection + current item + scroll, restored after the rebuild
 	m_mediaGrid->clear();
 
 	const int previewFrameCount = m_previewFrameCountCombo->currentData().toInt();
@@ -1063,6 +1073,79 @@ void MainWindow::refreshMediaGrid()
 	// The name filter is a view-level hide/show over these cards (applied here too so a structural rebuild
 	// keeps honouring the active filter); renumberGridCaptions runs inside applyNameFilter.
 	applyNameFilter();
+
+	// Reapply the pre-rebuild selection and scroll position. After applyNameFilter so the final (post-hide)
+	// layout is in place and name-filtered cards stay out of the restored selection.
+	restoreGridViewState(viewState);
+}
+
+QString MainWindow::topAnchorKey() const
+{
+	// Model order is visual order in the wrapping icon grid, so the first not-hidden card whose bottom edge has
+	// reached the viewport's top (rect in viewport coordinates) is the top-most visible one.
+	for (int row = 0; row < m_mediaGrid->count(); ++row)
+	{
+		const QListWidgetItem* item = m_mediaGrid->item(row);
+		if (!item->isHidden() && m_mediaGrid->visualItemRect(item).bottom() >= 0)
+			return static_cast<const GridItem*>(item)->mediaId.key();
+	}
+	return {};
+}
+
+void MainWindow::scrollGridToAnchorKey(const QString& anchorKey)
+{
+	if (anchorKey.isEmpty())
+		return;
+	for (int row = 0; row < m_mediaGrid->count(); ++row)
+	{
+		QListWidgetItem* item = m_mediaGrid->item(row);
+		if (!item->isHidden() && static_cast<const GridItem*>(item)->mediaId.key() == anchorKey)
+		{
+			m_mediaGrid->scrollToItem(item, QAbstractItemView::PositionAtTop);
+			return;
+		}
+	}
+}
+
+MainWindow::GridViewState MainWindow::captureGridViewState() const
+{
+	GridViewState state;
+	state.scrollAnchorKey = topAnchorKey();
+	for (const QListWidgetItem* item : m_mediaGrid->selectedItems())
+		state.selectedKeys.insert(static_cast<const GridItem*>(item)->mediaId.key());
+	if (const QListWidgetItem* current = m_mediaGrid->currentItem())
+		state.currentKey = static_cast<const GridItem*>(current)->mediaId.key();
+	return state;
+}
+
+void MainWindow::restoreGridViewState(const GridViewState& state)
+{
+	if (!state.selectedKeys.isEmpty() || !state.currentKey.isEmpty())
+	{
+		QListWidgetItem* currentItem = nullptr;
+		{
+			// Restore the whole selection as one change (updateEditActions once, below), skipping hidden cards so a
+			// name-filtered item is never reselected - the same rule applyNameFilter enforces on its own.
+			const QSignalBlocker blocker{ m_mediaGrid };
+			for (int row = 0; row < m_mediaGrid->count(); ++row)
+			{
+				auto* item = static_cast<GridItem*>(m_mediaGrid->item(row));
+				if (item->isHidden())
+					continue;
+				const QString key = item->mediaId.key();
+				if (state.selectedKeys.contains(key))
+					item->setSelected(true);
+				if (!state.currentKey.isEmpty() && key == state.currentKey)
+					currentItem = item;
+			}
+			// Re-seat the keyboard anchor without clearing the selection just restored (NoUpdate).
+			if (currentItem)
+				m_mediaGrid->setCurrentItem(currentItem, QItemSelectionModel::NoUpdate);
+		}
+		updateEditActions();
+	}
+
+	scrollGridToAnchorKey(state.scrollAnchorKey);
 }
 
 // Reorders the existing cards in place to match the current sort controls, without rebuilding any

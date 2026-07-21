@@ -81,7 +81,9 @@ logic itself is unchanged** — the same grid ordering drives it; only the contr
 
 - `refreshMediaGrid()` — clears and rebuilds the grid from `Catalog::mediaItems()` filtered by the label filter, ending
   with `applyNameFilter()`. Deliberately does **not** call `Catalog::rebuildIndex()` — see
-  [catalog-and-labels.md](catalog-and-labels.md#in-memory-model) for why.
+  [catalog-and-labels.md](catalog-and-labels.md#in-memory-model) for why. A rebuild preserves the scroll position and
+  selection by re-anchoring on `MediaId` identity — not scroll offset or row index, which shift as items are
+  inserted/removed. Scroll also persists across restarts; the selection is per-session.
 - `showMediaItemContextMenu()` — multi-select-aware right-click menu. **"Remove from library"** drops the selection from
   the catalog only — since the catalog is never re-derived from a disk walk, an untracked video's frame folder stays on
   disk, surfaced again only by the integrity tool or a re-import.
