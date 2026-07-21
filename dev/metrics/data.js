@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784629058894,
+  "lastUpdate": 1784630918028,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -6928,6 +6928,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 32.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "51cf55fa43e999441a933830126cd365e5c617d9",
+          "message": "Video player: audio added",
+          "timestamp": "2026-07-21T13:44:36+03:00",
+          "tree_id": "1864683b166e8fb344e833b0a2b8eb28dddabb0e",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/51cf55fa43e999441a933830126cd365e5c617d9"
+        },
+        "date": 1784630915967,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 11872,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 7917,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1049,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 634,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 311.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 32.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 33,
             "unit": "KB"
           },
           {
