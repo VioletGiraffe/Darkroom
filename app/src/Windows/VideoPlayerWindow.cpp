@@ -362,6 +362,10 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	QShortcut* closeWindowShortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
 	connect(closeWindowShortcut, &QShortcut::activated, this, &VideoPlayerWindow::close);
 
+	// 'E' repeats the last frame extraction at the current position.
+	QShortcut* extractFrameShortcut = new QShortcut(QKeySequence(Qt::Key_E), this);
+	connect(extractFrameShortcut, &QShortcut::activated, this, [this] { repeatLastExtraction(_player->position()); });
+
 	// Start playback
 	_player->play();
 }
@@ -489,19 +493,36 @@ void VideoPlayerWindow::showContextMenu(const QPoint& globalPos)
 			extractFrameToFolder(timestampMs, folder);
 	});
 
-	// The repeat action replays the last extraction verbatim - same destination, no picker - and shows that
-	// destination in its text so the target is never a surprise.
+	// Third item: repeat the last extraction with no picker, its label naming that destination; enabled only
+	// once one has run.
 	const QString lastMode   = QSettings{}.value(Settings::LastFrameExtractionMode).toString();
 	const QString lastFolder = QSettings{}.value(Settings::LastFrameExtractionFolder).toString();
+	QString repeatText;
 	if (lastMode == ExtractToLibraryMode)
-		menu.addAction(tr("Extract frame → library"), this, [this, timestampMs] { extractFrameToLibrary(timestampMs); });
+		repeatText = tr("Extract frame → library");
 	else if (lastMode == ExtractToFolderMode && !lastFolder.isEmpty())
-		menu.addAction(tr("Extract frame → %1").arg(QDir::toNativeSeparators(lastFolder)), this,
-			[this, timestampMs, lastFolder] { extractFrameToFolder(timestampMs, lastFolder); });
-	else
-		menu.addAction(tr("Extract frame (last used)"))->setEnabled(false);
+		repeatText = tr("Extract frame → %1").arg(QDir::toNativeSeparators(lastFolder));
+
+	// "\tE" is a display-only hint in the menu's shortcut column; the actual key is the constructor's QShortcut.
+	QAction* repeatAction = menu.addAction((repeatText.isEmpty() ? tr("Extract frame (last used)") : repeatText) + "\tE",
+		this, [this, timestampMs] { repeatLastExtraction(timestampMs); });
+	repeatAction->setEnabled(!repeatText.isEmpty());
 
 	menu.exec(globalPos);
+}
+
+void VideoPlayerWindow::repeatLastExtraction(qint64 timestampMs)
+{
+	const QString lastMode = QSettings{}.value(Settings::LastFrameExtractionMode).toString();
+	if (lastMode == ExtractToLibraryMode)
+		extractFrameToLibrary(timestampMs);
+	else if (lastMode == ExtractToFolderMode)
+	{
+		const QString lastFolder = QSettings{}.value(Settings::LastFrameExtractionFolder).toString();
+		if (!lastFolder.isEmpty())
+			extractFrameToFolder(timestampMs, lastFolder);
+	}
+	// No prior extraction (or a folder setting since cleared) - nothing to repeat.
 }
 
 QString VideoPlayerWindow::extractFrameInto(qint64 timestampMs, const QString& destinationFolder)

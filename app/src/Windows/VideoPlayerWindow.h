@@ -29,11 +29,14 @@ private:
 	void resizeAndMoveWindow();
 	void togglePlayPause();
 
-	// Frame extraction (the video widget's right-click menu): the frame at timestampMs is written either into a
-	// user-chosen folder, or imported into the library as an owned photo.
+	// Frame extraction, offered by the video's right-click menu: the current frame goes either to a user-chosen
+	// folder or into the library as an owned photo.
 	void showContextMenu(const QPoint& globalPos);
 	void extractFrameToLibrary(qint64 timestampMs);
 	void extractFrameToFolder(qint64 timestampMs, const QString& folder);
+	// Replays the last extraction (library or folder, same destination) at timestampMs; no-op until one has run.
+	// Bound to the 'E' shortcut and the menu's "last used" item.
+	void repeatLastExtraction(qint64 timestampMs);
 	// The shared extraction step: runs ffmpeg, reports any failure. Returns the written file's path, empty on failure.
 	[[nodiscard]] QString extractFrameInto(qint64 timestampMs, const QString& destinationFolder);
 
