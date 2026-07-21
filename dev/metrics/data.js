@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784669924211,
+  "lastUpdate": 1784671989325,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -7135,6 +7135,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 33,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "f26704e373d06678b0bc9752e20976002a19a5e1",
+          "message": "VideoPlayerWindow: named loops",
+          "timestamp": "2026-07-22T01:09:30+03:00",
+          "tree_id": "f9fad5f9cfeb9eaec27d46d564e8d7bf7b051e7e",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/f26704e373d06678b0bc9752e20976002a19a5e1"
+        },
+        "date": 1784671987122,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 12207,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 7917,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1071.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 651.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 316,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 32.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 33.5,
             "unit": "KB"
           },
           {
