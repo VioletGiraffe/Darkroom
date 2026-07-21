@@ -120,8 +120,13 @@ the status just separates a probe failure (corrupt input, nothing extracted) fro
 
 It also has a batch form that extracts several videos' previews at once, used by the Import dialog's staging. The
 concurrency is deliberately thread-free — each ffmpeg is its own OS process, so a bounded number run together
-and are waited on, all on the calling thread. A video whose probe fails is skipped (its destination left empty),
-and a progress callback reports completions for the staging dialog's counter.
+and are waited on, all on the calling thread. The caller passes how many run at once (`maxConcurrentProcesses`);
+on top of that the engine extracts any single source past an internal size threshold (`kSoloExtractionAboveBytes`,
+50 MB) in a window of its own, never paired with another — one big video's extraction is a long sequential read
+and a long decode, so running two together thrashes disk and CPU, while small clips only gain from packing. That
+solo rule applies to the extraction pass only; the duration probes preceding it always pack, their cost being
+size-independent. A video whose probe fails is skipped (its destination left empty), and a progress callback
+reports completions for the staging dialog's counter.
 
 The batch is **interruptible**: it takes a `const std::atomic<bool>&` the caller sets from another thread, polled
 between the slices its process waits are broken into (so a cancel lands in ~100 ms rather than after the running

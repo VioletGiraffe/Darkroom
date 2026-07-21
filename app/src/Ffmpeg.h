@@ -42,10 +42,11 @@ struct PreviewResult
 };
 
 // Generates frameCount evenly-spaced preview frames for each job into its destinationFolder (created if
-// needed), running up to maxConcurrentProcesses ffmpeg processes at once. Each ffmpeg is its own OS process,
-// so this parallelizes without any worker threads: it starts a batch of processes and then waits on that
-// batch, all on the calling thread. Work happens in two passes - first all duration probes, then all frame
-// extractions - each batched at maxConcurrentProcesses; a job whose folder can't be created or whose
+// needed), running up to maxConcurrentProcesses ffmpeg processes at once. Each ffmpeg is its own OS process, so
+// this parallelizes without any worker threads: it starts a window of processes and then waits on that window,
+// all on the calling thread. Work happens in two passes - first all duration probes, then all frame extractions
+// - each windowed at maxConcurrentProcesses, except that an extraction of a large source runs in a window of its
+// own so its long read and decode don't contend with another's. A job whose folder can't be created or whose
 // duration can't be probed (the first thing to fail on a corrupt file) is skipped, leaving its destinationFolder
 // empty and never entering the extraction pass.
 //

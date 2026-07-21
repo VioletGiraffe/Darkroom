@@ -68,9 +68,9 @@ constexpr int STAGED_CARD_IMAGE_HEIGHT = 120;
 // label name can't grow the pane without bound - past this the row elides instead.
 constexpr int LABEL_LIST_MAX_WIDTH = 300;
 
-// How many preview extractions run at once when staging a drop of several videos. Each is its own ffmpeg
-// process which already threads internally, so a low number leaves the machine responsive and keeps disk
-// reads from thrashing between sources.
+// How many preview extractions run at once when staging a drop of several videos. Each is its own ffmpeg process
+// which already threads internally, so a low number leaves the machine responsive. A large video extracts alone
+// regardless, so it can't pair with another and thrash disk and CPU - that cap is the engine's (Ffmpeg).
 constexpr int PREVIEW_EXTRACTION_CONCURRENCY = 2;
 
 // A fresh, unique scratch directory for one staged video's temp preview frames.

@@ -19,6 +19,13 @@ constexpr int kPreviewFrameJpegQuality = 5;
 // aspect ratio - see the -vf scale argument below); upscaling a smaller source is fine, these are thumbnails.
 constexpr int kPreviewFrameHeight = 360;
 
+// In a batch, a source larger than this has its preview frames extracted in an ffmpeg process of its own, never
+// sharing a window with another job: a big file's extraction is a long sequential read and a long decode at once,
+// and running two of those together thrashes disk and CPU, whereas small clips only gain from packing. The batch
+// is usually fed small clips, so this rarely trips - it just keeps the occasional large source from dragging the
+// others down. Tuned by eye; easy to revisit.
+constexpr qint64 kSoloExtractionAboveBytes = 50LL * 1024 * 1024;
+
 // Waits for a process to finish, killing it if it overruns or if cancellation is requested, so a stuck ffmpeg
 // (e.g. on a corrupt file) never lingers past the QProcess it was spawned from - important here since a batch
 // can spawn many at once.
@@ -35,18 +42,20 @@ void waitForFinishedOrKill(QProcess& process, int timeoutMs, const std::atomic<b
 	process.waitForFinished();  // reap the killed process rather than leaving it orphaned
 }
 
-// Runs `count` operations in windows of up to `concurrency` concurrent QProcess, all on the calling thread -
-// the parallelism is the OS running the ffmpeg processes at once, not threads. For each operation in a
-// window, start(index, process) launches it without waiting; once the whole window is started,
-// finish(index, process) is called per operation (in start order) to wait on and consume its result.
-// Cancellation stops further windows from starting; the current window is still finished through, because
-// that is what kills and reaps its processes (see waitForFinishedOrKill) rather than leaving them running.
+// Runs `windowSizes.size()` windows of concurrent QProcess, all on the calling thread - the parallelism is the OS
+// running the ffmpeg processes at once, not threads. Operations are numbered 0.. in window order; for each,
+// start(index, process) launches it without waiting, then once the whole window is started, finish(index,
+// process) is called per operation (in start order) to wait on and consume its result. Cancellation stops
+// further windows from starting; the current window is still finished through, because that is what kills and
+// reaps its processes (see waitForFinishedOrKill) rather than leaving them running.
 template <typename StartFn, typename FinishFn>
-void runInProcessWindows(int count, int concurrency, const std::atomic<bool>& cancelled, StartFn&& start, FinishFn&& finish)
+void runInProcessWindows(const std::vector<int>& windowSizes, const std::atomic<bool>& cancelled, StartFn&& start, FinishFn&& finish)
 {
-	for (int windowStart = 0; windowStart < count && !cancelled; windowStart += concurrency)
+	int windowStart = 0;
+	for (const int windowCount : windowSizes)
 	{
-		const int windowCount = qMin(concurrency, count - windowStart);
+		if (cancelled)
+			break;
 
 		// The sizing constructor default-constructs each QProcess in place; QProcess is a QObject (neither
 		// copyable nor movable), so a vector of them can only be built this way, not grown via push_back.
@@ -56,6 +65,8 @@ void runInProcessWindows(int count, int concurrency, const std::atomic<bool>& ca
 
 		for (int i = 0; i < windowCount; ++i)
 			finish(windowStart + i, processes[i]);
+
+		windowStart += windowCount;
 	}
 }
 
@@ -137,7 +148,7 @@ std::vector<PreviewResult> generatePreviewFrames(const std::vector<PreviewJob>& 
 	if (total == 0)
 		return results;
 
-	const int concurrency = qMax(1, maxConcurrentProcesses);
+	const int maxProcesses = qMax(1, maxConcurrentProcesses);
 
 	// Reaching a terminal state is tracked per job, not just counted: whatever the cancellation cut short is
 	// exactly what never got here, and is marked Cancelled once both passes are done.
@@ -145,13 +156,18 @@ std::vector<PreviewResult> generatePreviewFrames(const std::vector<PreviewJob>& 
 	std::vector<bool> reachedTerminalState(total, false);
 	const auto reportCompleted = [&](int i) { reachedTerminalState[i] = true; ++completed; if (onProgress) onProgress(completed, total); };
 
-	// Pass 1: probe each job's duration and build its extraction arguments, up to `concurrency` probes at
-	// once. A job whose destination folder can't be created (FolderCreateFailed) or whose duration can't be
-	// probed (ProbeFailed - a corrupt file typically fails here first) gets no arguments and is counted done
-	// now, so it never enters pass 2 and the extraction windows there stay packed with only good jobs.
+	// Pass 1: probe each job's duration and build its extraction arguments, up to maxProcesses probes at once
+	// (probing is size-independent, so the solo rule below doesn't apply - every window is packed full). A job
+	// whose destination folder can't be created (FolderCreateFailed) or whose duration can't be probed
+	// (ProbeFailed - a corrupt file typically fails here first) gets no arguments and is counted done now, so it
+	// never enters pass 2 and the extraction windows there stay packed with only good jobs.
+	std::vector<int> probeWindows;
+	for (int remaining = total; remaining > 0; remaining -= maxProcesses)
+		probeWindows.push_back(qMin(maxProcesses, remaining));
+
 	std::vector<bool> probeStarted(total, false);
 	std::vector<QStringList> extractionArguments(total);
-	runInProcessWindows(total, concurrency, cancelled,
+	runInProcessWindows(probeWindows, cancelled,
 		[&](int i, QProcess& probe) {
 			if (!QDir{}.mkpath(jobs[i].destinationFolder))
 				return;  // leaves probeStarted[i] false -> FolderCreateFailed in finish
@@ -181,15 +197,35 @@ std::vector<PreviewResult> generatePreviewFrames(const std::vector<PreviewJob>& 
 			}
 		});
 
-	// Pass 2: run the extractions for the jobs that probed successfully, again up to `concurrency` at once. A
-	// non-zero exit (or a kill on timeout) marks the job ExtractionFailed but leaves its probed duration intact.
+	// Pass 2: run the extractions for the jobs that probed successfully. Windows pack maxProcesses at a time,
+	// except a source over kSoloExtractionAboveBytes gets a window of its own so its long read and decode don't
+	// run beside another's. A non-zero exit (or a kill on timeout) marks the job ExtractionFailed but leaves its
+	// probed duration intact.
 	std::vector<int> jobsToExtract;
 	jobsToExtract.reserve(total);
 	for (int i = 0; i < total; ++i)
 		if (!extractionArguments[i].isEmpty())
 			jobsToExtract.push_back(i);
 
-	runInProcessWindows(static_cast<int>(jobsToExtract.size()), concurrency, cancelled,
+	std::vector<int> extractionWindows;
+	int packed = 0;  // small jobs gathered for the current window but not yet emitted
+	for (const int i : jobsToExtract)
+	{
+		if (const auto fileSize = QFileInfo(jobs[i].videoFilePath).size(); fileSize > kSoloExtractionAboveBytes)
+		{
+			if (packed > 0) { extractionWindows.push_back(packed); packed = 0; }  // close the run of small jobs before it
+			extractionWindows.push_back(1);
+		}
+		else if (++packed == maxProcesses)
+		{
+			extractionWindows.push_back(packed);
+			packed = 0;
+		}
+	}
+	if (packed > 0)
+		extractionWindows.push_back(packed);
+
+	runInProcessWindows(extractionWindows, cancelled,
 		[&](int k, QProcess& extract) {
 			extract.start(ffmpegPath(), extractionArguments[jobsToExtract[k]]);
 		},
