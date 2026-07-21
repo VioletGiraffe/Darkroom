@@ -7,6 +7,7 @@
 #include <vector>
 
 class QMediaPlayer;
+class QAudioOutput;
 class QVideoWidget;
 class Library;
 
@@ -37,6 +38,7 @@ private:
 	MediaId _mediaId; // identity of the played source video; keys its saved loops in MetadataStore
 
 	QMediaPlayer* _player = nullptr;
+	QAudioOutput* _audioOutput = nullptr;
 	QVideoWidget* _videoWidget = nullptr;
 	bool _pauseOnSeek = true;
 	bool _wasPlayingBeforeSeek = false;

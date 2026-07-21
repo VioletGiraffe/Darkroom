@@ -20,9 +20,9 @@ Separate top-level `QWidget` (`Qt::Window`), persistent — reused, not destroye
 
 ## `VideoPlayerWindow` (`src/Windows/VideoPlayerWindow.h/.cpp`) + `MarkerSlider`
 
-Built-in player (`QMediaPlayer` + `QVideoWidget`), used for the double-click-to-play path. Keeps a static list
-of open instances (for app-wide restart/close) and auto-tiles each window into screen thirds once the video
-size is known.
+Built-in player (`QMediaPlayer` + `QVideoWidget` + `QAudioOutput`), used for the double-click-to-play path. Keeps
+a static list of open instances (for app-wide restart/close) and auto-tiles each window into screen thirds once
+the video size is known.
 
 ### Seek behavior
 

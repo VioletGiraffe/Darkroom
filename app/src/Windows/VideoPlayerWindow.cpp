@@ -2,8 +2,11 @@
 #include "UiComponents/MarkerSlider.h"
 #include "Core/Library.h"
 #include "Core/MetadataStore.h"
+#include "Theme/Icons.h"
 #include "Settings.h"
 
+#include <QAudio>
+#include <QAudioOutput>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QFileInfo>
@@ -45,7 +48,9 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	// Initialize Player & Output
 	_videoWidget = new QVideoWidget(this);
 	_player = new QMediaPlayer(this);
+	_audioOutput = new QAudioOutput(this);
 	_player->setVideoOutput(_videoWidget);
+	_player->setAudioOutput(_audioOutput); // Qt6 QMediaPlayer is silent until an audio sink is attached
 	_player->setSource(QUrl::fromLocalFile(videoPath));
 
 	_videoWidget->installEventFilter(this);
@@ -90,6 +95,47 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	connect(pauseOnSeekCheck, &QCheckBox::toggled, this, [this](bool checked) {
 		_pauseOnSeek = checked;
 		QSettings{}.setValue(Settings::PauseOnSeek, checked);
+	});
+
+	// Volume: the slider is a perceptual 0..100 position; the audio device wants a linear gain, so map through
+	// QAudio::convertVolume. Mute is an independent flag on the sink and leaves the volume position untouched.
+	auto* volumeSlider = new QSlider(Qt::Horizontal, this);
+	volumeSlider->setRange(0, 100);
+	volumeSlider->setFixedWidth(90);
+	volumeSlider->setToolTip(tr("Volume"));
+
+	auto* muteButton = new QPushButton(this);
+	muteButton->setCheckable(true);
+	muteButton->setToolTip(tr("Mute"));
+
+	const auto applyVolume = [this](int position) {
+		_audioOutput->setVolume(QAudio::convertVolume(position / qreal(100), QAudio::LogarithmicVolumeScale, QAudio::LinearVolumeScale));
+	};
+	const auto updateMuteIcon = [muteButton] {
+		muteButton->setIcon(Theme::tintedIcon(muteButton->isChecked() ? QStringLiteral(":/UI/icon_volume_muted.svg")
+		                                                               : QStringLiteral(":/UI/icon_volume.svg"),
+		                                       &Theme::ThemeColors::TextPrimary));
+	};
+
+	// Restore persisted volume/mute directly; the handlers below are wired afterwards, so this doesn't re-persist.
+	{
+		const int savedVolume = QSettings{}.value(Settings::Volume, Defaults::Volume).toInt();
+		const bool savedMuted = QSettings{}.value(Settings::Muted, Defaults::Muted).toBool();
+		volumeSlider->setValue(savedVolume);
+		applyVolume(savedVolume);
+		muteButton->setChecked(savedMuted);
+		_audioOutput->setMuted(savedMuted);
+		updateMuteIcon();
+	}
+
+	connect(volumeSlider, &QAbstractSlider::valueChanged, this, [applyVolume](int position) {
+		applyVolume(position);
+		QSettings{}.setValue(Settings::Volume, position);
+	});
+	connect(muteButton, &QPushButton::toggled, this, [this, updateMuteIcon](bool muted) {
+		_audioOutput->setMuted(muted);
+		updateMuteIcon();
+		QSettings{}.setValue(Settings::Muted, muted);
 	});
 
 	// Loop controls. A/B/Clear define the current ("live") loop; the combo holds this video's saved loops
@@ -214,6 +260,8 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	controlsLayout->addWidget(timeLabel);
 	controlsLayout->addWidget(speedCombo);
 	controlsLayout->addWidget(pauseOnSeekCheck);
+	controlsLayout->addWidget(muteButton);
+	controlsLayout->addWidget(volumeSlider);
 
 	// Loop controls live on their own row to keep the seek row uncluttered.
 	QHBoxLayout* loopLayout = new QHBoxLayout();
