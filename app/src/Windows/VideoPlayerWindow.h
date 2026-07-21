@@ -9,6 +9,7 @@
 class QMediaPlayer;
 class QAudioOutput;
 class QVideoWidget;
+class QSlider;
 class Library;
 
 class VideoPlayerWindow final : public QMainWindow
@@ -28,9 +29,10 @@ public:
 private:
 	void resizeAndMoveWindow();
 	void togglePlayPause();
+	void toggleFullScreen();
 
-	// Frame extraction, offered by the video's right-click menu: the current frame goes either to a user-chosen
-	// folder or into the library as an owned photo.
+	// The video's right-click menu: frame extraction (to a folder or into the library as an owned photo) and a
+	// fullscreen toggle.
 	void showContextMenu(const QPoint& globalPos);
 	void extractFrameToLibrary(qint64 timestampMs);
 	void extractFrameToFolder(qint64 timestampMs, const QString& folder);
@@ -52,6 +54,7 @@ private:
 	QMediaPlayer* _player = nullptr;
 	QAudioOutput* _audioOutput = nullptr;
 	QVideoWidget* _videoWidget = nullptr;
+	QSlider* _volumeSlider = nullptr;
 	bool _pauseOnSeek = true;
 	bool _wasPlayingBeforeSeek = false;
 

@@ -39,6 +39,7 @@
 #include <QVBoxLayout>
 #include <QVideoSink>
 #include <QVideoWidget>
+#include <QWheelEvent>
 
 #include <algorithm>
 
@@ -49,6 +50,9 @@ enum LoopItemDataRole { LoopStartRole = Qt::UserRole, LoopEndRole = Qt::UserRole
 // Settings::LastFrameExtractionMode values.
 constexpr const char* ExtractToLibraryMode = "library";
 constexpr const char* ExtractToFolderMode  = "folder";
+
+// Volume-slider units (0..100) changed per wheel notch over the video.
+constexpr int VolumeWheelStep = 5;
 }
 
 std::vector<VideoPlayerWindow*> VideoPlayerWindow::_instances;
@@ -59,6 +63,8 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 {
 	setAttribute(Qt::WA_DeleteOnClose);
 	setWindowTitle(QFileInfo{ videoPath }.completeBaseName());
+
+	const QSettings settings;
 
 	_instances.push_back(this);
 	// Initialize Player & Output
@@ -89,11 +95,11 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	for (const auto& s : speeds)
 		speedCombo->addItem(QString::number(s) + "×", s);
 
-	_pauseOnSeek = QSettings{}.value(Settings::PauseOnSeek, Defaults::PauseOnSeek).toBool();
+	_pauseOnSeek = settings.value(Settings::PauseOnSeek, Defaults::PauseOnSeek).toBool();
 
 	// Restore persisted speed, default to 1.0×
 	{
-		const double savedSpeed = QSettings{}.value(Settings::PlaybackSpeed, 1.0).toDouble();
+		const double savedSpeed = settings.value(Settings::PlaybackSpeed, 1.0).toDouble();
 		for (int i = 0; i < speedCombo->count(); ++i)
 		{
 			if (qAbs(speedCombo->itemData(i).toDouble() - savedSpeed) < 0.001)
@@ -115,36 +121,35 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 
 	// Volume: the slider is a perceptual 0..100 position; the audio device wants a linear gain, so map through
 	// QAudio::convertVolume. Mute is an independent flag on the sink and leaves the volume position untouched.
-	auto* volumeSlider = new QSlider(Qt::Horizontal, this);
-	volumeSlider->setRange(0, 100);
-	volumeSlider->setFixedWidth(90);
-	volumeSlider->setToolTip(tr("Volume"));
+	_volumeSlider = new QSlider(Qt::Horizontal, this);
+	_volumeSlider->setRange(0, 100);
+	_volumeSlider->setFixedWidth(90);
+	_volumeSlider->setToolTip(tr("Volume"));
 
 	auto* muteButton = new QPushButton(this);
 	muteButton->setCheckable(true);
-	muteButton->setToolTip(tr("Mute"));
+	muteButton->setToolTip(tr("Mute (M)"));
 
 	const auto applyVolume = [this](int position) {
 		_audioOutput->setVolume(QAudio::convertVolume(position / qreal(100), QAudio::LogarithmicVolumeScale, QAudio::LinearVolumeScale));
 	};
 	const auto updateMuteIcon = [muteButton] {
-		muteButton->setIcon(Theme::tintedIcon(muteButton->isChecked() ? QStringLiteral(":/UI/icon_volume_muted.svg")
-		                                                               : QStringLiteral(":/UI/icon_volume.svg"),
-		                                       &Theme::ThemeColors::TextPrimary));
+		muteButton->setIcon(Theme::tintedIcon(muteButton->isChecked() ? ":/UI/icon_volume_muted.svg" : ":/UI/icon_volume.svg",
+		                    &Theme::ThemeColors::TextPrimary));
 	};
 
 	// Restore persisted volume/mute directly; the handlers below are wired afterwards, so this doesn't re-persist.
 	{
-		const int savedVolume = QSettings{}.value(Settings::Volume, Defaults::Volume).toInt();
-		const bool savedMuted = QSettings{}.value(Settings::Muted, Defaults::Muted).toBool();
-		volumeSlider->setValue(savedVolume);
+		const int savedVolume = settings.value(Settings::Volume, Defaults::Volume).toInt();
+		const bool savedMuted = settings.value(Settings::Muted, Defaults::Muted).toBool();
+		_volumeSlider->setValue(savedVolume);
 		applyVolume(savedVolume);
 		muteButton->setChecked(savedMuted);
 		_audioOutput->setMuted(savedMuted);
 		updateMuteIcon();
 	}
 
-	connect(volumeSlider, &QAbstractSlider::valueChanged, this, [applyVolume](int position) {
+	connect(_volumeSlider, &QAbstractSlider::valueChanged, this, [applyVolume](int position) {
 		applyVolume(position);
 		QSettings{}.setValue(Settings::Volume, position);
 	});
@@ -180,6 +185,7 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 		slider->setMarkerB(static_cast<int>(end));
 		setLoopStartButton->setChecked(true);
 		setLoopEndButton->setChecked(true);
+		_player->setPosition(start);  // rewind so looping starts now, rather than after the playhead drifts past the end
 	};
 	const auto clearLoop = [this, slider, setLoopStartButton, setLoopEndButton] {
 		_loopStart = _loopEnd = -1;
@@ -277,7 +283,7 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	controlsLayout->addWidget(speedCombo);
 	controlsLayout->addWidget(pauseOnSeekCheck);
 	controlsLayout->addWidget(muteButton);
-	controlsLayout->addWidget(volumeSlider);
+	controlsLayout->addWidget(_volumeSlider);
 
 	// Loop controls live on their own row to keep the seek row uncluttered.
 	QHBoxLayout* loopLayout = new QHBoxLayout();
@@ -359,8 +365,21 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	QShortcut* spaceShortcut = new QShortcut(QKeySequence(Qt::Key_Space), this);
 	connect(spaceShortcut, &QShortcut::activated, this, &VideoPlayerWindow::togglePlayPause);
 
+	// Escape leaves fullscreen if in it, otherwise closes the window.
 	QShortcut* closeWindowShortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
-	connect(closeWindowShortcut, &QShortcut::activated, this, &VideoPlayerWindow::close);
+	connect(closeWindowShortcut, &QShortcut::activated, this, [this] {
+		if (isFullScreen())
+			showNormal();
+		else
+			close();
+	});
+
+	QShortcut* fullScreenShortcut = new QShortcut(QKeySequence(Qt::Key_F), this);
+	connect(fullScreenShortcut, &QShortcut::activated, this, &VideoPlayerWindow::toggleFullScreen);
+
+	// 'M' toggles mute via the button, so its handler (icon + persistence) runs.
+	QShortcut* muteShortcut = new QShortcut(QKeySequence(Qt::Key_M), this);
+	connect(muteShortcut, &QShortcut::activated, muteButton, &QAbstractButton::toggle);
 
 	// 'E' repeats the last frame extraction at the current position.
 	QShortcut* extractFrameShortcut = new QShortcut(QKeySequence(Qt::Key_E), this);
@@ -462,9 +481,17 @@ void VideoPlayerWindow::togglePlayPause()
 		_player->play();
 }
 
+void VideoPlayerWindow::toggleFullScreen()
+{
+	if (isFullScreen())
+		showNormal();
+	else
+		showFullScreen();
+}
+
 bool VideoPlayerWindow::eventFilter(QObject* watched, QEvent* event)
 {
-	// Left click pauses/plays, right click offers frame extraction
+	// Left click pauses/plays, right click opens the context menu.
 	if (event->type() == QEvent::MouseButtonRelease)
 	{
 		const auto* mouseEvent = static_cast<const QMouseEvent*>(event);
@@ -473,6 +500,15 @@ bool VideoPlayerWindow::eventFilter(QObject* watched, QEvent* event)
 		else if (mouseEvent->button() == Qt::RightButton)
 			showContextMenu(mouseEvent->globalPosition().toPoint());
 		return true; // Consume the event so it doesn't propagate to the widget
+	}
+
+	// Wheel over the video adjusts volume through the slider, which owns the apply-and-persist logic.
+	if (event->type() == QEvent::Wheel)
+	{
+		const int notches = static_cast<const QWheelEvent*>(event)->angleDelta().y() / 120;
+		if (notches != 0)
+			_volumeSlider->setValue(_volumeSlider->value() + notches * VolumeWheelStep);
+		return true;
 	}
 
 	return QMainWindow::eventFilter(watched, event);
@@ -507,6 +543,9 @@ void VideoPlayerWindow::showContextMenu(const QPoint& globalPos)
 	QAction* repeatAction = menu.addAction((repeatText.isEmpty() ? tr("Extract frame (last used)") : repeatText) + "\tE",
 		this, [this, timestampMs] { repeatLastExtraction(timestampMs); });
 	repeatAction->setEnabled(!repeatText.isEmpty());
+
+	menu.addSeparator();
+	menu.addAction((isFullScreen() ? tr("Exit fullscreen") : tr("Fullscreen")) + "\tF", this, &VideoPlayerWindow::toggleFullScreen);
 
 	menu.exec(globalPos);
 }
