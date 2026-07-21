@@ -63,9 +63,9 @@ group gets an explicit `MutedText` override — without it, disabled controls wo
 builds one `Theme`-driven stylesheet and applies it to `qApp`, providing the shared non-stock vocabulary
 (rounded corners, hairline borders, roomy padding, soft hover/focus) for stock controls. `QScrollArea` is
 deliberately **not** styled centrally: its uses want different frames. The sheet also carries **grid card,
-star, and thumbnail** styles (by object name, e.g. `#mediaItemCard`), moved from per-instance `setStyleSheet`
-because those polished too slowly when the grid and frame viewer build hundreds at once — and, being in this
-sheet, they now follow a live theme switch too. Every corner radius used anywhere in the app is a named
+star, and thumbnail** styles (by object name, e.g. `#mediaItemCard`), kept here rather than per-instance
+`setStyleSheet` — that polishes too slowly when the grid and frame viewer build hundreds at once, and a
+central sheet also follows a live theme switch. Every corner radius used anywhere in the app is a named
 constant in `Theme.h` rather than a literal, so the relationships between them live in one place instead of
 being rediscovered. `QComboBox`'s drop-down popup is rounded by `ComboPopupRounder`, an app-wide event filter
 that hand-paints the popup surface — QSS cannot round that popup itself. See

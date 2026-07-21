@@ -123,7 +123,7 @@ Single shared store for per-item metadata. Dumb persistence only — it has no n
   `set`/`remove`/`rekey` are private behind it, so an unbatched write is impossible by construction rather
   than by convention. A write applies to the in-memory records *immediately* (read-after-write inside a
   batch sees fresh data — `rebuildIndex` relies on this mid-`renameLabel`), but the disk write is deferred
-  until the **outermost** live Writer is destroyed (they nest via a depth counter) — so a multi-field record
+  until the **outermost** live Writer is destroyed (they nest) — so a multi-field record
   update made through one Writer reaches disk as a single atomic `QSaveFile` write, never as a
   partially-updated record. A failed flush retains the error for retry instead of declaring success. What
   the Writer can't enforce is loop batching: n mutations without an enclosing batch still write
@@ -143,8 +143,8 @@ Single shared store for per-item metadata. Dumb persistence only — it has no n
 `readObject` distinguishes a missing file (valid new-library state) from a read or parse failure. `Library`
 additionally validates every label entry's required field types and id uniqueness before Catalog
 construction, because Catalog reconstructs that registry and startup may immediately seed and rewrite it.
-The validated objects are moved directly into `MetadataStore`/`Catalog`, closing the former
-validate-then-reparse gap that could collapse malformed data to an empty object and overwrite it.
+The validated objects are moved straight into `MetadataStore`/`Catalog` rather than re-parsed there — a
+permissive re-parse could collapse malformed data to an empty object and silently overwrite it.
 
 Both stores retain failed writes as dirty state and expose their pending errors through `Library`.
 `MainWindow` receives a failure callback but queues the dialog, so no RAII writer destructor presents UI or

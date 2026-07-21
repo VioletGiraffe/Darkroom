@@ -15,12 +15,8 @@ UI action can). Where `MetadataStore` is dumb `MediaId`-keyed byte persistence,
 `"labels"` field's id-list (de)serialization, and the model's lifecycle. Callers talk to `Catalog`, never to
 `MetadataStore`, for anything item- or label-related. Owned by `Library` and borrowed explicitly; GUI-thread only.
 
-This replaced the original folder-based organization, where each item belonged to exactly one folder:
-items now carry **labels** (an item can have many; `★ Best` is just another label) and are browsed via dynamic
-in-app **filters by label** rather than a 1:1 item→folder mapping. A
-later pass (see "Import lifecycle" below) replaced the *disk-walk-per-refresh* implementation of that
-model with the current in-memory one — identity is minted from a file (a stat for name+size) at exactly one
-point, import (`addMediaItem`); everywhere else an item is addressed by the `MediaId` it already carries.
+Identity is minted from a file (a stat for name+size) at exactly one point — import (`addMediaItem`);
+everywhere else an item is addressed by the `MediaId` it already carries.
 
 ## The model
 
@@ -38,17 +34,6 @@ point, import (`addMediaItem`); everywhere else an item is addressed by the `Med
 - **`Best` can never be renamed** (`renameLabel` refuses it) — its displayName is permanently `"Best"` by
   design. No other "virtual"-kind meta-label is anticipated; anything else needed in the future is a normal
   (ordinary, folder-eligible) label.
-
-### Design history: why this model, not the alternative
-
-An earlier draft of this design (recorded in session memory before implementation, see "Design rationale"
-below) modelled a **"folder-backed" attribute on the label itself** — i.e. a label would *know* whether it
-was backed by a storage folder. That was deliberately abandoned mid-implementation in favor of the
-current model, where the folder coincidence is purely a per-item runtime fact, never stored on the label.
-The reasoning: a label's relationship to a folder is a *storage detail of the items that happen to use it*,
-not a property of the label as a concept — modelling it as a label attribute conflates two different things
-that don't always change together (a label can lose its last folder-backed item and gain a new one without
-the label itself changing identity).
 
 ## Persistence
 
@@ -116,10 +101,9 @@ that case stays clean.
   extraction) treats refusal as a failure: it deletes the just-extracted frames rather than leave them on
   disk as an untracked, catalog-invisible duplicate. Re-registering the same id at its *current* folder
   (re-export re-extracting in place, or a later on-demand split flipping `splitIntoFrames` from `false` to
-  `true`) is not a collision and succeeds normally, upserting the entry's fields — this is why
-  **`checkForDuplicateVideos` was removed**: the catalog is one-folder-per-`MediaId` by construction, so it
-  structurally cannot hold a same-source duplicate; the old disk-walking tool that looked for one always
-  reported none. Catching the collision here, at registration time, is the replacement.
+  `true`) is not a collision and succeeds normally, upserting the entry's fields. The catalog is
+  one-folder-per-`MediaId` by construction, so it structurally cannot hold a same-source duplicate — the
+  collision is caught here at registration, not by any disk scan.
   `splitIntoFrames`: `false` means only permanent preview frames exist yet, a full extraction is still owed;
   `Catalog::isSplitIntoFrames(id)`
   queries it, and `CatalogIntegrity::scan`'s ghost verdict is guarded by it so a video that's legitimately still
@@ -179,12 +163,10 @@ failures; see [data-model.md](data-model.md#json-loadsave-failure-policy).
 ### Label-name and path safety
 
 `Catalog::labelNameValidationError` is the one contract used by create, rename, and the Import dialog's
-manual provisional-label editors. A name must be one portable directory component:
-non-empty; no leading or trailing whitespace, control characters, separators, or other Windows-invalid characters; not
-`.` / `..`;
-no trailing dot; not an app-reserved `Best` / `Photos`; and not a Windows device basename (`CON`, `NUL`,
-`COM1`...`COM9`, `LPT1`...`LPT9`, including forms with an extension). `Photos` is reserved because
-`<root>/Photos` is the owned-photo storage tree; `Best` is the virtual label.
+manual provisional-label editors. A name must be **one portable, safe directory component** — the usual
+filesystem-invalid-name rules (empty, whitespace/control/separator/reserved characters, `.`/`..`, trailing
+dot, Windows device names) plus the app-reserved `Best` (the virtual label) and `Photos` (the `<root>/Photos`
+owned-photo tree).
 
 Syntax validation is backed by `validatedDirectChildPath`: create/rename refuse a path whose resolved parent
 is not the intended root or whose existing child is a symlink. This is deliberately checked at the Catalog
@@ -217,16 +199,7 @@ See [main-window.md](main-window.md), [media-widgets.md](media-widgets.md), and 
 
 ---
 
-## FS-reconciliation audit (done) — findings
-
-### Bug found and fixed: reserved-name guard checked the wrong string
-
-A per-UI reserved-name constant was stale, allowing "Best" to be typed as a new label name. It would create a `Best`
-folder, and `rebuildIndex` would mint a second ordinary label also displaying as "Best" — two rows in the sidebar. The
-immediate constant fix was superseded by the centralized `Catalog::labelNameValidationError` above; the per-UI guard no
-longer exists.
-
-### Labels persist independent of item count
+## Labels persist independent of item count
 
 `rebuildIndex`/`ensureBestAndFolderLabels` only ever *add* registry entries; they never *remove* a label
 whose last item is gone. This is intentional: a label is a first-class object, and **a 0-item label is a
@@ -247,6 +220,10 @@ above doesn't carry the reasoning behind forks that were considered and rejected
 
 - **No user-facing "primary" label, ever** — settled early and never revisited. An item's labels are a flat
   set; the UI never asks "which one is primary."
+- **"Folder-backed" is never a property of the label** — drafted as a label attribute, rejected
+  mid-implementation: the folder tie is a storage detail of the *items* using the label, not of the label
+  itself (a label can lose its last folder-backed item and gain another without changing identity), so it
+  stays a per-item runtime fact.
 - **`labels.json` is a separate file from `MetadataStore`'s `catalog.json`**, even though both are
   JSON-on-disk — kept separate so `MetadataStore`'s "every key is a `MediaId`" invariant stays clean; the
   label registry isn't keyed by item at all, it's keyed by label id.

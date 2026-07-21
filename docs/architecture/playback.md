@@ -66,12 +66,9 @@ transform layers**:
 Three ways to set the alignment:
 
 - **Auto-align (`A`)** — one click estimates every photo's transform against the reference via the
-  `magic-alignment` submodule (a Qt-only static library; pipeline: black-bar detection → coarse joint
-  scale+offset brute force → patch correspondences refined coarse-to-fine over an image pyramid → robust
-  least-squares similarity fit over correspondences weighted by the localization precision measured from each
-  correlation peak, iteratively reweighted by residual, with patches that stop matching at fine levels —
-  e.g. defocused regions — still contributing their last good coarser match at a discounted weight →
-  accept-or-fail verdict), feeding the current alignment in as the initial guess. A photo the library cannot align reliably *keeps* its current alignment rather than receiving a
+  `magic-alignment` submodule (a Qt-only static library; a deterministic coarse-to-fine correspondence search
+  with a robust similarity fit and an accept-or-fail verdict — the full pipeline is documented on `alignImages`
+  in `MagicAlignment.h`), feeding the current alignment in as the initial guess. A photo the library cannot align reliably *keeps* its current alignment rather than receiving a
   plausible-but-wrong one. Rotation is corrected along with scale and offset, but its capture range is
   small-angle only (a few degrees — horizon-correction grade; a larger real rotation fails honestly); a
   notable corrected angle is surfaced in the hint bar, being the one component with no manual-adjustment

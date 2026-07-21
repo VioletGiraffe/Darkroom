@@ -39,8 +39,8 @@ v1 shows dots; named chips with drag-out removal are deferred polish.
 ### Frames-extracted badge
 
 A green contact-sheet grid icon marks a video whose full frame set has been extracted. It is a *positive*
-marker of the ready state, deliberately inverted from an earlier "pending" badge: a "frames-done" glyph
-reads immediately to a newcomer; an abstract "not-done" glyph did not. **MainWindow gates it to videos** —
+marker of the ready state — a "frames-done" glyph reads immediately, where an abstract "not-done" one
+wouldn't. **MainWindow gates it to videos** —
 a photo never shows it even though `isSplitIntoFrames()` returns `true` (photos have no frames; see
 [import.md](import.md)). Its position depends on the thumbnail width, so it is re-placed on every thumbnail
 resize — the self-correcting placement that handles the real widget size not being known at construction.

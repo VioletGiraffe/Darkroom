@@ -137,11 +137,11 @@ Import dialog: copy/move source files under a label.
 `ImportDialog` borrows its modal lifetime's `Library&` and reads its `Catalog` directly for lookups (label
 options, photo-content duplicates, the
 id-tracking check, random label colors) and calls back into its host (`MainWindow`) only for host-owned
-actions it can't do itself. That is the whole `Callbacks` struct now — four members:
+actions it can't do itself. The `Callbacks` struct is four members:
 `addMediaItemsRequested` / `importPhotosRequested` (the import workers, which own the app-wide busy lock and
 the progress modal), `createLabelRequested` (shared with the sidebar's create-label flow), and
-`viewChanged` (the host repaint). The Best/extra-label flush and the tracked-under-label check that used to
-be callbacks are done in-dialog now (below). Source-file relocation lives in its own **`SourceRelocation`** module
+`viewChanged` (the host repaint). The Best/extra-label flush and the tracked-under-label check are done
+in-dialog, not through callbacks (below). Source-file relocation lives in its own **`SourceRelocation`** module
 (`src/Windows/SourceRelocation.h/.cpp`),
 entry point `SourceRelocation::relocateIfNeeded`.
 
@@ -225,8 +225,8 @@ just an ordinary additional tag, applied the same way Best is.
    successes. The staged path is updated to the relocated location when the file was actually moved, so a
    retry starts from where the file really is.
 4. Both group importers accumulate into one `ImportOutcome`. Once every group is processed, `runImport` flushes
-   Best flags and extra-label picks to the Catalog — guarded by `Catalog::containsMediaItem` (the old
-   frame-folder-exists guard was video-shaped and meaningless for photos), wrapped in one `Catalog::BatchScope`
+   Best flags and extra-label picks to the Catalog — guarded by `Catalog::containsMediaItem` (a
+   frame-folder-exists check wouldn't work for photos), wrapped in one `Catalog::BatchScope`
    (see [catalog-and-labels.md](catalog-and-labels.md)) so a multi-item Import session writes the store once.
 5. If anything succeeded, `viewChanged()` fires once (`MainWindow` wires it to `refreshLibraryView()`):
    `addMediaItemsRequested` → `importVideoBatch` already refreshes mid-Import as each group lands, but only with
@@ -242,9 +242,8 @@ dirs, a purely local resource the caller never depends on seeing.
 `isTrackedUnderLabel`, the accumulated `bestItems`, and `ExtraLabelAssignment` all take a `MediaId`, captured once at
 stage time, rather than the staged path. `MediaId::fromFile(path)` stats the file for its size — if
 relocation mode is **Move**, the source has already been deleted from that path by the time step 3/4 above
-run, so re-deriving the id from the path there would return an invalid id matching nothing (the bug this
-shape replaced: a Move-imported video's card never unstaged, and any label beyond the first silently never
-applied). `MediaId::name()` still gives the original filename for string-only needs (e.g. deriving
+run, so re-deriving the id from the path there would return an invalid id matching nothing. `MediaId::name()`
+still gives the original filename for string-only needs (e.g. deriving
 `<storageFolder>/<baseName>` without touching disk) — see [data-model.md](data-model.md).
 
 ---
