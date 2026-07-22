@@ -28,6 +28,7 @@
 
 #include "aboutdialog/caboutdialog.h"
 #include "assert/advanced_assert.h"
+#include "dialogs/messagebox.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
 #include <QAbstractButton>
@@ -1961,20 +1962,32 @@ void MainWindow::scanForUntrackedFiles()
 	QSettings settings;
 	constexpr const char* lastFolderKey = "untrackedScan/lastFolder";
 	const QString defaultStartDir = tracked.empty() ? _library.rootFolder() : QFileInfo(*tracked.begin()).absolutePath();
-	const QString startDir = settings.value(lastFolderKey, defaultStartDir).toString();
+	QString startDir = settings.value(lastFolderKey, defaultStartDir).toString();
+	if (!QFileInfo(startDir).exists())
+		startDir = defaultStartDir;
 	const QString dir = QFileDialog::getExistingDirectory(this, tr("Scan folder for untracked media"), startDir);
 	if (dir.isEmpty())
 		return;
 	settings.setValue(lastFolderKey, dir);
 
+	const std::optional<int> depth = MessageBox::question(this, tr("Scan for untracked media"),
+		tr("Scan subfolders as well, or only this folder?\n\n%1").arg(QDir::toNativeSeparators(dir)),
+		{tr("Include Subfolders"), tr("This Folder Only")});
+	if (!depth)
+		return;
+	const bool scanRecursively = *depth == 0;
+
 	QStringList untracked;
-	for (const QString& path : collectFilesInDirectory(dir, /*recursive=*/true, isSupportedMediaFile))
+	for (const QString& path : collectFilesInDirectory(dir, scanRecursively, isSupportedMediaFile))
 		if (!tracked.contains(pathComparisonKey(path)))
 			untracked.push_back(QDir::toNativeSeparators(path));
 
 	if (untracked.isEmpty())
 	{
-		QMessageBox::information(this, tr("Scan complete"), tr("No untracked media files were found under:\n%1").arg(QDir::toNativeSeparators(dir)));
+		const QString message = scanRecursively
+			? tr("No untracked media files were found under:\n%1").arg(QDir::toNativeSeparators(dir))
+			: tr("No untracked media files were found directly in:\n%1").arg(QDir::toNativeSeparators(dir));
+		QMessageBox::information(this, tr("Scan complete"), message);
 		return;
 	}
 
