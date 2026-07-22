@@ -117,9 +117,11 @@ private:
 	[[nodiscard]] QPointF widgetFromImage(const Photo& photo, const QPointF& imagePos) const;
 	[[nodiscard]] QPointF imageFromWidget(const Photo& photo, const QPointF& widgetPos) const;
 
-	// Returns the mip level to paint the photo at effectiveScale (viewZoom * alignScale), building missing
-	// levels on demand, and the residual scale the painter must still apply to that level.
-	[[nodiscard]] const QImage& imageForScale(Photo& photo, double effectiveScale, double& residualScale);
+	// Returns the mip level to paint the photo at effectiveScale (viewZoom * alignScale) and the residual scale
+	// the painter must still apply to it, building missing levels on demand. The level is chosen against the
+	// physical target (effectiveScale * devicePixelRatio) so HiDPI minification stays crisp; residualScale is
+	// logical, matching the painter's coordinate space.
+	[[nodiscard]] const QImage& imageForScale(Photo& photo, double effectiveScale, double devicePixelRatio, double& residualScale);
 
 	// One in-flight background photo load (the paths and the images decoded from them); defined in the .cpp.
 	struct PhotoLoadBatch;
@@ -195,7 +197,7 @@ private:
 	QCheckBox* _ignoreRotationCheck = nullptr;  // auto-align constrains its fit to scale+offset (no rotation model)
 	QLabel* _hintLabel = nullptr;
 
-	double _viewZoom = 1.0;  // subject -> widget; 1.0 means the reference photo at 100% (1 image px = 1 widget px)
+	double _viewZoom = 1.0;  // subject -> widget; 1.0 maps the reference 1 image px = 1 widget (logical) px (caption % is physical, = this * DPR)
 	QPointF _viewPan;
 	QRectF _alignAoi;         // auto-align region (Shift+drag), subject space; empty = align on the whole frame
 	int _flickerIndex = -1;   // >= 0: every pane renders this photo (a digit key is held)

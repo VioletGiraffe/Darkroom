@@ -147,7 +147,7 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 	const auto drawPhoto = [&](PhotoCompareWindow::Photo& drawn) {
 		const double drawnScale = _owner._viewZoom * drawn.alignScale;
 		double residualScale = 1.0;
-		const QImage& source = _owner.imageForScale(drawn, drawnScale, residualScale);
+		const QImage& source = _owner.imageForScale(drawn, drawnScale, devicePixelRatioF(), residualScale);
 		painter.save();
 		painter.setRenderHint(QPainter::SmoothPixmapTransform);
 		painter.translate(_owner._viewZoom * drawn.alignOffset + _owner._viewPan);
@@ -238,8 +238,9 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 }
 
 // Corner caption, stacked lines. Headline "2 · name.jpg · 6000x4000 (24 MP) · 63%": the leading digit
-// doubles as the pane's flicker key, then the photo's pixel resolution, then its on-screen scale (100% =
-// 1 image px per widget px), making any compensation difference between panes visible at a glance. The
+// doubles as the pane's flicker key, then the photo's pixel resolution, then its on-screen scale in device
+// pixels (100% = 1 image px per physical device px, i.e. the Ctrl+1 actual-pixels view), making any
+// compensation difference between panes visible at a glance. The
 // alignment line spells out this photo's raw similarity into subject space (scale, rotation in degrees,
 // offset in subject px). The score line appears only once auto-align has evaluated this photo: the run's
 // two quality measures (conf = weighted patch ZNCC fitness, coarse = coarse whole-frame score), the fitted
@@ -251,7 +252,7 @@ void PhotoComparePane::drawCaption(QPainter& painter, const PhotoCompareWindow::
 		.arg(renderIndex + 1).arg(photo.caption)
 		.arg(photo.image.width()).arg(photo.image.height())
 		.arg(qRound(photo.image.width() * photo.image.height() / 1e6))
-		.arg(qRound(_owner._viewZoom * photo.alignScale * 100.0));
+		.arg(qRound(_owner._viewZoom * photo.alignScale * devicePixelRatioF() * 100.0));
 	captionLines << QString("scale %1 · rot %2° · offset (%3, %4)")
 		.arg(photo.alignScale, 0, 'f', 3)
 		.arg(qRadiansToDegrees(photo.alignRotation), 0, 'f', 2)
@@ -818,14 +819,17 @@ QPointF PhotoCompareWindow::imageFromWidget(const Photo& photo, const QPointF& w
 	return rotated((subjectFromWidget(widgetPos) - photo.alignOffset) / photo.alignScale, -photo.alignRotation);
 }
 
-const QImage& PhotoCompareWindow::imageForScale(Photo& photo, double effectiveScale, double& residualScale)
+const QImage& PhotoCompareWindow::imageForScale(Photo& photo, double effectiveScale, double devicePixelRatio, double& residualScale)
 {
-	// Pick the halving-chain level whose scale is the smallest one still >= effectiveScale, so the painter's
-	// live bilinear pass only ever minifies by <= 2x - bilinear aliases badly at larger reductions (the same
-	// lesson as ThumbnailWidget's pre-resample fix). Levels are built once, on demand.
+	// Pick the halving-chain level against the PHYSICAL target (effectiveScale * devicePixelRatio): the widget
+	// paints in logical units, but Qt blits to a devicePixelRatio-denser backing store, so choosing by the
+	// logical scale alone hands a too-coarse mip to be upscaled on HiDPI. Selecting by the physical scale keeps
+	// the painter's live bilinear pass minifying by <= 2x in REAL pixels - bilinear aliases badly past that (the
+	// same lesson as ThumbnailWidget's pre-resample fix). Levels are built once, on demand.
+	const double pickScale = effectiveScale * devicePixelRatio;
 	int level = 0;
 	double levelScale = 1.0;
-	while (levelScale * 0.5 >= effectiveScale && level < 16)
+	while (levelScale * 0.5 >= pickScale && level < 16)
 	{
 		levelScale *= 0.5;
 		++level;
@@ -839,7 +843,7 @@ const QImage& PhotoCompareWindow::imageForScale(Photo& photo, double effectiveSc
 		                                    Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
 	}
 	level = std::min(level, static_cast<int>(photo.mipmaps.size()));
-	residualScale = effectiveScale * std::pow(2.0, level);
+	residualScale = effectiveScale * std::pow(2.0, level);  // logical: the painter still works in device-independent units
 	return level == 0 ? photo.image : photo.mipmaps[level - 1];
 }
 
