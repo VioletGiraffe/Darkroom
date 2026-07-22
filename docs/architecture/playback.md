@@ -80,6 +80,8 @@ Three ways to set the alignment:
   clears; persists across aligns and reference folds) restricts the alignment evidence to that region — the
   tool for scenes where no global alignment exists (depth parallax between focus-stack slices, locally moved
   subjects): align what matters and let the rest fall where it falls.
+  `I` toggles a diagnostic overlay (off by default) that draws the last run's patch evidence as
+  true-footprint squares — accent = used for the fit, orange = outlier, red = no match.
 - **Two-point calibration (`Shift+A`)** — click the same two features in every photo; the photo receiving the
   session's first point becomes the reference; the two point pairs determine the full similarity exactly
   (scale from the distance ratio, rotation from the segment angles, offset from the midpoints) — so manual

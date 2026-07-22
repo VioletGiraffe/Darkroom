@@ -189,20 +189,23 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 	// patch's true on-screen footprint. Accent = used for the fit (dashed = used via a coarser-level match
 	// only, e.g. defocused at full res); orange = matched well but inconsistent with the fitted transform
 	// (outlier - locally moved content, parallax, ...); red = failed to match.
-	painter.setBrush(Qt::NoBrush);
-	const double markHalf = 0.5 * _owner._alignMarkSize * _owner._viewZoom;
-	for (const PhotoCompareWindow::AlignmentMark& mark : photo.alignMarks)
+	if (_owner._showAlignDiagnostics)
 	{
-		using Kind = PhotoCompareWindow::AlignmentMark::Kind;
-		const QColor color = mark.kind == Kind::Used || mark.kind == Kind::UsedCoarse ? QColor(Theme::current().AccentBorder)
-		                   : mark.kind == Kind::Outlier ? QColor(0xe0, 0xa2, 0x30)
-		                                                : QColor(0xd0, 0x40, 0x40);
-		QPen pen(color, 2);
-		if (mark.kind == Kind::UsedCoarse)
-			pen.setStyle(Qt::DashLine);
-		painter.setPen(pen);
-		const QPointF center = _owner.widgetFromImage(photo, mark.imagePos);
-		painter.drawRect(QRectF(center.x() - markHalf, center.y() - markHalf, 2.0 * markHalf, 2.0 * markHalf));
+		painter.setBrush(Qt::NoBrush);
+		const double markHalf = 0.5 * _owner._alignMarkSize * _owner._viewZoom;
+		for (const PhotoCompareWindow::AlignmentMark& mark : photo.alignMarks)
+		{
+			using Kind = PhotoCompareWindow::AlignmentMark::Kind;
+			const QColor color = mark.kind == Kind::Used || mark.kind == Kind::UsedCoarse ? QColor(Theme::current().AccentBorder)
+			                   : mark.kind == Kind::Outlier ? QColor(0xe0, 0xa2, 0x30)
+			                                                : QColor(0xd0, 0x40, 0x40);
+			QPen pen(color, 2);
+			if (mark.kind == Kind::UsedCoarse)
+				pen.setStyle(Qt::DashLine);
+			painter.setPen(pen);
+			const QPointF center = _owner.widgetFromImage(photo, mark.imagePos);
+			painter.drawRect(QRectF(center.x() - markHalf, center.y() - markHalf, 2.0 * markHalf, 2.0 * markHalf));
+		}
 	}
 
 	// The auto-align region (Shift+drag): one subject-space rect, so it frames the same content in every
@@ -744,6 +747,7 @@ void PhotoCompareWindow::dropEvent(QDropEvent* event)
 void PhotoCompareWindow::keyPressEvent(QKeyEvent* event)
 {
 	const int key = event->key();
+	const bool ctrl = event->modifiers().testFlag(Qt::ControlModifier);
 	if (key == Qt::Key_Escape)
 	{
 		if (_fullViewIndex >= 0)
@@ -763,15 +767,22 @@ void PhotoCompareWindow::keyPressEvent(QKeyEvent* event)
 		else
 			autoAlignPhotos();  // works in the full view too
 	}
-	else if (key == Qt::Key_F)
+	else if (key == Qt::Key_F || key == Qt::Key_Home || (ctrl && key == Qt::Key_0))
 		fitView();
+	else if (ctrl && key == Qt::Key_1)
+		zoomToActualPixels();
 	else if (key == Qt::Key_D && !event->isAutoRepeat() && !_photos.empty())
 		setDifferenceMode(!_differenceMode);
+	else if (key == Qt::Key_I && !event->isAutoRepeat() && !_photos.empty())
+	{
+		_showAlignDiagnostics = !_showAlignDiagnostics;
+		updateAllPanes();
+	}
 	else if (key == Qt::Key_R && !event->isAutoRepeat() && !_photos.empty())
 		resetToInitialState();
 	else if (_fullViewIndex >= 0 && (key == Qt::Key_Left || key == Qt::Key_Right))
 		_slider->setValue(_slider->value() + (key == Qt::Key_Right ? 1 : -1));  // setValue clamps to the range
-	else if (!_calibrating && !event->isAutoRepeat() &&
+	else if (!ctrl && !_calibrating && !event->isAutoRepeat() &&
 	         key >= Qt::Key_1 && key <= Qt::Key_9 && key < Qt::Key_1 + static_cast<int>(_photos.size()))
 	{
 		_flickerIndex = key - Qt::Key_1;
@@ -862,6 +873,20 @@ void PhotoCompareWindow::fitView()
 	                    (paneSize.height() - _viewZoom * subjectRect.height()) / 2.0)
 	            - _viewZoom * subjectRect.topLeft();
 	updateAllPanes();
+}
+
+void PhotoCompareWindow::zoomToActualPixels()
+{
+	if (_photos.empty())
+		return;
+	const QWidget* pane = _fullViewIndex >= 0 ? _fullPane : _paneWidgets.front();
+	const QSizeF paneSize = pane->size();
+	if (paneSize.isEmpty())
+		return;
+	// The reference's on-screen scale is _viewZoom * alignScale in LOGICAL pixels; dividing by the pane's
+	// devicePixelRatio is what makes it a true 1:1 with physical pixels on HiDPI rather than DPR-magnified.
+	const double targetZoom = 1.0 / (pane->devicePixelRatioF() * _photos[_refIndex].alignScale);
+	zoomView(targetZoom / _viewZoom, QPointF(paneSize.width() / 2.0, paneSize.height() / 2.0));  // keep the center fixed
 }
 
 void PhotoCompareWindow::adjustPhotoScale(int index, double factor, const QPointF& widgetAnchor)
@@ -1146,9 +1171,9 @@ void PhotoCompareWindow::updateHintText()
 			.arg(progress.join("   ")));
 	}
 	else if (_fullViewIndex >= 0)
-		_hintLabel->setText(tr("Full view %1/%2 · slider / Left,Right: switch photo · hold 1..%2: flicker · A: auto-align · Shift+drag: align region · D: difference · wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust this photo · F: fit · R: reset · Esc: back to grid")
+		_hintLabel->setText(tr("Full view %1/%2 · slider / Left,Right: switch photo · hold 1..%2: flicker · A: auto-align · Shift+drag: align region · D: difference · I: patch info · wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust this photo · F / Ctrl+0 / Home: fit · Ctrl+1: actual px · R: reset · Esc: back to grid")
 			.arg(_fullViewIndex + 1).arg(_photos.size()));
 	else
-		_hintLabel->setText(tr("Wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust one photo · A: auto-align · Shift+A: align by 2 clicks · Shift+drag: align region · hold 1..%1: flicker · D: difference · slider: full view · F / double-click: fit · R: reset · Esc: close")
+		_hintLabel->setText(tr("Wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust one photo · A: auto-align · Shift+A: align by 2 clicks · Shift+drag: align region · hold 1..%1: flicker · D: difference · I: patch info · slider: full view · F / Ctrl+0 / Home / double-click: fit · Ctrl+1: actual px · R: reset · Esc: close")
 			.arg(_photos.size()));
 }

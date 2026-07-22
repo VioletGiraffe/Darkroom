@@ -28,12 +28,14 @@ struct AlignmentTransform;
 // (same shot exported at different sizes) with no user action.
 //
 // Controls (also summarized in the in-window hint bar):
-//   wheel = synchronized zoom around the cursor; left-drag = synchronized pan; F / double-click = fit;
+//   wheel = synchronized zoom around the cursor; left-drag = synchronized pan;
+//   F / Ctrl+0 / Home / double-click = fit; Ctrl+1 = actual pixels (reference at 1 image px per device px);
 //   Ctrl+wheel / Ctrl+drag = adjust the hovered photo's alignment (scale / offset) alone;
 //   A = auto-align: estimates every photo's scale+rotation+offset against the reference (magic-alignment
 //       library; rotation capture is small-angle - a few degrees; the bottom bar's "Ignore rotation" checkbox
-//       constrains the fit to scale+offset, for pairs whose apparent rotation is spurious); the patch evidence is drawn as
-//       true-footprint squares (accent = used, orange = outlier, red = no match) until the next alignment;
+//       constrains the fit to scale+offset, for pairs whose apparent rotation is spurious);
+//   I = patch info (off by default): overlay the last auto-align's patch evidence as true-footprint
+//       squares (accent = used, orange = outlier, red = no match); toggle it off again to hide them;
 //   Shift+A = two-point calibration: click the same two features in every photo - the photo that receives
 //       the first point becomes the reference; the two point pairs define each other photo's similarity
 //       exactly (scale from the distance ratio, rotation from the segment angles, offset from the
@@ -147,6 +149,7 @@ private:
 	void zoomView(double factor, const QPointF& widgetAnchor);  // zoom keeping widgetAnchor fixed
 	void panView(const QPointF& widgetDelta);
 	void fitView();  // fit the reference photo's subject-space rect into the current viewport (grid cell or full-view pane)
+	void zoomToActualPixels();  // reference photo at one image pixel per physical device pixel (DPR-corrected 1:1)
 
 	// Per-photo alignment mutations (Ctrl+wheel / Ctrl+drag).
 	void adjustPhotoScale(int index, double factor, const QPointF& widgetAnchor);
@@ -203,6 +206,7 @@ private:
 	int _refIndex = 0;        // the pane others align against; re-chosen by each calibration session's first point or the pane context menu
 	bool _calibrating = false;
 	bool _differenceMode = false;
+	bool _showAlignDiagnostics = false;  // draws the auto-align patch footprints as an overlay
 	bool _viewTouched = false;  // until the user navigates, pane resizes keep re-fitting the view
 
 	std::shared_ptr<PhotoLoadBatch> _loadBatch;  // the in-flight load, non-null from addPhotosFromFiles until applied; drops are denied meanwhile
