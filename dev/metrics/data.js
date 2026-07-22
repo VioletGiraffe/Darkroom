@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784675178089,
+  "lastUpdate": 1784743514521,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -7238,6 +7238,75 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/VioletGiraffe/Darkroom/commit/49f16620f6187f36614b43ec2a7fbf607c6cc56d"
         },
         "date": 1784675175671,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 12239,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 7917,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1070.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 651,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 316,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 32.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 33,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "032bce836a7096dc9f072136554a77ccc876fd0f",
+          "message": "Inconsistent member variable naming fixed",
+          "timestamp": "2026-07-22T21:01:28+03:00",
+          "tree_id": "182d42ef5bd100f4ac0edabb2b32a53f1115738d",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/032bce836a7096dc9f072136554a77ccc876fd0f"
+        },
+        "date": 1784743512425,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
