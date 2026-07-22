@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784758902409,
+  "lastUpdate": 1784761011582,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -7411,6 +7411,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 33,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "3da4624ffd6d41abc5adbade377d6d6300b20994",
+          "message": "Untracked files scan: asking for recursive vs non recursive scan",
+          "timestamp": "2026-07-23T01:53:04+03:00",
+          "tree_id": "dd8eea4e6140f89af388b2d865bba53744493633",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/3da4624ffd6d41abc5adbade377d6d6300b20994"
+        },
+        "date": 1784761009542,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 12276,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 7958,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1074.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 653.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 316.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 32.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 33.5,
             "unit": "KB"
           },
           {
