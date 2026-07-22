@@ -30,40 +30,40 @@ FrameViewerWindow::FrameViewerWindow(QWidget* parent)
 	setWindowTitle(tr("Frame Viewer"));
 	resize(1200, 800);
 
-	m_thumbnailSize = QSettings{}.value(SETTINGS_KEY_THUMBNAIL_SIZE, DEFAULT_THUMBNAIL_SIZE).toInt();
+	_thumbnailSize = QSettings{}.value(SETTINGS_KEY_THUMBNAIL_SIZE, DEFAULT_THUMBNAIL_SIZE).toInt();
 
 	auto* layout = new QVBoxLayout(this);
 	layout->setContentsMargins(0, 0, 0, 0);
 
-	m_instructionLabel = new QLabel(this);
-	m_instructionLabel->setAlignment(Qt::AlignCenter);
-	Style::applyThemedSheet(m_instructionLabel, [] {
+	_instructionLabel = new QLabel(this);
+	_instructionLabel->setAlignment(Qt::AlignCenter);
+	Style::applyThemedSheet(_instructionLabel, [] {
 		return QStringLiteral("font-size: 16pt; color: %1;").arg(Theme::current().InstructionText);
 	});
-	m_instructionLabel->hide();
-	layout->addWidget(m_instructionLabel);
+	_instructionLabel->hide();
+	layout->addWidget(_instructionLabel);
 
-	m_scrollArea = new QScrollArea(this);
-	m_scrollArea->setWidgetResizable(true);
-	m_scrollArea->setFrameShape(QFrame::NoFrame);   // the whole client area is this scroll area - nothing to frame off
-	m_scrollArea->setFocusPolicy(Qt::StrongFocus);
-	m_scrollArea->viewport()->setMouseTracking(true);
+	_scrollArea = new QScrollArea(this);
+	_scrollArea->setWidgetResizable(true);
+	_scrollArea->setFrameShape(QFrame::NoFrame);   // the whole client area is this scroll area - nothing to frame off
+	_scrollArea->setFocusPolicy(Qt::StrongFocus);
+	_scrollArea->viewport()->setMouseTracking(true);
 
-	m_thumbnailContainer = new QWidget();
-	m_thumbnailContainer->setMouseTracking(true);
-	m_thumbnailContainer->setFocusPolicy(Qt::NoFocus);
+	_thumbnailContainer = new QWidget();
+	_thumbnailContainer->setMouseTracking(true);
+	_thumbnailContainer->setFocusPolicy(Qt::NoFocus);
 
-	m_thumbnailLayout = new CFlowLayout(m_thumbnailContainer);
-	m_thumbnailLayout->setSpacing(10);
-	m_thumbnailLayout->setContentsMargins(10, 10, 10, 10);
+	_thumbnailLayout = new CFlowLayout(_thumbnailContainer);
+	_thumbnailLayout->setSpacing(10);
+	_thumbnailLayout->setContentsMargins(10, 10, 10, 10);
 
-	m_scrollArea->setWidget(m_thumbnailContainer);
-	layout->addWidget(m_scrollArea);
+	_scrollArea->setWidget(_thumbnailContainer);
+	layout->addWidget(_scrollArea);
 
-	m_refreshDebounceTimer = new QTimer(this);
-	m_refreshDebounceTimer->setSingleShot(true);
-	m_refreshDebounceTimer->setInterval(100);
-	connect(m_refreshDebounceTimer, &QTimer::timeout, this, &FrameViewerWindow::refreshDisplay);
+	_refreshDebounceTimer = new QTimer(this);
+	_refreshDebounceTimer->setSingleShot(true);
+	_refreshDebounceTimer->setInterval(100);
+	connect(_refreshDebounceTimer, &QTimer::timeout, this, &FrameViewerWindow::refreshDisplay);
 
 	auto* escShortcut = new QShortcut(Qt::Key_Escape, this);
 	connect(escShortcut, &QShortcut::activated, this, &QWidget::close);
@@ -71,7 +71,7 @@ FrameViewerWindow::FrameViewerWindow(QWidget* parent)
 
 void FrameViewerWindow::showForFolder(const QString& folderPath)
 {
-	m_folderPath = folderPath;
+	_folderPath = folderPath;
 	setWindowTitle(folderPath.isEmpty() ? tr("Frame Viewer") : QFileInfo(folderPath).fileName());
 	refreshDisplay();
 	if (!folderPath.isEmpty())
@@ -84,24 +84,24 @@ void FrameViewerWindow::showForFolder(const QString& folderPath)
 
 void FrameViewerWindow::refreshDisplay()
 {
-	while (m_thumbnailLayout->count() > 0)
+	while (_thumbnailLayout->count() > 0)
 	{
-		QLayoutItem* item = m_thumbnailLayout->takeAt(0);
+		QLayoutItem* item = _thumbnailLayout->takeAt(0);
 		if (item->widget())
 			item->widget()->deleteLater();
 		delete item;
 	}
 
-	if (m_folderPath.isEmpty())
+	if (_folderPath.isEmpty())
 	{
 		showInstruction(tr("Select a video to view its frames"));
 		return;
 	}
 
-	QDir dir(m_folderPath);
+	QDir dir(_folderPath);
 	if (!dir.exists())
 	{
-		showInstruction(tr("Folder not found: %1").arg(m_folderPath));
+		showInstruction(tr("Folder not found: %1").arg(_folderPath));
 		return;
 	}
 
@@ -112,39 +112,39 @@ void FrameViewerWindow::refreshDisplay()
 		return;
 	}
 
-	m_instructionLabel->hide();
-	m_scrollArea->show();
+	_instructionLabel->hide();
+	_scrollArea->show();
 
 	for (const QString& fileName : std::as_const(imageFiles))
 	{
-		const QString filePath = m_folderPath + "/" + fileName;
-		auto* thumbnail = new ThumbnailWidget(filePath, QFileInfo{ filePath }.completeBaseName(), m_thumbnailSize, m_thumbnailContainer);
+		const QString filePath = _folderPath + "/" + fileName;
+		auto* thumbnail = new ThumbnailWidget(filePath, QFileInfo{ filePath }.completeBaseName(), _thumbnailSize, _thumbnailContainer);
 		connect(thumbnail, &ThumbnailWidget::customContextMenuRequested, this, &FrameViewerWindow::showThumbnailContextMenu);
 		thumbnail->setOnMouseWheelCallback([this](int steps) { zoomThumbnails(steps); });
-		m_thumbnailLayout->addWidget(thumbnail);
+		_thumbnailLayout->addWidget(thumbnail);
 	}
 
-	if (auto* sb = m_scrollArea->verticalScrollBar())
+	if (auto* sb = _scrollArea->verticalScrollBar())
 		sb->setValue(0);
 }
 
 void FrameViewerWindow::showInstruction(const QString& text)
 {
-	m_instructionLabel->setText(text);
-	m_instructionLabel->show();
-	m_scrollArea->hide();
+	_instructionLabel->setText(text);
+	_instructionLabel->show();
+	_scrollArea->hide();
 }
 
 void FrameViewerWindow::zoomThumbnails(int steps)
 {
-	const int current = m_thumbnailSize;
+	const int current = _thumbnailSize;
 	const int next = qBound(MIN_THUMBNAIL_SIZE, current + steps * THUMBNAIL_SIZE_STEP, MAX_THUMBNAIL_SIZE);
 	if (next == current)
 		return;
 
-	m_thumbnailSize = next;
-	QSettings{}.setValue(SETTINGS_KEY_THUMBNAIL_SIZE, m_thumbnailSize);
-	m_refreshDebounceTimer->start(); // rebuild once the wheel settles
+	_thumbnailSize = next;
+	QSettings{}.setValue(SETTINGS_KEY_THUMBNAIL_SIZE, _thumbnailSize);
+	_refreshDebounceTimer->start(); // rebuild once the wheel settles
 }
 
 void FrameViewerWindow::showThumbnailContextMenu(const QPoint& pos)

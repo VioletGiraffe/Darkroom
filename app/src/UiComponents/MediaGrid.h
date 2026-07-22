@@ -31,6 +31,6 @@ protected:
 	void wheelEvent(QWheelEvent* event) override;
 
 private:
-	std::function<QList<QUrl>(const QList<QListWidgetItem*>&)> m_dragUrlsProvider;
-	QString m_emptyMessage;
+	std::function<QList<QUrl>(const QList<QListWidgetItem*>&)> _dragUrlsProvider;
+	QString _emptyMessage;
 };

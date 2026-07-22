@@ -45,11 +45,11 @@ class TintedSvgIconEngine final : public QIconEngine
 
 public:
 	TintedSvgIconEngine(QString resource, const char* Theme::ThemeColors::* colorField)
-		: m_resource(std::move(resource)), m_colorField(colorField) {}
+		: _resource(std::move(resource)), _colorField(colorField) {}
 
 	QPixmap scaledPixmap(const QSize& size, QIcon::Mode mode, QIcon::State, qreal scale) override
 	{
-		return Theme::tintedPixmap(m_resource, colorForMode(mode), size, scale);
+		return Theme::tintedPixmap(_resource, colorForMode(mode), size, scale);
 	}
 	QPixmap pixmap(const QSize& size, QIcon::Mode mode, QIcon::State state) override
 	{
@@ -75,11 +75,11 @@ private:
 			c.setAlphaF(DisabledOpacity);
 			return c;
 		}
-		return QColor(QString::fromLatin1(Theme::current().*m_colorField));
+		return QColor(QString::fromLatin1(Theme::current().*_colorField));
 	}
 
-	QString m_resource;
-	const char* Theme::ThemeColors::* m_colorField;
+	QString _resource;
+	const char* Theme::ThemeColors::* _colorField;
 };
 
 } // namespace

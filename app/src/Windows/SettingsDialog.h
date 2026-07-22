@@ -16,12 +16,12 @@ public:
 	void acceptSettings() override;
 
 private:
-	QLineEdit*       m_ffmpegPath    = nullptr;
-	SegmentedToggle* m_schemeToggle  = nullptr;
+	QLineEdit*       _ffmpegPath    = nullptr;
+	SegmentedToggle* _schemeToggle  = nullptr;
 	// The scheme applied when the dialog opened; restored live if the dialog is cancelled. Holds the stored
 	// Qt::ColorScheme value (not the effective one), so a "System" choice reverts back to System, not its
 	// resolved light/dark.
-	int              m_originalScheme = 0;
+	int              _originalScheme = 0;
 };
 
 // ── Encoding page: output format + JPEG quality ───────────────────────────────
@@ -33,9 +33,9 @@ public:
 	void acceptSettings() override;
 
 private:
-	SegmentedToggle* m_formatToggle = nullptr;
-	QSpinBox*        m_quality      = nullptr;
-	QSpinBox*        m_frameStep    = nullptr;
+	SegmentedToggle* _formatToggle = nullptr;
+	QSpinBox*        _quality      = nullptr;
+	QSpinBox*        _frameStep    = nullptr;
 };
 
 // ── Top-level dialog ─────────────────────────────────────────────────────────

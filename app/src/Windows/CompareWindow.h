@@ -25,10 +25,10 @@ private:
 
 private:
 	// Per-folder sorted image file lists.
-	std::vector<QStringList> m_folderFrames;
+	std::vector<QStringList> _folderFrames;
 
-	std::vector<ThumbnailWidget*> m_thumbnailWidgets;
-	QSlider*         m_slider    = nullptr;
-	QLabel*          m_frameLabel = nullptr;
-	QTimer*          m_debounceTimer = nullptr;
+	std::vector<ThumbnailWidget*> _thumbnailWidgets;
+	QSlider*         _slider    = nullptr;
+	QLabel*          _frameLabel = nullptr;
+	QTimer*          _debounceTimer = nullptr;
 };

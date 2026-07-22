@@ -26,7 +26,7 @@ public:
 
 	~ThumbnailWidget() override;
 
-	[[nodiscard]] inline QString filePath() const { return m_filePath; }
+	[[nodiscard]] inline QString filePath() const { return _filePath; }
 
 	// Re-renders the single displayed frame (path + caption) at the widget's current size. Used by
 	// callers that swap the shown frame in place (e.g. CompareWindow stepping through frames).
@@ -57,10 +57,10 @@ protected:
 
 private:
 	void applyStyleSettings();
-	// Opens m_filePath in the system's default viewer; warns and returns false if the handoff failed.
+	// Opens _filePath in the system's default viewer; warns and returns false if the handoff failed.
 	bool openFile();
 
-	// (Re)starts the async render of m_sourcePaths into an m_maxSize-sized canvas at the current DPR.
+	// (Re)starts the async render of _sourcePaths into an _maxSize-sized canvas at the current DPR.
 	void scheduleRender();
 	// The logical size of the area the image is drawn into = contentsRect() minus the caption strip.
 	[[nodiscard]] QSize currentImageArea() const;
@@ -68,23 +68,23 @@ private:
 	void disarmAsyncTask();
 
 private:
-	QString m_filePath;
-	QStringList m_sourcePaths; // frame path(s) the loader renders into the canvas (1 = single frame, N = composite strip)
-	QString m_caption;
-	QImage m_image;
-	QString m_errorMessage; // non-empty after a completed load that produced no image (e.g. file not found)
-	QSize m_maxSize; // the image-area size the canvas is rendered to fill (deterministic, drives sizeHint)
-	qreal m_renderDpr = 0.0; // devicePixelRatioF() at the time of the most recently scheduled render; re-checked in paintEvent (see scheduleRender)
+	QString _filePath;
+	QStringList _sourcePaths; // frame path(s) the loader renders into the canvas (1 = single frame, N = composite strip)
+	QString _caption;
+	QImage _image;
+	QString _errorMessage; // non-empty after a completed load that produced no image (e.g. file not found)
+	QSize _maxSize; // the image-area size the canvas is rendered to fill (deterministic, drives sizeHint)
+	qreal _renderDpr = 0.0; // devicePixelRatioF() at the time of the most recently scheduled render; re-checked in paintEvent (see scheduleRender)
 
-	std::shared_ptr<LoadJob> m_job;  // shared control block for the in-flight two-stage load (read -> decode); see ThumbnailWidget.cpp
-	bool m_loadArmed = false;  // a dwell timer is pending to start the first render (see paintEvent); guards against stacking timers across repaints
+	std::shared_ptr<LoadJob> _job;  // shared control block for the in-flight two-stage load (read -> decode); see ThumbnailWidget.cpp
+	bool _loadArmed = false;  // a dwell timer is pending to start the first render (see paintEvent); guards against stacking timers across repaints
 
-	DragGestureHelper m_dragHelper;
-	std::function<QMimeData*()> m_dragMimeDataFactory;
+	DragGestureHelper _dragHelper;
+	std::function<QMimeData*()> _dragMimeDataFactory;
 
-	std::function<void(int)> m_onZoomRequested;
+	std::function<void(int)> _onZoomRequested;
 
-	const bool m_bDynamicSizeHint = true;
-	const bool m_framed = true;  // false = borderless matte-only well (grid card draws its own frame)
-	const bool m_filmStrip = false;  // true = video film-strip styling (black base, reserved sprocket bands, black inter-frame gaps)
+	const bool _bDynamicSizeHint = true;
+	const bool _framed = true;  // false = borderless matte-only well (grid card draws its own frame)
+	const bool _filmStrip = false;  // true = video film-strip styling (black base, reserved sprocket bands, black inter-frame gaps)
 };

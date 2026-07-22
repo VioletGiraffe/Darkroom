@@ -43,14 +43,14 @@ public:
 
 	void setColors(const std::vector<QColor>& colors)
 	{
-		m_colors = colors;
+		_colors = colors;
 		updateGeometry();   // sizeHint changed; let the footer layout re-fit the strip
 		update();
 	}
 
 	[[nodiscard]] QSize sizeHint() const override
 	{
-		const int n = static_cast<int>(m_colors.size());
+		const int n = static_cast<int>(_colors.size());
 		if (n == 0)
 			return { 0, 0 };
 		return { n * DOT + (n - 1) * GAP, DOT };
@@ -59,7 +59,7 @@ public:
 protected:
 	void paintEvent(QPaintEvent*) override
 	{
-		if (m_colors.empty())
+		if (_colors.empty())
 			return;
 
 		QPainter p{ this };
@@ -68,7 +68,7 @@ protected:
 
 		const int y = (height() - DOT) / 2;
 		int x = 0;
-		for (const QColor& c : m_colors)
+		for (const QColor& c : _colors)
 		{
 			p.setBrush(c.isValid() ? c : QColor("#888888"));  // unset label color -> neutral grey
 			p.drawEllipse(x, y, DOT, DOT);
@@ -80,7 +80,7 @@ private:
 	static constexpr int DOT = 8;  // dot diameter
 	static constexpr int GAP = 4;  // spacing between dots
 
-	std::vector<QColor> m_colors;
+	std::vector<QColor> _colors;
 };
 
 // A QLabel that elides its text to the available width, keeping the full string for the tooltip. Used for
@@ -91,7 +91,7 @@ public:
 
 	void setFullText(const QString& text)
 	{
-		m_full = text;
+		_full = text;
 		setToolTip(text);
 		updateElision();
 	}
@@ -106,10 +106,10 @@ protected:
 private:
 	void updateElision()
 	{
-		setText(fontMetrics().elidedText(m_full, Qt::ElideRight, width()));
+		setText(fontMetrics().elidedText(_full, Qt::ElideRight, width()));
 	}
 
-	QString m_full;
+	QString _full;
 };
 
 // A tiny mouse-transparent badge in the thumbnail's top-right corner, shown on a video whose full frame set has
@@ -119,7 +119,7 @@ private:
 class FramesReadyBadge final : public QWidget {
 public:
 	explicit FramesReadyBadge(QWidget* parent)
-		: QWidget(parent), m_icon(Theme::tintedIcon(QStringLiteral(":/UI/icon_grid.svg"), &Theme::ThemeColors::ReadyGreen))
+		: QWidget(parent), _icon(Theme::tintedIcon(QStringLiteral(":/UI/icon_grid.svg"), &Theme::ThemeColors::ReadyGreen))
 	{
 		setAttribute(Qt::WA_TransparentForMouseEvents);
 		resize(sizeHint());
@@ -139,14 +139,14 @@ protected:
 		p.drawRoundedRect(rect(), BACKDROP_RADIUS, BACKDROP_RADIUS);
 
 		// The icon engine tints the SVG with Theme::ReadyGreen and renders it at the badge's device pixel ratio.
-		m_icon.paint(&p, QRect(PAD, PAD, SIZE, SIZE));
+		_icon.paint(&p, QRect(PAD, PAD, SIZE, SIZE));
 	}
 
 private:
 	static constexpr int SIZE = 16;            // the icon's box; the backdrop adds PAD around it
 	static constexpr int PAD = 3;              // backdrop padding around the icon
 	static constexpr int BACKDROP_RADIUS = 6;  // rounded-square corners, ~concentric with the grid icon's outline (not a circle)
-	QIcon m_icon;                              // green "frames extracted" contact-sheet grid glyph
+	QIcon _icon;                              // green "frames extracted" contact-sheet grid glyph
 };
 
 // Compact video-duration text: M:SS under an hour, H:MM:SS at or past it, no leading zero on the leading
@@ -178,9 +178,9 @@ public:
 
 	void setText(const QString& text)
 	{
-		if (m_text == text)
+		if (_text == text)
 			return;
-		m_text = text;
+		_text = text;
 		resize(sizeHint());   // hug the content; the owner pins the corner
 		update();
 	}
@@ -188,7 +188,7 @@ public:
 	[[nodiscard]] QSize sizeHint() const override
 	{
 		const QFontMetrics fm(font());
-		return { PAD_H * 2 + triangleWidth(fm) + GAP + fm.horizontalAdvance(m_text), fm.height() + PAD_V * 2 };
+		return { PAD_H * 2 + triangleWidth(fm) + GAP + fm.horizontalAdvance(_text), fm.height() + PAD_V * 2 };
 	}
 
 protected:
@@ -214,7 +214,7 @@ protected:
 
 		const int textX = PAD_H + triW + GAP;
 		p.setPen(fg);
-		p.drawText(QRect(textX, 0, width() - textX - PAD_H, height()), Qt::AlignVCenter | Qt::AlignLeft, m_text);
+		p.drawText(QRect(textX, 0, width() - textX - PAD_H, height()), Qt::AlignVCenter | Qt::AlignLeft, _text);
 	}
 
 private:
@@ -227,7 +227,7 @@ private:
 	static int triangleHeight(const QFontMetrics& fm) { return qRound(fm.ascent() * 0.62); }
 	static int triangleWidth(const QFontMetrics& fm)  { return qRound(triangleHeight(fm) * 0.85); }
 
-	QString m_text;
+	QString _text;
 };
 
 }  // namespace
@@ -243,10 +243,10 @@ MediaItemWidget::MediaItemWidget(
 	QWidget* parent
 )
 	: QWidget{ parent }
-	, m_mediaId{ mediaId }
-	, m_filmStrip{ filmStrip }
-	, m_onDoubleClick{ std::move(onDoubleClick) }
-	, m_onContextMenu{ std::move(onContextMenu) }
+	, _mediaId{ mediaId }
+	, _filmStrip{ filmStrip }
+	, _onDoubleClick{ std::move(onDoubleClick) }
+	, _onContextMenu{ std::move(onContextMenu) }
 {
 	setObjectName("mediaItemCard");
 	setAcceptDrops(true);  // accept a label dragged from the sidebar (see dropEvent / setOnLabelDropped)
@@ -264,59 +264,59 @@ MediaItemWidget::MediaItemWidget(
 	layout->setContentsMargins(0, 0, 0, 0);
 	layout->setSpacing(CARD_FOOTER_SPACING);
 
-	m_thumb = new ThumbnailWidget(previewPaths, QString(), this, maxImageSize, dynamicSizeHint, /*framed*/ false, /*filmStrip*/ m_filmStrip);
-	m_thumb->installEventFilter(this);
+	_thumb = new ThumbnailWidget(previewPaths, QString(), this, maxImageSize, dynamicSizeHint, /*framed*/ false, /*filmStrip*/ _filmStrip);
+	_thumb->installEventFilter(this);
 
 	// "Frames extracted" badge in the thumbnail's top-right corner. Hidden until setFramesExtracted(true).
-	m_framesReadyBadge = new FramesReadyBadge(m_thumb);
-	m_framesReadyBadge->hide();
+	_framesReadyBadge = new FramesReadyBadge(_thumb);
+	_framesReadyBadge->hide();
 
 	// Duration overlay in the thumbnail's bottom-right corner. Hidden until setDuration() is given a video's length.
-	m_durationBadge = new DurationBadge(m_thumb);
-	m_durationBadge->hide();
+	_durationBadge = new DurationBadge(_thumb);
+	_durationBadge->hide();
 
-	if (m_onContextMenu)
+	if (_onContextMenu)
 	{
-		m_thumb->setContextMenuPolicy(Qt::CustomContextMenu);
-		connect(m_thumb, &QWidget::customContextMenuRequested, this, [this](const QPoint& pos) {
-			// m_onContextMenu runs the menu's exec() synchronously, and a menu action (e.g. Labels/Delete) can
+		_thumb->setContextMenuPolicy(Qt::CustomContextMenu);
+		connect(_thumb, &QWidget::customContextMenuRequested, this, [this](const QPoint& pos) {
+			// _onContextMenu runs the menu's exec() synchronously, and a menu action (e.g. Labels/Delete) can
 			// rebuild the grid and delete this very card mid-call - so guard with QPointer before touching it.
 			QPointer<MediaItemWidget> self(this);
-			m_onContextMenu(m_thumb->mapToGlobal(pos));
+			_onContextMenu(_thumb->mapToGlobal(pos));
 			if (self)
 				clearStuckHoverIfCursorLeft(self);  // else the popup grab leaves #mediaItemCard:hover stuck on
 		});
 	}
 
-	layout->addWidget(m_thumb, 1);
+	layout->addWidget(_thumb, 1);
 
 	// Footer row: Best-star toggle, label dots, then the name (right-aligned, filling the rest).
-	m_footer = new QWidget(this);
-	m_footer->setObjectName("cardFooter");
-	auto* footerLayout = new QHBoxLayout(m_footer);
+	_footer = new QWidget(this);
+	_footer->setObjectName("cardFooter");
+	auto* footerLayout = new QHBoxLayout(_footer);
 	footerLayout->setContentsMargins(0, 0, 0, 0);
 	footerLayout->setSpacing(6);
 
-	m_starButton = new QPushButton("★", m_footer);
-	m_starButton->setObjectName("cardStar");   // styled via #cardStar in the central sheet (Style.cpp)
-	m_starButton->setCheckable(true);
-	m_starButton->setChecked(inBest);
-	m_starButton->setFlat(true);
-	m_starButton->setCursor(Qt::PointingHandCursor);
-	m_starButton->setFocusPolicy(Qt::NoFocus);
-	m_starButton->setFixedSize(18, 18);
-	connect(m_starButton, &QPushButton::clicked, this, [onToggleBest = std::move(onToggleBest)]() {
+	_starButton = new QPushButton("★", _footer);
+	_starButton->setObjectName("cardStar");   // styled via #cardStar in the central sheet (Style.cpp)
+	_starButton->setCheckable(true);
+	_starButton->setChecked(inBest);
+	_starButton->setFlat(true);
+	_starButton->setCursor(Qt::PointingHandCursor);
+	_starButton->setFocusPolicy(Qt::NoFocus);
+	_starButton->setFixedSize(18, 18);
+	connect(_starButton, &QPushButton::clicked, this, [onToggleBest = std::move(onToggleBest)]() {
 		onToggleBest();
 	});
-	footerLayout->addWidget(m_starButton, 0, Qt::AlignVCenter);
+	footerLayout->addWidget(_starButton, 0, Qt::AlignVCenter);
 
 	// Label-dot strip. Hidden until setLabelDots() supplies colors.
-	m_labelDots = new LabelDotStrip(m_footer);
-	m_labelDots->setObjectName("cardLabelDots");
-	m_labelDots->hide();
-	footerLayout->addWidget(m_labelDots, 0, Qt::AlignVCenter);
+	_labelDots = new LabelDotStrip(_footer);
+	_labelDots->setObjectName("cardLabelDots");
+	_labelDots->hide();
+	footerLayout->addWidget(_labelDots, 0, Qt::AlignVCenter);
 
-	auto* name = new ElidedLabel(m_footer);
+	auto* name = new ElidedLabel(_footer);
 	name->setObjectName("cardName");
 	name->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 	name->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);  // takes the stretch space; elides within it
@@ -324,37 +324,37 @@ MediaItemWidget::MediaItemWidget(
 	nameFont.setPointSize(9);
 	name->setFont(nameFont);
 	name->setFullText(label);
-	m_name = name;
+	_name = name;
 	footerLayout->addWidget(name, 1);
 
-	layout->addWidget(m_footer, 0);
+	layout->addWidget(_footer, 0);
 }
 
 void MediaItemWidget::setInBest(bool inBest)
 {
-	m_starButton->setChecked(inBest);   // visual only - does not emit clicked(), so onToggleBest isn't re-invoked
+	_starButton->setChecked(inBest);   // visual only - does not emit clicked(), so onToggleBest isn't re-invoked
 }
 
 void MediaItemWidget::setLabel(const QString& label)
 {
-	static_cast<ElidedLabel*>(m_name)->setFullText(label);
+	static_cast<ElidedLabel*>(_name)->setFullText(label);
 }
 
 void MediaItemWidget::setLabelDots(const std::vector<QColor>& colors, const QString& tooltip)
 {
-	auto* strip = static_cast<LabelDotStrip*>(m_labelDots);
+	auto* strip = static_cast<LabelDotStrip*>(_labelDots);
 	strip->setColors(colors);            // updates its sizeHint; the footer layout re-fits it
 	strip->setVisible(!colors.empty());
-	m_thumb->setToolTip(tooltip);        // the card's single tooltip, composed by the caller (video extraction state + labels)
+	_thumb->setToolTip(tooltip);        // the card's single tooltip, composed by the caller (video extraction state + labels)
 }
 
 void MediaItemWidget::setFramesExtracted(bool extracted)
 {
-	m_framesReadyBadge->setVisible(extracted);
+	_framesReadyBadge->setVisible(extracted);
 	if (extracted)
 	{
 		repositionFramesReadyBadge();
-		m_framesReadyBadge->raise();
+		_framesReadyBadge->raise();
 	}
 }
 
@@ -362,63 +362,63 @@ void MediaItemWidget::repositionFramesReadyBadge()
 {
 	static constexpr int MARGIN = 4;
 	// On a film-strip card, drop below the top sprocket band so the badge sits over a frame, not the perforations.
-	const int bandOffset = m_filmStrip ? ThumbnailWidget::filmStripBandHeight(m_thumb->height()) : 0;
-	m_framesReadyBadge->move(m_thumb->width() - m_framesReadyBadge->width() - MARGIN, MARGIN + bandOffset);
+	const int bandOffset = _filmStrip ? ThumbnailWidget::filmStripBandHeight(_thumb->height()) : 0;
+	_framesReadyBadge->move(_thumb->width() - _framesReadyBadge->width() - MARGIN, MARGIN + bandOffset);
 }
 
 void MediaItemWidget::setDuration(qint64 durationMs)
 {
 	const bool show = durationMs > 0;
-	m_durationBadge->setVisible(show);
+	_durationBadge->setVisible(show);
 	if (!show)
 		return;
 
-	static_cast<DurationBadge*>(m_durationBadge)->setText(formatDuration(durationMs));
+	static_cast<DurationBadge*>(_durationBadge)->setText(formatDuration(durationMs));
 	repositionDurationBadge();
-	m_durationBadge->raise();
+	_durationBadge->raise();
 }
 
 void MediaItemWidget::repositionDurationBadge()
 {
 	static constexpr int MARGIN = 4;
 	// On a film-strip card, lift above the bottom sprocket band so the pill sits over a frame, not the perforations.
-	const int bandOffset = m_filmStrip ? ThumbnailWidget::filmStripBandHeight(m_thumb->height()) : 0;
-	m_durationBadge->move(m_thumb->width() - m_durationBadge->width() - MARGIN,
-	                      m_thumb->height() - m_durationBadge->height() - MARGIN - bandOffset);
+	const int bandOffset = _filmStrip ? ThumbnailWidget::filmStripBandHeight(_thumb->height()) : 0;
+	_durationBadge->move(_thumb->width() - _durationBadge->width() - MARGIN,
+	                      _thumb->height() - _durationBadge->height() - MARGIN - bandOffset);
 }
 
 void MediaItemWidget::setOnMiddleButtonClick(std::function<void()> onClick)
 {
-	m_onMiddleButtonClick = std::move(onClick);
-	m_thumb->installEventFilter(this); // idempotent; ensures filter is active
+	_onMiddleButtonClick = std::move(onClick);
+	_thumb->installEventFilter(this); // idempotent; ensures filter is active
 }
 
 void MediaItemWidget::setOnMouseWheelCallback(std::function<void(int)> handler)
 {
-	m_thumb->setOnMouseWheelCallback(std::move(handler));
+	_thumb->setOnMouseWheelCallback(std::move(handler));
 }
 
 void MediaItemWidget::setOnLabelDropped(std::function<void(const QString&)> handler)
 {
-	m_onLabelDropped = std::move(handler);
+	_onLabelDropped = std::move(handler);
 }
 
 void MediaItemWidget::dragEnterEvent(QDragEnterEvent* event)
 {
-	if (m_onLabelDropped && event->mimeData()->hasFormat(LabelMimeType))
+	if (_onLabelDropped && event->mimeData()->hasFormat(LabelMimeType))
 		event->acceptProposedAction();
 }
 
 void MediaItemWidget::dragMoveEvent(QDragMoveEvent* event)
 {
 	// Re-accept across the whole card (the child thumbnail doesn't accept drops, so events bubble up here).
-	if (m_onLabelDropped && event->mimeData()->hasFormat(LabelMimeType))
+	if (_onLabelDropped && event->mimeData()->hasFormat(LabelMimeType))
 		event->acceptProposedAction();
 }
 
 void MediaItemWidget::dropEvent(QDropEvent* event)
 {
-	if (!m_onLabelDropped || !event->mimeData()->hasFormat(LabelMimeType))
+	if (!_onLabelDropped || !event->mimeData()->hasFormat(LabelMimeType))
 		return;
 
 	const QString labelId = QString::fromUtf8(event->mimeData()->data(LabelMimeType));
@@ -426,26 +426,26 @@ void MediaItemWidget::dropEvent(QDropEvent* event)
 		return;
 
 	event->acceptProposedAction();
-	m_onLabelDropped(labelId);  // the handler defers the catalog mutation + grid rebuild (which deletes this card)
+	_onLabelDropped(labelId);  // the handler defers the catalog mutation + grid rebuild (which deletes this card)
 }
 
 QSize MediaItemWidget::sizeHint() const
 {
-	if (!m_thumb)
+	if (!_thumb)
 		return QWidget::sizeHint();
 
 	// Width is driven by the thumbnail (the footer elides to fit). Height stacks thumbnail + spacing +
 	// footer, all inside the card's border+padding margins.
 	const QMargins m = contentsMargins();
-	const QSize thumb = m_thumb->sizeHint();
-	const int footerHeight = m_footer->sizeHint().height();
+	const QSize thumb = _thumb->sizeHint();
+	const int footerHeight = _footer->sizeHint().height();
 	return QSize(thumb.width() + m.left() + m.right(),
 	            thumb.height() + CARD_FOOTER_SPACING + footerHeight + m.top() + m.bottom());
 }
 
 bool MediaItemWidget::eventFilter(QObject* watched, QEvent* event)
 {
-	if (watched != m_thumb)
+	if (watched != _thumb)
 		return QWidget::eventFilter(watched, event);
 
 	// Check for double click first, no need to do anything else in that case
@@ -453,18 +453,18 @@ bool MediaItemWidget::eventFilter(QObject* watched, QEvent* event)
 	{
 		const auto* me = static_cast<QMouseEvent*>(event);
 
-		if (me->button() == Qt::LeftButton && m_onDoubleClick)
+		if (me->button() == Qt::LeftButton && _onDoubleClick)
 		{
-			m_onDoubleClick();
+			_onDoubleClick();
 			return true;
 		}
 	}
 	else if (event->type() == QEvent::MouseButtonRelease)
 	{
 		const auto* me = static_cast<QMouseEvent*>(event);
-		if (me->button() == Qt::MiddleButton && m_onMiddleButtonClick)
+		if (me->button() == Qt::MiddleButton && _onMiddleButtonClick)
 		{
-			m_onMiddleButtonClick();
+			_onMiddleButtonClick();
 			return true; // This is middle mouse button - OK to consume, doesn't interfere with context menu or dbl click
 		}
 	}

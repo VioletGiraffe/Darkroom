@@ -36,7 +36,7 @@ private:
 	static qreal iconDpr(const QStyleOptionViewItem& option);
 	const QPixmap& allRowIcon(const QColor& color, qreal dpr) const;
 
-	mutable QPixmap m_allIcon;
-	mutable QColor  m_allIconColor;
-	mutable qreal   m_allIconDpr = 0.0;
+	mutable QPixmap _allIcon;
+	mutable QColor  _allIconColor;
+	mutable qreal   _allIconDpr = 0.0;
 };

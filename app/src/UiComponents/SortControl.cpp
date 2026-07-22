@@ -34,7 +34,7 @@ public:
 	SortPopover(QWidget* parent, int sortBy, bool descending, bool favoritesFirst,
 	            std::function<void(int sortBy, bool descending, bool favoritesFirst)> onChanged,
 	            std::function<void()> onClosed)
-		: QWidget(parent, Qt::Popup | Qt::FramelessWindowHint), m_onChanged(std::move(onChanged)), m_onClosed(std::move(onClosed))
+		: QWidget(parent, Qt::Popup | Qt::FramelessWindowHint), _onChanged(std::move(onChanged)), _onClosed(std::move(onClosed))
 	{
 		setAttribute(Qt::WA_DeleteOnClose);
 		setAttribute(Qt::WA_TranslucentBackground);
@@ -62,19 +62,19 @@ public:
 		col->setSpacing(6);
 
 		col->addWidget(makeSectionLabel(tr("Sort by"), t));
-		m_field = new SegmentedToggle({ tr("Name"), tr("Date") }, card);
-		m_field->setCurrentIndex(sortBy);   // silent
-		m_field->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-		connect(m_field, &SegmentedToggle::currentChanged, this, [this] { notify(); });
-		col->addWidget(m_field);
+		_field = new SegmentedToggle({ tr("Name"), tr("Date") }, card);
+		_field->setCurrentIndex(sortBy);   // silent
+		_field->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+		connect(_field, &SegmentedToggle::currentChanged, this, [this] { notify(); });
+		col->addWidget(_field);
 
 		col->addSpacing(3);
 		col->addWidget(makeSectionLabel(tr("Direction"), t));
-		m_direction = new SegmentedToggle({ tr("↑ Ascending"), tr("↓ Descending") }, card);
-		m_direction->setCurrentIndex(descending ? 1 : 0);   // silent
-		m_direction->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-		connect(m_direction, &SegmentedToggle::currentChanged, this, [this] { notify(); });
-		col->addWidget(m_direction);
+		_direction = new SegmentedToggle({ tr("↑ Ascending"), tr("↓ Descending") }, card);
+		_direction->setCurrentIndex(descending ? 1 : 0);   // silent
+		_direction->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+		connect(_direction, &SegmentedToggle::currentChanged, this, [this] { notify(); });
+		col->addWidget(_direction);
 
 		auto* divider = new QFrame(card);
 		divider->setFrameShape(QFrame::HLine);
@@ -84,11 +84,11 @@ public:
 		col->addWidget(divider);
 		col->addSpacing(2);
 
-		m_favorites = new QCheckBox(tr("Favorites first"), card);
-		m_favorites->setChecked(favoritesFirst);
-		m_favorites->setCursor(Qt::PointingHandCursor);   // the popover's other controls (SegmentedToggle) use it too
-		connect(m_favorites, &QCheckBox::toggled, this, [this] { notify(); });
-		col->addWidget(m_favorites);
+		_favorites = new QCheckBox(tr("Favorites first"), card);
+		_favorites->setChecked(favoritesFirst);
+		_favorites->setCursor(Qt::PointingHandCursor);   // the popover's other controls (SegmentedToggle) use it too
+		connect(_favorites, &QCheckBox::toggled, this, [this] { notify(); });
+		col->addWidget(_favorites);
 	}
 
 	void popupBelow(QWidget* anchor)
@@ -113,8 +113,8 @@ protected:
 	{
 		// Fires on the click that dismisses the popup; lets the owner timestamp the close so the same click,
 		// once replayed to the sort button, is read as a toggle-shut instead of reopening the popover.
-		if (m_onClosed)
-			m_onClosed();
+		if (_onClosed)
+			_onClosed();
 		QWidget::closeEvent(e);
 	}
 
@@ -140,24 +140,24 @@ private:
 
 	void notify()
 	{
-		if (m_onChanged)
-			m_onChanged(m_field->currentIndex(), m_direction->currentIndex() == 1, m_favorites->isChecked());
+		if (_onChanged)
+			_onChanged(_field->currentIndex(), _direction->currentIndex() == 1, _favorites->isChecked());
 	}
 
-	std::function<void(int, bool, bool)> m_onChanged;
-	std::function<void()> m_onClosed;
-	SegmentedToggle* m_field     = nullptr;
-	SegmentedToggle* m_direction = nullptr;
-	QCheckBox*       m_favorites = nullptr;
+	std::function<void(int, bool, bool)> _onChanged;
+	std::function<void()> _onClosed;
+	SegmentedToggle* _field     = nullptr;
+	SegmentedToggle* _direction = nullptr;
+	QCheckBox*       _favorites = nullptr;
 };
 
 } // namespace
 
 SortControl::SortControl(QWidget* parent) : QPushButton(parent)
 {
-	m_sortBy         = QSettings{}.value(SORT_BY_KEY, SortBy::Date).toInt();
-	m_descending     = QSettings{}.value(SORT_DESCENDING_KEY, true).toBool();
-	m_favoritesFirst = QSettings{}.value(FAVORITES_FIRST_KEY, false).toBool();
+	_sortBy         = QSettings{}.value(SORT_BY_KEY, SortBy::Date).toInt();
+	_descending     = QSettings{}.value(SORT_DESCENDING_KEY, true).toBool();
+	_favoritesFirst = QSettings{}.value(FAVORITES_FIRST_KEY, false).toBool();
 
 	setToolTip(tr("Sort order"));
 	// The sort glyph's SVG carries right padding (a wider viewBox) for a gap before the text; the engine
@@ -170,7 +170,7 @@ SortControl::SortControl(QWidget* parent) : QPushButton(parent)
 
 void SortControl::updateFace()
 {
-	setText(QStringLiteral("%1  %2").arg(m_sortBy == SortBy::Date ? tr("Date") : tr("Name"), m_descending ? "↓" : "↑"));
+	setText(QStringLiteral("%1  %2").arg(_sortBy == SortBy::Date ? tr("Date") : tr("Name"), _descending ? "↓" : "↑"));
 }
 
 void SortControl::openPopover()
@@ -178,23 +178,23 @@ void SortControl::openPopover()
 	// Clicking the button while the popover is open closes it (Qt::Popup dismisses on any outside press)
 	// and then replays that same click to the button. Without this guard that replay would immediately
 	// reopen the popover; a close that just happened means this click is the dismiss, so leave it shut.
-	if (m_sincePopoverClosed.isValid() && m_sincePopoverClosed.elapsed() < PopoverReopenGuardMs)
+	if (_sincePopoverClosed.isValid() && _sincePopoverClosed.elapsed() < PopoverReopenGuardMs)
 		return;
 
-	auto* pop = new SortPopover(this, m_sortBy, m_descending, m_favoritesFirst,
+	auto* pop = new SortPopover(this, _sortBy, _descending, _favoritesFirst,
 		[this](int sortBy, bool descending, bool favoritesFirst) {
-			m_sortBy         = sortBy;
-			m_descending     = descending;
-			m_favoritesFirst = favoritesFirst;
+			_sortBy         = sortBy;
+			_descending     = descending;
+			_favoritesFirst = favoritesFirst;
 			QSettings s;
-			s.setValue(SORT_BY_KEY, m_sortBy);
-			s.setValue(SORT_DESCENDING_KEY, m_descending);
-			s.setValue(FAVORITES_FIRST_KEY, m_favoritesFirst);
+			s.setValue(SORT_BY_KEY, _sortBy);
+			s.setValue(SORT_DESCENDING_KEY, _descending);
+			s.setValue(FAVORITES_FIRST_KEY, _favoritesFirst);
 			updateFace();
 			emit changed();
 		},
 		[this] {
-			m_sincePopoverClosed.restart();
+			_sincePopoverClosed.restart();
 		});
 
 	pop->popupBelow(this);

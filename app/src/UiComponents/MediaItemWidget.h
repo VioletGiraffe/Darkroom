@@ -52,7 +52,7 @@ public:
 
 	// The card's stable identity (source video name + size). Carried so label ops and the label-drop target
 	// (see setOnLabelDropped) address the video directly. Invalid if the source video is missing.
-	[[nodiscard]] const MediaId& mediaId() const { return m_mediaId; }
+	[[nodiscard]] const MediaId& mediaId() const { return _mediaId; }
 
 	// Updates the card's caption (the "N:  name" label) without re-rendering its thumbnail.
 	void setLabel(const QString& label);
@@ -100,17 +100,17 @@ private:
 	void repositionDurationBadge();
 
 private:
-	ThumbnailWidget*             m_thumb = nullptr;
-	QWidget*                     m_footer = nullptr;     // bottom row: star + dots + name (sibling of m_thumb)
-	QPushButton*                 m_starButton = nullptr; // Best toggle in the footer; setInBest() syncs its checked state
-	QLabel*                      m_name = nullptr;       // elided, right-aligned item name in the footer
-	QWidget*                     m_labelDots = nullptr;  // colored-dot strip (LabelDotStrip), child of m_footer
-	QWidget*                     m_framesReadyBadge = nullptr;   // top-right green "frames extracted" badge, child of m_thumb
-	QWidget*                     m_durationBadge = nullptr;      // bottom-right play-triangle + duration overlay, child of m_thumb (shown for videos with a known duration)
-	MediaId                      m_mediaId;
-	bool                         m_filmStrip = false;    // video film-strip styling: reserves sprocket bands, so the corner badges lift clear of them
-	std::function<void()>               m_onMiddleButtonClick;
-	std::function<void()>               m_onDoubleClick;
-	std::function<void(QPoint)>         m_onContextMenu;
-	std::function<void(const QString&)> m_onLabelDropped;
+	ThumbnailWidget*             _thumb = nullptr;
+	QWidget*                     _footer = nullptr;     // bottom row: star + dots + name (sibling of _thumb)
+	QPushButton*                 _starButton = nullptr; // Best toggle in the footer; setInBest() syncs its checked state
+	QLabel*                      _name = nullptr;       // elided, right-aligned item name in the footer
+	QWidget*                     _labelDots = nullptr;  // colored-dot strip (LabelDotStrip), child of _footer
+	QWidget*                     _framesReadyBadge = nullptr;   // top-right green "frames extracted" badge, child of _thumb
+	QWidget*                     _durationBadge = nullptr;      // bottom-right play-triangle + duration overlay, child of _thumb (shown for videos with a known duration)
+	MediaId                      _mediaId;
+	bool                         _filmStrip = false;    // video film-strip styling: reserves sprocket bands, so the corner badges lift clear of them
+	std::function<void()>               _onMiddleButtonClick;
+	std::function<void()>               _onDoubleClick;
+	std::function<void(QPoint)>         _onContextMenu;
+	std::function<void(const QString&)> _onLabelDropped;
 };

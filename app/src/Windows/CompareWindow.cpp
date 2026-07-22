@@ -27,48 +27,48 @@ CompareWindow::CompareWindow(const QStringList& folderPaths, QWidget* parent) : 
 		// Prepend the full path so ThumbnailWidget can load them directly.
 		for (QString& f : files)
 			f = dir.filePath(f);
-		m_folderFrames.push_back(std::move(files));
+		_folderFrames.push_back(std::move(files));
 	}
 
 	// The slider spans 0 .. maxFrameCount-1 (the longest folder); a folder with no frame at the current
 	// index just shows an empty cell (see loadCurrentFrame).
 	int maxFrameCount = 0;
-	for (const QStringList& frames : std::as_const(m_folderFrames))
+	for (const QStringList& frames : std::as_const(_folderFrames))
 		maxFrameCount = qMax(maxFrameCount, static_cast<int>(frames.size()));
 
 	QHBoxLayout* thumbnailRow = new QHBoxLayout();
 	// No initial paths, no size required here - the first load will happen on resize
 	for (int i = 0; i < folderPaths.size(); ++i)
 	{
-		m_thumbnailWidgets.push_back(new ThumbnailWidget(QString{}, QString{}, 0, this));
-		thumbnailRow->addWidget(m_thumbnailWidgets.back());
+		_thumbnailWidgets.push_back(new ThumbnailWidget(QString{}, QString{}, 0, this));
+		thumbnailRow->addWidget(_thumbnailWidgets.back());
 	}
 
-	m_slider = new QSlider(Qt::Horizontal, this);
-	m_slider->setMinimum(0);
-	m_slider->setMaximum(qMax(0, maxFrameCount - 1));
-	m_slider->setValue(0);
-	m_slider->setPageStep(5);
+	_slider = new QSlider(Qt::Horizontal, this);
+	_slider->setMinimum(0);
+	_slider->setMaximum(qMax(0, maxFrameCount - 1));
+	_slider->setValue(0);
+	_slider->setPageStep(5);
 
-	m_frameLabel = new QLabel(tr("Frame: 1 / %1").arg(maxFrameCount), this);
-	m_frameLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-	m_frameLabel->setMinimumWidth(120);
+	_frameLabel = new QLabel(tr("Frame: 1 / %1").arg(maxFrameCount), this);
+	_frameLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+	_frameLabel->setMinimumWidth(120);
 
 	QHBoxLayout* sliderRow = new QHBoxLayout();
-	sliderRow->addWidget(m_slider);
-	sliderRow->addWidget(m_frameLabel);
+	sliderRow->addWidget(_slider);
+	sliderRow->addWidget(_frameLabel);
 
 	QVBoxLayout* mainLayout = new QVBoxLayout(this);
 	mainLayout->addLayout(thumbnailRow, 1);
 	mainLayout->addLayout(sliderRow, 0);
 
 	// Debounce timer: single-shot, fires after DEBOUNCE_MS of slider inactivity.
-	m_debounceTimer = new QTimer(this);
-	m_debounceTimer->setSingleShot(true);
-	connect(m_debounceTimer, &QTimer::timeout, this, &CompareWindow::loadCurrentFrame);
+	_debounceTimer = new QTimer(this);
+	_debounceTimer->setSingleShot(true);
+	connect(_debounceTimer, &QTimer::timeout, this, &CompareWindow::loadCurrentFrame);
 
-	connect(m_slider, &QSlider::valueChanged, this, [this, maxFrameCount](int value) {
-		m_frameLabel->setText(tr("Frame: %1 / %2").arg(value + 1).arg(maxFrameCount));
+	connect(_slider, &QSlider::valueChanged, this, [this, maxFrameCount](int value) {
+		_frameLabel->setText(tr("Frame: %1 / %2").arg(value + 1).arg(maxFrameCount));
 		startFrameLoadTimer();
 	});
 
@@ -85,30 +85,30 @@ CompareWindow::~CompareWindow() {
 void CompareWindow::resizeEvent(QResizeEvent* event)
 {
 	QWidget::resizeEvent(event);
-	if (m_debounceTimer)
+	if (_debounceTimer)
 		startFrameLoadTimer();
 }
 
 void CompareWindow::startFrameLoadTimer()
 {
-	m_debounceTimer->start(DEBOUNCE_MS);
+	_debounceTimer->start(DEBOUNCE_MS);
 }
 
 void CompareWindow::loadCurrentFrame()
 {
-	const int frameIndex = m_slider->value();
+	const int frameIndex = _slider->value();
 
 	QStringList paths;
-	paths.reserve(m_folderFrames.size());
+	paths.reserve(_folderFrames.size());
 
-	assert_r(m_thumbnailWidgets.size() == m_folderFrames.size());
+	assert_r(_thumbnailWidgets.size() == _folderFrames.size());
 
-	for (size_t i = 0; i < m_thumbnailWidgets.size(); ++i)
+	for (size_t i = 0; i < _thumbnailWidgets.size(); ++i)
 	{
-		ThumbnailWidget* widget = m_thumbnailWidgets[i];
-		if (frameIndex < m_folderFrames[i].size())
+		ThumbnailWidget* widget = _thumbnailWidgets[i];
+		if (frameIndex < _folderFrames[i].size())
 		{
-			const QString framePath = m_folderFrames[i][frameIndex];
+			const QString framePath = _folderFrames[i][frameIndex];
 			QString caption = QFileInfo(framePath).fileName();
 			widget->loadFrame(framePath, caption);
 		}

@@ -15,7 +15,7 @@ class SegmentedToggle final : public QWidget
 public:
 	explicit SegmentedToggle(const QStringList& segments, QWidget* parent = nullptr);
 
-	[[nodiscard]] int currentIndex() const { return m_current; }
+	[[nodiscard]] int currentIndex() const { return _current; }
 
 	// Selects a segment programmatically. Silent by design (no currentChanged) so callers can restore
 	// persisted state without re-triggering the work the signal drives; only user clicks emit.
@@ -35,7 +35,7 @@ protected:
 private:
 	[[nodiscard]] int segmentAt(const QPoint& pos) const;
 
-	QStringList m_segments;
-	int m_current = 0;
-	int m_hovered = -1;
+	QStringList _segments;
+	int _current = 0;
+	int _hovered = -1;
 };

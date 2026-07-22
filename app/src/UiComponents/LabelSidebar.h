@@ -48,8 +48,8 @@ private:
 	void showRowContextMenu(const QPoint& pos);   // right-click a label row -> rename / set color / delete
 
 private:
-	Library&          m_library;
-	QListWidget*      m_list        = nullptr;   // flat single-column list; rows painted by a custom delegate
-	SegmentedToggle*  m_andOrToggle = nullptr;   // OR / AND combine-mode control (segment 1 == AND)
-	QSet<LabelId>     m_activeLabelIds;   // empty == All (no filter)
+	Library&          _library;
+	QListWidget*      _list        = nullptr;   // flat single-column list; rows painted by a custom delegate
+	SegmentedToggle*  _andOrToggle = nullptr;   // OR / AND combine-mode control (segment 1 == AND)
+	QSet<LabelId>     _activeLabelIds;   // empty == All (no filter)
 };

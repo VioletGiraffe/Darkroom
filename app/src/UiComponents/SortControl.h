@@ -18,9 +18,9 @@ class SortControl final : public QPushButton
 public:
 	explicit SortControl(QWidget* parent = nullptr);
 
-	[[nodiscard]] int  sortBy() const { return m_sortBy; }
-	[[nodiscard]] bool descending() const { return m_descending; }
-	[[nodiscard]] bool favoritesFirst() const { return m_favoritesFirst; }
+	[[nodiscard]] int  sortBy() const { return _sortBy; }
+	[[nodiscard]] bool descending() const { return _descending; }
+	[[nodiscard]] bool favoritesFirst() const { return _favoritesFirst; }
 
 signals:
 	void changed();
@@ -29,11 +29,11 @@ private:
 	void openPopover();
 	void updateFace();
 
-	int  m_sortBy = SortBy::Name;
-	bool m_descending = false;
-	bool m_favoritesFirst = false;
+	int  _sortBy = SortBy::Name;
+	bool _descending = false;
+	bool _favoritesFirst = false;
 
 	// Time since the popover last dismissed itself, used to make a click on the button toggle the popover
 	// shut instead of reopening it. See openPopover() for the reopen-race it guards against.
-	QElapsedTimer m_sincePopoverClosed;
+	QElapsedTimer _sincePopoverClosed;
 };

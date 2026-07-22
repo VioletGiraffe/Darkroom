@@ -17,7 +17,7 @@ Library > Open library and Library > Create new library share `pickAndSwitchLibr
 and fully loads the requested root; `setRoot()` first flushes the current library, so a persistent save failure blocks
 replacement. On success it synchronously destroys player windows, clears the persistent frame viewer, grid, and the
 library-specific label filter before returning to the event loop. The sidebar borrows the stable `Library&`, so it needs
-no replacement/rebinding. Library switching and Settings are refused while `m_isProcessing`: import/re-export pumps
+no replacement/rebinding. Library switching and Settings are refused while `_isProcessing`: import/re-export pumps
 events while holding a catalog batch, and settings changes partway through could give one batch mixed encoding behavior.
 
 ## The Library menu and its recent list
@@ -49,7 +49,7 @@ choice before closing with unsaved changes.
 
 ## Media-type switch
 
-`m_mediaTypeFilter` (a `SegmentedToggle`): **All / Videos / Photos**, ANDed with the other filters. A *structural*
+`_mediaTypeFilter` (a `SegmentedToggle`): **All / Videos / Photos**, ANDed with the other filters. A *structural*
 filter — changing it rebuilds the grid (`refreshMediaGrid`), unlike the name filter's cheap hide/show.
 
 **Photo cards** use the decoded photo file directly as the image strip — no preview cache. An unloadable path (e.g. a
@@ -59,7 +59,7 @@ is not wired; the green "frames extracted" badge is gated to videos; the context
 
 ## Name filter
 
-`m_nameFilter` (toolbar `QLineEdit`): an item-name substring filter ANDed with the sidebar's label filter. It's a
+`_nameFilter` (toolbar `QLineEdit`): an item-name substring filter ANDed with the sidebar's label filter. It's a
 **view-level hide/show**, not a rebuild: `textChanged` runs `applyNameFilter`, which only toggles each card's
 `setHidden` — no grid rebuild and no thumbnail re-decode. (The label filter, by contrast, *does* drive which cards get
 built, in `refreshMediaGrid`.)
@@ -146,7 +146,7 @@ not implemented: Explorer's release-without-drag collapse-to-single nuance.
 `QListWidget` subclass whose `startDrag` exports the current selection's **source files** as `file://` URLs
 (`CopyAction`) to Explorer or another app. Catalog access stays out of the view — `MainWindow` sets the URL provider
 (`dragUrlsForItems`), following the same "MainWindow computes, card draws" split. `MainWindow::dragEnterEvent` guards
-against the export dropping back onto the import handler (`event->source() == m_mediaGrid` → ignored).
+against the export dropping back onto the import handler (`event->source() == _mediaGrid` → ignored).
 
 **Empty state**: `MediaGrid` paints a caller-set message whenever **no item is visible** — whether none were built or
 the name filter hid them all; the paint checks live visibility, so it needs no hooks in `applyNameFilter`.

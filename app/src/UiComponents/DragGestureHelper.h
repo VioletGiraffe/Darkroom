@@ -31,7 +31,7 @@ public:
 	                  const QPixmap& dragPixmap = {});
 
 private:
-	QPoint m_pressPos;
+	QPoint _pressPos;
 };
 
 // The complete drag-out gesture for a QListWidget's rows, packaged as an event filter: construct it with the
@@ -49,8 +49,8 @@ protected:
 	bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
-	QListWidget* const m_list;
-	const std::function<QMimeData*(const QListWidgetItem*)> m_makeMimeDataForRow;
-	DragGestureHelper m_dragHelper;
-	QListWidgetItem* m_pressedItem = nullptr;  // row under the last left-press, the drag's candidate source
+	QListWidget* const _list;
+	const std::function<QMimeData*(const QListWidgetItem*)> _makeMimeDataForRow;
+	DragGestureHelper _dragHelper;
+	QListWidgetItem* _pressedItem = nullptr;  // row under the last left-press, the drag's candidate source
 };

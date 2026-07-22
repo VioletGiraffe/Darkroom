@@ -26,12 +26,12 @@ GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent
 	setWindowTitle(tr("General"));
 
 	QSettings s;
-	m_ffmpegPath = new QLineEdit(s.value(Settings::FfmpegPath).toString(), this);
+	_ffmpegPath = new QLineEdit(s.value(Settings::FfmpegPath).toString(), this);
 
 	// What leaving the field empty resolves to. Deliberately not ffmpegPath(): with a path configured it answers with
 	// that, which is the one thing a placeholder must not echo.
 	const QString detectedFfmpeg = autoDetectedFfmpegPath();
-	m_ffmpegPath->setPlaceholderText(detectedFfmpeg.isEmpty()
+	_ffmpegPath->setPlaceholderText(detectedFfmpeg.isEmpty()
 		? tr("Not found - set the path to the ffmpeg binary")
 		: tr("Auto-detected: %1").arg(QDir::toNativeSeparators(detectedFfmpeg)));
 
@@ -43,13 +43,13 @@ GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent
 #else
 		const QString filter = tr("All files (*)");   // nothing to filter on: Unix executables carry no extension
 #endif
-		const QString path = QFileDialog::getOpenFileName(this, tr("Select ffmpeg executable"), m_ffmpegPath->text(), filter);
+		const QString path = QFileDialog::getOpenFileName(this, tr("Select ffmpeg executable"), _ffmpegPath->text(), filter);
 		if (!path.isEmpty())
-			m_ffmpegPath->setText(QDir::toNativeSeparators(path));
+			_ffmpegPath->setText(QDir::toNativeSeparators(path));
 	});
 
 	auto* ffmpegRow = new QHBoxLayout;
-	ffmpegRow->addWidget(m_ffmpegPath, 1);
+	ffmpegRow->addWidget(_ffmpegPath, 1);
 	ffmpegRow->addWidget(browseFfmpeg);
 
 	auto* form = new QFormLayout;
@@ -57,13 +57,13 @@ GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent
 
 	// Segment order matches Qt::ColorScheme's own values (Unknown/System = 0, Light = 1, Dark = 2), so the
 	// segment index is directly the scheme value - no lookup table needed here or in acceptSettings().
-	m_originalScheme = s.value(Settings::ColorScheme, Defaults::ColorScheme).toInt();
-	m_schemeToggle = new SegmentedToggle({ tr("System"), tr("Light"), tr("Dark") }, this);
-	m_schemeToggle->setCurrentIndex(m_originalScheme);   // silent
+	_originalScheme = s.value(Settings::ColorScheme, Defaults::ColorScheme).toInt();
+	_schemeToggle = new SegmentedToggle({ tr("System"), tr("Light"), tr("Dark") }, this);
+	_schemeToggle->setCurrentIndex(_originalScheme);   // silent
 
 	// Apply the scheme live as the user toggles, for immediate preview (Style::install() re-themes the app on
 	// QStyleHints::colorSchemeChanged). acceptSettings() only persists it; a cancel reverts it below.
-	connect(m_schemeToggle, &SegmentedToggle::currentChanged, this, [](int index) {
+	connect(_schemeToggle, &SegmentedToggle::currentChanged, this, [](int index) {
 		QGuiApplication::styleHints()->setColorScheme(static_cast<Qt::ColorScheme>(index));
 	});
 
@@ -71,10 +71,10 @@ GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent
 	// route through QDialog::reject()). On accept, only accepted() fires, so this leaves the choice in place.
 	if (auto* dialog = qobject_cast<QDialog*>(parent))
 		connect(dialog, &QDialog::rejected, this, [this] {
-			QGuiApplication::styleHints()->setColorScheme(static_cast<Qt::ColorScheme>(m_originalScheme));
+			QGuiApplication::styleHints()->setColorScheme(static_cast<Qt::ColorScheme>(_originalScheme));
 		});
 
-	form->addRow(tr("Color scheme:"), m_schemeToggle);
+	form->addRow(tr("Color scheme:"), _schemeToggle);
 
 	auto* layout = new QVBoxLayout(this);
 	layout->addLayout(form);
@@ -85,8 +85,8 @@ void GeneralSettingsPage::acceptSettings()
 {
 	QSettings s;
 	// The scheme is already applied live; persist it here.
-	s.setValue(Settings::ColorScheme, m_schemeToggle->currentIndex());
-	s.setValue(Settings::FfmpegPath, m_ffmpegPath->text().trimmed());
+	s.setValue(Settings::ColorScheme, _schemeToggle->currentIndex());
+	s.setValue(Settings::FfmpegPath, _ffmpegPath->text().trimmed());
 }
 
 // ── EncodingSettingsPage ──────────────────────────────────────────────────────
@@ -101,14 +101,14 @@ EncodingSettingsPage::EncodingSettingsPage(QWidget* parent) : CSettingsPage(pare
 	const int  step     = s.value(Settings::FrameStep,   Defaults::FrameStep).toInt();
 
 	// Output format - segment 0 = JPEG, 1 = TIFF
-	m_formatToggle = new SegmentedToggle({ tr("JPEG"), tr("TIFF") }, this);
-	m_formatToggle->setCurrentIndex(useTiff ? 1 : 0);   // silent
+	_formatToggle = new SegmentedToggle({ tr("JPEG"), tr("TIFF") }, this);
+	_formatToggle->setCurrentIndex(useTiff ? 1 : 0);   // silent
 
 	// JPEG quality (disabled when TIFF is selected)
-	m_quality = new QSpinBox(this);
-	m_quality->setRange(1, 31);
-	m_quality->setValue(quality);
-	m_quality->setEnabled(!useTiff);
+	_quality = new QSpinBox(this);
+	_quality->setRange(1, 31);
+	_quality->setValue(quality);
+	_quality->setEnabled(!useTiff);
 
 	auto* qualityHint = new QLabel(tr("1 = best quality / largest file, 31 = worst / smallest"), this);
 	Style::applyThemedSheet(qualityHint, [] {
@@ -117,27 +117,27 @@ EncodingSettingsPage::EncodingSettingsPage(QWidget* parent) : CSettingsPage(pare
 	qualityHint->setEnabled(!useTiff);
 
 	// JPEG quality only applies to JPEG output; grey it out (with its hint) while TIFF is selected.
-	connect(m_formatToggle, &SegmentedToggle::currentChanged, this, [this, qualityHint](int index) {
+	connect(_formatToggle, &SegmentedToggle::currentChanged, this, [this, qualityHint](int index) {
 		const bool jpeg = index == 0;
-		m_quality->setEnabled(jpeg);
+		_quality->setEnabled(jpeg);
 		qualityHint->setEnabled(jpeg);
 	});
 
 	auto* qualityRow = new QHBoxLayout;
-	qualityRow->addWidget(m_quality);
+	qualityRow->addWidget(_quality);
 	qualityRow->addWidget(qualityHint);
 	qualityRow->addStretch();
 
-	m_frameStep = new QSpinBox(this);
-	m_frameStep->setRange(1, 100);
-	m_frameStep->setValue(step);
-	m_frameStep->setSpecialValueText(tr("1 (every frame)"));
+	_frameStep = new QSpinBox(this);
+	_frameStep->setRange(1, 100);
+	_frameStep->setValue(step);
+	_frameStep->setSpecialValueText(tr("1 (every frame)"));
 
 	auto* form = new QFormLayout;
 	form->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
-	form->addRow(tr("Output format:"), m_formatToggle);
+	form->addRow(tr("Output format:"), _formatToggle);
 	form->addRow(tr("JPEG quality:"), qualityRow);
-	form->addRow(tr("Extract every N-th frame:"), m_frameStep);
+	form->addRow(tr("Extract every N-th frame:"), _frameStep);
 
 	auto* layout = new QVBoxLayout(this);
 	layout->addLayout(form);
@@ -147,9 +147,9 @@ EncodingSettingsPage::EncodingSettingsPage(QWidget* parent) : CSettingsPage(pare
 void EncodingSettingsPage::acceptSettings()
 {
 	QSettings s;
-	s.setValue(Settings::UseTiff,     m_formatToggle->currentIndex() == 1);
-	s.setValue(Settings::JpegQuality, m_quality->value());
-	s.setValue(Settings::FrameStep,   m_frameStep->value());
+	s.setValue(Settings::UseTiff,     _formatToggle->currentIndex() == 1);
+	s.setValue(Settings::JpegQuality, _quality->value());
+	s.setValue(Settings::FrameStep,   _frameStep->value());
 }
 
 // ── SettingsDialog ────────────────────────────────────────────────────────────

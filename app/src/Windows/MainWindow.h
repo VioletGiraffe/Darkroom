@@ -38,7 +38,7 @@ public:
 	explicit MainWindow(QWidget* parent = nullptr);
 	~MainWindow();
 
-	[[nodiscard]] bool isLibraryLoaded() const { return m_library.isLoaded(); }
+	[[nodiscard]] bool isLibraryLoaded() const { return _library.isLoaded(); }
 
 protected:
 	void dragEnterEvent(QDragEnterEvent* event) override;
@@ -189,30 +189,30 @@ private:
 
 	// Declared first so it outlives the other C++ members; the destructor explicitly deletes Qt children
 	// that borrow it before member destruction begins.
-	Library m_library;
-	LabelSidebar*      m_labelSidebar = nullptr;
-	QLineEdit*         m_nameFilter   = nullptr;
-	SegmentedToggle*   m_mediaTypeFilter = nullptr;  // All / Videos / Photos grid filter
-	QComboBox*         m_previewFrameCountCombo = nullptr;
-	SortControl*       m_sortControl  = nullptr;
-	MediaGrid*         m_mediaGrid    = nullptr;
-	QTimer*            m_gridZoomDebounce = nullptr;
-	FrameViewerWindow* m_frameViewer  = nullptr;
+	Library _library;
+	LabelSidebar*      _labelSidebar = nullptr;
+	QLineEdit*         _nameFilter   = nullptr;
+	SegmentedToggle*   _mediaTypeFilter = nullptr;  // All / Videos / Photos grid filter
+	QComboBox*         _previewFrameCountCombo = nullptr;
+	SortControl*       _sortControl  = nullptr;
+	MediaGrid*         _mediaGrid    = nullptr;
+	QTimer*            _gridZoomDebounce = nullptr;
+	FrameViewerWindow* _frameViewer  = nullptr;
 
 	// The right-clicked card's id while a context menu is open; nullopt when triggered via keyboard shortcut
 	// or main menu. Passed to effectiveSelection so that actions resolve to the right-click target when it
 	// falls outside the grid selection.
-	std::optional<MediaId> m_contextMenuTarget;
+	std::optional<MediaId> _contextMenuTarget;
 
 	// Persistent actions for Edit menu / keyboard shortcuts. Created in setupMainMenu, reused in context menu.
-	QAction* m_deleteAction = nullptr;
-	QAction* m_removeFromLibraryAction = nullptr;
-	QAction* m_renameAction = nullptr;
+	QAction* _deleteAction = nullptr;
+	QAction* _removeFromLibraryAction = nullptr;
+	QAction* _renameAction = nullptr;
 
-	QMenu* m_libraryMenu = nullptr;
-	std::vector<QAction*> m_recentLibraryActions;  // the menu's recent entries, held so each rebuild can drop the previous set
+	QMenu* _libraryMenu = nullptr;
+	std::vector<QAction*> _recentLibraryActions;  // the menu's recent entries, held so each rebuild can drop the previous set
 
 	// Guards against re-entering the frame-extraction loops (which pump events) from a new drop or menu action while one is already running.
-	bool m_isProcessing = false;
-	bool m_persistenceWarningQueued = false;
+	bool _isProcessing = false;
+	bool _persistenceWarningQueued = false;
 };

@@ -196,11 +196,11 @@ qreal LabelRowDelegate::iconDpr(const QStyleOptionViewItem& option)
 // changes - so paint() doesn't re-render the SVG on every hover/scroll repaint. Mutable because paint() is const.
 const QPixmap& LabelRowDelegate::allRowIcon(const QColor& color, qreal dpr) const
 {
-	if (m_allIcon.isNull() || m_allIconColor != color || !qFuzzyCompare(m_allIconDpr, dpr))
+	if (_allIcon.isNull() || _allIconColor != color || !qFuzzyCompare(_allIconDpr, dpr))
 	{
-		m_allIcon = Theme::tintedPixmap(QStringLiteral(":/UI/icon_stack.svg"), color, QSize(ICON, ICON), dpr);
-		m_allIconColor = color;
-		m_allIconDpr = dpr;
+		_allIcon = Theme::tintedPixmap(QStringLiteral(":/UI/icon_stack.svg"), color, QSize(ICON, ICON), dpr);
+		_allIconColor = color;
+		_allIconDpr = dpr;
 	}
-	return m_allIcon;
+	return _allIcon;
 }

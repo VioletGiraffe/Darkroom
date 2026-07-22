@@ -42,7 +42,7 @@ regenerating-in-place there; it just goes through the normal import flow from sc
 per-item import worker. It is deliberately UI-free — it never prompts or pops a message box; every outcome
 comes back as an `Import::Result` (`Success` / `FolderConflict` / `Error` with a user-presentable message).
 `MainWindow::importVideoBatch` stays the batch coordinator on top of it and owns all the import UI: the
-app-wide `m_isProcessing` lock shared with `reExportAllVideos`, the progress modal, the folder-conflict
+app-wide `_isProcessing` lock shared with `reExportAllVideos`, the progress modal, the folder-conflict
 prompt, the per-item error boxes, `Catalog::BatchScope`, and the view refresh.
 
 It does not extract the full frame set. It creates the output folder, puts a few
@@ -158,7 +158,7 @@ Four independent layers, at different points and catching different things:
 - **Same-identity file at staging** (`stageMediaItems()`): a dropped file whose `MediaId` matches an
   already-staged entry (or another file in the same drop) is byte-compared against it — identical content is
   a re-drop of the same file, skipped silently; different content is refused with a warning naming both
-  paths. Accepting both is not an option: `m_staged` is keyed by id, and the catalog tracks at most one
+  paths. Accepting both is not an option: `_staged` is keyed by id, and the catalog tracks at most one
   item per id anyway, so the second file would have silently overwritten the first's staging entry.
 - **File-content duplicate at the relocation destination** (the `SourceRelocation` module, above): on a same-name
   destination collision, `performRelocation` treats it as a duplicate when the `MediaId`s match (name+size,
@@ -205,7 +205,7 @@ just an ordinary additional tag, applied the same way Best is.
 
 0. **`materializeUsedProvisionalLabels()`** runs first — the *only* point provisional labels reach the Catalog.
    Rewrites every staged entry's `pendingLabelIds` from provisional stand-in to real id; a failed creation
-   leaves that item staged but unlabeled. Successfully-created provisionals are removed from `m_provisionalLabels`
+   leaves that item staged but unlabeled. Successfully-created provisionals are removed from `_provisionalLabels`
    so a partial Import that leaves items staged won't recreate them on a second run.
 1. Groups staged entries by first label id; entries with no label are left staged. It never reconstructs a
    destination from the display name — always asks `Catalog::storageFolderForLabel` / `photoFolderForLabel`

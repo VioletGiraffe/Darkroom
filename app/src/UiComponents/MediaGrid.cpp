@@ -43,14 +43,14 @@ void paintDragCountBadge(QPixmap& pixmap, int count)
 
 void MediaGrid::setDragUrlsProvider(std::function<QList<QUrl>(const QList<QListWidgetItem*>&)> provider)
 {
-	m_dragUrlsProvider = std::move(provider);
+	_dragUrlsProvider = std::move(provider);
 }
 
 void MediaGrid::setEmptyMessage(const QString& message)
 {
-	if (m_emptyMessage == message)
+	if (_emptyMessage == message)
 		return;
-	m_emptyMessage = message;
+	_emptyMessage = message;
 	viewport()->update();
 }
 
@@ -58,7 +58,7 @@ void MediaGrid::paintEvent(QPaintEvent* event)
 {
 	QListWidget::paintEvent(event);
 
-	if (m_emptyMessage.isEmpty())
+	if (_emptyMessage.isEmpty())
 		return;
 	for (int row = 0; row < count(); ++row)   // any visible item -> no empty state (cheap: bool checks only)
 		if (!item(row)->isHidden())
@@ -70,7 +70,7 @@ void MediaGrid::paintEvent(QPaintEvent* event)
 	font.setPointSizeF(font.pointSizeF() + 2);
 	p.setFont(font);
 	// Inset so a long message wraps well clear of the edges and any scrollbar.
-	p.drawText(viewport()->rect().adjusted(20, 20, -20, -20), Qt::AlignCenter | Qt::TextWordWrap, m_emptyMessage);
+	p.drawText(viewport()->rect().adjusted(20, 20, -20, -20), Qt::AlignCenter | Qt::TextWordWrap, _emptyMessage);
 }
 
 void MediaGrid::wheelEvent(QWheelEvent* event)
@@ -92,10 +92,10 @@ void MediaGrid::startDrag(Qt::DropActions /*supportedActions*/)
 	// press within a multi-selection keeps the group - see the setDragEnabled note in MainWindow::setupUI), so
 	// the current selection is exactly what the user grabbed.
 	const QList<QListWidgetItem*> items = selectedItems();
-	if (items.isEmpty() || !m_dragUrlsProvider)
+	if (items.isEmpty() || !_dragUrlsProvider)
 		return;
 
-	const QList<QUrl> urls = m_dragUrlsProvider(items);
+	const QList<QUrl> urls = _dragUrlsProvider(items);
 	if (urls.isEmpty())
 		return;   // nothing to export (e.g. every selected file is missing / on an unmounted drive)
 

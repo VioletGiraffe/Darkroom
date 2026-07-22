@@ -64,7 +64,7 @@ private:
 	IntegrityCheckDialog(const Catalog& catalog, const CatalogIntegrity::IntegrityReport& report, Callbacks callbacks, QWidget* parent);
 	~IntegrityCheckDialog() override;
 
-	Callbacks m_callbacks;
+	Callbacks _callbacks;
 	// Owns the section rows' shared state, so it must live as long as the dialog's buttons - see IntegrityCheckSections.h.
-	std::unique_ptr<IntegrityCheckSections> m_sections;
+	std::unique_ptr<IntegrityCheckSections> _sections;
 };

@@ -108,8 +108,8 @@ private:
 		double alignTimeMs = 0.0;         // runtime of the last alignImages call for this photo
 	};
 
-	// Coordinate mapping. widget = m_viewZoom * (alignScale * R(alignRotation) * image + alignOffset) +
-	// m_viewPan; the pan is in widget coordinates, shared across panes (they are equally sized grid cells,
+	// Coordinate mapping. widget = _viewZoom * (alignScale * R(alignRotation) * image + alignOffset) +
+	// _viewPan; the pan is in widget coordinates, shared across panes (they are equally sized grid cells,
 	// so the same transform shows the same subject region in each). The view itself has no rotation.
 	[[nodiscard]] QPointF subjectFromWidget(const QPointF& widgetPos) const;
 	[[nodiscard]] QPointF widgetFromImage(const Photo& photo, const QPointF& imagePos) const;
@@ -124,7 +124,7 @@ private:
 
 	// Starts a background load of the given files (the constructor's initial batch, or files dropped onto the
 	// window): the pool decodes them in parallel, then applyLoadedPhotoBatch runs on the GUI thread. One batch
-	// at a time - dragEnterEvent denies drops while m_loadBatch is set. An empty list applies immediately.
+	// at a time - dragEnterEvent denies drops while _loadBatch is set. An empty list applies immediately.
 	void addPhotosFromFiles(const QStringList& photoPaths);
 	// Appends the batch's decoded photos (unreadable files were skipped with a warning at decode time), then
 	// refreshes everything that depends on the photo count.
@@ -152,7 +152,7 @@ private:
 	void adjustPhotoScale(int index, double factor, const QPointF& widgetAnchor);
 	void movePhotoOffset(int index, const QPointF& widgetDelta);
 
-	// Folds the reference's alignment into the view transform (rebasing m_alignAoi along), making subject space
+	// Folds the reference's alignment into the view transform (rebasing _alignAoi along), making subject space
 	// the reference's pixel coords - the frame both alignment paths work in - while the reference stays
 	// pixel-frozen on screen. Returns the reference's replaced transform.
 	AlignmentTransform rebaseSubjectSpaceToReference();
@@ -170,7 +170,7 @@ private:
 	// Full (single-pane) view, driven by the bottom slider.
 	void setFullViewIndex(int index);  // switches the full view to this photo, entering the mode if the grid is showing
 	void exitFullView();
-	// Switches m_viewStack to 'page', compensating the shared view for the viewport size change: a touched
+	// Switches _viewStack to 'page', compensating the shared view for the viewport size change: a touched
 	// view keeps its center subject point, an untouched one re-fits.
 	void switchViewportPage(int page, const QSizeF& oldViewportSize, const QSizeF& newViewportSize);
 
@@ -181,30 +181,30 @@ private:
 	void updateHintText();
 
 private:
-	std::vector<Photo> m_photos;
-	std::vector<PhotoComparePane*> m_paneWidgets;  // the grid cells; the full-view pane is separate (m_fullPane)
-	QWidget* m_gridPage = nullptr;             // page 0 of m_viewStack: the pane grid (or the drop hint when empty)
-	QLabel* m_dropHintLabel = nullptr;         // centered "drop files" prompt, shown only while there are no photos
-	PhotoComparePane* m_fullPane = nullptr;    // full-view page: one pane covering the whole grid area (index -1)
-	QStackedLayout* m_viewStack = nullptr;     // page 0: the pane grid, page 1: m_fullPane
-	QSlider* m_slider = nullptr;               // full-view photo picker; interacting with it enters the full view
-	SegmentedToggle* m_diffToggle = nullptr;   // Normal / Difference, mirrors m_differenceMode
-	QCheckBox* m_ignoreRotationCheck = nullptr;  // auto-align constrains its fit to scale+offset (no rotation model)
-	QLabel* m_hintLabel = nullptr;
+	std::vector<Photo> _photos;
+	std::vector<PhotoComparePane*> _paneWidgets;  // the grid cells; the full-view pane is separate (_fullPane)
+	QWidget* _gridPage = nullptr;             // page 0 of _viewStack: the pane grid (or the drop hint when empty)
+	QLabel* _dropHintLabel = nullptr;         // centered "drop files" prompt, shown only while there are no photos
+	PhotoComparePane* _fullPane = nullptr;    // full-view page: one pane covering the whole grid area (index -1)
+	QStackedLayout* _viewStack = nullptr;     // page 0: the pane grid, page 1: _fullPane
+	QSlider* _slider = nullptr;               // full-view photo picker; interacting with it enters the full view
+	SegmentedToggle* _diffToggle = nullptr;   // Normal / Difference, mirrors _differenceMode
+	QCheckBox* _ignoreRotationCheck = nullptr;  // auto-align constrains its fit to scale+offset (no rotation model)
+	QLabel* _hintLabel = nullptr;
 
-	double m_viewZoom = 1.0;  // subject -> widget; 1.0 means the reference photo at 100% (1 image px = 1 widget px)
-	QPointF m_viewPan;
-	QRectF m_alignAoi;         // auto-align region (Shift+drag), subject space; empty = align on the whole frame
-	int m_flickerIndex = -1;   // >= 0: every pane renders this photo (a digit key is held)
-	int m_fullViewIndex = -1;  // >= 0: the full-view page is active, showing this photo (flicker keys still override)
+	double _viewZoom = 1.0;  // subject -> widget; 1.0 means the reference photo at 100% (1 image px = 1 widget px)
+	QPointF _viewPan;
+	QRectF _alignAoi;         // auto-align region (Shift+drag), subject space; empty = align on the whole frame
+	int _flickerIndex = -1;   // >= 0: every pane renders this photo (a digit key is held)
+	int _fullViewIndex = -1;  // >= 0: the full-view page is active, showing this photo (flicker keys still override)
 	// Edge of an alignment patch in subject units. The footprint is the same in subject space for both sides
 	// of a pair (ref px directly; target px scaled by its alignment), so one number serves every mark.
-	double m_alignMarkSize = 0.0;
-	int m_refIndex = 0;        // the pane others align against; re-chosen by each calibration session's first point or the pane context menu
-	bool m_calibrating = false;
-	bool m_differenceMode = false;
-	bool m_viewTouched = false;  // until the user navigates, pane resizes keep re-fitting the view
+	double _alignMarkSize = 0.0;
+	int _refIndex = 0;        // the pane others align against; re-chosen by each calibration session's first point or the pane context menu
+	bool _calibrating = false;
+	bool _differenceMode = false;
+	bool _viewTouched = false;  // until the user navigates, pane resizes keep re-fitting the view
 
-	std::shared_ptr<PhotoLoadBatch> m_loadBatch;  // the in-flight load, non-null from addPhotosFromFiles until applied; drops are denied meanwhile
-	CWorkerThreadPool m_workerPool;  // parallelizes photo decoding and auto-alignment; sized in the constructor to leave the GUI thread a core
+	std::shared_ptr<PhotoLoadBatch> _loadBatch;  // the in-flight load, non-null from addPhotosFromFiles until applied; drops are denied meanwhile
+	CWorkerThreadPool _workerPool;  // parallelizes photo decoding and auto-alignment; sized in the constructor to leave the GUI thread a core
 };

@@ -13,7 +13,7 @@ public:
 	explicit FrameViewerWindow(QWidget* parent = nullptr);
 
 	void showForFolder(const QString& folderPath);
-	[[nodiscard]] const QString& currentFolder() const { return m_folderPath; }
+	[[nodiscard]] const QString& currentFolder() const { return _folderPath; }
 
 private:
 	void refreshDisplay();
@@ -21,11 +21,11 @@ private:
 	void showThumbnailContextMenu(const QPoint& pos);
 	void zoomThumbnails(int steps);
 
-	QString       m_folderPath;
-	int           m_thumbnailSize        = 200;
-	QLabel*       m_instructionLabel     = nullptr;
-	QScrollArea*  m_scrollArea           = nullptr;
-	QWidget*      m_thumbnailContainer   = nullptr;
-	CFlowLayout*  m_thumbnailLayout      = nullptr;
-	QTimer*       m_refreshDebounceTimer = nullptr;
+	QString       _folderPath;
+	int           _thumbnailSize        = 200;
+	QLabel*       _instructionLabel     = nullptr;
+	QScrollArea*  _scrollArea           = nullptr;
+	QWidget*      _thumbnailContainer   = nullptr;
+	CFlowLayout*  _thumbnailLayout      = nullptr;
+	QTimer*       _refreshDebounceTimer = nullptr;
 };

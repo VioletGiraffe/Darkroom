@@ -219,9 +219,9 @@ bool MainWindow::loadInitialLibrary()
 	for(;;)
 	{
 		QString error;
-		if (m_library.setRoot(requestedRoot, &error))
+		if (_library.setRoot(requestedRoot, &error))
 		{
-			recordCurrentLibrary(m_library.rootFolder());
+			recordCurrentLibrary(_library.rootFolder());
 			return true;
 		}
 
@@ -245,10 +245,10 @@ MainWindow::MainWindow(QWidget* parent)
 	resize(1500, 800);
 	setAcceptDrops(true);
 
-	m_frameViewer = new FrameViewerWindow();
+	_frameViewer = new FrameViewerWindow();
 
 	setupUI();
-	m_library.setPersistenceFailureHandler([this] { schedulePersistenceFailureWarning(); });
+	_library.setPersistenceFailureHandler([this] { schedulePersistenceFailureWarning(); });
 
 	// The one initial grid build is deliberately deferred to restoreSettings() below (queued): it applies the
 	// persisted label filter and calls refreshMediaGrid() once. Building here too would construct every card
@@ -260,24 +260,24 @@ MainWindow::MainWindow(QWidget* parent)
 
 MainWindow::~MainWindow()
 {
-	if (!m_library.isLoaded())
+	if (!_library.isLoaded())
 		return;  // the constructor stopped at a cancelled library picker: nothing was built, nothing to save
 
-	m_library.setPersistenceFailureHandler({});
+	_library.setPersistenceFailureHandler({});
 	saveSettings();
 	VideoPlayerWindow::closeAll();
-	delete m_frameViewer;
-	delete takeCentralWidget();  // root-bound child widgets must die before the m_library member
+	delete _frameViewer;
+	delete takeCentralWidget();  // root-bound child widgets must die before the _library member
 }
 
 Catalog& MainWindow::libraryCatalog()
 {
-	return m_library.catalog();
+	return _library.catalog();
 }
 
 const Catalog& MainWindow::libraryCatalog() const
 {
-	return m_library.catalog();
+	return _library.catalog();
 }
 
 void MainWindow::setupUI()
@@ -290,12 +290,12 @@ void MainWindow::setupUI()
 	rootLayout->setSpacing(0);
 
 	// Left: the label sidebar (filter).
-	m_labelSidebar = new LabelSidebar(m_library);
-	connect(m_labelSidebar, &LabelSidebar::filterChanged, this, &MainWindow::refreshMediaGrid);
-	connect(m_labelSidebar, &LabelSidebar::addLabelRequested, this, &MainWindow::createLabelInteractive);
-	connect(m_labelSidebar, &LabelSidebar::renameLabelRequested, this, &MainWindow::renameLabelInteractive);
-	connect(m_labelSidebar, &LabelSidebar::setLabelColorRequested, this, &MainWindow::setLabelColorInteractive);
-	connect(m_labelSidebar, &LabelSidebar::deleteLabelRequested, this, &MainWindow::deleteLabelInteractive);
+	_labelSidebar = new LabelSidebar(_library);
+	connect(_labelSidebar, &LabelSidebar::filterChanged, this, &MainWindow::refreshMediaGrid);
+	connect(_labelSidebar, &LabelSidebar::addLabelRequested, this, &MainWindow::createLabelInteractive);
+	connect(_labelSidebar, &LabelSidebar::renameLabelRequested, this, &MainWindow::renameLabelInteractive);
+	connect(_labelSidebar, &LabelSidebar::setLabelColorRequested, this, &MainWindow::setLabelColorInteractive);
+	connect(_labelSidebar, &LabelSidebar::deleteLabelRequested, this, &MainWindow::deleteLabelInteractive);
 
 	// Right: a toolbar of view controls above the card grid.
 	auto* rightPanel = new QWidget();
@@ -311,26 +311,26 @@ void MainWindow::setupUI()
 	// Carries the former SearchDialog's query syntax (see nameMatchesFilter). textChanged only hides/shows
 	// the already-built cards (applyNameFilter) - no catalog rebuild, no thumbnail re-decode - so it stays
 	// cheap on every keystroke.
-	m_nameFilter = new QLineEdit();
-	m_nameFilter->setPlaceholderText(tr("filter by name..."));
-	m_nameFilter->setClearButtonEnabled(true);
-	m_nameFilter->setMinimumWidth(220);
-	m_nameFilter->addAction(Theme::tintedIcon(QStringLiteral(":/UI/icon_search.svg"), &Theme::ThemeColors::MutedText),
+	_nameFilter = new QLineEdit();
+	_nameFilter->setPlaceholderText(tr("filter by name..."));
+	_nameFilter->setClearButtonEnabled(true);
+	_nameFilter->setMinimumWidth(220);
+	_nameFilter->addAction(Theme::tintedIcon(QStringLiteral(":/UI/icon_search.svg"), &Theme::ThemeColors::MutedText),
 		QLineEdit::LeadingPosition);
-	connect(m_nameFilter, &QLineEdit::textChanged, this, &MainWindow::applyNameFilter);
-	headerLayout->addWidget(m_nameFilter, 0, Qt::AlignVCenter);
+	connect(_nameFilter, &QLineEdit::textChanged, this, &MainWindow::applyNameFilter);
+	headerLayout->addWidget(_nameFilter, 0, Qt::AlignVCenter);
 
 	// Media-type filter beside the name filter: All / Videos / Photos, ANDed with the other filters. A
 	// structural filter (changes which items are enumerated), so it rebuilds the grid, unlike the name
 	// filter's cheap hide/show. setCurrentIndex is silent, so restoring the persisted choice here doesn't
 	// fire a redundant refresh during setup.
-	m_mediaTypeFilter = new SegmentedToggle({ tr("All"), tr("Videos"), tr("Photos") });
-	m_mediaTypeFilter->setCurrentIndex(qBound(0, QSettings{}.value(MEDIA_TYPE_FILTER_KEY, 0).toInt(), 2));
-	connect(m_mediaTypeFilter, &SegmentedToggle::currentChanged, this, [this](int index) {
+	_mediaTypeFilter = new SegmentedToggle({ tr("All"), tr("Videos"), tr("Photos") });
+	_mediaTypeFilter->setCurrentIndex(qBound(0, QSettings{}.value(MEDIA_TYPE_FILTER_KEY, 0).toInt(), 2));
+	connect(_mediaTypeFilter, &SegmentedToggle::currentChanged, this, [this](int index) {
 		QSettings{}.setValue(MEDIA_TYPE_FILTER_KEY, index);
 		refreshMediaGrid();
 	});
-	headerLayout->addWidget(m_mediaTypeFilter, 0, Qt::AlignVCenter);
+	headerLayout->addWidget(_mediaTypeFilter, 0, Qt::AlignVCenter);
 
 	// Ctrl+F focuses the name filter (app-wide, like the menu shortcuts) instead of opening a search dialog.
 	// Surface the main window first, since the shortcut can fire while a player/frame-viewer window is on top.
@@ -339,79 +339,79 @@ void MainWindow::setupUI()
 	connect(focusFilterShortcut, &QShortcut::activated, this, [this] {
 		raise();
 		activateWindow();
-		m_nameFilter->setFocus();
-		m_nameFilter->selectAll();
+		_nameFilter->setFocus();
+		_nameFilter->selectAll();
 	});
 
 	headerLayout->addStretch(1);  // view controls sit on the right of the stretch, the name filter on the left
 
 	// Preview-frame-count selector. Self-labelling items ("N frames per preview") replace the usual separate QLabel + control pair.
-	m_previewFrameCountCombo = new QComboBox();
-	m_previewFrameCountCombo->setToolTip(tr("Number of preview frames shown on each video card"));
+	_previewFrameCountCombo = new QComboBox();
+	_previewFrameCountCombo->setToolTip(tr("Number of preview frames shown on each video card"));
 	const QIcon previewCountIcon = Theme::tintedIcon(QStringLiteral(":/UI/icon_columns.svg"), &Theme::ThemeColors::InstructionText);
 	for (int n = MIN_PREVIEW_FRAME_COUNT; n <= MAX_PREVIEW_FRAME_COUNT; ++n)
-		m_previewFrameCountCombo->addItem(previewCountIcon, (n == 1 ? tr("%1 frame per preview") : tr("%1 frames per preview")).arg(n), n);
+		_previewFrameCountCombo->addItem(previewCountIcon, (n == 1 ? tr("%1 frame per preview") : tr("%1 frames per preview")).arg(n), n);
 	// The icon labels the control's purpose; show it only on the closed box, not repeated on every popup row.
-	m_previewFrameCountCombo->view()->setItemDelegate(new ClosedControlIconDelegate(m_previewFrameCountCombo));
+	_previewFrameCountCombo->view()->setItemDelegate(new ClosedControlIconDelegate(_previewFrameCountCombo));
 
 	// Apply the saved value before connecting, so restoring it during setup doesn't fire a redundant refresh.
 	const int savedFrameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
-	const int savedFrameIdx = m_previewFrameCountCombo->findData(savedFrameCount);
-	m_previewFrameCountCombo->setCurrentIndex(savedFrameIdx >= 0 ? savedFrameIdx
-		: m_previewFrameCountCombo->findData(Defaults::PreviewFrameCount));
+	const int savedFrameIdx = _previewFrameCountCombo->findData(savedFrameCount);
+	_previewFrameCountCombo->setCurrentIndex(savedFrameIdx >= 0 ? savedFrameIdx
+		: _previewFrameCountCombo->findData(Defaults::PreviewFrameCount));
 
-	connect(m_previewFrameCountCombo, &QComboBox::currentIndexChanged, this, [this] {
-		QSettings{}.setValue(Settings::PreviewFrameCount, m_previewFrameCountCombo->currentData().toInt());
+	connect(_previewFrameCountCombo, &QComboBox::currentIndexChanged, this, [this] {
+		QSettings{}.setValue(Settings::PreviewFrameCount, _previewFrameCountCombo->currentData().toInt());
 		refreshMediaGrid();
 	});
-	headerLayout->addWidget(m_previewFrameCountCombo, 0, Qt::AlignVCenter);
+	headerLayout->addWidget(_previewFrameCountCombo, 0, Qt::AlignVCenter);
 
 	// Sort control: one chip-button showing the current field + direction; clicking opens a popover with
 	// every ordering option (field, direction, favorites-first). It owns its own persistence and just tells
 	// us when the order changed - the sort itself stays in resortMediaGrid(). Favorites-first is a no-op
 	// while viewing the Best tab (everything there is already a favorite, so its partition collapses).
-	m_sortControl = new SortControl();
-	connect(m_sortControl, &SortControl::changed, this, &MainWindow::resortMediaGrid);
-	headerLayout->addWidget(m_sortControl, 0, Qt::AlignVCenter);
+	_sortControl = new SortControl();
+	connect(_sortControl, &SortControl::changed, this, &MainWindow::resortMediaGrid);
+	headerLayout->addWidget(_sortControl, 0, Qt::AlignVCenter);
 
 	mainLayout->addWidget(headerWidget);
 
 	// Media item card grid
-	m_mediaGrid = new MediaGrid();
-	m_mediaGrid->setViewMode(QListView::IconMode);
-	m_mediaGrid->setFlow(QListView::LeftToRight);
-	m_mediaGrid->setWrapping(true);
-	m_mediaGrid->setResizeMode(QListView::Adjust);
+	_mediaGrid = new MediaGrid();
+	_mediaGrid->setViewMode(QListView::IconMode);
+	_mediaGrid->setFlow(QListView::LeftToRight);
+	_mediaGrid->setWrapping(true);
+	_mediaGrid->setResizeMode(QListView::Adjust);
 	// Cards come in two fixed sizes (a video's frame strip vs. a square photo), so setUniformItemSizes(true) -
 	// which forces one size on every item - can't be used. Instead each GridItem carries an explicit sizeHint
 	// (computed once per media type in refreshMediaGrid), so laying out an item stays a cached-value lookup
 	// rather than a widget layout activation; populating hundreds of items is essentially as cheap as before.
-	m_mediaGrid->setUniformItemSizes(false);
-	m_mediaGrid->setMovement(QListView::Static);
-	m_mediaGrid->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-	m_mediaGrid->setSelectionMode(QAbstractItemView::ExtendedSelection);
+	_mediaGrid->setUniformItemSizes(false);
+	_mediaGrid->setMovement(QListView::Static);
+	_mediaGrid->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+	_mediaGrid->setSelectionMode(QAbstractItemView::ExtendedSelection);
 	// Dragging a card exports its source file(s): MediaGrid::startDrag turns the view's drag into a file:// URL
 	// copy out to Explorer / another app. Enabling drags also makes the view keep an existing multi-selection
 	// through a plain press+move instead of collapsing it to the single card under the cursor (it defers the
 	// collapse while a drag is possible), so a whole group can be dragged out together.
-	m_mediaGrid->setDragEnabled(true);
-	m_mediaGrid->setDragUrlsProvider([this](const QList<QListWidgetItem*>& items) { return dragUrlsForItems(items); });
-	m_mediaGrid->setSpacing(10);
-	Style::applyThemedSheet(m_mediaGrid, [] {
+	_mediaGrid->setDragEnabled(true);
+	_mediaGrid->setDragUrlsProvider([this](const QList<QListWidgetItem*>& items) { return dragUrlsForItems(items); });
+	_mediaGrid->setSpacing(10);
+	Style::applyThemedSheet(_mediaGrid, [] {
 		return QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().AccentBg);
 	});
 
-	mainLayout->addWidget(m_mediaGrid, 1);
+	mainLayout->addWidget(_mediaGrid, 1);
 
 	// Ctrl+wheel over a card adjusts the preview height; coalesce a burst of wheel steps into one rebuild.
-	m_gridZoomDebounce = new QTimer(this);
-	m_gridZoomDebounce->setSingleShot(true);
-	m_gridZoomDebounce->setInterval(80);
-	connect(m_gridZoomDebounce, &QTimer::timeout, this, &MainWindow::refreshMediaGrid);
+	_gridZoomDebounce = new QTimer(this);
+	_gridZoomDebounce->setSingleShot(true);
+	_gridZoomDebounce->setInterval(80);
+	connect(_gridZoomDebounce, &QTimer::timeout, this, &MainWindow::refreshMediaGrid);
 
 	// Assemble the window as a resizable [sidebar | right panel] split.
 	auto* splitter = new QSplitter(Qt::Horizontal);
-	splitter->addWidget(m_labelSidebar);
+	splitter->addWidget(_labelSidebar);
 	splitter->addWidget(rightPanel);
 	splitter->setStretchFactor(0, 0);
 	splitter->setStretchFactor(1, 1);
@@ -431,19 +431,19 @@ void MainWindow::setupMainMenu()
 	fileMenu->addSeparator();
 	fileMenu->addAction(tr("Exit"), QKeySequence("Ctrl+Q"), this, &QMainWindow::close);
 
-	m_libraryMenu = new QMenu(tr("Library"), menuBar);
-	m_libraryMenu->addAction(tr("Open library..."), QKeySequence("Ctrl+O"), this, [this] { pickAndSwitchLibrary(LibraryPickerMode::Open); });
-	m_libraryMenu->addAction(tr("Create new library..."), this, [this] { pickAndSwitchLibrary(LibraryPickerMode::CreateNew); });
-	m_libraryMenu->addSeparator();
+	_libraryMenu = new QMenu(tr("Library"), menuBar);
+	_libraryMenu->addAction(tr("Open library..."), QKeySequence("Ctrl+O"), this, [this] { pickAndSwitchLibrary(LibraryPickerMode::Open); });
+	_libraryMenu->addAction(tr("Create new library..."), this, [this] { pickAndSwitchLibrary(LibraryPickerMode::CreateNew); });
+	_libraryMenu->addSeparator();
 	// Everything below the separator is the recent list, refilled on each open so that neither it nor its
 	// current-library marker can go stale after a switch.
-	connect(m_libraryMenu, &QMenu::aboutToShow, this, &MainWindow::rebuildRecentLibraryActions);
+	connect(_libraryMenu, &QMenu::aboutToShow, this, &MainWindow::rebuildRecentLibraryActions);
 
 	QMenu* editMenu = new QMenu(tr("Edit"), menuBar);
-	m_deleteAction = editMenu->addAction(tr("Delete"), QKeySequence(Shortcuts::DeleteFile), this, &MainWindow::deleteSelectedItems);
-	m_removeFromLibraryAction = editMenu->addAction(tr("Remove from library"), QKeySequence(Shortcuts::RemoveFromList), this, &MainWindow::removeSelectedItemsFromLibrary);
-	m_renameAction = editMenu->addAction(tr("Rename"), QKeySequence(Shortcuts::Rename), this, &MainWindow::renameSelectedItemInteractive);
-	connect(m_mediaGrid, &QListWidget::itemSelectionChanged, this, &MainWindow::updateEditActions);
+	_deleteAction = editMenu->addAction(tr("Delete"), QKeySequence(Shortcuts::DeleteFile), this, &MainWindow::deleteSelectedItems);
+	_removeFromLibraryAction = editMenu->addAction(tr("Remove from library"), QKeySequence(Shortcuts::RemoveFromList), this, &MainWindow::removeSelectedItemsFromLibrary);
+	_renameAction = editMenu->addAction(tr("Rename"), QKeySequence(Shortcuts::Rename), this, &MainWindow::renameSelectedItemInteractive);
+	connect(_mediaGrid, &QListWidget::itemSelectionChanged, this, &MainWindow::updateEditActions);
 	updateEditActions();
 
 	QMenu* toolsMenu = new QMenu(tr("Tools"), menuBar);
@@ -472,7 +472,7 @@ void MainWindow::setupMainMenu()
 	});
 
 	menuBar->addMenu(fileMenu);
-	menuBar->addMenu(m_libraryMenu);
+	menuBar->addMenu(_libraryMenu);
 	menuBar->addMenu(editMenu);
 	menuBar->addMenu(toolsMenu);
 	menuBar->addMenu(helpMenu);
@@ -486,9 +486,9 @@ void MainWindow::setupMainMenu()
 	}
 
 	// Del/Shift+Del/F2 must not fire while typing in a text field - scope them to the grid.
-	for (QAction* a : { m_deleteAction, m_removeFromLibraryAction, m_renameAction })
+	for (QAction* a : { _deleteAction, _removeFromLibraryAction, _renameAction })
 	{
-		m_mediaGrid->addAction(a);
+		_mediaGrid->addAction(a);
 		a->setShortcutContext(Qt::WidgetWithChildrenShortcut);
 	}
 }
@@ -497,10 +497,10 @@ void MainWindow::saveSettings()
 {
 	saveWindowGeometry(this, "mainWindow");
 	QVariantList activeIds;  // stored as native quint64s (a LabelId is not a QVariant-native type)
-	for (const LabelId id : m_labelSidebar->activeLabelIds())
+	for (const LabelId id : _labelSidebar->activeLabelIds())
 		activeIds << static_cast<qulonglong>(toUInt64(id));
 	QSettings{}.setValue("mainWindow/activeLabelIds", activeIds);
-	QSettings{}.setValue("mainWindow/labelsAndMode", m_labelSidebar->isAndMode());
+	QSettings{}.setValue("mainWindow/labelsAndMode", _labelSidebar->isAndMode());
 	QSettings{}.setValue("mainWindow/scrollAnchor", topAnchorKey());
 }
 
@@ -512,7 +512,7 @@ void MainWindow::restoreSettings()
 	for (const QVariant& v : QSettings{}.value("mainWindow/activeLabelIds").toList())
 		activeIds << labelIdFromUInt64(v.toULongLong());  // an unparseable stored value reads back as None and is dropped on refresh
 	const bool andMode = QSettings{}.value("mainWindow/labelsAndMode", false).toBool();
-	m_labelSidebar->setActiveFilter(activeIds, andMode);  // silent; the grid refresh below applies it
+	_labelSidebar->setActiveFilter(activeIds, andMode);  // silent; the grid refresh below applies it
 	refreshMediaGrid();
 
 	// Restore the persisted scroll position, deferred one turn: the grid's wrapped layout only reaches its final
@@ -525,7 +525,7 @@ void MainWindow::restoreSettings()
 
 bool MainWindow::refuseLibraryChangeWhileProcessing()
 {
-	if (!m_isProcessing)
+	if (!_isProcessing)
 		return false;
 
 	QMessageBox::information(this, tr("Busy"), tr("The library cannot be changed while media processing is in progress."));
@@ -549,7 +549,7 @@ void MainWindow::pickAndSwitchLibrary(LibraryPickerMode mode)
 
 	const bool creating = mode == LibraryPickerMode::CreateNew;
 	const QString title = creating ? tr("Create new library") : tr("Open library");
-	QString startFolder = QFileInfo{ m_library.rootFolder() }.absolutePath();
+	QString startFolder = QFileInfo{ _library.rootFolder() }.absolutePath();
 	for(;;)
 	{
 		const QString requestedRoot = QFileDialog::getExistingDirectory(this, title, libraryPickerStartFolder(startFolder));
@@ -566,7 +566,7 @@ void MainWindow::pickAndSwitchLibrary(LibraryPickerMode mode)
 					.arg(QDir::toNativeSeparators(requestedRoot)));
 			continue;
 		}
-		if (!creating && pathComparisonKey(requestedRoot) == pathComparisonKey(m_library.rootFolder()))
+		if (!creating && pathComparisonKey(requestedRoot) == pathComparisonKey(_library.rootFolder()))
 			return;
 
 		if (switchLibraryToOrReport(requestedRoot, title))
@@ -584,17 +584,17 @@ void MainWindow::openRecentLibrary(const QString& root)
 
 void MainWindow::rebuildRecentLibraryActions()
 {
-	qDeleteAll(m_recentLibraryActions);
-	m_recentLibraryActions.clear();
+	qDeleteAll(_recentLibraryActions);
+	_recentLibraryActions.clear();
 
-	const QString currentRoot = m_library.rootFolder();
+	const QString currentRoot = _library.rootFolder();
 	int number = 0;
 	for (const QString& root : recentLibraries())
 	{
 		QString display = QDir::toNativeSeparators(root);
 		display.replace('&', QLatin1String("&&"));   // an & in the path would otherwise be eaten as a mnemonic
 
-		QAction* action = m_libraryMenu->addAction(QString("&%1  %2").arg(++number).arg(display),
+		QAction* action = _libraryMenu->addAction(QString("&%1  %2").arg(++number).arg(display),
 			this, [this, root] { openRecentLibrary(root); });
 
 		// The current library is listed for orientation but not offered: re-selecting it would run a full
@@ -605,37 +605,37 @@ void MainWindow::rebuildRecentLibraryActions()
 			action->setChecked(true);
 			action->setEnabled(false);
 		}
-		m_recentLibraryActions.push_back(action);
+		_recentLibraryActions.push_back(action);
 	}
 }
 
 bool MainWindow::switchLibraryTo(const QString& root, QString* error)
 {
-	if (!m_library.setRoot(root, error))
+	if (!_library.setRoot(root, error))
 		return false;
 
 	// The state is already replaced, but no event can run between setRoot() and this synchronous cleanup.
 	// Close players before returning to the event loop so an old video's controls cannot write into the new
 	// catalog. Clear the read-only views so they do not continue presenting the previous library.
 	VideoPlayerWindow::closeAll();
-	m_frameViewer->showForFolder({});
-	m_mediaGrid->clear();
-	m_contextMenuTarget.reset();
-	m_labelSidebar->setActiveFilter({}, m_labelSidebar->isAndMode());  // label ids belong to one library
+	_frameViewer->showForFolder({});
+	_mediaGrid->clear();
+	_contextMenuTarget.reset();
+	_labelSidebar->setActiveFilter({}, _labelSidebar->isAndMode());  // label ids belong to one library
 
-	recordCurrentLibrary(m_library.rootFolder());
+	recordCurrentLibrary(_library.rootFolder());
 	refreshLibraryView();
 	return true;
 }
 
 void MainWindow::schedulePersistenceFailureWarning()
 {
-	if (m_persistenceWarningQueued)
+	if (_persistenceWarningQueued)
 		return;
-	m_persistenceWarningQueued = true;
+	_persistenceWarningQueued = true;
 	QMetaObject::invokeMethod(this, [this] {
-		m_persistenceWarningQueued = false;
-		QString error = m_library.pendingPersistenceError();
+		_persistenceWarningQueued = false;
+		QString error = _library.pendingPersistenceError();
 		while (!error.isEmpty())
 		{
 			QMessageBox message(QMessageBox::Critical, tr("Library save failed"),
@@ -645,7 +645,7 @@ void MainWindow::schedulePersistenceFailureWarning()
 			message.button(QMessageBox::Ok)->setText(tr("Keep working"));
 			if (message.exec() != QMessageBox::Retry)
 				return;
-			if (m_library.flushPendingWrites(&error))
+			if (_library.flushPendingWrites(&error))
 				return;
 		}
 	}, Qt::QueuedConnection);
@@ -653,7 +653,7 @@ void MainWindow::schedulePersistenceFailureWarning()
 
 void MainWindow::openSettings()
 {
-	if (m_isProcessing)
+	if (_isProcessing)
 	{
 		QMessageBox::information(this, tr("Busy"), tr("Settings cannot be changed while media processing is in progress."));
 		return;
@@ -668,7 +668,7 @@ void MainWindow::dragEnterEvent(QDragEnterEvent* event)
 	// A card dragged out of the grid carries its source file:// URL(s) for export to other apps. Those URLs are
 	// "supported files", so without this the drop would land back on our own import handler and re-import an
 	// already-tracked item. The import drop zone is for files coming from outside the app.
-	if (event->source() == m_mediaGrid)
+	if (event->source() == _mediaGrid)
 		return;
 
 	if (hasSupportedPaths(event->mimeData()))
@@ -692,7 +692,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
 {
 	VideoPlayerWindow::closeAll();
 	QString error;
-	while (!m_library.flushPendingWrites(&error))
+	while (!_library.flushPendingWrites(&error))
 	{
 		QMessageBox message(QMessageBox::Critical, tr("Library save failed"),
 			tr("The library still has unsaved changes. Closing now will discard them."),
@@ -719,7 +719,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
 void MainWindow::refreshLibraryView()
 {
 	refreshMediaGrid();          // rebuilds the card grid from the (already-current) catalog model
-	m_labelSidebar->refresh();   // pull the now-current labels/counts into the sidebar
+	_labelSidebar->refresh();   // pull the now-current labels/counts into the sidebar
 }
 
 void MainWindow::zoomCards(int steps)
@@ -730,7 +730,7 @@ void MainWindow::zoomCards(int steps)
 		return;
 
 	QSettings{}.setValue(CARD_IMAGE_HEIGHT_KEY, next);
-	m_gridZoomDebounce->start(); // rebuild once the wheel settles
+	_gridZoomDebounce->start(); // rebuild once the wheel settles
 }
 
 namespace {
@@ -873,7 +873,7 @@ bool MainWindow::regeneratePreviewFor(const MediaId& id)
 {
 	Catalog& catalog = libraryCatalog();
 	const QString folder = catalog.folderForMediaItem(id);
-	const int frameCount = m_previewFrameCountCombo->currentData().toInt();
+	const int frameCount = _previewFrameCountCombo->currentData().toInt();
 
 	// Prefer the video's own real frames - a plain copy, no source needed. Their presence also means the entry
 	// is genuinely split whatever its flag said, so reconcile that (clears a co-occurring STALE flag).
@@ -898,7 +898,7 @@ std::vector<MediaId> MainWindow::mediaItemsMatchingFilters() const
 	const Catalog& catalog = libraryCatalog();
 
 	// The sidebar's active label filter applied to the catalog.
-	const QList<LabelId> activeLabelIds = m_labelSidebar->activeLabelIds();
+	const QList<LabelId> activeLabelIds = _labelSidebar->activeLabelIds();
 	std::vector<MediaId> mediaItems;
 	if (activeLabelIds.isEmpty())
 	{
@@ -911,7 +911,7 @@ std::vector<MediaId> MainWindow::mediaItemsMatchingFilters() const
 		for (qsizetype i = 1; i < activeLabelIds.size(); ++i)
 		{
 			const QSet<MediaId> next = catalog.mediaItemsForLabel(activeLabelIds[i]);
-			if (m_labelSidebar->isAndMode())
+			if (_labelSidebar->isAndMode())
 				matched.intersect(next);   // AND: items carrying every selected label
 			else
 				matched.unite(next);       // OR: items carrying any selected label
@@ -920,7 +920,7 @@ std::vector<MediaId> MainWindow::mediaItemsMatchingFilters() const
 	}
 
 	// The header's All/Videos/Photos switch, ANDed with the label filter above.
-	if (const int typeFilterIdx = m_mediaTypeFilter->currentIndex(); typeFilterIdx != 0)
+	if (const int typeFilterIdx = _mediaTypeFilter->currentIndex(); typeFilterIdx != 0)
 	{
 		const Catalog::MediaType wanted = typeFilterIdx == 2 ? Catalog::MediaType::Photo : Catalog::MediaType::Video;
 		std::erase_if(mediaItems, [&](const MediaId& id) { return catalog.mediaType(id) != wanted; });
@@ -969,7 +969,7 @@ MediaItemWidget* MainWindow::buildMediaCard(const MediaId& id, bool isBest, cons
 	{
 		card->setOnMiddleButtonClick([this, id, folderPath] {
 			if (ensureFramesSplit(id))  // transparently runs the full split first, if this video hasn't had one yet
-				m_frameViewer->showForFolder(folderPath);
+				_frameViewer->showForFolder(folderPath);
 		});
 	}
 	card->setOnMouseWheelCallback([this](int steps) { zoomCards(steps); });
@@ -983,9 +983,9 @@ MediaItemWidget* MainWindow::buildMediaCard(const MediaId& id, bool isBest, cons
 	card->setOnLabelDropped([this, id](const QString& labelId) {
 		const std::vector<MediaId> targets = effectiveSelection(id);
 		const LabelId dropped = labelIdFromString(labelId);  // the mime payload is the id's decimal string
-		const uint64_t libraryGeneration = m_library.generation();
+		const uint64_t libraryGeneration = _library.generation();
 		QMetaObject::invokeMethod(this, [this, libraryGeneration, targets, dropped] {
-			if (m_library.generation() != libraryGeneration)
+			if (_library.generation() != libraryGeneration)
 				return;  // the queued card action belonged to the State that has since been replaced
 			Catalog::BatchScope batch(libraryCatalog());  // one store write for the whole selection instead of one per item
 			for (const MediaId& target : targets)
@@ -1001,16 +1001,16 @@ MediaItemWidget* MainWindow::buildMediaCard(const MediaId& id, bool isBest, cons
 void MainWindow::refreshMediaGrid()
 {
 	const GridViewState viewState = captureGridViewState();  // selection + current item + scroll, restored after the rebuild
-	m_mediaGrid->clear();
+	_mediaGrid->clear();
 
-	const int previewFrameCount = m_previewFrameCountCombo->currentData().toInt();
+	const int previewFrameCount = _previewFrameCountCombo->currentData().toInt();
 	const int imageHeight = cardImageHeight();
 
 	// Card thumbnail canvases: a photo is square; a video is a horizontal strip sized to tile with
 	// previewFrameCount photo cards (so a video's width + gap spans that many photo widths + gaps), letting a
 	// mixed grid line up on one column grid. Both are fixed per refresh, so each is computed once here.
 	const QSize photoCanvas{ imageHeight, imageHeight };
-	const QSize videoCanvas{ MediaItemWidget::videoCanvasWidthForTiling(imageHeight, previewFrameCount, m_mediaGrid->spacing()), imageHeight };
+	const QSize videoCanvas{ MediaItemWidget::videoCanvasWidthForTiling(imageHeight, previewFrameCount, _mediaGrid->spacing()), imageHeight };
 
 	// The catalog is the authoritative in-memory model, kept current by its mutations, so the grid reads it
 	// directly - no per-refresh re-derivation. Look up the Best set once: the per-card star state and the
@@ -1018,7 +1018,7 @@ void MainWindow::refreshMediaGrid()
 	Catalog& catalog = libraryCatalog();
 	const QSet<MediaId> bestSet = catalog.mediaItemsForLabel(Catalog::BestLabelId);
 
-	GridItem::setSortMode(m_sortControl);
+	GridItem::setSortMode(_sortControl);
 	const bool sortByDate = GridItem::sortBy == SortBy::Date;
 
 	// Media items to show = the structural filters applied to the catalog (final order comes from sortItems()
@@ -1028,7 +1028,7 @@ void MainWindow::refreshMediaGrid()
 	// Empty-state text, painted by the grid when no card is visible. "Library empty" is the catalog's own
 	// state, not something inferred from this rebuild's filters; every other empty case (the label/type
 	// filters, or the name filter hiding every card later) is the filters matching nothing.
-	m_mediaGrid->setEmptyMessage(catalog.mediaItemCount() == 0
+	_mediaGrid->setEmptyMessage(catalog.mediaItemCount() == 0
 		? tr("The library is empty.\nDrop media files here, or use Tools > Import.")
 		: tr("No items match the current filters."));
 
@@ -1061,18 +1061,18 @@ void MainWindow::refreshMediaGrid()
 		if (!typeHint.isValid())
 			typeHint = card->sizeHint();
 		item->setSizeHint(typeHint);
-		m_mediaGrid->addItem(item);
+		_mediaGrid->addItem(item);
 
 		pendingAttach.emplace_back(item, card);   // widget attached in the second pass, after sortItems()
 	}
 
-	m_mediaGrid->sortItems(Qt::AscendingOrder);   // sorts bare items, no editors to reposition -> cheap
+	_mediaGrid->sortItems(Qt::AscendingOrder);   // sorts bare items, no editors to reposition -> cheap
 
 	// Pass 2: attach the card widgets, now that all items exist and are sorted. Interleaving this with the
 	// addItem loop above made each insert's endInsertRows walk every persistent editor index created so far
 	// -> O(N^2); deferring it keeps the inserts editor-free.
 	for (const auto& [item, card] : pendingAttach)
-		m_mediaGrid->setItemWidget(item, card);
+		_mediaGrid->setItemWidget(item, card);
 
 	// The name filter is a view-level hide/show over these cards (applied here too so a structural rebuild
 	// keeps honouring the active filter); renumberGridCaptions runs inside applyNameFilter.
@@ -1087,10 +1087,10 @@ QString MainWindow::topAnchorKey() const
 {
 	// Model order is visual order in the wrapping icon grid, so the first not-hidden card whose bottom edge has
 	// reached the viewport's top (rect in viewport coordinates) is the top-most visible one.
-	for (int row = 0; row < m_mediaGrid->count(); ++row)
+	for (int row = 0; row < _mediaGrid->count(); ++row)
 	{
-		const QListWidgetItem* item = m_mediaGrid->item(row);
-		if (!item->isHidden() && m_mediaGrid->visualItemRect(item).bottom() >= 0)
+		const QListWidgetItem* item = _mediaGrid->item(row);
+		if (!item->isHidden() && _mediaGrid->visualItemRect(item).bottom() >= 0)
 			return static_cast<const GridItem*>(item)->mediaId.key();
 	}
 	return {};
@@ -1100,12 +1100,12 @@ void MainWindow::scrollGridToAnchorKey(const QString& anchorKey)
 {
 	if (anchorKey.isEmpty())
 		return;
-	for (int row = 0; row < m_mediaGrid->count(); ++row)
+	for (int row = 0; row < _mediaGrid->count(); ++row)
 	{
-		QListWidgetItem* item = m_mediaGrid->item(row);
+		QListWidgetItem* item = _mediaGrid->item(row);
 		if (!item->isHidden() && static_cast<const GridItem*>(item)->mediaId.key() == anchorKey)
 		{
-			m_mediaGrid->scrollToItem(item, QAbstractItemView::PositionAtTop);
+			_mediaGrid->scrollToItem(item, QAbstractItemView::PositionAtTop);
 			return;
 		}
 	}
@@ -1115,9 +1115,9 @@ MainWindow::GridViewState MainWindow::captureGridViewState() const
 {
 	GridViewState state;
 	state.scrollAnchorKey = topAnchorKey();
-	for (const QListWidgetItem* item : m_mediaGrid->selectedItems())
+	for (const QListWidgetItem* item : _mediaGrid->selectedItems())
 		state.selectedKeys.insert(static_cast<const GridItem*>(item)->mediaId.key());
-	if (const QListWidgetItem* current = m_mediaGrid->currentItem())
+	if (const QListWidgetItem* current = _mediaGrid->currentItem())
 		state.currentKey = static_cast<const GridItem*>(current)->mediaId.key();
 	return state;
 }
@@ -1130,10 +1130,10 @@ void MainWindow::restoreGridViewState(const GridViewState& state)
 		{
 			// Restore the whole selection as one change (updateEditActions once, below), skipping hidden cards so a
 			// name-filtered item is never reselected - the same rule applyNameFilter enforces on its own.
-			const QSignalBlocker blocker{ m_mediaGrid };
-			for (int row = 0; row < m_mediaGrid->count(); ++row)
+			const QSignalBlocker blocker{ _mediaGrid };
+			for (int row = 0; row < _mediaGrid->count(); ++row)
 			{
-				auto* item = static_cast<GridItem*>(m_mediaGrid->item(row));
+				auto* item = static_cast<GridItem*>(_mediaGrid->item(row));
 				if (item->isHidden())
 					continue;
 				const QString key = item->mediaId.key();
@@ -1144,7 +1144,7 @@ void MainWindow::restoreGridViewState(const GridViewState& state)
 			}
 			// Re-seat the keyboard anchor without clearing the selection just restored (NoUpdate).
 			if (currentItem)
-				m_mediaGrid->setCurrentItem(currentItem, QItemSelectionModel::NoUpdate);
+				_mediaGrid->setCurrentItem(currentItem, QItemSelectionModel::NoUpdate);
 		}
 		updateEditActions();
 	}
@@ -1158,44 +1158,44 @@ void MainWindow::restoreGridViewState(const GridViewState& state)
 // setItemWidget() card moves with it through the model's persistent indexes.
 void MainWindow::resortMediaGrid()
 {
-	const int count = m_mediaGrid->count();
+	const int count = _mediaGrid->count();
 	if (count == 0)
 		return;
 
 	Catalog& catalog = libraryCatalog();
 	const QSet<MediaId> bestSet = catalog.mediaItemsForLabel(Catalog::BestLabelId);
 
-	GridItem::setSortMode(m_sortControl);
+	GridItem::setSortMode(_sortControl);
 	const bool sortByDate = GridItem::sortBy == SortBy::Date;
 
 	for (int row = 0; row < count; ++row)
 	{
-		auto* item = static_cast<GridItem*>(m_mediaGrid->item(row));
+		auto* item = static_cast<GridItem*>(_mediaGrid->item(row));
 		item->info = itemInfoFor(catalog, item->mediaId, bestSet.contains(item->mediaId), sortByDate);
 	}
 
-	m_mediaGrid->sortItems(Qt::AscendingOrder);
-	renumberGridCaptions(m_mediaGrid);
+	_mediaGrid->sortItems(Qt::AscendingOrder);
+	renumberGridCaptions(_mediaGrid);
 }
 
 void MainWindow::applyNameFilter()
 {
-	const QString query = m_nameFilter->text().trimmed();
-	for (int row = 0; row < m_mediaGrid->count(); ++row)
+	const QString query = _nameFilter->text().trimmed();
+	for (int row = 0; row < _mediaGrid->count(); ++row)
 	{
-		auto* item = static_cast<GridItem*>(m_mediaGrid->item(row));
+		auto* item = static_cast<GridItem*>(_mediaGrid->item(row));
 		const bool hide = !nameMatchesFilter(item->info.name, query);
 		item->setHidden(hide);
 		if (hide)
 			item->setSelected(false);  // don't leave a hidden card in the selection (effectiveSelection walks it)
 	}
-	renumberGridCaptions(m_mediaGrid);
+	renumberGridCaptions(_mediaGrid);
 }
 
 std::vector<MediaId> MainWindow::effectiveSelection(std::optional<MediaId> id) const
 {
 	std::vector<MediaId> selected;
-	for (const QListWidgetItem* item : m_mediaGrid->selectedItems())
+	for (const QListWidgetItem* item : _mediaGrid->selectedItems())
 		selected.push_back(static_cast<const GridItem*>(item)->mediaId);
 	if (id && std::find(selected.cbegin(), selected.cend(), *id) == selected.cend())
 		selected = { *id };
@@ -1235,7 +1235,7 @@ QString MainWindow::bulletedItemNameList(const std::vector<MediaId>& selection) 
 
 void MainWindow::deleteSelectedItems()
 {
-	const std::vector<MediaId> selection = effectiveSelection(m_contextMenuTarget);
+	const std::vector<MediaId> selection = effectiveSelection(_contextMenuTarget);
 	if (selection.empty())
 		return;
 
@@ -1316,8 +1316,8 @@ void MainWindow::deleteSelectedItems()
 
 				// A recursive removal may have deleted all or part of what the viewer was showing even when it
 				// ultimately reported failure; do not leave the viewer presenting that stale folder state.
-				if (m_frameViewer->currentFolder() == folderPath)
-					m_frameViewer->showForFolder({});
+				if (_frameViewer->currentFolder() == folderPath)
+					_frameViewer->showForFolder({});
 			}
 
 			if (failedParts.empty())
@@ -1338,7 +1338,7 @@ void MainWindow::deleteSelectedItems()
 
 void MainWindow::removeSelectedItemsFromLibrary()
 {
-	const std::vector<MediaId> selection = effectiveSelection(m_contextMenuTarget);
+	const std::vector<MediaId> selection = effectiveSelection(_contextMenuTarget);
 	if (selection.empty())
 		return;
 
@@ -1379,7 +1379,7 @@ void MainWindow::removeSelectedItemsFromLibrary()
 
 void MainWindow::renameSelectedItemInteractive()
 {
-	const auto selected = m_mediaGrid->selectedItems();
+	const auto selected = _mediaGrid->selectedItems();
 	if (selected.size() != 1)
 		return;
 	renameItemInteractive(static_cast<const GridItem*>(selected.front())->mediaId);
@@ -1387,18 +1387,18 @@ void MainWindow::renameSelectedItemInteractive()
 
 void MainWindow::updateEditActions()
 {
-	const auto selected = m_mediaGrid->selectedItems();
+	const auto selected = _mediaGrid->selectedItems();
 	const bool hasSelection = !selected.empty();
-	m_deleteAction->setEnabled(hasSelection);
-	m_removeFromLibraryAction->setEnabled(hasSelection);
+	_deleteAction->setEnabled(hasSelection);
+	_removeFromLibraryAction->setEnabled(hasSelection);
 
 	// Both videos and photos can be renamed, so the action only needs exactly one selected item.
-	m_renameAction->setEnabled(selected.size() == 1);
+	_renameAction->setEnabled(selected.size() == 1);
 }
 
 void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globalPos)
 {
-	m_contextMenuTarget = id;
+	_contextMenuTarget = id;
 	Catalog& catalog = libraryCatalog();
 	const std::vector<MediaId> selection = effectiveSelection(id);
 	const QString folderPath = catalog.folderForMediaItem(id);
@@ -1474,7 +1474,7 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 		if (!sourcePath.isEmpty())
 			QApplication::clipboard()->setText(QDir::toNativeSeparators(sourcePath));
 	});
-	addActionMirroringShortcut(isPhoto ? tr("Rename photo") : tr("Rename media file"), m_renameAction,
+	addActionMirroringShortcut(isPhoto ? tr("Rename photo") : tr("Rename media file"), _renameAction,
 		[this, id] { renameItemInteractive(id); });
 	menu.addSeparator();
 
@@ -1516,12 +1516,12 @@ void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globa
 	menu.addSeparator();
 
 	addActionMirroringShortcut(selection.size() > 1 ? tr("Remove %1 items from library (untrack)").arg(selection.size()) : tr("Remove from library (untrack)"),
-		m_removeFromLibraryAction, &MainWindow::removeSelectedItemsFromLibrary);
+		_removeFromLibraryAction, &MainWindow::removeSelectedItemsFromLibrary);
 	addActionMirroringShortcut(selection.size() > 1 ? tr("Delete (%1 items)").arg(selection.size()) : tr("Delete"),
-		m_deleteAction, &MainWindow::deleteSelectedItems);
+		_deleteAction, &MainWindow::deleteSelectedItems);
 
 	menu.exec(globalPos);
-	m_contextMenuTarget = std::nullopt;
+	_contextMenuTarget = std::nullopt;
 }
 
 void MainWindow::playVideo(const MediaId& id)
@@ -1533,7 +1533,7 @@ void MainWindow::playVideo(const MediaId& id)
 		return;
 	}
 
-	auto* playerWindow = new VideoPlayerWindow(m_library, sourcePath, id, nullptr);  // hand the player the catalog id directly
+	auto* playerWindow = new VideoPlayerWindow(_library, sourcePath, id, nullptr);  // hand the player the catalog id directly
 	playerWindow->show();
 }
 
@@ -1604,7 +1604,7 @@ bool MainWindow::resplitVideoIntoFrames(const MediaId& id, bool preserveExisting
 	}
 	else
 	{
-		const Ffmpeg::PreviewResult result = Ffmpeg::generatePreviewFrames(videoFilePath, Catalog::previewDirFor(outputFolder), m_previewFrameCountCombo->currentData().toInt());
+		const Ffmpeg::PreviewResult result = Ffmpeg::generatePreviewFrames(videoFilePath, Catalog::previewDirFor(outputFolder), _previewFrameCountCombo->currentData().toInt());
 		catalog.setDurationMs(id, result.durationMs);  // backfill videos imported before durations were recorded; no-op if the probe failed
 	}
 
@@ -1650,13 +1650,13 @@ void MainWindow::importVideoBatch(QStringList videoPaths, const QString& storage
 	if (videoPaths.empty())
 		return;
 
-	if (m_isProcessing)
+	if (_isProcessing)
 	{
 		QMessageBox::information(this, tr("Busy"), tr("Already extracting frames. Please wait for the current operation to finish."));
 		return;
 	}
-	m_isProcessing = true;
-	const auto processingGuard = qScopeGuard([this] { m_isProcessing = false; });
+	_isProcessing = true;
+	const auto processingGuard = qScopeGuard([this] { _isProcessing = false; });
 
 	// Each extracted video below registers via Catalog::addMediaItem (a couple of store writes); batch them into
 	// one write for the whole call instead of one per video.
@@ -1767,7 +1767,7 @@ std::vector<Import::PhotoResult> MainWindow::importPhotoBatch(LabelId labelId, c
 
 void MainWindow::reExportAllVideos()
 {
-	if (m_isProcessing)
+	if (_isProcessing)
 	{
 		QMessageBox::information(this, tr("Busy"), tr("Already extracting frames. Please wait for the current operation to finish."));
 		return;
@@ -1797,8 +1797,8 @@ void MainWindow::reExportAllVideos()
 		return;
 	}
 
-	m_isProcessing = true;
-	const auto processingGuard = qScopeGuard([this] { m_isProcessing = false; });
+	_isProcessing = true;
+	const auto processingGuard = qScopeGuard([this] { _isProcessing = false; });
 
 	// Batch split-state and duration backfills across the whole pass into one metadata write.
 	Catalog::BatchScope batch(catalog);
@@ -1936,7 +1936,7 @@ void MainWindow::openImportDialog(const QStringList& initialStaging)
 		.viewChanged = [this] { refreshLibraryView(); }
 	};
 
-	ImportDialog dialog(m_library, std::move(callbacks), libraryCatalog().anySourceDir(), this);
+	ImportDialog dialog(_library, std::move(callbacks), libraryCatalog().anySourceDir(), this);
 	if (!initialStaging.isEmpty())
 		dialog.addToStaging(initialStaging);
 	dialog.exec();   // each "Import" inside the dialog already applies its batch synchronously via the callbacks above
@@ -1960,7 +1960,7 @@ void MainWindow::scanForUntrackedFiles()
 
 	QSettings settings;
 	constexpr const char* lastFolderKey = "untrackedScan/lastFolder";
-	const QString defaultStartDir = tracked.empty() ? m_library.rootFolder() : QFileInfo(*tracked.begin()).absolutePath();
+	const QString defaultStartDir = tracked.empty() ? _library.rootFolder() : QFileInfo(*tracked.begin()).absolutePath();
 	const QString startDir = settings.value(lastFolderKey, defaultStartDir).toString();
 	const QString dir = QFileDialog::getExistingDirectory(this, tr("Scan folder for untracked media"), startDir);
 	if (dir.isEmpty())
@@ -2025,7 +2025,7 @@ void MainWindow::checkCatalogIntegrity()
 		},
 	};
 
-	if (IntegrityCheckDialog::scanAndShowUi(libraryCatalog(), m_library.rootFolder(), std::move(callbacks), this))
+	if (IntegrityCheckDialog::scanAndShowUi(libraryCatalog(), _library.rootFolder(), std::move(callbacks), this))
 		refreshLibraryView();
 }
 
@@ -2045,21 +2045,21 @@ void MainWindow::toggleBest(const MediaId& id)
 	// The star's own checked state updates itself (it's a checkable QPushButton), but the dot strip needs
 	// an explicit refresh - the resort/no-op branches below don't recreate the card, so without this the
 	// dot would stay stale until the next full grid rebuild.
-	for (int row = 0; row < m_mediaGrid->count(); ++row)
+	for (int row = 0; row < _mediaGrid->count(); ++row)
 	{
-		auto* item = static_cast<GridItem*>(m_mediaGrid->item(row));
+		auto* item = static_cast<GridItem*>(_mediaGrid->item(row));
 		if (item->mediaId == id)
 		{
-			applyLabelDots(catalog, id, static_cast<MediaItemWidget*>(m_mediaGrid->itemWidget(item)));
+			applyLabelDots(catalog, id, static_cast<MediaItemWidget*>(_mediaGrid->itemWidget(item)));
 			break;
 		}
 	}
 
 	// If the Best filter is currently active, toggling Best changes which cards match - rebuild the grid;
 	// otherwise just reposition under favorites-first (cheap reorder, no rebuild).
-	if (m_labelSidebar->activeLabelIds().contains(Catalog::BestLabelId))
+	if (_labelSidebar->activeLabelIds().contains(Catalog::BestLabelId))
 		QMetaObject::invokeMethod(this, &MainWindow::refreshMediaGrid, Qt::QueuedConnection);
-	else if (m_sortControl->favoritesFirst())
+	else if (_sortControl->favoritesFirst())
 		QMetaObject::invokeMethod(this, &MainWindow::resortMediaGrid, Qt::QueuedConnection);
 }
 
@@ -2071,6 +2071,6 @@ void MainWindow::renameItemInteractive(const MediaId& id)
 
 	refreshLibraryView();
 	// A video rename moves its frame folder - follow it if the frame viewer was showing that folder.
-	if (!result.oldFolderPath.isEmpty() && m_frameViewer->currentFolder() == result.oldFolderPath && m_frameViewer->isVisible())
-		m_frameViewer->showForFolder(result.newFolderPath);
+	if (!result.oldFolderPath.isEmpty() && _frameViewer->currentFolder() == result.oldFolderPath && _frameViewer->isVisible())
+		_frameViewer->showForFolder(result.newFolderPath);
 }

@@ -18,7 +18,7 @@ inline QColor colorFromHex(const char* hex) { return QColor(QString::fromLatin1(
 }
 
 SegmentedToggle::SegmentedToggle(const QStringList& segments, QWidget* parent)
-	: QWidget(parent), m_segments(segments)
+	: QWidget(parent), _segments(segments)
 {
 	setMouseTracking(true);                 // hover repaint without a button held
 	setCursor(Qt::PointingHandCursor);
@@ -27,10 +27,10 @@ SegmentedToggle::SegmentedToggle(const QStringList& segments, QWidget* parent)
 
 void SegmentedToggle::setCurrentIndex(int index)
 {
-	index = qBound(0, index, static_cast<int>(m_segments.size()) - 1);
-	if (index == m_current)
+	index = qBound(0, index, static_cast<int>(_segments.size()) - 1);
+	if (index == _current)
 		return;
-	m_current = index;
+	_current = index;
 	update();
 }
 
@@ -38,15 +38,15 @@ QSize SegmentedToggle::sizeHint() const
 {
 	const QFontMetrics fm(font());
 	int seg = 0;
-	for (const QString& s : m_segments)
+	for (const QString& s : _segments)
 		seg = qMax(seg, fm.horizontalAdvance(s));
 	seg += 2 * SEG_HPAD;
-	return { static_cast<int>(m_segments.size()) * seg + 2 * BORDER, fm.height() + 2 * SEG_VPAD + 2 * BORDER };
+	return { static_cast<int>(_segments.size()) * seg + 2 * BORDER, fm.height() + 2 * SEG_VPAD + 2 * BORDER };
 }
 
 int SegmentedToggle::segmentAt(const QPoint& pos) const
 {
-	const int n = static_cast<int>(m_segments.size());
+	const int n = static_cast<int>(_segments.size());
 	if (n == 0)
 		return -1;
 	const double segW = (width() - 2.0 * BORDER) / n;
@@ -66,7 +66,7 @@ void SegmentedToggle::paintEvent(QPaintEvent*)
 	p.setBrush(Qt::NoBrush);
 	p.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), RADIUS, RADIUS);
 
-	const int    n    = static_cast<int>(m_segments.size());
+	const int    n    = static_cast<int>(_segments.size());
 	const double segW = (width() - 2.0 * BORDER) / n;
 	for (int i = 0; i < n; ++i)
 	{
@@ -80,8 +80,8 @@ void SegmentedToggle::paintEvent(QPaintEvent*)
 			p.drawLine(QPointF(seg.left(), seg.top() + 3), QPointF(seg.left(), seg.bottom() - 3));
 		}
 
-		const bool selected = (i == m_current);
-		const bool hovered  = (i == m_hovered);
+		const bool selected = (i == _current);
+		const bool hovered  = (i == _hovered);
 		if (selected)
 		{
 			p.setPen(Qt::NoPen);
@@ -98,7 +98,7 @@ void SegmentedToggle::paintEvent(QPaintEvent*)
 		}
 
 		p.setPen(selected ? colorFromHex(t.AccentText) : textCol);   // accent text on the selected fill, normal text on the rest
-		p.drawText(seg, Qt::AlignCenter, m_segments[i]);
+		p.drawText(seg, Qt::AlignCenter, _segments[i]);
 	}
 }
 
@@ -106,22 +106,22 @@ void SegmentedToggle::mousePressEvent(QMouseEvent* event)
 {
 	if (event->button() == Qt::LeftButton)
 	{
-		if (m_segments.size() == 2)
+		if (_segments.size() == 2)
 		{
 			// Clicking anywhere toggles the switch - intentional
-			m_current = m_current == 0 ? 1 : 0;
+			_current = _current == 0 ? 1 : 0;
 		}
 		else
 		{
 			const int clickedSegment = segmentAt(event->pos());
-			if (clickedSegment == -1 || clickedSegment == m_current)
+			if (clickedSegment == -1 || clickedSegment == _current)
 				return;
 
-			m_current = clickedSegment;
+			_current = clickedSegment;
 		}
 
 		update();
-		emit currentChanged(m_current);
+		emit currentChanged(_current);
 	}
 	QWidget::mousePressEvent(event);
 }
@@ -129,9 +129,9 @@ void SegmentedToggle::mousePressEvent(QMouseEvent* event)
 void SegmentedToggle::mouseMoveEvent(QMouseEvent* event)
 {
 	const int i = segmentAt(event->pos());
-	if (i != m_hovered)
+	if (i != _hovered)
 	{
-		m_hovered = i;
+		_hovered = i;
 		update();
 	}
 	QWidget::mouseMoveEvent(event);
@@ -139,9 +139,9 @@ void SegmentedToggle::mouseMoveEvent(QMouseEvent* event)
 
 void SegmentedToggle::leaveEvent(QEvent* event)
 {
-	if (m_hovered != -1)
+	if (_hovered != -1)
 	{
-		m_hovered = -1;
+		_hovered = -1;
 		update();
 	}
 	QWidget::leaveEvent(event);

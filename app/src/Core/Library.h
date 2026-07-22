@@ -36,7 +36,7 @@ public:
 
 	// False until the first setRoot() succeeds. The accessors below assert on an empty Library rather than
 	// inventing a value, so ask this only where "no library yet" is genuinely reachable - i.e. at startup.
-	[[nodiscard]] bool isLoaded() const { return m_state != nullptr; }
+	[[nodiscard]] bool isLoaded() const { return _state != nullptr; }
 
 	[[nodiscard]] const QString& rootFolder() const;
 	[[nodiscard]] QString photosRootFolder() const;
@@ -50,7 +50,7 @@ public:
 	[[nodiscard]] bool flushPendingWrites(QString* error = nullptr);
 	[[nodiscard]] QString pendingPersistenceError() const;
 	void setPersistenceFailureHandler(std::function<void()> handler);
-	[[nodiscard]] uint64_t generation() const { return m_generation; }
+	[[nodiscard]] uint64_t generation() const { return _generation; }
 
 	Library(const Library&) = delete;
 	Library& operator=(const Library&) = delete;
@@ -59,7 +59,7 @@ public:
 	~Library();
 
 private:
-	std::function<void()> m_persistenceFailureHandler;
-	std::unique_ptr<LibraryState> m_state;
-	uint64_t m_generation = 0;
+	std::function<void()> _persistenceFailureHandler;
+	std::unique_ptr<LibraryState> _state;
+	uint64_t _generation = 0;
 };

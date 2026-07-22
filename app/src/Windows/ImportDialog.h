@@ -166,7 +166,7 @@ private:
 	void runImport();
 	[[nodiscard]] const LabelOption* findLabelOption(const QString& id) const;
 
-	// --- Provisional labels (folder-derived or "Create label"); all mutate m_provisionalLabels and re-render via
+	// --- Provisional labels (folder-derived or "Create label"); all mutate _provisionalLabels and re-render via
 	// refreshLabelList. See ImportDialog.cpp for the model. ---------------------------------------------------
 	[[nodiscard]] static bool isProvisionalId(const QString& id);
 	// The id of the label whose display name matches (case-insensitive), skipping excludeId; empty if none.
@@ -190,7 +190,7 @@ private:
 	void materializeUsedProvisionalLabels();
 
 private:
-	// Per-staged-item state, accumulated by dragging labels from m_labelList onto the card in m_stagedGrid
+	// Per-staged-item state, accumulated by dragging labels from _labelList onto the card in _stagedGrid
 	// and toggling its Best star; applied (and removed from here) only once "Import" runs successfully. The
 	// first id in pendingLabelIds resolves the item's destination folder at Import time (see runImport) -
 	// that's the only place this ordering matters; there's no other state or UI for it.
@@ -204,18 +204,18 @@ private:
 		QListWidgetItem* item = nullptr;  // the grid item carrying this entry's MediaItemWidget card
 	};
 
-	Library& m_library;
-	Callbacks m_callbacks;
-	std::vector<LabelOption> m_labelOptions;       // cached list: m_provisionalLabels + the Catalog's real labels
-	std::vector<LabelOption> m_provisionalLabels;  // labels minted in-dialog, not in the Catalog until Import materializes them
-	int m_provisionalSeq = 0;                      // mints unique provisional ids ("new:<n>")
-	QHash<MediaId, StagedEntry> m_staged;
+	Library& _library;
+	Callbacks _callbacks;
+	std::vector<LabelOption> _labelOptions;       // cached list: _provisionalLabels + the Catalog's real labels
+	std::vector<LabelOption> _provisionalLabels;  // labels minted in-dialog, not in the Catalog until Import materializes them
+	int _provisionalSeq = 0;                      // mints unique provisional ids ("new:<n>")
+	QHash<MediaId, StagedEntry> _staged;
 
-	QListWidget* m_labelList  = nullptr;
-	QListWidget* m_stagedGrid = nullptr;
+	QListWidget* _labelList  = nullptr;
+	QListWidget* _stagedGrid = nullptr;
 
 	// Source-file relocation controls - the machinery lives in SourceRelocation.h (see runImport for the use).
-	QComboBox* m_relocateModeCombo = nullptr;
-	QLineEdit* m_relocateFolderEdit = nullptr;
-	QSplitter* m_splitter = nullptr;
+	QComboBox* _relocateModeCombo = nullptr;
+	QLineEdit* _relocateFolderEdit = nullptr;
+	QSplitter* _splitter = nullptr;
 };

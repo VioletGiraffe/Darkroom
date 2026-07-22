@@ -14,5 +14,5 @@ public:
 private:
 	void refresh();
 
-	QPlainTextEdit* m_view = nullptr;
+	QPlainTextEdit* _view = nullptr;
 };

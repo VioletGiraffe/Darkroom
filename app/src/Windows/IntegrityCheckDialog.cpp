@@ -28,7 +28,7 @@ bool IntegrityCheckDialog::scanAndShowUi(const Catalog& catalog, const QString& 
 }
 
 IntegrityCheckDialog::IntegrityCheckDialog(const Catalog& catalog, const CatalogIntegrity::IntegrityReport& report, Callbacks callbacks, QWidget* parent)
-	: QDialog(parent), m_callbacks(std::move(callbacks))
+	: QDialog(parent), _callbacks(std::move(callbacks))
 {
 	setWindowTitle(tr("Catalog Integrity Check"));
 
@@ -52,7 +52,7 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog& catalog, const Catalog
 	QVBoxLayout* contentLayout = new QVBoxLayout(content);
 
 	// A member (not a local) because it owns the row state the section button handlers share.
-	m_sections = std::make_unique<IntegrityCheckSections>(catalog, report, m_callbacks, content, contentLayout, this);
+	_sections = std::make_unique<IntegrityCheckSections>(catalog, report, _callbacks, content, contentLayout, this);
 
 	contentLayout->addStretch(1);
 	scroll->setWidget(content);

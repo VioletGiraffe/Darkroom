@@ -134,8 +134,8 @@ using RelocateMode = SourceRelocation::Mode;
 
 ImportDialog::ImportDialog(Library& library, Callbacks callbacks, const QString& suggestedRelocateFolder, QWidget* parent)
 	: QDialog(parent)
-	, m_library(library)
-	, m_callbacks(std::move(callbacks))
+	, _library(library)
+	, _callbacks(std::move(callbacks))
 {
 	setWindowTitle(tr("Import"));
 	// Opens maximized and acts as a full workspace window: give it real min/max caption buttons (a QDialog has
@@ -147,73 +147,73 @@ ImportDialog::ImportDialog(Library& library, Callbacks callbacks, const QString&
 
 	// --- Source file relocation row ---
 	QSettings relocateSettings;
-	m_relocateModeCombo = new QComboBox(this);
+	_relocateModeCombo = new QComboBox(this);
 	// The interim wording notes the photo meaning (Reference) in place; a deeper redesign of the whole
 	// owned/referenced model is a flagged post-v1 direction, so this stays a plain static label until then.
-	m_relocateModeCombo->addItem(tr("Leave source file in place (photos: reference, never touched)"), int(RelocateMode::LeaveInPlace));
-	m_relocateModeCombo->addItem(tr("Copy source file to:"), int(RelocateMode::Copy));
-	m_relocateModeCombo->addItem(tr("Move source file to:"), int(RelocateMode::Move));
+	_relocateModeCombo->addItem(tr("Leave source file in place (photos: reference, never touched)"), int(RelocateMode::LeaveInPlace));
+	_relocateModeCombo->addItem(tr("Copy source file to:"), int(RelocateMode::Copy));
+	_relocateModeCombo->addItem(tr("Move source file to:"), int(RelocateMode::Move));
 	const int savedRelocateMode = relocateSettings.value("importDialog/relocateMode", int(RelocateMode::LeaveInPlace)).toInt();
-	m_relocateModeCombo->setCurrentIndex(qMax(0, m_relocateModeCombo->findData(savedRelocateMode)));
+	_relocateModeCombo->setCurrentIndex(qMax(0, _relocateModeCombo->findData(savedRelocateMode)));
 
 	// Persisted choice wins; the caller's suggestion only seeds the field on first use.
 	QString relocateFolder = relocateSettings.value("importDialog/relocateFolder").toString();
 	if (relocateFolder.isEmpty())
 		relocateFolder = suggestedRelocateFolder;
-	m_relocateFolderEdit = new QLineEdit(relocateFolder, this);
+	_relocateFolderEdit = new QLineEdit(relocateFolder, this);
 	QPushButton* relocateBrowseButton = new QPushButton(tr("Browse..."), this);
 
 	const auto updateRelocateRowEnabled = [this, relocateBrowseButton] {
-		const bool enabled = m_relocateModeCombo->currentData().toInt() != int(RelocateMode::LeaveInPlace);
-		m_relocateFolderEdit->setEnabled(enabled);
+		const bool enabled = _relocateModeCombo->currentData().toInt() != int(RelocateMode::LeaveInPlace);
+		_relocateFolderEdit->setEnabled(enabled);
 		relocateBrowseButton->setEnabled(enabled);
 	};
 	updateRelocateRowEnabled();
-	connect(m_relocateModeCombo, &QComboBox::currentIndexChanged, this, updateRelocateRowEnabled);
+	connect(_relocateModeCombo, &QComboBox::currentIndexChanged, this, updateRelocateRowEnabled);
 
 	connect(relocateBrowseButton, &QPushButton::clicked, this, [this] {
-		const QString path = QFileDialog::getExistingDirectory(this, tr("Select destination folder"), m_relocateFolderEdit->text());
+		const QString path = QFileDialog::getExistingDirectory(this, tr("Select destination folder"), _relocateFolderEdit->text());
 		if (!path.isEmpty())
-			m_relocateFolderEdit->setText(QDir::toNativeSeparators(path));
+			_relocateFolderEdit->setText(QDir::toNativeSeparators(path));
 	});
 
 	QHBoxLayout* relocateRow = new QHBoxLayout;
 	relocateRow->addWidget(new QLabel(tr("Source file:"), this));
-	relocateRow->addWidget(m_relocateModeCombo);
-	relocateRow->addWidget(m_relocateFolderEdit, 1);
+	relocateRow->addWidget(_relocateModeCombo);
+	relocateRow->addWidget(_relocateFolderEdit, 1);
 	relocateRow->addWidget(relocateBrowseButton);
 	outerLayout->addLayout(relocateRow);
 
 	// --- Main area: [label list | staged video grid], mirroring MainWindow's [LabelSidebar | grid] split ---
-	m_splitter = new QSplitter(Qt::Horizontal, this);
-	outerLayout->addWidget(m_splitter, 1);
+	_splitter = new QSplitter(Qt::Horizontal, this);
+	outerLayout->addWidget(_splitter, 1);
 
 	QWidget* labelPane = new QWidget();
 	QVBoxLayout* labelPaneLayout = new QVBoxLayout(labelPane);
 	labelPaneLayout->setContentsMargins(0, 0, 0, 0);
 	labelPaneLayout->addWidget(new QLabel(tr("Labels")));
 
-	m_labelList = new ContentWidthListWidget();  // hugs its content so the pane auto-fits the label names
-	m_labelList->setSelectionMode(QAbstractItemView::NoSelection);  // rows are dragged, never selected
-	m_labelList->setFrameShape(QFrame::NoFrame);
+	_labelList = new ContentWidthListWidget();  // hugs its content so the pane auto-fits the label names
+	_labelList->setSelectionMode(QAbstractItemView::NoSelection);  // rows are dragged, never selected
+	_labelList->setFrameShape(QFrame::NoFrame);
 	// Cap the content-hugging width so a pathologically long label name can't blow the pane up; the row elides
 	// instead (horizontal scrolling off). No explicit minimum width, so the minimum tracks content up to the cap.
-	m_labelList->setMaximumWidth(LABEL_LIST_MAX_WIDTH);
-	m_labelList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	_labelList->setMaximumWidth(LABEL_LIST_MAX_WIDTH);
+	_labelList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	// LabelRowDelegate paints the rows just like the main window's sidebar: squircle swatch, name, dashed
 	// hover outline (mouse tracking on so hover repaints). The active pill/spine states simply never engage
 	// here - no row is ever marked active.
-	m_labelList->setItemDelegate(new LabelRowDelegate(m_labelList));
-	m_labelList->setMouseTracking(true);
+	_labelList->setItemDelegate(new LabelRowDelegate(_labelList));
+	_labelList->setMouseTracking(true);
 	// A press-and-drag on a label row drags the label out, to be dropped onto a staged card.
-	new ListRowDragFilter(m_labelList, [](const QListWidgetItem* item) {
+	new ListRowDragFilter(_labelList, [](const QListWidgetItem* item) {
 		auto* mime = new QMimeData();
 		mime->setData(LabelMimeType, item->data(kLabelIdRole).toString().toUtf8());
 		return mime;
 	});
-	m_labelList->setContextMenuPolicy(Qt::CustomContextMenu);  // right-click a row to edit a provisional label
-	connect(m_labelList, &QListWidget::customContextMenuRequested, this, &ImportDialog::showLabelListContextMenu);
-	labelPaneLayout->addWidget(m_labelList, 1);
+	_labelList->setContextMenuPolicy(Qt::CustomContextMenu);  // right-click a row to edit a provisional label
+	connect(_labelList, &QListWidget::customContextMenuRequested, this, &ImportDialog::showLabelListContextMenu);
+	labelPaneLayout->addWidget(_labelList, 1);
 
 	QPushButton* addLabelButton = new QPushButton(tr("Create label"));
 	addLabelButton->setObjectName("addLabelButton");
@@ -244,19 +244,19 @@ ImportDialog::ImportDialog(Library& library, Callbacks callbacks, const QString&
 	});
 	labelPaneLayout->addWidget(addLabelButton);
 
-	m_splitter->addWidget(labelPane);
+	_splitter->addWidget(labelPane);
 
-	m_stagedGrid = new QListWidget();
-	m_stagedGrid->setViewMode(QListView::IconMode);
-	m_stagedGrid->setFlow(QListView::LeftToRight);
-	m_stagedGrid->setWrapping(true);
-	m_stagedGrid->setResizeMode(QListView::Adjust);
-	m_stagedGrid->setMovement(QListView::Static);
-	m_stagedGrid->setSelectionMode(QAbstractItemView::ExtendedSelection);
-	m_stagedGrid->setSpacing(10);
+	_stagedGrid = new QListWidget();
+	_stagedGrid->setViewMode(QListView::IconMode);
+	_stagedGrid->setFlow(QListView::LeftToRight);
+	_stagedGrid->setWrapping(true);
+	_stagedGrid->setResizeMode(QListView::Adjust);
+	_stagedGrid->setMovement(QListView::Static);
+	_stagedGrid->setSelectionMode(QAbstractItemView::ExtendedSelection);
+	_stagedGrid->setSpacing(10);
 	// The cards are transparent (see MediaItemWidget), so the selection highlight has to come from the list
 	// item behind them - same rule the main grid uses.
-	m_stagedGrid->setStyleSheet(QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().AccentBg));
+	_stagedGrid->setStyleSheet(QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().AccentBg));
 
 	// Keyboard accelerators on the staged grid, mirroring MainWindow's edit actions: F2 renames, Del removes from
 	// staging, Shift+Del deletes the source file(s). WidgetWithChildrenShortcut scopes them to the grid so they don't
@@ -269,25 +269,25 @@ ImportDialog::ImportDialog(Library& library, Callbacks callbacks, const QString&
 		if (ids.size() == 1)
 			renameStagedItem(ids.front());   // F2 renames only when exactly one item is selected
 	});
-	m_stagedGrid->addAction(renameStagedAction);
+	_stagedGrid->addAction(renameStagedAction);
 
 	auto* removeStagedAction = new QAction(tr("Remove from staging"), this);
 	removeStagedAction->setShortcut(QKeySequence(Shortcuts::RemoveFromList));
 	removeStagedAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
 	connect(removeStagedAction, &QAction::triggered, this, [this] { removeStagedItems(selectedStagedIds()); });
-	m_stagedGrid->addAction(removeStagedAction);
+	_stagedGrid->addAction(removeStagedAction);
 
 	auto* deleteStagedAction = new QAction(tr("Delete source file(s)"), this);
 	deleteStagedAction->setShortcut(QKeySequence(Shortcuts::DeleteFile));
 	deleteStagedAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
 	connect(deleteStagedAction, &QAction::triggered, this, [this] { deleteStagedSourceFiles(selectedStagedIds()); });
-	m_stagedGrid->addAction(deleteStagedAction);
+	_stagedGrid->addAction(deleteStagedAction);
 
-	m_splitter->addWidget(m_stagedGrid);
+	_splitter->addWidget(_stagedGrid);
 
-	m_splitter->setStretchFactor(0, 0);
-	m_splitter->setStretchFactor(1, 1);
-	m_splitter->setCollapsible(0, false);
+	_splitter->setStretchFactor(0, 0);
+	_splitter->setStretchFactor(1, 1);
+	_splitter->setCollapsible(0, false);
 
 	QLabel* instructions = new QLabel(
 		tr("Drop video or image files here to stage them, then drag labels from the list onto a card to tag it. "
@@ -317,20 +317,20 @@ ImportDialog::ImportDialog(Library& library, Callbacks callbacks, const QString&
 	}
 	const QByteArray splitterState = QSettings{}.value("importDialog/splitter").toByteArray();
 	if (!splitterState.isEmpty())
-		m_splitter->restoreState(splitterState);
+		_splitter->restoreState(splitterState);
 }
 
 ImportDialog::~ImportDialog()
 {
 	saveWindowGeometry(this, "importDialog");
-	QSettings{}.setValue("importDialog/splitter", m_splitter->saveState());
-	QSettings{}.setValue("importDialog/relocateMode", m_relocateModeCombo->currentData().toInt());
-	QSettings{}.setValue("importDialog/relocateFolder", m_relocateFolderEdit->text());
+	QSettings{}.setValue("importDialog/splitter", _splitter->saveState());
+	QSettings{}.setValue("importDialog/relocateMode", _relocateModeCombo->currentData().toInt());
+	QSettings{}.setValue("importDialog/relocateFolder", _relocateFolderEdit->text());
 
 	// Best-effort: clean up whatever's still staged when the dialog closes (anything already unstaged or
 	// successfully added already removed its own temp dir). The isEmpty guard is load-bearing: staged photos
 	// have no temp dir, and QDir("") refers to the working directory - removeRecursively on it would be a disaster.
-	for (const StagedEntry& entry : std::as_const(m_staged))
+	for (const StagedEntry& entry : std::as_const(_staged))
 		if (!entry.tempPreviewDir.isEmpty())
 			QDir(entry.tempPreviewDir).removeRecursively();
 }
@@ -359,20 +359,20 @@ void ImportDialog::refreshLabelList()
 {
 	// The list is this session's provisional labels (folder-derived or manually added) followed by the Catalog's
 	// real ones. Provisionals lead so they're easy to review/rename before Import materializes them.
-	m_labelOptions.clear();
-	for (const LabelOption& provisional : m_provisionalLabels)
-		m_labelOptions.push_back(provisional);
+	_labelOptions.clear();
+	for (const LabelOption& provisional : _provisionalLabels)
+		_labelOptions.push_back(provisional);
 	// Every ordinary Catalog label is a candidate destination - read from the Catalog model (which also
 	// carries each label's color), not from a disk listing.
-	for (const Catalog::Label& label : m_library.catalog().allLabels())
+	for (const Catalog::Label& label : _library.catalog().allLabels())
 		if (!label.isVirtual())
-			m_labelOptions.push_back(LabelOption{ toString(label.id), label.displayName, label.color });
+			_labelOptions.push_back(LabelOption{ toString(label.id), label.displayName, label.color });
 
-	m_labelList->clear();
-	for (const LabelOption& option : m_labelOptions)
+	_labelList->clear();
+	for (const LabelOption& option : _labelOptions)
 	{
 		auto* item = new QListWidgetItem(
-			option.provisional ? tr("%1  (new)").arg(option.displayName) : option.displayName, m_labelList);
+			option.provisional ? tr("%1  (new)").arg(option.displayName) : option.displayName, _labelList);
 		item->setData(kLabelIdRole, option.id);
 		item->setData(LabelRowDelegate::SwatchColorRole, LabelRowDelegate::swatchColor(option.color));
 		if (option.provisional)
@@ -385,12 +385,12 @@ void ImportDialog::refreshLabelList()
 	}
 
 	// The row set changed the content width; let the layout/splitter re-fit the pane (mirrors LabelSidebar::rebuildRows).
-	m_labelList->updateGeometry();
+	_labelList->updateGeometry();
 }
 
 const ImportDialog::LabelOption* ImportDialog::findLabelOption(const QString& id) const
 {
-	for (const LabelOption& option : m_labelOptions)
+	for (const LabelOption& option : _labelOptions)
 		if (option.id == id)
 			return &option;
 	return nullptr;
@@ -404,7 +404,7 @@ bool ImportDialog::isProvisionalId(const QString& id)
 QString ImportDialog::findLabelIdByName(const QString& name, const QString& excludeId) const
 {
 	// Case-insensitive to match the (Windows) filesystem and Catalog's own label-name uniqueness rule.
-	for (const LabelOption& option : m_labelOptions)
+	for (const LabelOption& option : _labelOptions)
 		if (option.id != excludeId && option.displayName.compare(name, Qt::CaseInsensitive) == 0)
 			return option.id;
 	return {};
@@ -413,12 +413,12 @@ QString ImportDialog::findLabelIdByName(const QString& name, const QString& excl
 QString ImportDialog::addProvisionalLabel(const QString& name)
 {
 	LabelOption option;
-	option.id = QStringLiteral("new:%1").arg(m_provisionalSeq++);
+	option.id = QStringLiteral("new:%1").arg(_provisionalSeq++);
 	option.displayName = name;
 	option.color = Catalog::randomLabelColor();  // the swatch it will keep when Import creates it for real
 	option.provisional = true;
-	m_provisionalLabels.push_back(option);
-	m_labelOptions.push_back(option);  // keep the cached union live so a follow-up findLabelId/updateCardLabelDots sees it at once
+	_provisionalLabels.push_back(option);
+	_labelOptions.push_back(option);  // keep the cached union live so a follow-up findLabelId/updateCardLabelDots sees it at once
 	return option.id;
 }
 
@@ -434,7 +434,7 @@ QString ImportDialog::ensureLabelForFolderName(const QString& name)
 
 void ImportDialog::showLabelListContextMenu(const QPoint& pos)
 {
-	QListWidgetItem* item = m_labelList->itemAt(pos);
+	QListWidgetItem* item = _labelList->itemAt(pos);
 	if (!item)
 		return;
 	const QString labelId = item->data(kLabelIdRole).toString();
@@ -456,14 +456,14 @@ void ImportDialog::showLabelListContextMenu(const QPoint& pos)
 				   "assign the existing label and rename it after import runs."));
 		});
 	}
-	menu.exec(m_labelList->viewport()->mapToGlobal(pos));
+	menu.exec(_labelList->viewport()->mapToGlobal(pos));
 }
 
 void ImportDialog::renameProvisionalLabel(const QString& provisionalId)
 {
-	const auto option = std::find_if(m_provisionalLabels.begin(), m_provisionalLabels.end(),
+	const auto option = std::find_if(_provisionalLabels.begin(), _provisionalLabels.end(),
 		[&](const LabelOption& o) { return o.id == provisionalId; });
-	if (option == m_provisionalLabels.end())
+	if (option == _provisionalLabels.end())
 		return;
 
 	bool ok = false;
@@ -492,9 +492,9 @@ void ImportDialog::renameProvisionalLabel(const QString& provisionalId)
 
 void ImportDialog::setProvisionalLabelColor(const QString& provisionalId)
 {
-	const auto option = std::find_if(m_provisionalLabels.begin(), m_provisionalLabels.end(),
+	const auto option = std::find_if(_provisionalLabels.begin(), _provisionalLabels.end(),
 		[&](const LabelOption& o) { return o.id == provisionalId; });
-	if (option == m_provisionalLabels.end())
+	if (option == _provisionalLabels.end())
 		return;
 
 	const QColor initial = option->color.isEmpty() ? QColor(Qt::white) : QColor(option->color);
@@ -510,7 +510,7 @@ void ImportDialog::setProvisionalLabelColor(const QString& provisionalId)
 bool ImportDialog::remapStagedLabelIds(const QHash<QString, QString>& mapping)
 {
 	bool anyDropped = false;
-	for (auto it = m_staged.begin(); it != m_staged.end(); ++it)
+	for (auto it = _staged.begin(); it != _staged.end(); ++it)
 	{
 		QStringList remapped;
 		for (const QString& labelId : std::as_const(it->pendingLabelIds))
@@ -535,8 +535,8 @@ void ImportDialog::deleteProvisionalLabel(const QString& provisionalId)
 	// Strip the label from every staged card that carried it, then drop it from the list.
 	remapStagedLabelIds({ { provisionalId, QString{} } });
 
-	m_provisionalLabels.erase(std::remove_if(m_provisionalLabels.begin(), m_provisionalLabels.end(),
-		[&](const LabelOption& o) { return o.id == provisionalId; }), m_provisionalLabels.end());
+	_provisionalLabels.erase(std::remove_if(_provisionalLabels.begin(), _provisionalLabels.end(),
+		[&](const LabelOption& o) { return o.id == provisionalId; }), _provisionalLabels.end());
 	refreshLabelList();
 }
 
@@ -546,14 +546,14 @@ void ImportDialog::mergeProvisionalInto(const QString& provisionalId, const QStr
 	// nothing in the Catalog changes; it's a rewrite of the staged cards' pending assignments.
 	remapStagedLabelIds({ { provisionalId, targetId } });
 
-	m_provisionalLabels.erase(std::remove_if(m_provisionalLabels.begin(), m_provisionalLabels.end(),
-		[&](const LabelOption& o) { return o.id == provisionalId; }), m_provisionalLabels.end());
+	_provisionalLabels.erase(std::remove_if(_provisionalLabels.begin(), _provisionalLabels.end(),
+		[&](const LabelOption& o) { return o.id == provisionalId; }), _provisionalLabels.end());
 	refreshLabelList();
 }
 
 void ImportDialog::updateAllCardLabelDots()
 {
-	for (auto it = m_staged.constBegin(); it != m_staged.constEnd(); ++it)
+	for (auto it = _staged.constBegin(); it != _staged.constEnd(); ++it)
 		updateCardLabelDots(it.key());
 }
 
@@ -574,7 +574,7 @@ MediaItemWidget* ImportDialog::buildStagedCard(const MediaId& id, const QString&
 	if (!isSupportedImageFile(path))
 	{
 		const int frameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
-		canvasSize.setWidth(MediaItemWidget::videoCanvasWidthForTiling(STAGED_CARD_IMAGE_HEIGHT, frameCount, m_stagedGrid->spacing()));
+		canvasSize.setWidth(MediaItemWidget::videoCanvasWidthForTiling(STAGED_CARD_IMAGE_HEIGHT, frameCount, _stagedGrid->spacing()));
 		previewPaths.clear();
 		const QDir previewDir(tempPreviewDir);
 		for (const QString& file : listFrameImageFiles(previewDir))
@@ -587,8 +587,8 @@ MediaItemWidget* ImportDialog::buildStagedCard(const MediaId& id, const QString&
 		id,
 		/*inBest*/ false,
 		[this, id] {
-			auto it = m_staged.find(id);
-			if (it != m_staged.end())
+			auto it = _staged.find(id);
+			if (it != _staged.end())
 				it->pendingBest = !it->pendingBest;  // the star button's own checked state is Qt's, not ours
 		},
 		[this, id] { previewStagedItem(id); },   // double-click: open the photo / play the video (same as the menu action)
@@ -601,8 +601,8 @@ MediaItemWidget* ImportDialog::buildStagedCard(const MediaId& id, const QString&
 	card->setOnLabelDropped([this, id](const QString& labelId) {
 		for (const MediaId& target : effectiveStagedSelection(id))
 		{
-			auto it = m_staged.find(target);
-			if (it != m_staged.end() && !it->pendingLabelIds.contains(labelId))
+			auto it = _staged.find(target);
+			if (it != _staged.end() && !it->pendingLabelIds.contains(labelId))
 				it->pendingLabelIds << labelId;
 			updateCardLabelDots(target);
 		}
@@ -628,14 +628,14 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 		if (!file.labelName.isEmpty())
 			labelNameByPath.insert(file.path, file.labelName);
 
-	// Dedup by MediaId, both against already-staged entries and within this batch (m_staged is keyed by id,
+	// Dedup by MediaId, both against already-staged entries and within this batch (_staged is keyed by id,
 	// so accepting a second same-id file would silently overwrite the first entry, orphaning its card and
 	// leaking its temp dir). The id match (name+size) is the cheap gate; a byte comparison then classifies
 	// it, mirroring SourceRelocation's gate-then-verify shape: identical content is a plain duplicate,
 	// skipped silently, while different content is a genuine collision the user must know about - the
 	// catalog tracks at most one item per id, so the file can't be staged alongside its twin.
 	QHash<MediaId, QString> stagedPathById;
-	for (auto it = m_staged.constBegin(); it != m_staged.constEnd(); ++it)
+	for (auto it = _staged.constBegin(); it != _staged.constEnd(); ++it)
 		stagedPathById.insert(it.key(), it->path);
 
 	QStringList newPaths;
@@ -675,8 +675,8 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 	{
 		const bool isPhoto = isSupportedImageFile(path);
 		const QString existingPath = isPhoto
-			? m_library.catalog().findPhotoBySameContent(path)
-			: m_library.catalog().sourcePathForMediaItem(MediaId::fromFile(path));
+			? _library.catalog().findPhotoBySameContent(path)
+			: _library.catalog().sourcePathForMediaItem(MediaId::fromFile(path));
 		if (!existingPath.isEmpty())
 			duplicateLines << tr("%1\n    is already imported as %2").arg(QDir::toNativeSeparators(path), QDir::toNativeSeparators(existingPath));
 		else
@@ -711,15 +711,15 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 
 		auto* item = new QListWidgetItem();
 		item->setSizeHint(card->sizeHint());
-		m_stagedGrid->addItem(item);
-		m_stagedGrid->setItemWidget(item, card);
+		_stagedGrid->addItem(item);
+		_stagedGrid->setItemWidget(item, card);
 
-		m_staged.insert(id, StagedEntry{ path, tempPreviewDir, durationMs, /*pendingBest*/ false, /*pendingLabelIds*/ {}, item });
+		_staged.insert(id, StagedEntry{ path, tempPreviewDir, durationMs, /*pendingBest*/ false, /*pendingLabelIds*/ {}, item });
 
 		// Pre-assign the folder-derived label (the first/destination label), if this file came from a dropped folder.
 		if (const QString labelId = labelIdByPath.value(path); !labelId.isEmpty())
 		{
-			m_staged[id].pendingLabelIds << labelId;
+			_staged[id].pendingLabelIds << labelId;
 			updateCardLabelDots(id);
 		}
 	};
@@ -795,20 +795,20 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 
 void ImportDialog::unstage(const MediaId& id)
 {
-	auto it = m_staged.find(id);
-	if (it == m_staged.end())
+	auto it = _staged.find(id);
+	if (it == _staged.end())
 		return;
 
 	if (!it->tempPreviewDir.isEmpty())  // photos have none; QDir("") would be the working directory
 		QDir(it->tempPreviewDir).removeRecursively();
-	delete it->item;  // also removes the row from m_stagedGrid and deletes its embedded MediaItemWidget
-	m_staged.erase(it);
+	delete it->item;  // also removes the row from _stagedGrid and deletes its embedded MediaItemWidget
+	_staged.erase(it);
 }
 
 void ImportDialog::updateCardLabelDots(const MediaId& id)
 {
-	const auto it = m_staged.constFind(id);
-	if (it == m_staged.constEnd())
+	const auto it = _staged.constFind(id);
+	if (it == _staged.constEnd())
 		return;
 
 	std::vector<QColor> colors;
@@ -822,18 +822,18 @@ void ImportDialog::updateCardLabelDots(const MediaId& id)
 		}
 	}
 
-	auto* card = static_cast<MediaItemWidget*>(m_stagedGrid->itemWidget(it->item));
+	auto* card = static_cast<MediaItemWidget*>(_stagedGrid->itemWidget(it->item));
 	card->setLabelDots(colors, names.join(", "));
 }
 
 std::vector<MediaId> ImportDialog::effectiveStagedSelection(const MediaId& id) const
 {
-	const QList<QListWidgetItem*> selected = m_stagedGrid->selectedItems();
-	if (selected.size() <= 1 || !selected.contains(m_staged.value(id).item))
+	const QList<QListWidgetItem*> selected = _stagedGrid->selectedItems();
+	if (selected.size() <= 1 || !selected.contains(_staged.value(id).item))
 		return { id };
 
 	std::vector<MediaId> targets;
-	for (auto it = m_staged.constBegin(); it != m_staged.constEnd(); ++it)
+	for (auto it = _staged.constBegin(); it != _staged.constEnd(); ++it)
 		if (selected.contains(it->item))
 			targets.push_back(it.key());
 	return targets;
@@ -841,7 +841,7 @@ std::vector<MediaId> ImportDialog::effectiveStagedSelection(const MediaId& id) c
 
 void ImportDialog::showStagedCardContextMenu(const MediaId& id, const QPoint& globalPos)
 {
-	if (!m_staged.contains(id))
+	if (!_staged.contains(id))
 		return;
 	const std::vector<MediaId> selection = effectiveStagedSelection(id);
 
@@ -851,7 +851,7 @@ void ImportDialog::showStagedCardContextMenu(const MediaId& id, const QPoint& gl
 	// an all-photo selection of 2+ - the file paths are ready even though nothing has been imported yet.
 	std::vector<MediaId> photoSelection;
 	for (const MediaId& sel : selection)
-		if (isSupportedImageFile(m_staged.value(sel).path))
+		if (isSupportedImageFile(_staged.value(sel).path))
 			photoSelection.push_back(sel);
 	if (photoSelection.size() == selection.size() && photoSelection.size() >= 2)
 	{
@@ -860,7 +860,7 @@ void ImportDialog::showStagedCardContextMenu(const MediaId& id, const QPoint& gl
 	}
 
 	// Single-target file actions act on the right-clicked card (like MainWindow's), not the whole selection.
-	const bool isPhoto = isSupportedImageFile(m_staged.value(id).path);
+	const bool isPhoto = isSupportedImageFile(_staged.value(id).path);
 	menu.addAction(isPhoto ? tr("Open photo") : tr("Play source video"), this, [this, id] { previewStagedItem(id); });
 	menu.addAction(tr("Locate source file"), this, [this, id] { locateStagedSourceFile(id); });
 	menu.addAction(tr("Copy source path to clipboard"), this, [this, id] { copyStagedSourcePath(id); });
@@ -875,7 +875,7 @@ void ImportDialog::showStagedCardContextMenu(const MediaId& id, const QPoint& gl
 	// Add to / Remove from Best across the whole selection: a uniform toggle (remove when all already carry it, else
 	// add to all), the same shape the Labels checklist below uses.
 	const bool allBest = std::all_of(selection.cbegin(), selection.cend(),
-		[this](const MediaId& sel) { return m_staged.value(sel).pendingBest; });
+		[this](const MediaId& sel) { return _staged.value(sel).pendingBest; });
 	menu.addAction(allBest ? tr("Remove from Best") : tr("Add to Best"), this, [this, selection, allBest] {
 		setBestForStagedSelection(selection, !allBest);
 	});
@@ -884,11 +884,11 @@ void ImportDialog::showStagedCardContextMenu(const MediaId& id, const QPoint& gl
 	// until "Import" runs). Each row's color-tinted checkbox reflects the whole staged selection; toggling makes it
 	// uniform (strip when all carry it, else add to all).
 	std::vector<LabelVisuals::ChecklistRow> labelRows;
-	for (const LabelOption& option : m_labelOptions)
+	for (const LabelOption& option : _labelOptions)
 	{
 		int haveCount = 0;
 		for (const MediaId& sel : selection)
-			if (m_staged.value(sel).pendingLabelIds.contains(option.id))
+			if (_staged.value(sel).pendingLabelIds.contains(option.id))
 				++haveCount;
 
 		labelRows.push_back({ option.displayName, QColor(option.color),
@@ -896,8 +896,8 @@ void ImportDialog::showStagedCardContextMenu(const MediaId& id, const QPoint& gl
 			[this, selection, labelId = option.id](bool addToAll) {
 				for (const MediaId& target : selection)
 				{
-					auto it = m_staged.find(target);
-					if (it == m_staged.end())
+					auto it = _staged.find(target);
+					if (it == _staged.end())
 						continue;
 					if (addToAll)
 					{
@@ -934,9 +934,9 @@ void ImportDialog::showStagedCardContextMenu(const MediaId& id, const QPoint& gl
 
 std::vector<MediaId> ImportDialog::selectedStagedIds() const
 {
-	const QList<QListWidgetItem*> selected = m_stagedGrid->selectedItems();
+	const QList<QListWidgetItem*> selected = _stagedGrid->selectedItems();
 	std::vector<MediaId> ids;
-	for (auto it = m_staged.constBegin(); it != m_staged.constEnd(); ++it)
+	for (auto it = _staged.constBegin(); it != _staged.constEnd(); ++it)
 		if (selected.contains(it->item))
 			ids.push_back(it.key());
 	return ids;
@@ -944,19 +944,19 @@ std::vector<MediaId> ImportDialog::selectedStagedIds() const
 
 void ImportDialog::previewStagedItem(const MediaId& id)
 {
-	const auto it = m_staged.constFind(id);
-	if (it == m_staged.constEnd())
+	const auto it = _staged.constFind(id);
+	if (it == _staged.constEnd())
 		return;
 	if (isSupportedImageFile(it->path))
 		QDesktopServices::openUrl(QUrl::fromLocalFile(it->path));  // a photo opens in the system image viewer
 	else
-		VideoPlayerWindow::createPlayerWindow(m_library, it->path, this);
+		VideoPlayerWindow::createPlayerWindow(_library, it->path, this);
 }
 
 void ImportDialog::locateStagedSourceFile(const MediaId& id)
 {
-	const auto it = m_staged.constFind(id);
-	if (it == m_staged.constEnd())
+	const auto it = _staged.constFind(id);
+	if (it == _staged.constEnd())
 		return;
 
 	if (!revealInFileManager(it->path))
@@ -965,8 +965,8 @@ void ImportDialog::locateStagedSourceFile(const MediaId& id)
 
 void ImportDialog::copyStagedSourcePath(const MediaId& id)
 {
-	const auto it = m_staged.constFind(id);
-	if (it != m_staged.constEnd())
+	const auto it = _staged.constFind(id);
+	if (it != _staged.constEnd())
 		QApplication::clipboard()->setText(QDir::toNativeSeparators(it->path));
 }
 
@@ -974,7 +974,7 @@ void ImportDialog::compareStagedPhotos(const std::vector<MediaId>& photoIds)
 {
 	QStringList paths;
 	for (const MediaId& id : photoIds)
-		paths << m_staged.value(id).path;
+		paths << _staged.value(id).path;
 	PhotoCompareWindow::showForFiles(paths, this);
 }
 
@@ -982,11 +982,11 @@ void ImportDialog::setBestForStagedSelection(const std::vector<MediaId>& ids, bo
 {
 	for (const MediaId& id : ids)
 	{
-		auto it = m_staged.find(id);
-		if (it == m_staged.end())
+		auto it = _staged.find(id);
+		if (it == _staged.end())
 			continue;
 		it->pendingBest = inBest;
-		static_cast<MediaItemWidget*>(m_stagedGrid->itemWidget(it->item))->setInBest(inBest);  // sync the card's star
+		static_cast<MediaItemWidget*>(_stagedGrid->itemWidget(it->item))->setInBest(inBest);  // sync the card's star
 	}
 }
 
@@ -1002,7 +1002,7 @@ void ImportDialog::deleteStagedSourceFiles(const std::vector<MediaId>& ids)
 		return;
 
 	const QString question = ids.size() == 1
-		? tr("Permanently delete this source file from disk?\n\n%1").arg(QDir::toNativeSeparators(m_staged.value(ids.front()).path))
+		? tr("Permanently delete this source file from disk?\n\n%1").arg(QDir::toNativeSeparators(_staged.value(ids.front()).path))
 		: tr("Permanently delete %1 source files from disk? This cannot be undone.").arg(ids.size());
 	if (QMessageBox::warning(this, tr("Delete source file(s)"), question,
 			QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
@@ -1011,8 +1011,8 @@ void ImportDialog::deleteStagedSourceFiles(const std::vector<MediaId>& ids)
 	QStringList failed;
 	for (const MediaId& id : ids)
 	{
-		const auto it = m_staged.constFind(id);
-		if (it == m_staged.constEnd())
+		const auto it = _staged.constFind(id);
+		if (it == _staged.constEnd())
 			continue;
 		const QString path = it->path;
 		if (QFile::remove(path))
@@ -1028,8 +1028,8 @@ void ImportDialog::deleteStagedSourceFiles(const std::vector<MediaId>& ids)
 
 void ImportDialog::renameStagedItem(const MediaId& id)
 {
-	const auto it = m_staged.constFind(id);
-	if (it == m_staged.constEnd())
+	const auto it = _staged.constFind(id);
+	if (it == _staged.constEnd())
 		return;
 
 	const StagedEntry entry = it.value();   // snapshot; carried over to the re-keyed entry below
@@ -1055,7 +1055,7 @@ void ImportDialog::renameStagedItem(const MediaId& id)
 
 	// Reject a clash with another staged item (same new name+size) or an existing on-disk file. A case-only change
 	// resolves to the same file, so it isn't treated as an on-disk clash.
-	if (newId != id && m_staged.contains(newId))
+	if (newId != id && _staged.contains(newId))
 	{
 		QMessageBox::warning(this, tr("Rename"), tr("Another staged item already has that name and size."));
 		return;
@@ -1077,9 +1077,9 @@ void ImportDialog::renameStagedItem(const MediaId& id)
 	StagedEntry renamed = entry;
 	renamed.path = newPath;
 	auto* card = buildStagedCard(newId, newPath, renamed.tempPreviewDir, renamed.durationMs);
-	m_stagedGrid->setItemWidget(renamed.item, card);   // deletes the previous card
-	m_staged.remove(id);
-	m_staged.insert(newId, renamed);
+	_stagedGrid->setItemWidget(renamed.item, card);   // deletes the previous card
+	_staged.remove(id);
+	_staged.insert(newId, renamed);
 
 	if (renamed.pendingBest)
 		card->setInBest(true);
@@ -1092,7 +1092,7 @@ void ImportDialog::materializeUsedProvisionalLabels()
 	// map its provisional id to the real one. A provisional whose name already matched a real label was reused
 	// directly (never minted), so it doesn't appear here; a genuinely new one is created with the swatch it showed.
 	QHash<QString, QString> provisionalToReal;  // provisional id -> real id ("" = creation failed)
-	for (auto it = m_staged.constBegin(); it != m_staged.constEnd(); ++it)
+	for (auto it = _staged.constBegin(); it != _staged.constEnd(); ++it)
 	{
 		for (const QString& labelId : it->pendingLabelIds)
 		{
@@ -1100,7 +1100,7 @@ void ImportDialog::materializeUsedProvisionalLabels()
 			{
 				const LabelOption* option = findLabelOption(labelId);
 				provisionalToReal.insert(labelId,
-					option ? m_callbacks.createLabelRequested(option->displayName, option->color) : QString());
+					option ? _callbacks.createLabelRequested(option->displayName, option->color) : QString());
 			}
 		}
 	}
@@ -1111,8 +1111,8 @@ void ImportDialog::materializeUsedProvisionalLabels()
 	// Drop the now-created provisionals; the Catalog lists them as real labels from here on, so a partial
 	// Import that leaves items staged won't try to recreate them on a second run. Refreshed before the remap
 	// below so the changed cards' re-derived dots resolve the new real ids.
-	m_provisionalLabels.erase(std::remove_if(m_provisionalLabels.begin(), m_provisionalLabels.end(),
-		[&](const LabelOption& o) { return !provisionalToReal.value(o.id).isEmpty(); }), m_provisionalLabels.end());
+	_provisionalLabels.erase(std::remove_if(_provisionalLabels.begin(), _provisionalLabels.end(),
+		[&](const LabelOption& o) { return !provisionalToReal.value(o.id).isEmpty(); }), _provisionalLabels.end());
 	refreshLabelList();
 
 	// Rewrite every staged pick through the mapping (real ids pass through unchanged); a label that failed to
@@ -1127,9 +1127,9 @@ void ImportDialog::importPhotoGroup(const QString& labelId, const std::vector<Me
 	QStringList photoPaths;
 	photoPaths.reserve(photoIds.size());
 	for (const MediaId& id : photoIds)
-		photoPaths << m_staged.value(id).path;
+		photoPaths << _staged.value(id).path;
 
-	const std::vector<Import::PhotoResult> results = m_callbacks.importPhotosRequested(labelId, photoPaths, mode);
+	const std::vector<Import::PhotoResult> results = _callbacks.importPhotosRequested(labelId, photoPaths, mode);
 	for (size_t i = 0; i < photoIds.size() && i < results.size(); ++i)
 	{
 		const MediaId& id = photoIds[i];
@@ -1141,11 +1141,11 @@ void ImportDialog::importPhotoGroup(const QString& labelId, const std::vector<Me
 			&& QMessageBox::question(this, tr("Already tracked"),
 				tr("%1\n\nhas the same name and size as an item already in the library, so it cannot be referenced in place.\n\n"
 				   "Import a copy into the library instead (renamed automatically to avoid the clash)?")
-				.arg(QDir::toNativeSeparators(m_staged.value(id).path)),
+				.arg(QDir::toNativeSeparators(_staged.value(id).path)),
 				QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes)
 		{
 			const std::vector<Import::PhotoResult> retried =
-				m_callbacks.importPhotosRequested(labelId, { m_staged.value(id).path }, Import::PhotoImportMode::Copy);
+				_callbacks.importPhotosRequested(labelId, { _staged.value(id).path }, Import::PhotoImportMode::Copy);
 			if (!retried.empty())
 				result = retried.front();
 		}
@@ -1153,7 +1153,7 @@ void ImportDialog::importPhotoGroup(const QString& labelId, const std::vector<Me
 		if (result.status != Import::PhotoStatus::Success)
 			continue;  // failed or declined - stays staged with its labels intact (errors already reported by the host)
 
-		const StagedEntry entry = m_staged.value(id);
+		const StagedEntry entry = _staged.value(id);
 		outcome.succeededIds.push_back(id);
 		// Bookkeeping keys on the *registered* id: an owned-import auto-rename gives the imported copy
 		// a new name, hence a new identity - the staged id no longer names anything in the catalog.
@@ -1169,7 +1169,7 @@ void ImportDialog::importVideoGroup(const QString& labelId, const std::vector<Me
 	const LabelOption* label = findLabelOption(labelId);
 	if (!label)
 		return;
-	if (m_library.catalog().storageFolderForLabel(labelIdFromString(labelId)).isEmpty())
+	if (_library.catalog().storageFolderForLabel(labelIdFromString(labelId)).isEmpty())
 	{
 		QMessageBox::warning(this, tr("Import"),
 			tr("This label does not have a safe storage path:\n%1").arg(label->displayName));
@@ -1184,19 +1184,19 @@ void ImportDialog::importVideoGroup(const QString& labelId, const std::vector<Me
 	stagedDurations.reserve(videoIds.size());
 	for (const MediaId& id : videoIds)
 	{
-		const StagedEntry entry = m_staged.value(id);
+		const StagedEntry entry = _staged.value(id);
 		paths << entry.path;
 		stagedPreviewDirs.insert(id, entry.tempPreviewDir);
 		stagedDurations.insert(id, entry.durationMs);
 	}
 
 	const SourceRelocation::BatchResult relocated = SourceRelocation::relocateIfNeeded(
-		m_library, this, paths, relocateMode, m_relocateFolderEdit->text());
-	m_callbacks.addMediaItemsRequested(labelId, relocated.toImport, stagedPreviewDirs, stagedDurations);
+		_library, this, paths, relocateMode, _relocateFolderEdit->text());
+	_callbacks.addMediaItemsRequested(labelId, relocated.toImport, stagedPreviewDirs, stagedDurations);
 
 	for (const MediaId& id : videoIds)
 	{
-		const StagedEntry entry = m_staged.value(id);
+		const StagedEntry entry = _staged.value(id);
 		if (relocated.keepStaged.contains(entry.path))
 			continue;  // relocation deferred (Cancel) - stays staged untouched, try again later
 
@@ -1209,9 +1209,9 @@ void ImportDialog::importVideoGroup(const QString& labelId, const std::vector<Me
 		// The file was copied/moved: the staged entry follows it, so if the import below failed or was
 		// declined, a later retry starts from where the file actually is (a Move deleted the original).
 		if (const QString newPath = relocated.relocatedTo.value(entry.path); !newPath.isEmpty())
-			m_staged[id].path = newPath;
+			_staged[id].path = newPath;
 
-		if (!isTrackedUnderLabel(m_library.catalog(), id, labelId))
+		if (!isTrackedUnderLabel(_library.catalog(), id, labelId))
 			continue;  // import declined/failed, or the id collided with an item tracked elsewhere - stays staged with its labels intact
 
 		outcome.succeededIds.push_back(id);
@@ -1228,11 +1228,11 @@ void ImportDialog::runImport()
 	materializeUsedProvisionalLabels();
 
 	// Group labeled entries by the first label dropped on them - the only place that ordering matters. Keyed
-	// by MediaId throughout (the stable m_staged key, captured while the source file still existed): a Move
+	// by MediaId throughout (the stable _staged key, captured while the source file still existed): a Move
 	// relocation deletes the source from its staged path before the post-import bookkeeping runs, so
 	// re-deriving a MediaId from the path then would fail.
 	QHash<QString, std::vector<MediaId>> idsByLabelId;
-	for (auto it = m_staged.constBegin(); it != m_staged.constEnd(); ++it)
+	for (auto it = _staged.constBegin(); it != _staged.constEnd(); ++it)
 		if (!it->pendingLabelIds.isEmpty())
 			idsByLabelId[it->pendingLabelIds.constFirst()].push_back(it.key());
 
@@ -1242,7 +1242,7 @@ void ImportDialog::runImport()
 		return;
 	}
 
-	const RelocateMode relocateMode = static_cast<RelocateMode>(m_relocateModeCombo->currentData().toInt());
+	const RelocateMode relocateMode = static_cast<RelocateMode>(_relocateModeCombo->currentData().toInt());
 	// The relocation mode doubles as the photo import mode: Copy/Move land the file in the library's
 	// photo storage, "leave in place" means tracking it right where it is (a referenced photo).
 	const Import::PhotoImportMode photoMode =
@@ -1263,7 +1263,7 @@ void ImportDialog::runImport()
 		std::vector<MediaId> videoIds;
 		std::vector<MediaId> photoIds;
 		for (const MediaId& id : it.value())
-			(isSupportedImageFile(m_staged.value(id).path) ? photoIds : videoIds).push_back(id);
+			(isSupportedImageFile(_staged.value(id).path) ? photoIds : videoIds).push_back(id);
 
 		if (!photoIds.empty())
 			importPhotoGroup(it.key(), photoIds, photoMode, outcome);
@@ -1276,7 +1276,7 @@ void ImportDialog::runImport()
 	// videos and photos (a photo has no per-item folder whose existence could stand in for it).
 	if (!outcome.bestItems.empty() || !outcome.extraLabelAssignments.empty())
 	{
-		Catalog& catalog = m_library.catalog();
+		Catalog& catalog = _library.catalog();
 		Catalog::BatchScope batch(catalog);  // one store write for the whole flush instead of one per label
 		for (const MediaId& id : outcome.bestItems)
 			if (catalog.containsMediaItem(id))
@@ -1297,6 +1297,6 @@ void ImportDialog::runImport()
 
 	// Repaint the host once with the fully-applied state - the dialog stays open, so the mid-Import refresh
 	// that addMediaItemsRequested may have done only shows folder labels, not the Best/extra labels flushed just above.
-	if (!outcome.succeededIds.empty() && m_callbacks.viewChanged)
-		m_callbacks.viewChanged();
+	if (!outcome.succeededIds.empty() && _callbacks.viewChanged)
+		_callbacks.viewChanged();
 }

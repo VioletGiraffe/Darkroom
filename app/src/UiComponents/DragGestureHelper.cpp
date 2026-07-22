@@ -9,7 +9,7 @@
 void DragGestureHelper::mousePressed(const QMouseEvent* event)
 {
 	if (event->button() == Qt::LeftButton)
-		m_pressPos = event->pos();
+		_pressPos = event->pos();
 }
 
 static constexpr QSize MAX_DRAG_PIXMAP_SIZE{ 120, 120 };
@@ -20,7 +20,7 @@ bool DragGestureHelper::tryStartDrag(QWidget* widget, const QMouseEvent* moveEve
 {
 	if (!(moveEvent->buttons() & Qt::LeftButton))
 		return false;
-	if ((moveEvent->pos() - m_pressPos).manhattanLength() < QApplication::startDragDistance())
+	if ((moveEvent->pos() - _pressPos).manhattanLength() < QApplication::startDragDistance())
 		return false;
 
 	QMimeData* mimeData = makeMimeData();
@@ -43,10 +43,10 @@ bool DragGestureHelper::tryStartDrag(QWidget* widget, const QMouseEvent* moveEve
 
 ListRowDragFilter::ListRowDragFilter(QListWidget* list, std::function<QMimeData*(const QListWidgetItem*)> makeMimeDataForRow)
 	: QObject(list)
-	, m_list(list)
-	, m_makeMimeDataForRow(std::move(makeMimeDataForRow))
+	, _list(list)
+	, _makeMimeDataForRow(std::move(makeMimeDataForRow))
 {
-	m_list->viewport()->installEventFilter(this);
+	_list->viewport()->installEventFilter(this);
 }
 
 bool ListRowDragFilter::eventFilter(QObject* watched, QEvent* event)
@@ -56,29 +56,29 @@ bool ListRowDragFilter::eventFilter(QObject* watched, QEvent* event)
 	case QEvent::MouseButtonPress:
 	{
 		auto* me = static_cast<QMouseEvent*>(event);
-		m_dragHelper.mousePressed(me);
-		m_pressedItem = m_list->itemAt(me->pos());
+		_dragHelper.mousePressed(me);
+		_pressedItem = _list->itemAt(me->pos());
 		break;
 	}
 	case QEvent::MouseMove:
 	{
-		if (!m_pressedItem)
+		if (!_pressedItem)
 			break;
 		auto* me = static_cast<QMouseEvent*>(event);
-		const QPixmap rowPixmap = m_list->viewport()->grab(m_list->visualItemRect(m_pressedItem));
-		const bool started = m_dragHelper.tryStartDrag(
-			m_list->viewport(), me,
-			[this] { return m_makeMimeDataForRow(m_pressedItem); },
+		const QPixmap rowPixmap = _list->viewport()->grab(_list->visualItemRect(_pressedItem));
+		const bool started = _dragHelper.tryStartDrag(
+			_list->viewport(), me,
+			[this] { return _makeMimeDataForRow(_pressedItem); },
 			Qt::CopyAction, rowPixmap);
 		if (started)
 		{
-			m_pressedItem = nullptr;
+			_pressedItem = nullptr;
 			return true;
 		}
 		break;
 	}
 	case QEvent::MouseButtonRelease:
-		m_pressedItem = nullptr;
+		_pressedItem = nullptr;
 		break;
 	default:
 		break;

@@ -95,39 +95,39 @@ public:
 		if (isDuplicate)
 		{
 			QPushButton* skip = new QPushButton(tr("Skip"), this);
-			connect(skip, &QPushButton::clicked, this, [this] { m_result = Result::Skip; accept(); });
+			connect(skip, &QPushButton::clicked, this, [this] { _result = Result::Skip; accept(); });
 			buttonRow->addWidget(skip);
 
 			QPushButton* skipDelete = new QPushButton(tr("Skip and Delete Duplicate"), this);
-			connect(skipDelete, &QPushButton::clicked, this, [this] { m_result = Result::SkipAndDelete; accept(); });
+			connect(skipDelete, &QPushButton::clicked, this, [this] { _result = Result::SkipAndDelete; accept(); });
 			buttonRow->addWidget(skipDelete);
 		}
 		else
 		{
 			QPushButton* overwrite = new QPushButton(tr("Overwrite"), this);
-			connect(overwrite, &QPushButton::clicked, this, [this] { m_result = Result::Overwrite; accept(); });
+			connect(overwrite, &QPushButton::clicked, this, [this] { _result = Result::Overwrite; accept(); });
 			buttonRow->addWidget(overwrite);
 
 			QPushButton* skip = new QPushButton(tr("Skip"), this);
-			connect(skip, &QPushButton::clicked, this, [this] { m_result = Result::Skip; accept(); });
+			connect(skip, &QPushButton::clicked, this, [this] { _result = Result::Skip; accept(); });
 			buttonRow->addWidget(skip);
 
 			// Defer: import nothing, touch no file, and leave the entry staged so
 			// the user can deal with the name clash later.
 			QPushButton* cancel = new QPushButton(tr("Cancel"), this);
-			connect(cancel, &QPushButton::clicked, this, [this] { m_result = Result::Cancel; accept(); });
+			connect(cancel, &QPushButton::clicked, this, [this] { _result = Result::Cancel; accept(); });
 			buttonRow->addWidget(cancel);
 		}
 
 		layout->addLayout(buttonRow);
 	}
 
-	[[nodiscard]] Result result() const { return m_result; }
+	[[nodiscard]] Result result() const { return _result; }
 
 private:
 	// Cancel is the default so dismissing the dialog (Escape / window close) defers
 	// rather than taking any action - the safe no-op for either flavor.
-	Result m_result = Result::Cancel;
+	Result _result = Result::Cancel;
 };
 
 // Outcome of relocating one file. importPath empty => don't import it; of those, keepStaged true => the
