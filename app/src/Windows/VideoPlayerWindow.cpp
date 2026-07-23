@@ -90,11 +90,16 @@ constexpr QImage::Format OscillationFallbackImageFormat = QImage::Format_RGBA888
 constexpr const char* OscillationMjpegBoundary = "darkroom_oscillation";
 constexpr const char* OscillationCurveSettingKey = "VideoPlayer/OscillationCurve";
 constexpr const char* DefaultOscillationCurveSetting = "cosine";
+// A nonzero linear share keeps eased curves moving through the turnaround instead of visually dwelling there.
+constexpr double CosineLinearShare = 0.6;
+constexpr double SmoothstepLinearShare = 0.5;
+constexpr double SmootherstepLinearShare = 0.5;
 
 enum class OscillationCurve
 {
 	Linear,
 	Cosine,
+	TrueCosine,
 	Smoothstep,
 	Smootherstep,
 };
@@ -103,6 +108,8 @@ OscillationCurve oscillationCurveFromSetting(const QString& value)
 {
 	if (value == "linear")
 		return OscillationCurve::Linear;
+	if (value == "true_cosine")
+		return OscillationCurve::TrueCosine;
 	if (value == "smoothstep")
 		return OscillationCurve::Smoothstep;
 	if (value == "smootherstep")
@@ -118,6 +125,8 @@ QString oscillationCurveSetting(OscillationCurve curve)
 		return "linear";
 	case OscillationCurve::Cosine:
 		return "cosine";
+	case OscillationCurve::TrueCosine:
+		return "true_cosine";
 	case OscillationCurve::Smoothstep:
 		return "smoothstep";
 	case OscillationCurve::Smootherstep:
@@ -135,13 +144,19 @@ double oscillationCurvePosition(OscillationCurve curve, double phase)
 	case OscillationCurve::Linear:
 		break;
 	case OscillationCurve::Cosine:
+		position = CosineLinearShare * phase
+			+ (1.0 - CosineLinearShare) * (1.0 - std::cos(std::numbers::pi * phase)) / 2.0;
+		break;
+	case OscillationCurve::TrueCosine:
 		position = (1.0 - std::cos(std::numbers::pi * phase)) / 2.0;
 		break;
 	case OscillationCurve::Smoothstep:
-		position = phase * phase * (3.0 - 2.0 * phase);
+		position = SmoothstepLinearShare * phase
+			+ (1.0 - SmoothstepLinearShare) * phase * phase * (3.0 - 2.0 * phase);
 		break;
 	case OscillationCurve::Smootherstep:
-		position = phase * phase * phase * (phase * (phase * 6.0 - 15.0) + 10.0);
+		position = SmootherstepLinearShare * phase
+			+ (1.0 - SmootherstepLinearShare) * phase * phase * phase * (phase * (phase * 6.0 - 15.0) + 10.0);
 		break;
 	}
 	return std::clamp(position, 0.0, 1.0);
@@ -154,11 +169,13 @@ double oscillationCurvePeakSlope(OscillationCurve curve)
 	case OscillationCurve::Linear:
 		return 1.0;
 	case OscillationCurve::Cosine:
+		return CosineLinearShare + (1.0 - CosineLinearShare) * std::numbers::pi / 2.0;
+	case OscillationCurve::TrueCosine:
 		return std::numbers::pi / 2.0;
 	case OscillationCurve::Smoothstep:
-		return 1.5;
+		return SmoothstepLinearShare + (1.0 - SmoothstepLinearShare) * 1.5;
 	case OscillationCurve::Smootherstep:
-		return 1.875;
+		return SmootherstepLinearShare + (1.0 - SmootherstepLinearShare) * 1.875;
 	}
 	assert_r(false);
 	return 1.0;
@@ -759,6 +776,7 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	_oscillationCurveCombo->setToolTip(tr("Motion curve for oscillating playback"));
 	_oscillationCurveCombo->addItem(tr("Linear"), "linear");
 	_oscillationCurveCombo->addItem(tr("Cosine"), "cosine");
+	_oscillationCurveCombo->addItem(tr("True cosine"), "true_cosine");
 	_oscillationCurveCombo->addItem(tr("Smooth"), "smoothstep");
 	_oscillationCurveCombo->addItem(tr("Extra smooth"), "smootherstep");
 	const OscillationCurve savedCurve = oscillationCurveFromSetting(settings.value(

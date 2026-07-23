@@ -30,9 +30,11 @@ seconds and a 1920×1080 output envelope (smaller sources are not upscaled); the
 the runaway guard, deliberately without compressed-byte accounting.
 
 Presentation uses an approximately 60 Hz GUI-thread clock. It selects the frame implied by elapsed time, so a
-late tick or 2× playback drops obsolete frames instead of slowing the motion. Linear, cosine, smoothstep, and
-smootherstep curves normalize the speed selector as their approximate maximum source speed; switching curve
-keeps raw cycle phase and cuts to the new mapping on the next tick. JPEG decode is inline and transient:
+late tick or 2× playback drops obsolete frames instead of slowing the motion. Linear, blended cosine,
+smoothstep, smootherstep, and true-cosine curves normalize the speed selector as their approximate maximum
+source speed. Except for explicitly unblended True cosine, the nonlinear choices mix easing with a linear
+component, retaining nonzero turnaround velocity instead of nearly dwelling at A/B; switching curve keeps raw
+cycle phase and cuts to the new mapping on the next tick. JPEG decode is inline and transient:
 the decoded `QImage` is submitted to the existing `QVideoSink` through Qt 6.8's `QVideoFrame(QImage)`.
 Formats with no direct Qt video-frame mapping receive one explicit `RGBA8888` conversion.
 
