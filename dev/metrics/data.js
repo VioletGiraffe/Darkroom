@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784827610110,
+  "lastUpdate": 1784831021461,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -7603,6 +7603,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .text",
             "value": 671,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 323.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 32.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 34,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "b4fc36adb3f7b299c01902fdd30f71bb0309e7ad",
+          "message": "canonicalFilePath() call removed from pathComparisonKey() - minor optimization (no stat on every comparison); canonicalFilePath() kept where it matters",
+          "timestamp": "2026-07-23T21:19:53+03:00",
+          "tree_id": "5f55fb5485a8cdb11b1db83d8259e689c3a82dd7",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/b4fc36adb3f7b299c01902fdd30f71bb0309e7ad"
+        },
+        "date": 1784831019649,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 13063,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 7958,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1100,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 671.5,
             "unit": "KB"
           },
           {
