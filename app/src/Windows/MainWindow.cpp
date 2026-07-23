@@ -567,8 +567,16 @@ void MainWindow::pickAndSwitchLibrary(LibraryPickerMode mode)
 					.arg(QDir::toNativeSeparators(requestedRoot)));
 			continue;
 		}
-		if (!creating && pathComparisonKey(requestedRoot) == pathComparisonKey(_library.rootFolder()))
-			return;
+		// requestedRoot is a folder the user just picked (so it exists): resolve both roots through
+		// canonicalFilePath once, so reopening the current library via an aliased path (junction/symlink) is
+		// recognized as a no-op instead of pointlessly reloading it under the alias spelling.
+		if (!creating)
+		{
+			const QString requestedReal = QFileInfo(requestedRoot).canonicalFilePath();
+			const QString currentReal   = QFileInfo(_library.rootFolder()).canonicalFilePath();
+			if (!requestedReal.isEmpty() && requestedReal.compare(currentReal, Qt::CaseInsensitive) == 0)
+				return;
+		}
 
 		if (switchLibraryToOrReport(requestedRoot, title))
 			return;
@@ -1977,10 +1985,22 @@ void MainWindow::scanForUntrackedFiles()
 		return;
 	const bool scanRecursively = *depth == 0;
 
+	// pathComparisonKey is lexical, so a file reached via a different spelling than its recorded source (the scan
+	// folder is a junction/symlink) wouldn't match. Resolve the scan root once and test each file two ways:
+	// as-walked (matches under-root sources - and a junctioned library root, whose sources are stored under the
+	// same unresolved spelling) and rebased onto the resolved root (matches an external source stored real).
+	const QString realScanRoot = QFileInfo(dir).canonicalFilePath();
+	const QDir scanRoot(dir);
+	const bool aliasedScanRoot = !realScanRoot.isEmpty() && pathComparisonKey(realScanRoot) != pathComparisonKey(dir);
+
 	QStringList untracked;
 	for (const QString& path : collectFilesInDirectory(dir, scanRecursively, isSupportedMediaFile))
-		if (!tracked.contains(pathComparisonKey(path)))
+	{
+		const bool isTracked = tracked.contains(pathComparisonKey(path))
+			|| (aliasedScanRoot && tracked.contains(pathComparisonKey(realScanRoot + '/' + scanRoot.relativeFilePath(path))));
+		if (!isTracked)
 			untracked.push_back(QDir::toNativeSeparators(path));
+	}
 
 	if (untracked.isEmpty())
 	{

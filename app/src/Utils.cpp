@@ -150,8 +150,10 @@ bool filesAreIdentical(const QString& pathA, const QString& pathB)
 
 QString pathComparisonKey(const QString& path)
 {
-	const QString canonical = QFileInfo(path).canonicalFilePath();
-	return (canonical.isEmpty() ? QDir::cleanPath(path) : canonical).toLower();
+	// Lexical, no stat: every per-item caller compares paths that share a real root prefix, where resolving
+	// symlinks can't change the verdict. The two callers that must see through an alias (untracked scan, "same
+	// library already open") canonicalize their one root themselves. Folds like normalizedRoot, so keys and roots agree.
+	return QDir::cleanPath(QDir::fromNativeSeparators(path)).toLower();
 }
 
 QChar invalidFilenameChar(const QString& name)

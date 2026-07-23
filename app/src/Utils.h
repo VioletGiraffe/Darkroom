@@ -46,7 +46,10 @@ void clearStuckHoverIfCursorLeft(QWidget* w);
 [[nodiscard]] bool filesAreIdentical(const QString& pathA, const QString& pathB);
 
 // Case/separator-insensitive key for testing whether two paths refer to the same location when they may come
-// from different sources (e.g. a catalog-stored path vs. one freshly walked off disk). Canonical form + lower case. Not meant for storing/directly using, but in practice fine for that too
+// from different sources (e.g. a catalog-stored path vs. one freshly walked off disk). Purely lexical - cleaned
+// and lowercased, no filesystem access - so it does NOT see through symlinks/junctions: two different routes to
+// the same file yield different keys. Fine for the comparisons here, which share a real root prefix; a caller
+// needing alias resolution canonicalizes its single root itself (see MainWindow::scanForUntrackedFiles).
 [[nodiscard]] QString pathComparisonKey(const QString& path);
 
 // Rejects characters illegal in Windows file/folder names: returns the first offending character, or a null

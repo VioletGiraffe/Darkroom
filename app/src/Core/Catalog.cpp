@@ -56,9 +56,12 @@ namespace
 			return {};
 		if (childInfo.exists())
 		{
-			const QString canonicalChild = childInfo.canonicalFilePath();
+			// canonicalChild has its symlinks resolved, so compare it against an equally-resolved parent:
+			// pathComparisonKey is lexical and would otherwise mismatch a parent reached through a junction.
+			const QString canonicalChild  = childInfo.canonicalFilePath();
+			const QString canonicalParent = QFileInfo(parent).canonicalFilePath();
 			if (canonicalChild.isEmpty()
-				|| pathComparisonKey(QFileInfo(canonicalChild).absolutePath()) != pathComparisonKey(parent)
+				|| pathComparisonKey(QFileInfo(canonicalChild).absolutePath()) != pathComparisonKey(canonicalParent)
 				|| QFileInfo(canonicalChild).fileName().compare(childInfo.fileName(), Qt::CaseInsensitive) != 0)
 				return {};
 		}

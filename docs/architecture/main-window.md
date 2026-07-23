@@ -32,9 +32,9 @@ as taken, keeping "create" from silently adopting an existing catalog.
 
 Two properties are deliberate and worth preserving:
 
-- **The recent list never touches the filesystem.** Its entries are `Library::rootFolder()` values, and that
-  normalization is purely lexical, so entries are compared as plain strings — no `pathComparisonKey()` (it
-  calls `canonicalFilePath()`). A recent library may well sit on an unplugged drive or a dead network share,
+- **The recent list never touches the filesystem.** Its entries are `Library::rootFolder()` values, already
+  lexically normalized, so they are compared as plain case-insensitive strings and never stat-ed to check they
+  still exist. A recent library may well sit on an unplugged drive or a dead network share,
   and stat-ing one of those can stall for seconds *every time the menu opens*. The cost of not checking is
   that a stale entry looks live until clicked, at which point the normal switch failure reports it; the entry
   keeps its place, so re-plugging the drive is enough to make it work again.
