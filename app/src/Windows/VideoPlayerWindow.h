@@ -4,12 +4,17 @@
 
 #include <QMainWindow>
 
+#include <memory>
 #include <vector>
 
 class QMediaPlayer;
 class QAudioOutput;
 class QVideoWidget;
 class QSlider;
+class QLabel;
+class QCheckBox;
+class QComboBox;
+class MarkerSlider;
 class Library;
 
 class VideoPlayerWindow final : public QMainWindow
@@ -27,9 +32,24 @@ public:
 	static void createPlayerWindow(Library& library, const QString& videoPath, QWidget* parent);
 
 private:
+	class OscillatingPlayback;
+	struct OscillationRequest;
+
 	void resizeAndMoveWindow();
 	void togglePlayPause();
 	void toggleFullScreen();
+	[[nodiscard]] qint64 currentPlaybackPosition() const;
+	[[nodiscard]] bool isPlaybackActive() const;
+	void setPlaybackActive(bool active);
+	void exitOscillatingPlayback(bool restorePlaybackState = true);
+	void updatePlaybackPositionUi(qint64 position);
+	void applyEffectiveMute();
+	void updateOscillationAvailability();
+	void startOscillatingPlayback();
+	[[nodiscard]] bool buildOscillationRequest(OscillationRequest* request, QString* error) const;
+	void onOscillationPrepared();
+	void onOscillationPositionChanged(qint64 position);
+	void onOscillationFailed(const QString& error, qint64 displayedPosition, bool hasDisplayedPosition, bool shouldResumePlayback);
 
 	// The video's right-click menu: frame extraction (to a folder or into the library as an owned photo) and a
 	// fullscreen toggle.
@@ -54,10 +74,16 @@ private:
 	QMediaPlayer* _player = nullptr;
 	QAudioOutput* _audioOutput = nullptr;
 	QVideoWidget* _videoWidget = nullptr;
+	MarkerSlider* _seekSlider = nullptr;
+	QLabel* _timeLabel = nullptr;
 	QSlider* _volumeSlider = nullptr;
+	QCheckBox* _oscillationCheck = nullptr;
+	QComboBox* _oscillationCurveCombo = nullptr;
+	std::unique_ptr<OscillatingPlayback> _oscillatingPlayback;
 	bool _windowPlacementDone = false;
 	bool _pauseOnSeek = true;
 	bool _wasPlayingBeforeSeek = false;
+	bool _userMuted = false;
 
 	// A-B loop interval, in milliseconds; -1 means the respective endpoint is unset.
 	// Looping is active only while both are set and _loopEnd > _loopStart.

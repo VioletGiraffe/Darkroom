@@ -1,7 +1,8 @@
 # Darkroom — Architecture
 
 C++/Qt6 desktop app (Windows primary target) for organizing a local library of video frames and extracting frames
-from source videos via ffmpeg. Requires Qt 6.5+ (uses `QGuiApplication::styleHints()->colorScheme()`).
+from source videos via ffmpeg. Requires Qt 6.8+ (`VideoPlayerWindow` feeds decoded cache images to
+`QVideoSink` through `QVideoFrame(const QImage&)`).
 
 This document is the living architectural reference: a high-level index plus the core cross-cutting
 principles. Per-subsystem depth lives in `docs/architecture/*.md`, linked below — read this file first to
@@ -147,7 +148,8 @@ and the card zoom/preview-count mechanism.
 
 ### [Frame viewer & video player](docs/architecture/playback.md)
 `FrameViewerWindow` (persistent per-folder thumbnail popup), `VideoPlayerWindow` (built-in player: seek,
-A–B loop, saved loops persisted per-video), `MarkerSlider`, and `PhotoCompareWindow` (N-way photo compare:
+A–B loop, in-memory oscillating playback, saved loops persisted per-video), `MarkerSlider`, and
+`PhotoCompareWindow` (N-way photo compare:
 one shared zoom/pan view + a per-photo alignment transform, one-click auto-align via the `magic-alignment`
 library, two-point calibration, flicker / difference / full-view comparison modes, drop-to-add photos).
 

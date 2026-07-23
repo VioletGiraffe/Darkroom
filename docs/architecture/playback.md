@@ -16,7 +16,32 @@ which needs the native multi-select `CFlowLayout` lacks (see
 
 Built-in player (`QMediaPlayer` + `QVideoWidget` + `QAudioOutput`) for the double-click-to-play path. Keeps a
 static list of open instances (app-wide restart/close) and auto-tiles each window into screen thirds once the
-video size is known. Offers an A–B loop plus multiple saved loops per video.
+video size is known. Offers an A–B loop plus multiple saved loops per video. The player has one logical
+position/play-state seam so controls keep referring to the frame actually shown when the optional oscillating
+mode temporarily takes presentation over from `QMediaPlayer`.
+
+### Oscillating playback
+
+For a valid A–B interval, **Oscillate** prepares an in-memory JPEG cache and then presents it forward and
+backward without seeking at either turnaround. Preparation is one asynchronous ffmpeg process owned by the
+player window; its constant-rate, at-most-60-fps MJPEG stream is parsed by multipart `Content-length` directly
+from stdout. There are no temporary files and no Darkroom worker thread. The coarse admission limits are 30
+seconds and a 1920×1080 output envelope (smaller sources are not upscaled); the resulting frame-count cap is
+the runaway guard, deliberately without compressed-byte accounting.
+
+Presentation uses an approximately 60 Hz GUI-thread clock. It selects the frame implied by elapsed time, so a
+late tick or 2× playback drops obsolete frames instead of slowing the motion. Linear, cosine, smoothstep, and
+smootherstep curves normalize the speed selector as their approximate maximum source speed; switching curve
+keeps raw cycle phase and cuts to the new mapping on the next tick. JPEG decode is inline and transient:
+the decoded `QImage` is submitted to the existing `QVideoSink` through Qt 6.8's `QVideoFrame(QImage)`.
+Formats with no direct Qt video-frame mapping receive one explicit `RGBA8888` conversion.
+
+The paused `QMediaPlayer` remains attached to the video widget while the manual frames are submitted. Audio is
+effectively muted during both preparation and oscillation, independently of the persisted user mute choice.
+Changing/clearing A or B, activating a saved loop, seeking, restart-all, or turning the toggle off cancels and
+drops the cache. Normal playback resumes at the discrete timestamp of the last displayed cached frame and
+preserves whether the oscillation was playing or paused. The selected motion curve is global/persisted; the
+toggle and cache are per-window/transient.
 
 ### Frame extraction
 
