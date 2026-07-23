@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784824855675,
+  "lastUpdate": 1784827610110,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -7539,6 +7539,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 323,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 32.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 34,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "7857313dd667718732d219db3793f8b339e691c0",
+          "message": "Oscillating playback smoothing functions improved",
+          "timestamp": "2026-07-23T20:23:26+03:00",
+          "tree_id": "c644ff9488b6ac012df6bdb12b2dd1d8ebac4a3a",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/7857313dd667718732d219db3793f8b339e691c0"
+        },
+        "date": 1784827604887,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 13051,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 7958,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1099.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 671,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 323.5,
             "unit": "KB"
           },
           {
