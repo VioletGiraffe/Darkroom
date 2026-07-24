@@ -904,7 +904,11 @@ bool MainWindow::regeneratePreviewFor(const MediaId& id)
 	if (!QFile::exists(source))
 		return false;
 
-	const Ffmpeg::PreviewResult result = Ffmpeg::generatePreviewFrames(source, Catalog::previewDirFor(folder), frameCount);
+	const QString previewDirPath = Catalog::previewDirFor(folder);
+	if (!QDir{}.mkpath(previewDirPath))
+		assert_and_return_unconditional_r("Failed to create preview folder " + previewDirPath.toStdString(), false);
+
+	const Ffmpeg::PreviewResult result = Ffmpeg::generatePreviewFrames(source, previewDirPath, frameCount);
 	catalog.setDurationMs(id, result.durationMs);  // backfill: an item imported before durations were recorded gets one here (no-op if the probe failed)
 	return result.ok();
 }
