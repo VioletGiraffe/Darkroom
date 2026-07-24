@@ -56,7 +56,7 @@ int main(int argc, char* argv[])
 	g_previousMessageHandler = qInstallMessageHandler(memoryLogMessageHandler);
 
 	AdvancedAssert::setLoggingFunc([](const char* msg) {
-		qInfo() << msg;
+		::memoryLogMessageHandler(QtWarningMsg, QMessageLogContext{}, msg);
 	});
 
 	QApplication app(argc, argv);

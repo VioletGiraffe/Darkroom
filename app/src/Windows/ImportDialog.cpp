@@ -19,6 +19,7 @@
 #include "Windows/VideoPlayerWindow.h"
 
 #include "assert/advanced_assert.h"
+#include "dialogs/messagebox.h"
 #include "threading/cinterruptablethread.h"
 
 #include <QAbstractItemView>
@@ -1236,6 +1237,23 @@ void ImportDialog::importVideoGroup(const QString& labelId, const std::vector<Me
 
 void ImportDialog::runImport()
 {
+	const RelocateMode relocateMode = static_cast<RelocateMode>(_relocateModeCombo->currentData().toInt());
+
+	// Move/Copy relocate the source files (Move deletes the originals), and the mode is easy to leave set from a
+	// previous run - so confirm before committing to it. Only prompt when there's actually something to import; an
+	// unlabeled run just reports "nothing labeled" below without a spurious confirmation first.
+	if (relocateMode != RelocateMode::LeaveInPlace
+		&& std::any_of(_staged.constBegin(), _staged.constEnd(), [](const StagedEntry& entry) { return !entry.pendingLabelIds.isEmpty(); }))
+	{
+		const bool move = relocateMode == RelocateMode::Move;
+		const QString text = move
+			? tr("Importing with \"Move\" will move each source file out of its current location, deleting the original. Continue?")
+			: tr("Importing with \"Copy\" will copy each source file into its destination. Continue?");
+		if (MessageBox::question(this, tr("Import"), text, { move ? tr("Move and import") : tr("Copy and import") },
+				/*defaultIndex*/ 0, /*cancellable*/ true, QMessageBox::Warning) != 0)
+			return;
+	}
+
 	materializeUsedProvisionalLabels();
 
 	// Group labeled entries by the first label dropped on them - the only place that ordering matters. Keyed
@@ -1253,7 +1271,6 @@ void ImportDialog::runImport()
 		return;
 	}
 
-	const RelocateMode relocateMode = static_cast<RelocateMode>(_relocateModeCombo->currentData().toInt());
 	// The relocation mode doubles as the photo import mode: Copy/Move land the file in the library's
 	// photo storage, "leave in place" means tracking it right where it is (a referenced photo).
 	const Import::PhotoImportMode photoMode =
