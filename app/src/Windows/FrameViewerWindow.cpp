@@ -69,10 +69,10 @@ FrameViewerWindow::FrameViewerWindow(QWidget* parent)
 	connect(escShortcut, &QShortcut::activated, this, &QWidget::close);
 }
 
-void FrameViewerWindow::showForFolder(const QString& folderPath)
+void FrameViewerWindow::showForFolder(const QString& folderPath, const QString& title)
 {
 	_folderPath = folderPath;
-	setWindowTitle(folderPath.isEmpty() ? tr("Frame Viewer") : QFileInfo(folderPath).fileName());
+	setWindowTitle(title.isEmpty() ? tr("Frame Viewer") : title);
 	refreshDisplay();
 	if (!folderPath.isEmpty())
 	{

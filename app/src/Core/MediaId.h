@@ -24,6 +24,7 @@ public:
 
 	// Canonical key for use as a map / JSON key. Folds the name's case so matching is case-insensitive.
 	QString key() const;
+	uint64_t hash() const;
 
 	bool operator==(const MediaId& other) const;
 
@@ -32,4 +33,6 @@ private:
 	qint64  _size = -1;  // -1 == invalid (no such file)
 };
 
-size_t qHash(const MediaId& id, size_t seed = 0);
+inline size_t qHash(const MediaId& id, size_t /*seed*/ = 0) {
+	return static_cast<size_t>(id.hash());
+}

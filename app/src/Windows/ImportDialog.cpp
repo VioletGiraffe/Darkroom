@@ -126,7 +126,7 @@ using RelocateMode = SourceRelocation::Mode;
 	const QString storageFolder = catalog.storageFolderForLabel(labelIdFromString(labelId));
 	if (storageFolder.isEmpty())
 		return false;
-	const QString expectedFolder = storageFolder + "/" + QFileInfo(id.name()).completeBaseName();
+	const QString expectedFolder = storageFolder + "/" + Catalog::frameFolderName(QFileInfo(id.name()).completeBaseName(), id);
 	return QString::compare(catalog.folderForMediaItem(id), expectedFolder, Qt::CaseInsensitive) == 0;
 }
 

@@ -35,9 +35,10 @@ Import::Result Import::importVideo(Catalog& catalog, const QString& videoPath, c
 	if (!videoInfo.exists())
 		return { Status::Error, QObject::tr("Video file does not exist:\n%1").arg(videoPath) };
 
-	// Create output folder
-	const QString baseName = videoInfo.completeBaseName();
-	const QString outputFolder = storageFolderPath + "/" + baseName;
+	// Create output folder. Its leaf carries a hash of the item's identity (see Catalog::frameFolderName), so it
+	// is always a valid, unique folder name whatever the video's base name happens to be.
+	const MediaId id = MediaId::fromFile(videoPath);
+	const QString outputFolder = storageFolderPath + "/" + Catalog::frameFolderName(videoInfo.completeBaseName(), id);
 	if (!QDir{}.mkpath(storageFolderPath))
 		return { Status::Error, QObject::tr("Failed to create label folder:\n%1").arg(storageFolderPath) };
 
@@ -65,7 +66,7 @@ Import::Result Import::importVideo(Catalog& catalog, const QString& videoPath, c
 		durationMs = Ffmpeg::generatePreviewFrames(videoPath, Catalog::previewDirFor(outputFolder), previewFrameCount).durationMs;
 	}
 
-	if (!catalog.addMediaItem(MediaId::fromFile(videoPath), videoPath, outputFolder, /*splitIntoFrames=*/false, durationMs))
+	if (!catalog.addMediaItem(id, videoPath, outputFolder, /*splitIntoFrames=*/false, durationMs))
 	{
 		QString message = QObject::tr("An item with the same name and file size is already tracked under a different label:\n%1").arg(videoPath);
 		if (!QDir(outputFolder).removeRecursively())

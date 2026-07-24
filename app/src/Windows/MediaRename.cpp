@@ -27,37 +27,29 @@ bool caseOnlyRenameAllowed([[maybe_unused]] QWidget* parent, [[maybe_unused]] co
 #endif
 }
 
-Result renameVideo(Catalog& catalog, const MediaId& oldId, const QString& newFolderPath, QWidget* parent)
+// Executes a video rename whose target names the caller already computed and validated: rename the source file (when
+// one is recorded and present), then the frame folder, then re-key the catalog record - undoing the disk renames if a
+// later step fails. newSourcePath is empty when no source is recorded; newId equals oldId unless the source file was
+// actually renamed (identity is the source file's name+size, so it can't change when there's no file to rename).
+Result renameVideo(Catalog& catalog, const MediaId& oldId, const MediaId& newId,
+	const QString& newName, const QString& newSourcePath, const QString& newFolderPath, QWidget* parent)
 {
 	const QString dialogTitle = QObject::tr("Rename media file");
 	const QString oldFolderPath = catalog.folderForMediaItem(oldId);
 	const QString oldSourcePath = catalog.sourcePathForMediaItem(oldId);
 
 	// --- Step 1: rename the source video file (if one is recorded and present) ---
-	QString newSourcePath;
-	bool sourceWasRenamed = false;
-	MediaId newId = oldId;  // identity only changes if the source file itself is renamed (below)
-	if (!oldSourcePath.isEmpty())
+	const bool renameSourceFile = !oldSourcePath.isEmpty() && QFile::exists(oldSourcePath);
+	if (renameSourceFile && !QFile::rename(oldSourcePath, newSourcePath))
 	{
-		const QFileInfo oldSourceInfo{ oldSourcePath };
-		newSourcePath = oldSourceInfo.absolutePath() + "/" + QFileInfo(newFolderPath).fileName() + "." + oldSourceInfo.suffix();
-
-		if (QFile::exists(oldSourcePath))
-		{
-			if (!QFile::rename(oldSourcePath, newSourcePath))
-			{
-				QMessageBox::critical(parent, dialogTitle, QObject::tr("Failed to rename the source file:\n%1\n→ %2").arg(oldSourcePath, newSourcePath));
-				return {};
-			}
-			sourceWasRenamed = true;
-			newId = MediaId::fromFile(newSourcePath);  // renaming the file changes its name and thus its MediaId
-		}
+		QMessageBox::critical(parent, dialogTitle, QObject::tr("Failed to rename the source file:\n%1\n→ %2").arg(oldSourcePath, newSourcePath));
+		return {};
 	}
 
 	// --- Step 2: rename the frame folder ---
 	if (!QFile::rename(oldFolderPath, newFolderPath))
 	{
-		if (sourceWasRenamed)
+		if (renameSourceFile)
 			QFile::rename(newSourcePath, oldSourcePath);
 		QMessageBox::critical(parent, dialogTitle, QObject::tr("Failed to rename the frame folder:\n%1\n→ %2").arg(oldFolderPath, newFolderPath));
 		return {};
@@ -70,14 +62,14 @@ Result renameVideo(Catalog& catalog, const MediaId& oldId, const QString& newFol
 	if (!catalog.applyRename(oldId, newId, newSourcePath, newFolderPath))
 	{
 		QFile::rename(newFolderPath, oldFolderPath);
-		if (sourceWasRenamed)
+		if (renameSourceFile)
 			QFile::rename(newSourcePath, oldSourcePath);
 		QMessageBox::critical(parent, dialogTitle,
 			QObject::tr("An item with the same name and file size is already tracked under a different label:\n%1").arg(newSourcePath));
 		return {};
 	}
 
-	return { .renamed = true, .oldFolderPath = oldFolderPath, .newFolderPath = newFolderPath };
+	return { .renamed = true, .oldFolderPath = oldFolderPath, .newFolderPath = newFolderPath, .newName = newName };
 }
 
 Result renameVideoInteractive(Catalog& catalog, const MediaId& id, QWidget* parent)
@@ -98,40 +90,39 @@ Result renameVideoInteractive(Catalog& catalog, const MediaId& id, QWidget* pare
 	const QString oldSourcePath = catalog.sourcePathForMediaItem(id);
 	const bool sourceExists = !oldSourcePath.isEmpty() && QFile::exists(oldSourcePath);
 
-	const QString oldName = QFileInfo(originalFolderPath).fileName();
-	const QString parentPath = QFileInfo(originalFolderPath).absolutePath();
+	// The editable name is the item's base name (its source file's), not the frame-folder leaf - the leaf now carries
+	// a hash suffix that must neither be shown to the user nor seed the new name.
+	const QString oldBaseName = catalog.displayName(id);
+	const QString parentPath  = QFileInfo(originalFolderPath).absolutePath();
 
 	// Ask for the new name
-	const QString newName = QInputDialog::getText(parent, QObject::tr("Rename media file"), QObject::tr("New name:"), QLineEdit::Normal, oldName).trimmed();
+	const QString newBaseName = QInputDialog::getText(parent, QObject::tr("Rename media file"), QObject::tr("New name:"), QLineEdit::Normal, oldBaseName).trimmed();
 
-	if (newName.isEmpty() || newName == oldName)
+	if (newBaseName.isEmpty() || newBaseName == oldBaseName)
 		return {};
 
-	if (const QChar bad = invalidFilenameChar(newName); !bad.isNull())
+	if (const QChar bad = invalidFilenameChar(newBaseName); !bad.isNull())
 	{
 		QMessageBox::warning(parent, QObject::tr("Rename media file"), QObject::tr("Name contains an invalid character: '%1'").arg(bad));
 		return {};
 	}
 
-	const bool caseChangeOnly = newName.compare(oldName, Qt::CaseInsensitive) == 0;
+	const bool caseChangeOnly = newBaseName.compare(oldBaseName, Qt::CaseInsensitive) == 0;
 	if (caseChangeOnly && !caseOnlyRenameAllowed(parent, QObject::tr("Rename media file")))
 		return {};
 
-	// Make sure the destination folder does not already exist. A case-only rename keeps the same folder, so
-	// its target "existing" is not a collision.
-	const QString newFolderPath = parentPath + "/" + newName;
-	if (!caseChangeOnly && QDir(newFolderPath).exists())
-	{
-		QMessageBox::warning(parent, QObject::tr("Rename media file"), QObject::tr("A folder with that name already exists:\n%1").arg(newFolderPath));
-		return {};
-	}
-
-	// Build the new source path (same directory and extension, new base name)
+	// Build the new source path (same directory and extension, new base name) and the identity it implies. A rename
+	// preserves the file's size, so deriving the id from name+size needs no disk access and matches what the renamed
+	// file would resolve to. Identity actually changes only when the source file itself is renamed.
 	QString newSourcePath;
+	MediaId newId = id;
 	if (!oldSourcePath.isEmpty())
 	{
 		const QFileInfo oldSourceInfo{ oldSourcePath };
-		newSourcePath = oldSourceInfo.absolutePath() + "/" + newName + "." + oldSourceInfo.suffix();
+		const QString newFileName = oldSourceInfo.suffix().isEmpty() ? newBaseName : newBaseName + "." + oldSourceInfo.suffix();
+		newSourcePath = oldSourceInfo.absolutePath() + "/" + newFileName;
+		if (sourceExists)
+			newId = MediaId::fromNameAndSize(newFileName, id.size());
 
 		// Make sure we would not overwrite a different existing file (a case-only rename keeps the same file)
 		if (!caseChangeOnly && sourceExists && QFile::exists(newSourcePath))
@@ -141,8 +132,17 @@ Result renameVideoInteractive(Catalog& catalog, const MediaId& id, QWidget* pare
 		}
 	}
 
+	// The frame folder is <newBaseName>_<hash>. A case-only rename leaves the identity (hence the hash) unchanged, so
+	// only the prefix's case differs and the pre-existing folder is not a collision.
+	const QString newFolderPath = parentPath + "/" + Catalog::frameFolderName(newBaseName, newId);
+	if (!caseChangeOnly && QDir(newFolderPath).exists())
+	{
+		QMessageBox::warning(parent, QObject::tr("Rename media file"), QObject::tr("A folder with that name already exists:\n%1").arg(newFolderPath));
+		return {};
+	}
+
 	// Build a confirmation message that spells out every change
-	QString message = QObject::tr("Rename “%1” to “%2”?\n\n").arg(oldName, newName);
+	QString message = QObject::tr("Rename “%1” to “%2”?\n\n").arg(oldBaseName, newBaseName);
 	if (sourceExists)
 	{
 		message += QObject::tr("• Source file:\n  %1\n  → %2\n\n").arg(oldSourcePath, newSourcePath);
@@ -161,7 +161,7 @@ Result renameVideoInteractive(Catalog& catalog, const MediaId& id, QWidget* pare
 		QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes) != QMessageBox::Yes)
 		return {};
 
-	return renameVideo(catalog, id, newFolderPath, parent);
+	return renameVideo(catalog, id, newId, newBaseName, newSourcePath, newFolderPath, parent);
 }
 
 Result renamePhoto(Catalog& catalog, const MediaId& oldId, const QString& newSourcePath, QWidget* parent)

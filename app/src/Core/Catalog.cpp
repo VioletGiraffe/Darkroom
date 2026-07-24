@@ -383,6 +383,16 @@ QString Catalog::sourcePathForMediaItem(const MediaId& id) const
 	return _mediaItems.value(id).sourcePath;
 }
 
+QString Catalog::displayName(const MediaId& id) const
+{
+	return QFileInfo(_mediaItems.value(id).sourcePath).completeBaseName();
+}
+
+QString Catalog::frameFolderName(const QString& baseName, const MediaId& id)
+{
+	return baseName + "_" + QString::number(id.hash(), 36);
+}
+
 QString Catalog::previewDirFor(const QString& frameFolder)
 {
 	return frameFolder + "/preview";

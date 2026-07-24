@@ -752,16 +752,13 @@ struct ItemInfo {
 	QString name;
 };
 
-// The display name + sort keys for one item, shared by the grid build and the in-place resort. A video is
-// named after its frame folder; a photo has none that names it (an owned photo's folder is the shared label
-// dir, a referenced photo's is empty), so its name comes from the id's file name.
+// The display name + sort keys for one item, shared by the grid build and the in-place resort. The name is the
+// item's source-file base name for every type (see Catalog::displayName) - folder-independent, so a video's
+// frame-folder hash suffix never shows.
 ItemInfo itemInfoFor(Catalog& catalog, const MediaId& id, bool isBest, bool sortByDate)
 {
-	const QString folderPath = catalog.folderForMediaItem(id);
-	const QString name = catalog.mediaType(id) == Catalog::MediaType::Photo
-		? QFileInfo(id.name()).completeBaseName()
-		: QFileInfo(folderPath).fileName();
-	return { isBest, sortByDate ? getSourceFileDate(catalog.sourcePathForMediaItem(id), folderPath) : QDateTime{}, name };
+	const QString name = catalog.displayName(id);
+	return { isBest, sortByDate ? getSourceFileDate(catalog.sourcePathForMediaItem(id), catalog.folderForMediaItem(id)) : QDateTime{}, name };
 }
 
 // A grid item that orders itself by its bundled ItemInfo. The sort mode (sortBy/descending/
@@ -995,7 +992,7 @@ MediaItemWidget* MainWindow::buildMediaCard(const MediaId& id, bool isBest, cons
 	{
 		card->setOnMiddleButtonClick([this, id, folderPath] {
 			if (ensureFramesSplit(id))  // transparently runs the full split first, if this video hasn't had one yet
-				_frameViewer->showForFolder(folderPath);
+				_frameViewer->showForFolder(folderPath, libraryCatalog().displayName(id));
 		});
 	}
 	card->setOnMouseWheelCallback([this](int steps) { zoomCards(steps); });
@@ -1248,9 +1245,9 @@ QString MainWindow::bulletedItemNameList(const std::vector<MediaId>& selection) 
 	for (size_t i = 0; i < std::min(maxListed, selection.size()); ++i)
 	{
 		const MediaId& sel = selection[i];
-		// A video is named by its frame folder; a photo's folder is shared/empty, so use the id's file name.
+		// A photo is listed with its extension (its file is the item); a video by its display (base) name.
 		list += "\n• " + (catalog.mediaType(sel) == Catalog::MediaType::Photo
-			? sel.name() : QFileInfo(catalog.folderForMediaItem(sel)).fileName());
+			? sel.name() : catalog.displayName(sel));
 	}
 	if (selection.size() > maxListed)
 		list += "\n" + tr("... and %1 more").arg(selection.size() - maxListed);
@@ -2120,5 +2117,5 @@ void MainWindow::renameItemInteractive(const MediaId& id)
 	refreshLibraryView();
 	// A video rename moves its frame folder - follow it if the frame viewer was showing that folder.
 	if (!result.oldFolderPath.isEmpty() && _frameViewer->currentFolder() == result.oldFolderPath && _frameViewer->isVisible())
-		_frameViewer->showForFolder(result.newFolderPath);
+		_frameViewer->showForFolder(result.newFolderPath, result.newName);
 }

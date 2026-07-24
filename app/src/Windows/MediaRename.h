@@ -20,6 +20,7 @@ namespace MediaRename
 		// The frame folder before/after the rename - set only for a video (a photo rename moves no folder).
 		QString oldFolderPath;
 		QString newFolderPath;
+		QString newName;       // the new display (base) name - set only for a video; the folder leaf now hides it
 	};
 
 	// Dispatches to the video- or photo-specific flow by the item's type. dialogParent hosts every prompt.

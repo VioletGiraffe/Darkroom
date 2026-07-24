@@ -1,6 +1,9 @@
 #include "Core/MediaId.h"
 
+#include "hash/wheathash.hpp"
+
 #include <QFileInfo>
+#include <QStringBuilder>
 
 namespace {
 	// key() (hence qHash, hence the persisted catalog key) and operator== must fold case identically, or QHash's
@@ -33,16 +36,17 @@ MediaId MediaId::fromNameAndSize(const QString& name, qint64 size)
 
 QString MediaId::key() const
 {
-	return QString::number(_size) + ':' + nameForMatching(_name);
+	return QString::number(_size) % ':' % nameForMatching(_name);
+}
+
+uint64_t MediaId::hash() const
+{
+	const QString k = key();
+	return ::wheathash64(k.data(), k.size() * sizeof(QChar));
 }
 
 bool MediaId::operator==(const MediaId& other) const
 {
 	// Size first: it settles almost every comparison without folding anything.
 	return _size == other._size && nameForMatching(_name) == nameForMatching(other._name);
-}
-
-size_t qHash(const MediaId& id, size_t seed)
-{
-	return qHash(id.key(), seed);
 }

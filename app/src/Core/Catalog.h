@@ -99,6 +99,15 @@ public:
 	// Per-item disk facts the catalog tracks. folderForMediaItem is absolute; both are empty for an unknown id.
 	[[nodiscard]] QString folderForMediaItem(const MediaId& id) const;
 	[[nodiscard]] QString sourcePathForMediaItem(const MediaId& id) const;
+	// The name shown for an item (and its sort key): its source file's base name. Folder-independent, so it never
+	// surfaces the hash suffix in a video's frame-folder name, and it follows a rename (which updates the stored
+	// source path). Empty for an unknown id.
+	[[nodiscard]] QString displayName(const MediaId& id) const;
+	// The frame-folder leaf name for a video: its base name plus a base36 hash of its identity, e.g. "movie_a1b2c3d4e".
+	// The hash makes the folder always valid and unique even when the base name alone would not be - empty, a reserved
+	// device name, or a trailing dot/space - by guaranteeing a non-empty, alphanumeric-terminated leaf. Import and
+	// rename both go through here so a video's on-disk folder is derived one way only.
+	[[nodiscard]] static QString frameFolderName(const QString& baseName, const MediaId& id);
 	// The preview-frames subdirectory of a video's frame folder - the single definition of the "preview"
 	// subfolder name (a UI-render cache the catalog otherwise never touches). Pure path join; folder may not exist.
 	[[nodiscard]] static QString previewDirFor(const QString& frameFolder);
