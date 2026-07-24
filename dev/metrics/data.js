@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784831021461,
+  "lastUpdate": 1784851913877,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -7672,6 +7672,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .text",
             "value": 671.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 323.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 32.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 34,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "0ed6ead7f83a348927ac57889481002943055b2b",
+          "message": "Videos with missing preview frames still show up in the library - no longer hidden",
+          "timestamp": "2026-07-24T03:07:45+03:00",
+          "tree_id": "838db4a51a1bf6f94658605647205b72d7d41c53",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/0ed6ead7f83a348927ac57889481002943055b2b"
+        },
+        "date": 1784851911095,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 13067,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 7958,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1100.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 672,
             "unit": "KB"
           },
           {
