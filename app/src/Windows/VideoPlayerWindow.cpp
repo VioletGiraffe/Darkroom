@@ -60,6 +60,20 @@
 #include <optional>
 #include <stdint.h>
 
+namespace Settings {
+	constexpr const char* PauseOnSeek  = "VideoPlayer/PauseOnSeek";
+	constexpr const char* Volume       = "VideoPlayer/Volume"; // UI slider position, 0..100 (perceptual)
+	constexpr const char* Muted        = "VideoPlayer/Muted";
+	constexpr const char* LastFrameExtractionMode   = "VideoPlayer/LastFrameExtractionMode";   // "library" or "folder"; unset = no extraction done yet
+	constexpr const char* LastFrameExtractionFolder = "VideoPlayer/LastFrameExtractionFolder";
+}
+
+namespace Defaults {
+	constexpr bool PauseOnSeek = true;
+	constexpr int  Volume      = 100; // full, on the 0..100 UI scale
+	constexpr bool Muted       = false;
+}
+
 namespace {
 // Item-data roles under which a saved-loop combo entry stores its interval endpoints (ms), optional name, and
 // playback speed (0 for legacy loops saved before the speed attribute existed).
