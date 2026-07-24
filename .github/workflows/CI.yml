@@ -98,13 +98,13 @@ jobs:
       shell: cmd
       run: |
         %QT_ROOT_DIR%\bin\qmake.exe -v
-        %QT_ROOT_DIR%\bin\qmake.exe -tp vc -r || exit /b 1
-        msbuild /t:DarkroomTests /p:Configuration=Release;PlatformToolset=v143 || exit /b 1
+        %QT_ROOT_DIR%\bin\qmake.exe -tp vc -r Tests.pro || exit /b 1
+        msbuild Tests.sln /t:DarkroomTests /p:Configuration=Release;PlatformToolset=v143 || exit /b 1
 
     - name: Build tests (Unix)
       if: ${{ !startsWith(matrix.os, 'windows') }}
       run: |
-        $QT_ROOT_DIR/bin/qmake -r CONFIG+=release
+        $QT_ROOT_DIR/bin/qmake -r CONFIG+=release Tests.pro
         make -j sub-tests
 
     - name: Run tests (Windows)
@@ -120,7 +120,9 @@ jobs:
       if: ${{ !cancelled() && startsWith(matrix.os, 'windows') }}
       shell: cmd
       run: |
-        msbuild /t:Darkroom /p:Configuration=Release;PlatformToolset=v143 || exit /b 1
+        rem Own qmake run: the tests step above generated Tests.sln, not the app's project files.
+        %QT_ROOT_DIR%\bin\qmake.exe -tp vc -r Darkroom.pro || exit /b 1
+        msbuild Darkroom.sln /t:Darkroom /p:Configuration=Release;PlatformToolset=v143 || exit /b 1
 
         @echo on
         set STAGING_DIR=dist
@@ -136,7 +138,10 @@ jobs:
 
     - name: Build app (Unix)
       if: ${{ !cancelled() && !startsWith(matrix.os, 'windows') }}
-      run: make -j sub-app
+      run: |
+        # Own qmake run: both projects generate the top-level Makefile, and the tests step's version is there now.
+        $QT_ROOT_DIR/bin/qmake -r CONFIG+=release Darkroom.pro
+        make -j sub-app
 
     - name: .exe file size
       if: startsWith(matrix.os, 'windows')
