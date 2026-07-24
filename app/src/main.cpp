@@ -55,6 +55,10 @@ int main(int argc, char* argv[])
 	// Installed before QApplication so plugin/platform diagnostics emitted during its construction are captured too.
 	g_previousMessageHandler = qInstallMessageHandler(memoryLogMessageHandler);
 
+	AdvancedAssert::setLoggingFunc([](const char* msg) {
+		qInfo() << msg;
+	});
+
 	QApplication app(argc, argv);
 	app.setOrganizationName("VioletGiraffe");
 	app.setApplicationName("Darkroom");
