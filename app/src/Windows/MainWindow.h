@@ -118,10 +118,10 @@ private:
 	// Called right before opening the frame viewer on a card; false means the viewer must not be opened.
 	[[nodiscard]] bool ensureFramesSplit(const MediaId& id);
 	// Rebuilds <folder>/preview from the video's own real frames (plain copy, no ffmpeg, no source needed).
-	// Returns false and touches nothing when there are no real frames to sample. Used by the integrity tool's
-	// INVISIBLE recovery (regeneratePreviewFor).
-	bool regeneratePreviewFromRealFrames(const QString& folderPath, int frameCount);
-	// Integrity resolution for INVISIBLE: restores a video's preview from its real frames if present (which also
+	// True once at least one frame is in place; false leaves the preview still missing, whether because there were
+	// no real frames to sample or because writing them failed. Used by regeneratePreviewFor.
+	[[nodiscard]] bool regeneratePreviewFromRealFrames(const QString& folderPath, int frameCount);
+	// Integrity resolution for a missing preview: restores it from the video's real frames if present (which also
 	// marks it fully split), else re-extracts from its source video. Returns whether a preview exists afterwards.
 	[[nodiscard]] bool regeneratePreviewFor(const MediaId& id);
 	void reExportAllVideos();

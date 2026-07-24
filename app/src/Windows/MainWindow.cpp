@@ -872,10 +872,19 @@ bool MainWindow::regeneratePreviewFromRealFrames(const QString& folderPath, int 
 		return false;
 
 	const QString previewFolder = Catalog::previewDirFor(folderPath);
-	QDir{}.mkpath(previewFolder);
+	if (!QDir{}.mkpath(previewFolder))
+		return false;
+
+	// One frame landing is enough to succeed: the postcondition the caller needs is just that preview/ stops being
+	// empty, and a short strip still renders the card. Every copy is attempted regardless, so one unreadable frame
+	// doesn't cost the rest.
+	bool anyCopied = false;
 	for (const QString& sourceFrame : pickEvenlySpacedFrames(folderDir, realFrames, frameCount))
-		QFile::copy(sourceFrame, previewFolder + "/" + QFileInfo(sourceFrame).fileName());
-	return true;
+	{
+		if (QFile::copy(sourceFrame, previewFolder + "/" + QFileInfo(sourceFrame).fileName()))
+			anyCopied = true;
+	}
+	return anyCopied;
 }
 
 bool MainWindow::regeneratePreviewFor(const MediaId& id)
@@ -892,7 +901,8 @@ bool MainWindow::regeneratePreviewFor(const MediaId& id)
 		return true;
 	}
 
-	// No real frames (a not-yet-split video): re-extract the preview straight from the source, if present.
+	// No real frames to copy (a not-yet-split video), or copying them failed: re-extract the preview straight from
+	// the source, if present.
 	const QString source = catalog.sourcePathForMediaItem(id);
 	if (!QFile::exists(source))
 		return false;
