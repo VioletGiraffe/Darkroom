@@ -41,6 +41,8 @@ private:
 	[[nodiscard]] qint64 currentPlaybackPosition() const;
 	[[nodiscard]] bool isPlaybackActive() const;
 	void setPlaybackActive(bool active);
+	// True while a usable A-B interval is set. When false, oscillation covers the whole video and no loop-back happens.
+	[[nodiscard]] bool hasAbInterval() const { return _loopStart >= 0 && _loopEnd > _loopStart; }
 	void exitOscillatingPlayback(bool restorePlaybackState = true);
 	void updatePlaybackPositionUi(qint64 position);
 	void applyEffectiveMute();
@@ -85,8 +87,7 @@ private:
 	bool _wasPlayingBeforeSeek = false;
 	bool _userMuted = false;
 
-	// A-B loop interval, in milliseconds; -1 means the respective endpoint is unset.
-	// Looping is active only while both are set and _loopEnd > _loopStart.
+	// A-B loop interval, in milliseconds; -1 means the respective endpoint is unset. See hasAbInterval().
 	qint64 _loopStart = -1;
 	qint64 _loopEnd = -1;
 };

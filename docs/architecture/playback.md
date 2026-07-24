@@ -22,8 +22,9 @@ mode temporarily takes presentation over from `QMediaPlayer`.
 
 ### Oscillating playback
 
-For a valid A–B interval, **Oscillate** prepares an in-memory JPEG cache and then presents it forward and
-backward without seeking at either turnaround. Preparation is one asynchronous ffmpeg process owned by the
+**Oscillate** prepares an in-memory JPEG cache of the target range and then presents it forward and backward
+without seeking at either turnaround. The range is the A–B interval, or the whole video when no valid A–B is
+set. Preparation is one asynchronous ffmpeg process owned by the
 player window; its constant-rate, at-most-60-fps MJPEG stream is parsed by multipart `Content-length` directly
 from stdout. There are no temporary files and no Darkroom worker thread. The coarse admission limits are 30
 seconds and a 1920×1080 output envelope (smaller sources are not upscaled); the resulting frame-count cap is

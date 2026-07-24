@@ -679,7 +679,7 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	_seekSlider = new MarkerSlider(Qt::Horizontal, this);
 	_timeLabel = new QLabel(tr("video is loading..."), this);
 
-	static constexpr double speeds[] { 0.25, 0.35, 0.5, 0.6, 0.8, 1.0, 2.0 };
+	static constexpr double speeds[] { 0.25, 0.35, 0.5, 0.6, 0.8, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 6.0, 8.0, 10.0 };
 	QComboBox* speedCombo = new QComboBox(this);
 	speedCombo->setToolTip(tr("Playback speed. During oscillation this is the approximate maximum speed."));
 	for (const auto& s : speeds)
@@ -878,7 +878,7 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 		             loopCombo->itemData(index, LoopEndRole).toLongLong());
 	});
 	connect(saveLoopButton, &QPushButton::clicked, this, [this, loopCombo, addIntervalItem, persistIntervals, promptLoopName] {
-		if (_loopStart < 0 || _loopEnd <= _loopStart)
+		if (!hasAbInterval())
 			return; // nothing valid to save
 		const std::optional<QString> name = promptLoopName(tr("Save loop"), {});
 		if (!name)
@@ -979,7 +979,7 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	connect(_player, &QMediaPlayer::positionChanged, this, [this](qint64 position) {
 		// A-B loop: jump back to the start once playback reaches the end marker.
 		// The follow-up positionChanged from the seek refreshes the slider/label below.
-		if (!_oscillatingPlayback->active() && _loopStart >= 0 && _loopEnd > _loopStart && position >= _loopEnd)
+		if (!_oscillatingPlayback->active() && hasAbInterval() && position >= _loopEnd)
 		{
 			_player->setPosition(_loopStart);
 			return;
@@ -1184,23 +1184,29 @@ bool VideoPlayerWindow::buildOscillationRequest(OscillationRequest* request, QSt
 	assert_r(request);
 	assert_r(error);
 
-	if (_loopStart < 0 || _loopEnd <= _loopStart)
+	const qint64 duration = _player->duration();
+	if (duration <= 0)
 	{
-		*error = tr("Set a valid A-B interval before enabling oscillation.");
+		*error = tr("The video duration is not available yet.");
 		return false;
 	}
 
-	const qint64 duration = _player->duration();
-	if (duration <= 0 || _loopEnd > duration)
+	// Without an A-B interval the whole video is oscillated.
+	const qint64 startMs = hasAbInterval() ? _loopStart : 0;
+	const qint64 endMs = hasAbInterval() ? _loopEnd : duration;
+	if (endMs > duration)
 	{
 		*error = tr("The A-B interval must be within the loaded video.");
 		return false;
 	}
 
-	const qint64 intervalDuration = _loopEnd - _loopStart;
+	const qint64 intervalDuration = endMs - startMs;
 	if (intervalDuration > MaxOscillationDurationMs)
 	{
-		*error = tr("Oscillating playback supports intervals up to 30 seconds.");
+		const qint64 maxSeconds = MaxOscillationDurationMs / 1000;
+		*error = hasAbInterval()
+			? tr("Oscillating playback supports intervals up to %1 seconds.").arg(maxSeconds)
+			: tr("The video is longer than %1 seconds; set an A-B interval to oscillate.").arg(maxSeconds);
 		return false;
 	}
 
@@ -1229,13 +1235,13 @@ bool VideoPlayerWindow::buildOscillationRequest(OscillationRequest* request, QSt
 	const int expectedFrameCount = static_cast<int>(std::ceil(intervalDuration * frameRate / 1000.0));
 	if (expectedFrameCount < 2)
 	{
-		*error = tr("The A-B interval is too short for oscillating playback.");
+		*error = tr("The interval is too short for oscillating playback.");
 		return false;
 	}
 
 	*request = OscillationRequest{
-		.startMs = _loopStart,
-		.endMs = _loopEnd,
+		.startMs = startMs,
+		.endMs = endMs,
 		.frameSize = frameSize,
 		.frameRate = frameRate,
 		.maximumFrameCount = expectedFrameCount + ExpectedFrameCountAllowance,
@@ -1254,7 +1260,9 @@ void VideoPlayerWindow::updateOscillationAvailability()
 	const bool available = buildOscillationRequest(&request, &error);
 	_oscillationCheck->setEnabled(_oscillationCheck->isChecked() || available);
 	_oscillationCheck->setToolTip(available
-		? tr("Play the A-B interval forward and backward. Audio is muted while active.")
+		? (hasAbInterval()
+			? tr("Play the A-B interval forward and backward. Audio is muted while active.")
+			: tr("Play the whole video forward and backward. Audio is muted while active."))
 		: error);
 }
 
