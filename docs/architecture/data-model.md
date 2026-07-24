@@ -111,8 +111,10 @@ Single shared store for per-item metadata. Dumb persistence only — it has no n
   external drive), keyed by `MediaId::key()`, **one record (JSON object of named fields) per item**.
   Written atomically via `QSaveFile`, indented for readability. `Library` reads it once and passes the
   validated object into `MetadataStore`; there is no second permissive parse in the store.
-- **Field-granular API** (`get`/`set` a single named field, `remove` a whole record) so independent features
-  share a record without clobbering each other; the store does read-modify-write internally.
+- **Field-granular API** (`get`/`set`/`removeField` a single named field, `remove` a whole record) so independent
+  features share a record without clobbering each other; the store does read-modify-write internally. `removeField`
+  drops a record left with only the reserved `"name"` bookkeeping, keeping the "every record has real metadata"
+  invariant so cleared optional fields leave no phantom item.
 - `allMediaIds()` reconstructs every recorded item from its key + stored name; `Catalog` enumerates items
   through here, not by walking the filesystem.
 - `rekey(oldId, newId)` moves a whole record to a new identity, preserving every field. `Catalog::applyRename`

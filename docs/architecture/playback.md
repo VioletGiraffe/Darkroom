@@ -67,9 +67,9 @@ untouched).
 ### Playback speed
 
 Playback speed is remembered **per video**, not globally, in the `"playbackSpeed"` metadata field. Only an
-explicit speed pick writes it, so untouched videos carry no record; restore and loop activation apply a speed
-without persisting it, so a loop's transient speed never overwrites the video's remembered one. Absent/≤0 means
-never customized and restores as 1×. Each player borrows the stable `Library&` and resolves the store at the
+explicit non-1× pick writes it; picking 1× removes the field (via `MetadataStore::removeField`), so untouched
+and reverted videos carry no record at all. Restore and loop activation apply a speed without persisting it, so
+a loop's transient speed never overwrites the video's remembered one. Absent means never customized, restored as 1×. Each player borrows the stable `Library&` and resolves the store at the
 read/write point; after a root switch `MainWindow` closes every player synchronously before returning to the
 event loop, so an old video's controls cannot write the new library's state.
 

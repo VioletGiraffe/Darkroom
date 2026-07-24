@@ -69,6 +69,30 @@ void MetadataStore::set(const MediaId& id, QStringView field, const QJsonValue& 
 	scheduleSave();
 }
 
+void MetadataStore::removeField(const MediaId& id, QStringView field)
+{
+	if (id.name().isEmpty())
+		return;
+
+	const QString key = id.key();
+	auto it = _records.find(key);
+	if (it == _records.end())
+		return;
+
+	QJsonObject record = it.value().toObject();
+	if (record.take(field.toString()).isUndefined())
+		return;  // field wasn't there - nothing changed, so no save
+
+	// Only the reserved "name" can remain (set() always stamps it); a record down to just that carries no real
+	// metadata, so drop it whole instead of leaving a phantom entry for allMediaIds() to resurrect.
+	if (record.size() <= 1)
+		_records.remove(key);
+	else
+		_records.insert(key, record);
+
+	scheduleSave();
+}
+
 void MetadataStore::remove(const MediaId& id)
 {
 	// QJsonObject::remove returns void; take() removes and hands back the old value (undefined if it wasn't
@@ -104,6 +128,11 @@ MetadataStore::Writer::~Writer()
 void MetadataStore::Writer::set(const MediaId& id, QStringView field, const QJsonValue& value)
 {
 	_store.set(id, field, value);
+}
+
+void MetadataStore::Writer::removeField(const MediaId& id, QStringView field)
+{
+	_store.removeField(id, field);
 }
 
 void MetadataStore::Writer::remove(const MediaId& id)

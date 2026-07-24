@@ -701,7 +701,13 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 			return;
 		const double speed = speedCombo->itemData(index).toDouble();
 		applySpeed(speed);
-		_library.metadataStore().beginBatch().set(_mediaId, u"playbackSpeed", speed);  // remember this video's speed
+		// Remember this video's speed, but store nothing for the 1× default - drop any override so untouched
+		// (and reverted) videos carry no metadata at all.
+		auto writer = _library.metadataStore().beginBatch();
+		if (qAbs(speed - 1.0) < 0.001)
+			writer.removeField(_mediaId, u"playbackSpeed");
+		else
+			writer.set(_mediaId, u"playbackSpeed", speed);
 	});
 
 	// Programmatically selects the combo entry nearest to a target speed (for restore and loop activation) and

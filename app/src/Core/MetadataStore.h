@@ -36,6 +36,12 @@ public:
 
 		void set(const MediaId& id, QStringView field, const QJsonValue& value);
 
+		// Removes a single named field from an item's record. No-op if the item or the field is absent. If this
+		// leaves only the reserved "name" bookkeeping (no real metadata remains), the whole record is dropped so
+		// it doesn't linger as a phantom item in allMediaIds(). Use to clear an optional field back to "unset"
+		// rather than storing a default sentinel.
+		void removeField(const MediaId& id, QStringView field);
+
 		// Drops an item's whole record. Used when an item is deleted outright so it doesn't linger as an orphaned
 		// entry once the catalog (not the disk walk) is the authoritative set of items. No-op if absent.
 		void remove(const MediaId& id);
@@ -70,6 +76,7 @@ private:
 	// The mutations behind Writer's public forwarders - private so every write is forced through a Writer's
 	// batch. Each updates _records immediately and defers the disk write to the batch flush (scheduleSave).
 	void set(const MediaId& id, QStringView field, const QJsonValue& value);
+	void removeField(const MediaId& id, QStringView field);
 	void remove(const MediaId& id);
 	void rekey(const MediaId& oldId, const MediaId& newId);
 
