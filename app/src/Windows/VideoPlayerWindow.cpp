@@ -9,6 +9,7 @@
 #include "Settings.h"
 #include "Utils.h"
 #include "assert/advanced_assert.h"
+#include "dialogs/messagebox.h"
 
 #include <QAudio>
 #include <QAudioOutput>
@@ -540,14 +541,11 @@ private:
 		}
 		(void)_process.readAllStandardOutput();
 		_stderr += _process.readAllStandardError();
-		QString completeMessage = message;
 		const QString diagnostics = QString::fromUtf8(_stderr).trimmed();
-		if (!diagnostics.isEmpty() && !completeMessage.contains(diagnostics))
-			completeMessage += "\n\n" + diagnostics;
 		_state = State::Inactive;
 		clearCacheAndParser();
 		_cancellingPreparation = false;
-		_window.onOscillationFailed(completeMessage, displayedPosition, hasDisplayedPosition, shouldResumePlayback);
+		_window.onOscillationFailed(message, diagnostics, displayedPosition, hasDisplayedPosition, shouldResumePlayback);
 	}
 
 	void advanceAndPresent()
@@ -1407,7 +1405,7 @@ void VideoPlayerWindow::onOscillationPositionChanged(qint64 position)
 }
 
 void VideoPlayerWindow::onOscillationFailed(
-	const QString& error, qint64 displayedPosition, bool hasDisplayedPosition, bool shouldResumePlayback)
+	const QString& error, const QString& diagnostics, qint64 displayedPosition, bool hasDisplayedPosition, bool shouldResumePlayback)
 {
 	{
 		const QSignalBlocker blocker{ _oscillationCheck };
@@ -1419,7 +1417,7 @@ void VideoPlayerWindow::onOscillationFailed(
 	setPlaybackActive(shouldResumePlayback);
 	updatePlaybackPositionUi(hasDisplayedPosition ? displayedPosition : _player->position());
 	updateOscillationAvailability();
-	QMessageBox::warning(this, tr("Oscillating playback"), error);
+	MessageBox::notice(this, tr("Oscillating playback"), error, diagnostics);
 }
 
 void VideoPlayerWindow::togglePlayPause()

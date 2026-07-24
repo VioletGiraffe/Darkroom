@@ -1356,8 +1356,9 @@ void MainWindow::deleteSelectedItems()
 
 	if (!failedItems.empty())
 	{
-		QMessageBox::critical(this, tr("Delete incomplete"),
-			tr("Some items could not be fully deleted. Their catalog records were kept:\n\n%1").arg(failedItems.join("\n\n")));
+		MessageBox::notice(this, tr("Delete incomplete"),
+			tr("Some items could not be fully deleted. Their catalog records were kept:"),
+			failedItems.join("\n\n"), QMessageBox::Critical);
 	}
 }
 

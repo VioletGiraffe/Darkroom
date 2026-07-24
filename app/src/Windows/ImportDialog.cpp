@@ -668,10 +668,10 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 	}
 
 	if (!collisionLines.isEmpty())
-		QMessageBox::warning(this, tr("Name collision"),
+		MessageBox::notice(this, tr("Name collision"),
 			tr("Not staged - same name and size as an already staged file, but different content. "
-			   "Only one item per name+size can be tracked; rename the file if both are wanted.\n\n%1")
-			.arg(collisionLines.join("\n\n")));
+			   "Only one item per name+size can be tracked; rename the file if both are wanted."),
+			collisionLines.join("\n\n"));
 
 	if (newPaths.isEmpty())
 		return;
@@ -697,8 +697,8 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 	}
 
 	if (!duplicateLines.isEmpty())
-		QMessageBox::information(this, tr("Already imported"),
-			tr("Not staged - already in the library:\n\n%1").arg(duplicateLines.join("\n\n")));
+		MessageBox::notice(this, tr("Already imported"), tr("Not staged - already in the library:"),
+			duplicateLines.join("\n\n"), QMessageBox::Information);
 
 	// Resolve each staged file's folder label to a concrete id (reusing an existing label or minting a provisional
 	// one) and surface the new provisional labels, before the slower video preview extraction below. Only files
@@ -1034,8 +1034,7 @@ void ImportDialog::deleteStagedSourceFiles(const std::vector<MediaId>& ids)
 	}
 
 	if (!failed.isEmpty())
-		QMessageBox::warning(this, tr("Delete source file(s)"),
-			tr("These files could not be deleted:\n\n%1").arg(failed.join("\n")));
+		MessageBox::notice(this, tr("Delete source file(s)"), tr("These files could not be deleted:"), failed.join("\n"));
 }
 
 void ImportDialog::renameStagedItem(const MediaId& id)

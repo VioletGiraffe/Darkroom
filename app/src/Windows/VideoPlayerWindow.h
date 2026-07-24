@@ -51,7 +51,10 @@ private:
 	[[nodiscard]] bool buildOscillationRequest(OscillationRequest* request, QString* error) const;
 	void onOscillationPrepared();
 	void onOscillationPositionChanged(qint64 position);
-	void onOscillationFailed(const QString& error, qint64 displayedPosition, bool hasDisplayedPosition, bool shouldResumePlayback);
+	// `diagnostics` is ffmpeg's raw output, kept separate from `error` (the one-line reason) so it can be shown in a
+	// bounded scrolling area instead of stretching the message box; empty when the process said nothing.
+	void onOscillationFailed(const QString& error, const QString& diagnostics, qint64 displayedPosition,
+		bool hasDisplayedPosition, bool shouldResumePlayback);
 
 	// The video's right-click menu: frame extraction (to a folder or into the library as an owned photo) and a
 	// fullscreen toggle.

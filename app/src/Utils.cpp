@@ -2,6 +2,8 @@
 #include "Ffmpeg.h"
 #include "Settings.h"
 
+#include "dialogs/messagebox.h"
+
 #include <QByteArray>
 #include <QCoreApplication>
 #include <QCursor>
@@ -301,8 +303,10 @@ void reportFfmpegFailure(QWidget* parent, const Ffmpeg::SplitResult& result, con
 		QMessageBox::critical(parent, QObject::tr("Error"), QObject::tr("The FFMPEG process timed out and was terminated."));
 		break;
 	case Status::ExtractionFailed:
-		QMessageBox::critical(parent, QObject::tr("Error"),
-			QObject::tr("FFMPEG failed with exit code %1\n\nError output:\n%2").arg(result.exitCode).arg(result.errorOutput));
+		// ffmpeg's own output goes in the scrollable body - it runs to hundreds of lines for some failures.
+		MessageBox::notice(parent, QObject::tr("Error"),
+			QObject::tr("FFMPEG failed with exit code %1.").arg(result.exitCode),
+			result.errorOutput.trimmed(), QMessageBox::Critical);
 		break;
 	case Status::NoFrames:
 		QMessageBox::warning(parent, QObject::tr("Warning"), QObject::tr("No frames were extracted from:\n%1").arg(videoFilePath));
