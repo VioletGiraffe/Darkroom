@@ -61,16 +61,19 @@
 #include <stdint.h>
 
 namespace {
-// Item-data roles under which a saved-loop combo entry stores its interval endpoints (ms) and optional name.
-enum LoopItemDataRole { LoopStartRole = Qt::UserRole, LoopEndRole = Qt::UserRole + 1, LoopNameRole = Qt::UserRole + 2 };
+// Item-data roles under which a saved-loop combo entry stores its interval endpoints (ms), optional name, and
+// playback speed (0 for legacy loops saved before the speed attribute existed).
+enum LoopItemDataRole { LoopStartRole = Qt::UserRole, LoopEndRole = Qt::UserRole + 1, LoopNameRole = Qt::UserRole + 2, LoopSpeedRole = Qt::UserRole + 3 };
 
 // A saved loop's dropdown label: optional name first, then the start as a clock time and the duration as
-// fractional seconds to 1 digit (e.g. "warmup   0:12 + 2.3s").
-QString formatLoopLabel(qint64 startMs, qint64 endMs, const QString& name)
+// fractional seconds to 1 digit, then the playback speed when it isn't 1× (e.g. "warmup   0:12 + 2.3s @2×").
+QString formatLoopLabel(qint64 startMs, qint64 endMs, const QString& name, double speed)
 {
 	const QString start = QTime::fromMSecsSinceStartOfDay(static_cast<int>(startMs)).toString(startMs >= 3600000 ? "h:mm:ss" : "m:ss");
-	const QString times = start + " + " + QString::number((endMs - startMs) / 1000.0, 'f', 1) + "s";
-	return name.isEmpty() ? times : name + "   " + times;
+	QString label = start + " + " + QString::number((endMs - startMs) / 1000.0, 'f', 1) + "s";
+	if (speed > 0 && qAbs(speed - 1.0) > 0.001)
+		label += " @" + QString::number(speed) + "×";
+	return name.isEmpty() ? label : name + "   " + label;
 }
 
 // Settings::LastFrameExtractionMode values.
@@ -687,20 +690,43 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 
 	_pauseOnSeek = settings.value(Settings::PauseOnSeek, Defaults::PauseOnSeek).toBool();
 
-	// Restore persisted speed, default to 1.0×
-	{
-		const double savedSpeed = settings.value(Settings::PlaybackSpeed, 1.0).toDouble();
+	// Applies a speed to the player and oscillation and persists it as the app-wide default.
+	const auto applySpeed = [this](double speed) {
+		_player->setPlaybackRate(speed);
+		_oscillatingPlayback->setMaximumSpeed(speed);
+		QSettings{}.setValue(Settings::PlaybackSpeed, speed);
+	};
+	connect(speedCombo, &QComboBox::currentIndexChanged, this, [speedCombo, applySpeed](int index) {
+		if (index >= 0)
+			applySpeed(speedCombo->itemData(index).toDouble());
+	});
+
+	// Programmatically selects the combo entry nearest to a target speed (for restore and loop activation) and
+	// applies it, blocking the change signal so the apply happens exactly once even when the index is unchanged.
+	// A non-positive target is "unset" and left alone, so legacy saved loops (no stored speed) keep the current one.
+	const auto selectSpeed = [speedCombo, applySpeed](double speed) {
+		if (!(speed > 0))
+			return;
+		int nearest = -1;
+		double nearestDiff = std::numeric_limits<double>::max();
 		for (int i = 0; i < speedCombo->count(); ++i)
 		{
-			if (qAbs(speedCombo->itemData(i).toDouble() - savedSpeed) < 0.001)
+			const double diff = qAbs(speedCombo->itemData(i).toDouble() - speed);
+			if (diff < nearestDiff)
 			{
-				speedCombo->setCurrentIndex(i);
-				_player->setPlaybackRate(speedCombo->currentData().toDouble());
-				_oscillatingPlayback->setMaximumSpeed(speedCombo->currentData().toDouble());
-				break;
+				nearestDiff = diff;
+				nearest = i;
 			}
 		}
-	}
+		if (nearest < 0)
+			return;
+		const QSignalBlocker blocker{ speedCombo };
+		speedCombo->setCurrentIndex(nearest);
+		applySpeed(speedCombo->itemData(nearest).toDouble());
+	};
+
+	// Restore persisted speed, default to 1.0×.
+	selectSpeed(settings.value(Settings::PlaybackSpeed, 1.0).toDouble());
 
 	auto* pauseOnSeekCheck = new QCheckBox(tr("Pause on seek"), this);
 	pauseOnSeekCheck->setChecked(_pauseOnSeek);
@@ -786,7 +812,7 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	_oscillatingPlayback->setCurve(savedCurve);
 
 	// Shared loop-control helpers.
-	const auto activateLoop = [this, setLoopStartButton, setLoopEndButton](qint64 start, qint64 end) {
+	const auto activateLoop = [this, setLoopStartButton, setLoopEndButton, selectSpeed](qint64 start, qint64 end, double speed) {
 		exitOscillatingPlayback();
 		_loopStart = start;
 		_loopEnd = end;
@@ -794,6 +820,7 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 		_seekSlider->setMarkerB(static_cast<int>(end));
 		setLoopStartButton->setChecked(true);
 		setLoopEndButton->setChecked(true);
+		selectSpeed(speed);  // a stored non-1× loop speed becomes the active speed; legacy loops (0) keep the current one
 		_player->setPosition(start);  // rewind so looping starts now, rather than after the playhead drifts past the end
 		updateOscillationAvailability();
 	};
@@ -805,12 +832,13 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 		setLoopEndButton->setChecked(false);
 		updateOscillationAvailability();
 	};
-	const auto addIntervalItem = [loopCombo](qint64 start, qint64 end, const QString& name) {
-		loopCombo->addItem(formatLoopLabel(start, end, name));
+	const auto addIntervalItem = [loopCombo](qint64 start, qint64 end, const QString& name, double speed) {
+		loopCombo->addItem(formatLoopLabel(start, end, name, speed));
 		const int index = loopCombo->count() - 1;
 		loopCombo->setItemData(index, start, LoopStartRole);
 		loopCombo->setItemData(index, end, LoopEndRole);
 		loopCombo->setItemData(index, name, LoopNameRole);
+		loopCombo->setItemData(index, speed, LoopSpeedRole);
 		return index;
 	};
 	const auto persistIntervals = [this, loopCombo] {
@@ -821,6 +849,7 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 			object.insert("start", loopCombo->itemData(i, LoopStartRole).toLongLong());
 			object.insert("end", loopCombo->itemData(i, LoopEndRole).toLongLong());
 			object.insert("name", loopCombo->itemData(i, LoopNameRole).toString());
+			object.insert("speed", loopCombo->itemData(i, LoopSpeedRole).toDouble());
 			array.append(object);
 		}
 		_library.metadataStore().beginBatch().set(_mediaId, u"intervals", array);  // single write; the temporary Writer flushes right here
@@ -841,7 +870,8 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 		for (const QJsonValue& value : saved)
 		{
 			const QJsonObject object = value.toObject();
-			addIntervalItem(object.value("start").toInteger(), object.value("end").toInteger(), object.value("name").toString());
+			addIntervalItem(object.value("start").toInteger(), object.value("end").toInteger(),
+			                object.value("name").toString(), object.value("speed").toDouble());
 		}
 	}
 
@@ -875,15 +905,16 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 			return;
 		}
 		activateLoop(loopCombo->itemData(index, LoopStartRole).toLongLong(),
-		             loopCombo->itemData(index, LoopEndRole).toLongLong());
+		             loopCombo->itemData(index, LoopEndRole).toLongLong(),
+		             loopCombo->itemData(index, LoopSpeedRole).toDouble());
 	});
-	connect(saveLoopButton, &QPushButton::clicked, this, [this, loopCombo, addIntervalItem, persistIntervals, promptLoopName] {
+	connect(saveLoopButton, &QPushButton::clicked, this, [this, loopCombo, speedCombo, addIntervalItem, persistIntervals, promptLoopName] {
 		if (!hasAbInterval())
 			return; // nothing valid to save
 		const std::optional<QString> name = promptLoopName(tr("Save loop"), {});
 		if (!name)
 			return; // cancelled
-		const int index = addIntervalItem(_loopStart, _loopEnd, *name);
+		const int index = addIntervalItem(_loopStart, _loopEnd, *name, speedCombo->currentData().toDouble());
 		persistIntervals();
 		loopCombo->setCurrentIndex(index); // reflect the saved loop as the active selection
 	});
@@ -908,7 +939,8 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 			return; // cancelled
 		const qint64 start = loopCombo->itemData(index, LoopStartRole).toLongLong();
 		const qint64 end   = loopCombo->itemData(index, LoopEndRole).toLongLong();
-		loopCombo->setItemText(index, formatLoopLabel(start, end, *name));
+		const double speed = loopCombo->itemData(index, LoopSpeedRole).toDouble();
+		loopCombo->setItemText(index, formatLoopLabel(start, end, *name, speed));
 		loopCombo->setItemData(index, *name, LoopNameRole);
 		persistIntervals();
 	});
@@ -940,14 +972,6 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	loopLayout->addWidget(renameLoopButton);
 	loopLayout->addWidget(deleteLoopButton);
 
-	connect(speedCombo, &QComboBox::currentIndexChanged, this, [this, speedCombo](int index) {
-		if (index < 0)
-			return;
-		const double speed = speedCombo->itemData(index).toDouble();
-		_player->setPlaybackRate(speed);
-		_oscillatingPlayback->setMaximumSpeed(speed);
-		QSettings{}.setValue(Settings::PlaybackSpeed, speed);
-	});
 	connect(_oscillationCurveCombo, &QComboBox::currentIndexChanged, this, [this](int index) {
 		if (index < 0)
 			return;
