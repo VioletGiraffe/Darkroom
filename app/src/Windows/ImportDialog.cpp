@@ -153,9 +153,12 @@ ImportDialog::ImportDialog(Library& library, Callbacks callbacks, const QString&
 	, _callbacks(std::move(callbacks))
 {
 	setWindowTitle(tr("Import"));
-	// Opens maximized and acts as a full workspace window: give it real min/max caption buttons (a QDialog has
-	// none by default) and no "?" context-help button.
-	setWindowFlags((windowFlags() | Qt::WindowMinMaxButtonsHint) & ~Qt::WindowContextHelpButtonHint);
+	// Opens maximized and acts as a full workspace window, so it is a Qt::Window rather than a Qt::Dialog: that is
+	// what earns a taskbar button, an Alt-Tab entry and the full caption button set. Modality is a separate property
+	// (set below) and is unaffected by the type. The hints are spelled out because Qt only supplies its defaults when
+	// none of them is set explicitly.
+	setWindowFlags(Qt::Window | Qt::WindowTitleHint | Qt::WindowSystemMenuHint | Qt::WindowMinMaxButtonsHint | Qt::WindowCloseButtonHint);
+	setWindowModality(Qt::ApplicationModal);  // exec() sets this too; explicit so a show() would behave the same
 	setAcceptDrops(true);  // media files dropped anywhere on the dialog are staged - see dragEnterEvent/dropEvent
 
 	QVBoxLayout* outerLayout = new QVBoxLayout(this);
