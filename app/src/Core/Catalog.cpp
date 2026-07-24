@@ -4,6 +4,8 @@
 #include "Theme/Theme.h"
 #include "Utils.h"
 
+#include "assert/advanced_assert.h"
+
 #include <QColor>
 #include <QDebug>
 #include <QDir>
@@ -698,8 +700,8 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, LabelId removedLabelId)
 			qWarning() << "Catalog: cannot relocate" << entryIt->sourcePath << "to" << newFilePath << "- destination already exists";
 			return;
 		}
-		QDir{}.mkpath(destDir);  // the destination label may not have a photo dir yet - created lazily
-		if (!QFile::rename(entryIt->sourcePath, newFilePath))
+		assert_r(QDir{}.mkpath(destDir));  // the destination label may not have a photo dir yet - created lazily
+		if (!QFile::rename(entryIt->sourcePath, newFilePath))  // also how a failed mkpath surfaces
 		{
 			qWarning() << "Catalog: failed to relocate" << entryIt->sourcePath << "to" << newFilePath;
 			return;
@@ -726,8 +728,8 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, LabelId removedLabelId)
 			qWarning() << "Catalog: cannot relocate" << entryIt->folder << "to" << newFolderAbs << "- destination already exists";
 			return;
 		}
-		QDir{}.mkpath(destStorageFolder);  // the destination label may not have a folder on disk yet
-		if (!QFile::rename(entryIt->folder, newFolderAbs))
+		assert_r(QDir{}.mkpath(destStorageFolder));  // the destination label may not have a folder on disk yet
+		if (!QFile::rename(entryIt->folder, newFolderAbs))  // also how a failed mkpath surfaces
 		{
 			qWarning() << "Catalog: failed to relocate" << entryIt->folder << "to" << newFolderAbs;
 			return;
@@ -851,9 +853,11 @@ bool Catalog::renameLabel(LabelId labelId, const QString& newDisplayName, QStrin
 	if (havePhotoDir && !QFile::rename(oldPhotoDir, newPhotoDir))
 	{
 		qWarning() << "Catalog: failed to rename folder" << oldPhotoDir << "to" << newPhotoDir;
-		if (haveStorageFolder)
-			QFile::rename(newFolder, oldFolder);  // roll back so the two dirs don't end up under different names
-		return fail(QObject::tr("Could not rename the label's photo folder:\n%1").arg(QDir::toNativeSeparators(oldPhotoDir)));
+		QString message = QObject::tr("Could not rename the label's photo folder:\n%1").arg(QDir::toNativeSeparators(oldPhotoDir));
+		// Roll back so the two dirs don't end up under different names
+		if (haveStorageFolder && !QFile::rename(newFolder, oldFolder))
+			message += "\n\n" + QObject::tr("Additionally, the label folder could not be renamed back and remains at:\n%1").arg(QDir::toNativeSeparators(newFolder));
+		return fail(message);
 	}
 
 	// The folders moved, so every item stored under oldName now lives under newName: rewrite the stored fields
@@ -999,14 +1003,14 @@ bool Catalog::deleteLabel(LabelId labelId)
 		{
 			QDir storageFolder{ storageFolderPath };
 			if (storageFolder.exists() && storageFolder.isEmpty())  // empty after relocation; guard against nuking stray contents
-				storageFolder.removeRecursively();
+				assert_r(storageFolder.removeRecursively());
 		}
 		const QString photoFolderPath = photoFolderForLabel(labelId);
 		if (!photoFolderPath.isEmpty())
 		{
 			QDir photoDir{ photoFolderPath };
 			if (photoDir.exists() && photoDir.isEmpty())
-				photoDir.removeRecursively();
+				assert_r(photoDir.removeRecursively());
 		}
 		std::erase_if(_labels, [&labelId](const Label& l) { return l.id == labelId; });
 	}

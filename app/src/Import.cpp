@@ -142,15 +142,11 @@ Import::PhotoResult Import::importPhoto(Catalog& catalog, const QString& labelPh
 	const MediaId registeredId = MediaId::fromFile(destPath);
 	if (!catalog.addPhoto(registeredId, destPath, labelPhotoFolder, /*referenced=*/false))
 	{
+		QString message = QObject::tr("An item with the same name and file size is already tracked elsewhere:\n%1").arg(photoPath);
 		// Undo the relocation rather than leave an untracked copy behind (mirrors importVideo's cleanup).
-		if (!adoptExisting)
-		{
-			if (mode == PhotoImportMode::Move)
-				QFile{ destPath }.rename(photoPath);
-			else
-				QFile::remove(destPath);
-		}
-		return { PhotoStatus::Error, QObject::tr("An item with the same name and file size is already tracked elsewhere:\n%1").arg(photoPath), {} };
+		if (!adoptExisting && !(mode == PhotoImportMode::Move ? QFile{ destPath }.rename(photoPath) : QFile::remove(destPath)))
+			message += "\n\n" + QObject::tr("Additionally, the imported file could not be cleaned up and remains at:\n%1").arg(destPath);
+		return { PhotoStatus::Error, message, {} };
 	}
 
 	return { PhotoStatus::Success, {}, registeredId };

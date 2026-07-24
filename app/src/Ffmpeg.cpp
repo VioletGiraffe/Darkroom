@@ -1,5 +1,6 @@
 #include "Ffmpeg.h"
 #include "Utils.h"
+#include "assert/advanced_assert.h"
 
 #include <QDir>
 #include <QFile>
@@ -285,7 +286,8 @@ SplitResult splitVideoIntoFrames(const QString& videoFilePath, const QString& ou
 
 	// Removes outputFolder on any failure path below, so a failed extraction leaves no debris - this undoes the
 	// mkpath above plus whatever ffmpeg partially wrote (callers always wipe the folder before calling anyway).
-	const auto cleanupAfterFailure = [&outputFolder] { QDir(outputFolder).removeRecursively(); };
+	// The folder exists and no ffmpeg process is left running by the time any call site gets here, so a failure is unexpected.
+	const auto cleanupAfterFailure = [&outputFolder] { assert_r(QDir(outputFolder).removeRecursively()); };
 
 	const QString baseName      = QFileInfo(videoFilePath).completeBaseName();
 	const QString outputPattern = outputFolder + "/%04d_" + baseName + (options.tiff ? ".tif" : ".jpg");
@@ -373,8 +375,12 @@ SplitResult extractFrame(const QString& videoFilePath, qint64 timestampMs, const
 	}
 
 	// Unlike splitVideoIntoFrames' folder wipe, only the (possibly partial) output file is removed on failure -
-	// the folder may be a user-chosen destination holding other files.
-	const auto cleanupAfterFailure = [&outputFilePath] { QFile::remove(outputFilePath); };
+	// the folder may be a user-chosen destination holding other files. ffmpeg can also fail before creating the
+	// file at all, hence the existence check: only removing a file that is there must succeed.
+	const auto cleanupAfterFailure = [&outputFilePath] {
+		if (QFile::exists(outputFilePath))
+			assert_r(QFile::remove(outputFilePath));
+	};
 
 	QStringList arguments;
 	arguments << "-y"

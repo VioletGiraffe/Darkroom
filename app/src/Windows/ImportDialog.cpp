@@ -18,6 +18,7 @@
 #include "Windows/PhotoCompareWindow.h"
 #include "Windows/VideoPlayerWindow.h"
 
+#include "assert/advanced_assert.h"
 #include "threading/cinterruptablethread.h"
 
 #include <QAbstractItemView>
@@ -77,6 +78,19 @@ constexpr int PREVIEW_EXTRACTION_CONCURRENCY = 2;
 QString uniqueTempPreviewDir()
 {
 	return QDir::tempPath() + "/darkroom_import/" + QUuid::createUuid().toString(QUuid::Id128);
+}
+
+// Discards a scratch dir handed out by uniqueTempPreviewDir. Both guards are load-bearing: a staged photo has no
+// temp dir at all and QDir("") would address the working directory, while a video whose extraction never got as
+// far as creating the dir leaves a path that names nothing. Removing one that is there must succeed.
+void removeTempPreviewDir(const QString& path)
+{
+	if (path.isEmpty())
+		return;
+
+	QDir dir{ path };
+	if (dir.exists())
+		assert_r(dir.removeRecursively());
 }
 
 // One staged file plus the label its origin folder implies. labelName is the path from the dropped folder's
@@ -328,11 +342,9 @@ ImportDialog::~ImportDialog()
 	QSettings{}.setValue("importDialog/relocateFolder", _relocateFolderEdit->text());
 
 	// Best-effort: clean up whatever's still staged when the dialog closes (anything already unstaged or
-	// successfully added already removed its own temp dir). The isEmpty guard is load-bearing: staged photos
-	// have no temp dir, and QDir("") refers to the working directory - removeRecursively on it would be a disaster.
+	// successfully added already removed its own temp dir).
 	for (const StagedEntry& entry : std::as_const(_staged))
-		if (!entry.tempPreviewDir.isEmpty())
-			QDir(entry.tempPreviewDir).removeRecursively();
+		removeTempPreviewDir(entry.tempPreviewDir);
 }
 
 void ImportDialog::dragEnterEvent(QDragEnterEvent* event)
@@ -787,7 +799,7 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 		// A cancelled job never becomes a card, so nothing would ever clean up its scratch dir - unstage() only
 		// reaches staged entries. Whatever frames ffmpeg had written before the kill go with it.
 		if (results[i].status == Ffmpeg::PreviewResult::Status::Cancelled)
-			QDir(jobs[i].destinationFolder).removeRecursively();
+			removeTempPreviewDir(jobs[i].destinationFolder);
 		else
 			stageCard(jobs[i].videoFilePath, jobs[i].destinationFolder, results[i].durationMs);
 	}
@@ -799,8 +811,7 @@ void ImportDialog::unstage(const MediaId& id)
 	if (it == _staged.end())
 		return;
 
-	if (!it->tempPreviewDir.isEmpty())  // photos have none; QDir("") would be the working directory
-		QDir(it->tempPreviewDir).removeRecursively();
+	removeTempPreviewDir(it->tempPreviewDir);
 	delete it->item;  // also removes the row from _stagedGrid and deletes its embedded MediaItemWidget
 	_staged.erase(it);
 }

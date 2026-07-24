@@ -27,6 +27,16 @@ bool caseOnlyRenameAllowed([[maybe_unused]] QWidget* parent, [[maybe_unused]] co
 #endif
 }
 
+// Rolls back a rename that already succeeded, after a later step of the same operation failed. Returns an empty
+// string when the rollback worked, otherwise a fragment naming what was left behind, to be appended to the error
+// message the caller is about to show.
+[[nodiscard]] QString undoRenameOrDescribeFailure(const QString& currentPath, const QString& originalPath)
+{
+	if (QFile::rename(currentPath, originalPath))
+		return {};
+	return "\n\n" + QObject::tr("Additionally, this rename could not be undone:\n%1\n→ %2").arg(currentPath, originalPath);
+}
+
 // Executes a video rename whose target names the caller already computed and validated: rename the source file (when
 // one is recorded and present), then the frame folder, then re-key the catalog record - undoing the disk renames if a
 // later step fails. newSourcePath is empty when no source is recorded; newId equals oldId unless the source file was
@@ -49,9 +59,10 @@ Result renameVideo(Catalog& catalog, const MediaId& oldId, const MediaId& newId,
 	// --- Step 2: rename the frame folder ---
 	if (!QFile::rename(oldFolderPath, newFolderPath))
 	{
+		QString message = QObject::tr("Failed to rename the frame folder:\n%1\n→ %2").arg(oldFolderPath, newFolderPath);
 		if (renameSourceFile)
-			QFile::rename(newSourcePath, oldSourcePath);
-		QMessageBox::critical(parent, dialogTitle, QObject::tr("Failed to rename the frame folder:\n%1\n→ %2").arg(oldFolderPath, newFolderPath));
+			message += undoRenameOrDescribeFailure(newSourcePath, oldSourcePath);
+		QMessageBox::critical(parent, dialogTitle, message);
 		return {};
 	}
 
@@ -61,11 +72,11 @@ Result renameVideo(Catalog& catalog, const MediaId& oldId, const MediaId& newId,
 	// and catalog stay in sync (a collision requires a changed id, so the source file was renamed here too).
 	if (!catalog.applyRename(oldId, newId, newSourcePath, newFolderPath))
 	{
-		QFile::rename(newFolderPath, oldFolderPath);
+		QString message = QObject::tr("An item with the same name and file size is already tracked under a different label:\n%1").arg(newSourcePath);
+		message += undoRenameOrDescribeFailure(newFolderPath, oldFolderPath);
 		if (renameSourceFile)
-			QFile::rename(newSourcePath, oldSourcePath);
-		QMessageBox::critical(parent, dialogTitle,
-			QObject::tr("An item with the same name and file size is already tracked under a different label:\n%1").arg(newSourcePath));
+			message += undoRenameOrDescribeFailure(newSourcePath, oldSourcePath);
+		QMessageBox::critical(parent, dialogTitle, message);
 		return {};
 	}
 
@@ -185,9 +196,9 @@ Result renamePhoto(Catalog& catalog, const MediaId& oldId, const QString& newSou
 	// catalog stay in sync.
 	if (!catalog.applyRename(oldId, newId, newSourcePath, folderAbs))
 	{
-		QFile::rename(newSourcePath, oldSourcePath);
-		QMessageBox::critical(parent, title,
-			QObject::tr("An item with the same name and file size is already tracked in the library:\n%1").arg(newSourcePath));
+		QString message = QObject::tr("An item with the same name and file size is already tracked in the library:\n%1").arg(newSourcePath);
+		message += undoRenameOrDescribeFailure(newSourcePath, oldSourcePath);
+		QMessageBox::critical(parent, title, message);
 		return {};
 	}
 
