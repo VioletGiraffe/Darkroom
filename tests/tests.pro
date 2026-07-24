@@ -36,7 +36,8 @@ INCLUDEPATH += \
 HEADERS += TestHelpers.h
 
 # The app sources under test are compiled in directly (the app is not a library). Utils.cpp is here because
-# Catalog.cpp calls its path helpers; it is what pulls in the widgets dependency.
+# Catalog.cpp calls its path helpers; its error-reporting functions are what pull in the widgets and qtutils
+# dependencies below.
 SOURCES += \
 	main.cpp \
 	MediaIdTests.cpp \
@@ -52,7 +53,8 @@ SOURCES += \
 	../app/src/Core/MetadataStore.cpp \
 	../app/src/Utils.cpp
 
-LIBS += -L$${DESTDIR} -lcpputils
+# qtutils before cpputils: it uses cpputils, and GNU ld resolves left to right
+LIBS += -L$${DESTDIR} -lqtutils -lcpputils
 include(../cpputils/dependencies.pri)
 
 win*{
