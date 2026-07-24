@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784886138569,
+  "lastUpdate": 1784888710376,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -7815,6 +7815,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 324,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 32.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 34,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "335a2be3937d24cf9906ab9a02bf709306d11175",
+          "message": "Playback speed is per video",
+          "timestamp": "2026-07-24T13:21:22+03:00",
+          "tree_id": "9656f8b8ab651a2b578439028e758dde76cf4c88",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/335a2be3937d24cf9906ab9a02bf709306d11175"
+        },
+        "date": 1784888707553,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 13101,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 7958,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1104,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 674.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 324.5,
             "unit": "KB"
           },
           {
