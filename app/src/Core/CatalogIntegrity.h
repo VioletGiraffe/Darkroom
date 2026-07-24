@@ -40,14 +40,14 @@ struct MediaIssue
 	QString sourcePath;
 	bool    sourcePresent     = false;  // source file still on disk
 	bool    realFramesPresent = false;  // real frames in <folder> - the deliverable
-	bool    previewPresent    = false;  // preview frames in Catalog::previewDirFor(<folder>) - the card's only render source
+	bool    previewPresent    = false;  // preview frames in Catalog::previewDirFor(<folder>) - the card's normal render source
 	bool    splitComplete     = false;  // the entry's splitIntoFrames flag
 
-	[[nodiscard]] bool isGhost() const       { return splitComplete && !realFramesPresent; }  // deliverable gone
-	[[nodiscard]] bool isInvisible() const   { return !previewPresent; }                      // card can't render
-	[[nodiscard]] bool isStale() const       { return !splitComplete && realFramesPresent; }  // flag disagrees with disk
-	[[nodiscard]] bool sourceMissing() const { return !sourcePresent; }
-	[[nodiscard]] bool healthy() const       { return sourcePresent && !isGhost() && !isInvisible() && !isStale(); }
+	[[nodiscard]] bool extractedFramesMissing() const { return splitComplete && !realFramesPresent; }  // the deliverable is gone
+	[[nodiscard]] bool previewMissing() const         { return !previewPresent; }                      // card falls back to real frames, or to a placeholder
+	[[nodiscard]] bool splitFlagStale() const         { return !splitComplete && realFramesPresent; }  // flag disagrees with disk
+	[[nodiscard]] bool sourceMissing() const          { return !sourcePresent; }
+	[[nodiscard]] bool healthy() const                { return sourcePresent && !extractedFramesMissing() && !previewMissing() && !splitFlagStale(); }
 };
 
 // A tracked photo whose source file is missing. A photo is source-only (no frames, no preview - the card

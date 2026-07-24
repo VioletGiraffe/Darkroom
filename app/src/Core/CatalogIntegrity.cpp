@@ -17,16 +17,16 @@
 // file under Photos/ - surfaced by the "untracked" walk lower down.
 //
 // (A) VIDEO  <folder> = frame folder. Cell = verdict; columns are what the folder holds, rows the split flag.
-//            preview/ is the card's ONLY render source (both rows); real frames are the deliverable, due once split.
+//            preview/ is the card's normal render source (both rows); real frames are the deliverable, due once split.
 //
-//     | split       | frames+preview  | preview only    | frames only     | empty / gone
-//     |-------------|-----------------|-----------------|-----------------|-----------------
-//     | split=true  | ok              | GHOST           | INVISIBLE       | GHOST+INVISIBLE
-//     | split=false | STALE flag      | ok              | STALE+INVISIBLE | INVISIBLE
+//     | split       | frames+preview | preview only   | frames only      | empty / gone
+//     |-------------|----------------|----------------|------------------|---------------------
+//     | split=true  | ok             | NO FRAMES      | NO PREVIEW       | NO FRAMES+NO PREVIEW
+//     | split=false | STALE FLAG     | ok             | STALE+NO PREVIEW | NO PREVIEW
 //
-//       GHOST     = real frames gone (source present -> re-import, else remove)
-//       INVISIBLE = preview/ gone -> card silently absent from the grid
-//       STALE     = real frames exist but entry still marked preview-only
+//       NO FRAMES  = extractedFramesMissing() - the deliverable is gone (source present -> re-import, else remove)
+//       NO PREVIEW = previewMissing() - preview/ gone; the card falls back to the real frames, or to a placeholder if there are none
+//       STALE FLAG = splitFlagStale() - real frames exist but entry still marked preview-only
 //     + source missing (overlays ANY cell): source unavailable - frames may be intact, but re-extract/re-import
 //       is blocked, and a not-yet-split entry can never complete its split.
 //
@@ -74,7 +74,7 @@ IntegrityReport scan(const Catalog& catalog, const QString& rootFolder)
 		}
 
 		// Probe the entry's on-disk backing; record a MediaIssue for anything non-healthy. The verdicts
-		// (ghost / invisible / stale / source-missing) are orthogonal - see the state grid above.
+		// (no frames / no preview / stale flag / source missing) are orthogonal - see the state grid above.
 		MediaIssue issue;
 		issue.id                = id;
 		issue.folder            = entry.folder;

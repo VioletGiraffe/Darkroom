@@ -952,14 +952,21 @@ MediaItemWidget* MainWindow::buildMediaCard(const MediaId& id, bool isBest, cons
 	}
 	else
 	{
-		// Video cards always render from the permanent preview/ subfolder, never the real frame folder
-		// directly - this is what lets a not-yet-split video (no real frames yet) still show a real thumbnail.
-		QDir previewDir(Catalog::previewDirFor(folderPath));
-		const QStringList imageFiles = listFrameImageFiles(previewDir);
+		// Video cards normally render from the permanent preview/ subfolder, never the real frame folder directly -
+		// this is what lets a not-yet-split video (no real frames yet) still show a real thumbnail. When preview/ is
+		// gone (externally deleted, or generation failed at import), fall back to the real frames: decoding those
+		// full-size stills is dearer, but it only happens for a broken entry, and it beats the alternative. With
+		// neither source the card renders a "No preview" placeholder. The item always gets a card either way -
+		// dropping it would strand it, since every action on an item is reached through its card.
+		QDir frameSource(Catalog::previewDirFor(folderPath));
+		QStringList imageFiles = listFrameImageFiles(frameSource);
 		if (imageFiles.isEmpty())
-			return nullptr;  // preview/ missing or empty (externally deleted folder, or preview generation failed outright) - don't show a frameless ghost card
+		{
+			frameSource.setPath(folderPath);
+			imageFiles = listFrameImageFiles(frameSource);
+		}
 
-		previewPaths = pickEvenlySpacedFrames(previewDir, imageFiles, previewFrameCount);
+		previewPaths = pickEvenlySpacedFrames(frameSource, imageFiles, previewFrameCount);
 	}
 
 	auto* card = new MediaItemWidget(
@@ -1060,8 +1067,6 @@ void MainWindow::refreshMediaGrid()
 	{
 		const bool isBest = bestSet.contains(id);
 		MediaItemWidget* card = buildMediaCard(id, isBest, photoCanvas, videoCanvas, previewFrameCount);
-		if (!card)
-			continue;  // a video with no preview frames gets no card (see buildMediaCard)
 
 		auto* item = new GridItem();
 		item->mediaId = id;

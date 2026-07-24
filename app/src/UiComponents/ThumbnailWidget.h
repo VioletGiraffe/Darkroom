@@ -18,6 +18,8 @@ public:
 	ThumbnailWidget(const QString& filePath, const QString& caption, int thumbnailSize, QWidget* parent);
 	// canvasSize is the card's image area: the frames are tiled across it (one slot each) and best-fit
 	// into their slot. The widget grows by its caption strip and content margins around that area.
+	// An empty compositePaths is a valid, final state - the widget claims the same canvas but renders a
+	// "No preview" placeholder instead of loading anything.
 	// framed=false drops the border/hover/padding, leaving just the recessed matte image well — used by the
 	// grid card, which draws its own frame (and hover) around the thumbnail + footer in MediaItemWidget.
 	// filmStrip=true styles a video card as a film strip: a black base with the frames composited shorter so they

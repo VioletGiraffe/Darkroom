@@ -261,7 +261,7 @@ inline void IntegrityCheckSections::buildVideoIssues(const CatalogIntegrity::Int
 	if (report.issues.empty())
 		return;
 
-	QHBoxLayout* header = addSectionHeader(QObject::tr("<b>Problems</b> - tracked videos whose files don't match the catalog"));
+	QHBoxLayout* header = addSectionHeader(QObject::tr("<b>Videos</b> - tracked, but the source, frames or preview are missing on disk"));
 	QPushButton* locateAllButton     = new QPushButton(QObject::tr("Locate all..."), _content);
 	QPushButton* reimportAllButton   = new QPushButton(QObject::tr("Re-import all"), _content);
 	QPushButton* regenerateAllButton = new QPushButton(QObject::tr("Regenerate all previews"), _content);
@@ -272,8 +272,8 @@ inline void IntegrityCheckSections::buildVideoIssues(const CatalogIntegrity::Int
 	header->addWidget(removeAllButton);
 
 	// Each blanket action stays enabled only while some open row still admits it: Remove applies to any open row;
-	// Locate to a row whose source is missing; Re-import to a ghost whose source is present; Regenerate to a
-	// rebuildable-but-invisible entry.
+	// Locate to a row whose source is missing; Re-import to a row whose extracted frames are gone but whose source
+	// is present; Regenerate to a rebuildable entry with no preview.
 	const auto refreshBlanket = [this, locateAllButton, reimportAllButton, regenerateAllButton, removeAllButton] {
 		bool anyOpen = false, anyLocate = false, anyReimport = false, anyRegenerate = false;
 		for (const VideoRow& v : _videoRows)
@@ -296,11 +296,12 @@ inline void IntegrityCheckSections::buildVideoIssues(const CatalogIntegrity::Int
 		// One line per broken video listing everything wrong with it - the grid's verdicts are orthogonal,
 		// so several can apply at once (e.g. frames gone and source also missing).
 		QStringList problems;
-		if (issue.isGhost())
-			problems << QObject::tr("frames are gone");
-		if (issue.isInvisible())
-			problems << QObject::tr("no preview - the card can't be shown");
-		if (issue.isStale())
+		if (issue.extractedFramesMissing())
+			problems << QObject::tr("extracted frames are gone");
+		if (issue.previewMissing())
+			problems << (issue.realFramesPresent ? QObject::tr("no preview - the card renders the full-size frames instead")
+			                                     : QObject::tr("no preview - the card has no image to show"));
+		if (issue.splitFlagStale())
 			problems << QObject::tr("marked not-yet-split, but frames exist");
 		if (issue.sourceMissing())
 			problems << (issue.sourcePath.isEmpty() ? QObject::tr("no source recorded")
@@ -316,9 +317,9 @@ inline void IntegrityCheckSections::buildVideoIssues(const CatalogIntegrity::Int
 		// the precondition for Re-import when the source is gone); Re-import re-extracts a gone deliverable (needs the
 		// source present); Regenerate rebuilds a missing preview from real frames or the source; Mark-split fixes only
 		// a stale flag. Remove/Skip are always available.
-		const bool canReimport   = issue.isGhost() && issue.sourcePresent;
-		const bool canRegenerate = issue.isInvisible() && !issue.isGhost() && (issue.realFramesPresent || issue.sourcePresent);
-		const bool canMarkSplit  = issue.isStale() && !issue.isInvisible();
+		const bool canReimport   = issue.extractedFramesMissing() && issue.sourcePresent;
+		const bool canRegenerate = issue.previewMissing() && !issue.extractedFramesMissing() && (issue.realFramesPresent || issue.sourcePresent);
+		const bool canMarkSplit  = issue.splitFlagStale() && !issue.previewMissing();
 		const bool canLocate     = issue.sourceMissing();
 
 		QPushButton* locateButton     = canLocate     ? addRowButton(rowLayout, row, QObject::tr("Locate source...")) : nullptr;
@@ -358,8 +359,8 @@ inline void IntegrityCheckSections::buildVideoIssues(const CatalogIntegrity::Int
 	}
 
 	// Locate all: relink every open source-missing video to its identity-match (name + size) under a chosen folder -
-	// the batch form of the per-row Locate, for when a whole tree of sources moved at once. A relinked ghost becomes
-	// re-importable, but stays a ghost until the next scan surfaces it with Re-import enabled.
+	// the batch form of the per-row Locate, for when a whole tree of sources moved at once. A relinked row becomes
+	// re-importable, but its frames stay gone until the next scan surfaces it with Re-import enabled.
 	QObject::connect(locateAllButton, &QPushButton::clicked, locateAllButton, [this, refreshBlanket] {
 		const auto tally = locateAllByIdentity(_videoRows, [](const VideoRow& v) { return v.sourceMissing; }, isSupportedVideoFile,
 			[this](const MediaId& id, const QString& picked) { return _callbacks.locateSourceRequested(id, picked); },
@@ -376,8 +377,8 @@ inline void IntegrityCheckSections::buildVideoIssues(const CatalogIntegrity::Int
 		QMessageBox::information(_dialog, QObject::tr("Locate all videos"), msg.join(QStringLiteral("\n")));
 	});
 
-	// Re-import all: re-extract every open ghost whose source is present. Heavy (an ffmpeg run per video), so
-	// confirm first and show a wait cursor for the batch.
+	// Re-import all: re-extract every open row whose frames are gone and whose source is present. Heavy (an ffmpeg
+	// run per video), so confirm first and show a wait cursor for the batch.
 	QObject::connect(reimportAllButton, &QPushButton::clicked, reimportAllButton, [this] {
 		if (QMessageBox::question(_dialog, QObject::tr("Re-import all"),
 		        QObject::tr("Re-extract frames for every re-importable video? This re-runs ffmpeg and can take a while."))
@@ -390,7 +391,7 @@ inline void IntegrityCheckSections::buildVideoIssues(const CatalogIntegrity::Int
 		showBlanketTally(QObject::tr("Re-import all"), QObject::tr("Re-imported %1 video(s)."), done, QObject::tr("%1 could not be re-imported."), failed);
 	});
 
-	// Regenerate all previews: rebuild the card render for every open invisible entry that can be rebuilt (from
+	// Regenerate all previews: rebuild the preview for every open entry that lacks one and can be rebuilt (from
 	// real frames where present, else the source). Lighter than re-import but still worth a wait cursor.
 	QObject::connect(regenerateAllButton, &QPushButton::clicked, regenerateAllButton, [this] {
 		QApplication::setOverrideCursor(Qt::WaitCursor);

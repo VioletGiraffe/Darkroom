@@ -106,8 +106,8 @@ that case stays clean.
   collision is caught here at registration, not by any disk scan.
   `splitIntoFrames`: `false` means only permanent preview frames exist yet, a full extraction is still owed;
   `Catalog::isSplitIntoFrames(id)`
-  queries it, and `CatalogIntegrity::scan`'s ghost verdict is guarded by it so a video that's legitimately still
-  preview-only is never misreported as a ghost (see [import.md](import.md) for the full on-demand-split
+  queries it, and `CatalogIntegrity::scan`'s `extractedFramesMissing` verdict is guarded by it so a video that's
+  legitimately still preview-only is never misreported (see [import.md](import.md) for the full on-demand-split
   design). It also records the video's **duration** (ms, from the import-time probe) when a positive value is
   passed; `-1` (unknown) leaves any already-stored duration intact, so a re-registration never erases it.
   `setDurationMs` backfills it onto an already-registered item for the paths that learn duration after the fact (preview
@@ -186,11 +186,6 @@ and inside `renameLabel`/`deleteLabel` — **not** on every grid refresh. `MainW
 deliberately does **not** call it: the model is kept current by its own mutation API, so re-reading the store
 on every refresh would be redundant work and would also re-save the registry on every sort/filter/zoom.
 `addLabel`/`removeLabel` patch the affected entry in place instead of triggering any reload.
-
-One known wart from this: the grid skips frame folders with zero images (`MainWindow::refreshMediaGrid`'s
-`addCard`, hiding a ghost from a failed re-export or an externally-deleted folder), but the sidebar's
-`labelMediaItemCounts()` reads the model directly and still counts such a ghost. Left as-is; the integrity tool
-(`CatalogIntegrity::scan`, `IntegrityCheckDialog`) surfaces and lets the user reconcile it.
 
 ## UI integration
 

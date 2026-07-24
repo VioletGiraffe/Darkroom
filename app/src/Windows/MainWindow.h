@@ -83,8 +83,7 @@ private:
 	// view-level hide/show over the already-built cards (applyNameFilter).
 	[[nodiscard]] std::vector<MediaId> mediaItemsMatchingFilters() const;
 	// Builds and wires one grid card for refreshMediaGrid: thumbnails, star, duration pill, label dots and
-	// every callback. Returns null for a video whose preview/ is missing or empty - such an item gets no
-	// card at all (rather than a frameless ghost one).
+	// every callback. Every catalog item gets a card, however broken its backing is on disk.
 	[[nodiscard]] MediaItemWidget* buildMediaCard(const MediaId& id, bool isBest, const QSize& photoCanvas, const QSize& videoCanvas, int previewFrameCount);
 	// Refreshes the grid AND the label sidebar (labels/counts). Use after structural changes (add/delete/
 	// rename an item, create a label); plain refreshMediaGrid is for filter/sort/zoom changes.

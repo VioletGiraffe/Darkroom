@@ -83,18 +83,18 @@ TEST_CASE("scan: each video verdict is reported, a healthy video is not", "[inte
 	f.putFrame(f.frameFolder("healthy.mp4", "L"));
 	f.putFrame(Catalog::previewDirFor(f.frameFolder("healthy.mp4", "L")));
 
-	// Ghost: split done but the real frames (the deliverable) are gone; preview still renders the card.
-	const MediaId ghost = f.addVideo("ghost.mp4", 2, "L", true, true);
-	f.putFrame(Catalog::previewDirFor(f.frameFolder("ghost.mp4", "L")));
+	// Extracted frames missing: split done but the real frames (the deliverable) are gone; preview still renders the card.
+	const MediaId noFrames = f.addVideo("noframes.mp4", 2, "L", true, true);
+	f.putFrame(Catalog::previewDirFor(f.frameFolder("noframes.mp4", "L")));
 
-	// Invisible: preview gone, so the card can't render, even though real frames exist.
-	const MediaId invisible = f.addVideo("invisible.mp4", 3, "L", true, true);
-	f.putFrame(f.frameFolder("invisible.mp4", "L"));
+	// Preview missing: the card falls back to the real frames, which are still there.
+	const MediaId noPreview = f.addVideo("nopreview.mp4", 3, "L", true, true);
+	f.putFrame(f.frameFolder("nopreview.mp4", "L"));
 
-	// Stale: real frames already exist but the entry is still flagged preview-only.
-	const MediaId stale = f.addVideo("stale.mp4", 4, "L", false, true);
-	f.putFrame(f.frameFolder("stale.mp4", "L"));
-	f.putFrame(Catalog::previewDirFor(f.frameFolder("stale.mp4", "L")));
+	// Stale split flag: real frames already exist but the entry is still flagged preview-only.
+	const MediaId staleFlag = f.addVideo("staleflag.mp4", 4, "L", false, true);
+	f.putFrame(f.frameFolder("staleflag.mp4", "L"));
+	f.putFrame(Catalog::previewDirFor(f.frameFolder("staleflag.mp4", "L")));
 
 	// Source missing: backing intact, but the source file is gone (overlays any cell; here the only fault).
 	const MediaId noSource = f.addVideo("nosource.mp4", 5, "L", true, false);
@@ -106,33 +106,33 @@ TEST_CASE("scan: each video verdict is reported, a healthy video is not", "[inte
 	REQUIRE(videoIssueFor(report, healthy) == nullptr);
 
 	// Each verdict holds in isolation - the predicates are orthogonal, so exactly one fires per entry here.
-	const CatalogIntegrity::MediaIssue* g = videoIssueFor(report, ghost);
-	REQUIRE(g);
-	REQUIRE(g->isGhost());
-	REQUIRE_FALSE(g->isInvisible());
-	REQUIRE_FALSE(g->isStale());
-	REQUIRE_FALSE(g->sourceMissing());
+	const CatalogIntegrity::MediaIssue* nf = videoIssueFor(report, noFrames);
+	REQUIRE(nf);
+	REQUIRE(nf->extractedFramesMissing());
+	REQUIRE_FALSE(nf->previewMissing());
+	REQUIRE_FALSE(nf->splitFlagStale());
+	REQUIRE_FALSE(nf->sourceMissing());
 
-	const CatalogIntegrity::MediaIssue* inv = videoIssueFor(report, invisible);
-	REQUIRE(inv);
-	REQUIRE(inv->isInvisible());
-	REQUIRE_FALSE(inv->isGhost());
-	REQUIRE_FALSE(inv->isStale());
-	REQUIRE_FALSE(inv->sourceMissing());
+	const CatalogIntegrity::MediaIssue* np = videoIssueFor(report, noPreview);
+	REQUIRE(np);
+	REQUIRE(np->previewMissing());
+	REQUIRE_FALSE(np->extractedFramesMissing());
+	REQUIRE_FALSE(np->splitFlagStale());
+	REQUIRE_FALSE(np->sourceMissing());
 
-	const CatalogIntegrity::MediaIssue* st = videoIssueFor(report, stale);
-	REQUIRE(st);
-	REQUIRE(st->isStale());
-	REQUIRE_FALSE(st->isGhost());
-	REQUIRE_FALSE(st->isInvisible());
-	REQUIRE_FALSE(st->sourceMissing());
+	const CatalogIntegrity::MediaIssue* sf = videoIssueFor(report, staleFlag);
+	REQUIRE(sf);
+	REQUIRE(sf->splitFlagStale());
+	REQUIRE_FALSE(sf->extractedFramesMissing());
+	REQUIRE_FALSE(sf->previewMissing());
+	REQUIRE_FALSE(sf->sourceMissing());
 
 	const CatalogIntegrity::MediaIssue* ns = videoIssueFor(report, noSource);
 	REQUIRE(ns);
 	REQUIRE(ns->sourceMissing());
-	REQUIRE_FALSE(ns->isGhost());
-	REQUIRE_FALSE(ns->isInvisible());
-	REQUIRE_FALSE(ns->isStale());
+	REQUIRE_FALSE(ns->extractedFramesMissing());
+	REQUIRE_FALSE(ns->previewMissing());
+	REQUIRE_FALSE(ns->splitFlagStale());
 
 	REQUIRE(report.issues.size() == 4u);
 	REQUIRE(report.photoIssues.empty());

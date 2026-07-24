@@ -6,7 +6,7 @@
 
 `MainWindow::splitVideoIntoFrames` extracts a candidate complete real frame set. It's never called during
 import anymore (see "Import: preview frames only" below) — `resplitVideoIntoFrames` uses it for the first
-on-demand split, Re-export all, and the integrity tool's ghost-reimport.
+on-demand split, Re-export all, and the integrity tool's re-import of an entry whose extracted frames are gone.
 `reExportAllVideos` skips photo entries when collecting its worklist — a photo has no frames, and its
 "folder" is the shared `Photos/<label>` dir, which frame-folder replacement would destroy.
 - The raw ffmpeg invocation lives in `Ffmpeg::splitVideoIntoFrames` (the module owns *all* ffmpeg calls now);
@@ -28,8 +28,8 @@ not a design goal.
 `preserveExistingPreview` controls the candidate's preview before commit:
 - **`true`** (`ensureFramesSplit` only) — `preview/` is still fresh from import, nothing changed that
   would make it stale, so the wrapper moves it from the preserved old folder into the successful candidate.
-- **`false`** (`reExportAllVideos`, ghost-reimport) — the caller explicitly wants a clean start (re-export
-  may follow a settings change; a ghost's frames disappeared for an unknown reason), so a fresh one is generated
+- **`false`** (`reExportAllVideos`, integrity re-import) — the caller explicitly wants a clean start (re-export
+  may follow a settings change; the frames disappeared for an unknown reason), so a fresh one is generated
   via `Ffmpeg::generatePreviewFrames`. A requested preserved preview that does not exist takes this same fallback.
 
 Neither path is used by `Import::importVideo`'s own overwrite-existing-folder path, which can be replacing a stale
@@ -111,13 +111,14 @@ caller to remove — the engine still owns no cleanup policy.
 
 `preview/` is a permanent, separate store once created: a later real `splitVideoIntoFrames` run never deletes
 or rewrites it (it only ever lists/writes files directly in `outputFolder`, never recursing into `preview/`),
-and `CatalogIntegrity::scan`'s ghost verdict is guarded by `splitIntoFrames` specifically so a video that's
-legitimately still preview-only (zero real frames yet, by design) is never misreported as a ghost.
+and `CatalogIntegrity::scan`'s `extractedFramesMissing` verdict is guarded by `splitIntoFrames` specifically so a
+video that's legitimately still preview-only (zero real frames yet, by design) is never misreported.
 
-`MainWindow::refreshMediaGrid` always builds a card's thumbnail set from `<folder>/preview/`, never from the
-real frame folder directly — this is what lets a not-yet-split video still show a real thumbnail, and means
-the grid never has to branch on split status for *where* to read images from. A video is hidden from the
-grid only if `preview/` itself is empty.
+`MainWindow::buildMediaCard` builds a card's thumbnail set from `<folder>/preview/` — this is what lets a
+not-yet-split video still show a real thumbnail, and means the grid never has to branch on split status for
+*where* to read images from. Only when `preview/` is empty does it fall back to the real frame folder, and
+with neither the card renders a "No preview" placeholder. Every catalog item gets a card either way: hiding
+one would strand it, since every action on an item is reached through its card.
 
 ## Other utilities
 

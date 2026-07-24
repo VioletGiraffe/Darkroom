@@ -36,7 +36,7 @@ public:
 
 		void set(const MediaId& id, QStringView field, const QJsonValue& value);
 
-		// Drops an item's whole record. Used when an item is deleted outright so it doesn't linger as a ghost
+		// Drops an item's whole record. Used when an item is deleted outright so it doesn't linger as an orphaned
 		// entry once the catalog (not the disk walk) is the authoritative set of items. No-op if absent.
 		void remove(const MediaId& id);
 

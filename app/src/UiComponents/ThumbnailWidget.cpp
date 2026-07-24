@@ -278,7 +278,7 @@ ThumbnailWidget::ThumbnailWidget(const QStringList& compositePaths, const QStrin
 	applyStyleSettings();
 
 	_sourcePaths = compositePaths;
-	_maxSize = compositePaths.isEmpty() ? QSize{} : canvasSize;
+	_maxSize = canvasSize;   // claimed even with no frames to render, so a placeholder card keeps its normal footprint
 	// Deferred to the first paintEvent, not started here - see paintEvent (lazy thumbnail load).
 }
 
@@ -440,7 +440,8 @@ void ThumbnailWidget::paintEvent(QPaintEvent*)
 	// visible ones) and then gated behind a short dwell: a fast flick paints each card once and scrolls it away
 	// before the timer fires, so cards the user didn't stop on never touch the disk. The render starts only if
 	// the card is still visible when the timer fires; _loadArmed stops repaints from stacking timers.
-	if (!_job)
+	// An empty source list never arms a load: the placeholder below is that card's final state.
+	if (!_job && !_sourcePaths.isEmpty())
 	{
 		if (!_loadArmed)
 		{
@@ -455,7 +456,7 @@ void ThumbnailWidget::paintEvent(QPaintEvent*)
 	// An already-rendered card that captured a stale DPR earlier (see scheduleRender) re-renders immediately -
 	// no dwell: it's correcting something already on-screen, not a fresh decode. paintEvent is the one place
 	// devicePixelRatioF() is guaranteed accurate - the widget is on its real, shown screen.
-	else if (!qFuzzyCompare(_renderDpr, devicePixelRatioF()))
+	else if (_job && !qFuzzyCompare(_renderDpr, devicePixelRatioF()))
 		scheduleRender();
 
 	QPainter painter(this);
@@ -473,7 +474,7 @@ void ThumbnailWidget::paintEvent(QPaintEvent*)
 
 	// Lock the image while drawing so the decode stage can't swap it mid-paint. During the dwell before the first
 	// render there is no job yet (and _image is null, touched only by this thread), so there is nothing to lock
-	// against - fall through unlocked and draw the "Loading..." placeholder.
+	// against - fall through unlocked and draw a text placeholder.
 	std::unique_lock<std::mutex> lock;
 	if (_job)
 		lock = std::unique_lock{ _job->_mutex };
@@ -519,6 +520,8 @@ void ThumbnailWidget::paintEvent(QPaintEvent*)
 	}
 	else if (!_errorMessage.isEmpty())
 		painter.drawText(content, Qt::AlignCenter | Qt::TextWordWrap, _errorMessage);
+	else if (_sourcePaths.isEmpty())
+		painter.drawText(content, Qt::AlignCenter, tr("No preview"));
 	else
 		painter.drawText(content, Qt::AlignCenter, tr("Loading..."));
 

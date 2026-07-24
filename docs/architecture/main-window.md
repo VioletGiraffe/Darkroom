@@ -52,8 +52,10 @@ choice before closing with unsaved changes.
 `_mediaTypeFilter` (a `SegmentedToggle`): **All / Videos / Photos**, ANDed with the other filters. A *structural*
 filter — changing it rebuilds the grid (`refreshMediaGrid`), unlike the name filter's cheap hide/show.
 
-**Photo cards** use the decoded photo file directly as the image strip — no preview cache. An unloadable path (e.g. a
-referenced photo on an unmounted drive) renders a blank card rather than hiding the item (accepted v1 behavior).
+**Photo cards** use the decoded photo file directly as the image strip — no preview cache; an unloadable path (e.g. a
+referenced photo on an unmounted drive) renders a blank card. Videos read `preview/`, falling back to the real frame
+folder and then to a "No preview" placeholder (see [import.md](import.md)). **Every catalog item gets a card**, whatever
+shape its backing is in: an item with no card would be unreachable, since every action on it is reached through its card.
 Per-type gates: double-click opens the system image viewer instead of the built-in player; middle-click (frame viewer)
 is not wired; the green "frames extracted" badge is gated to videos; the context menu adapts per type.
 
