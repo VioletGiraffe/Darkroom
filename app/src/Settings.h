@@ -10,7 +10,6 @@ namespace Settings {
 	constexpr const char* UseTiff       = "settings/useTiff";
 	constexpr const char* JpegQuality   = "settings/jpegQuality";
 	constexpr const char* FrameStep     = "settings/frameStep";
-	constexpr const char* PlaybackSpeed = "VideoPlayer/PlaybackSpeed";
 	constexpr const char* PauseOnSeek  = "VideoPlayer/PauseOnSeek";
 	constexpr const char* Volume       = "VideoPlayer/Volume"; // UI slider position, 0..100 (perceptual)
 	constexpr const char* Muted        = "VideoPlayer/Muted";

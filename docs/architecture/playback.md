@@ -62,7 +62,14 @@ Persisted via `MetadataStore` (see [data-model.md](data-model.md)) under the `"i
 `{start, end, name, speed}` objects keyed by the played video's `MediaId`; (de)serialization owned here per the
 field-owns-its-format convention. `speed` is the playback speed captured when the loop was saved; activating a
 loop restores it (a missing/zero `speed`, from loops saved before the attribute existed, leaves the current speed
-untouched). Each player borrows the stable `Library&` and resolves the store at the
+untouched).
+
+### Playback speed
+
+Playback speed is remembered **per video**, not globally, in the `"playbackSpeed"` metadata field. Only an
+explicit speed pick writes it, so untouched videos carry no record; restore and loop activation apply a speed
+without persisting it, so a loop's transient speed never overwrites the video's remembered one. Absent/≤0 means
+never customized and restores as 1×. Each player borrows the stable `Library&` and resolves the store at the
 read/write point; after a root switch `MainWindow` closes every player synchronously before returning to the
 event loop, so an old video's controls cannot write the new library's state.
 

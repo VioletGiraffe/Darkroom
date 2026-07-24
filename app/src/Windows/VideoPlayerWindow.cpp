@@ -690,20 +690,24 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 
 	_pauseOnSeek = settings.value(Settings::PauseOnSeek, Defaults::PauseOnSeek).toBool();
 
-	// Applies a speed to the player and oscillation and persists it as the app-wide default.
+	// Applies a speed to the player and oscillation, without persisting. Speed is remembered per video, so only
+	// an explicit user pick (the combo handler below) writes it; restore and loop activation apply without saving.
 	const auto applySpeed = [this](double speed) {
 		_player->setPlaybackRate(speed);
 		_oscillatingPlayback->setMaximumSpeed(speed);
-		QSettings{}.setValue(Settings::PlaybackSpeed, speed);
 	};
-	connect(speedCombo, &QComboBox::currentIndexChanged, this, [speedCombo, applySpeed](int index) {
-		if (index >= 0)
-			applySpeed(speedCombo->itemData(index).toDouble());
+	connect(speedCombo, &QComboBox::currentIndexChanged, this, [this, speedCombo, applySpeed](int index) {
+		if (index < 0)
+			return;
+		const double speed = speedCombo->itemData(index).toDouble();
+		applySpeed(speed);
+		_library.metadataStore().beginBatch().set(_mediaId, u"playbackSpeed", speed);  // remember this video's speed
 	});
 
 	// Programmatically selects the combo entry nearest to a target speed (for restore and loop activation) and
-	// applies it, blocking the change signal so the apply happens exactly once even when the index is unchanged.
-	// A non-positive target is "unset" and left alone, so legacy saved loops (no stored speed) keep the current one.
+	// applies it, blocking the change signal so the apply happens exactly once (and does not persist) even when
+	// the index is unchanged. A non-positive target is "unset" and left alone, so legacy saved loops (no stored
+	// speed) keep the current one.
 	const auto selectSpeed = [speedCombo, applySpeed](double speed) {
 		if (!(speed > 0))
 			return;
@@ -725,8 +729,12 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 		applySpeed(speedCombo->itemData(nearest).toDouble());
 	};
 
-	// Restore persisted speed, default to 1.0×.
-	selectSpeed(settings.value(Settings::PlaybackSpeed, 1.0).toDouble());
+	// Restore this video's remembered speed (absent/≤0 means never customized → default 1.0×). Passing 1.0
+	// explicitly (rather than letting selectSpeed no-op on ≤0) keeps the combo and player in sync at 1.0×.
+	{
+		const double storedSpeed = _library.metadataStore().get(_mediaId, u"playbackSpeed").toDouble();
+		selectSpeed(storedSpeed > 0 ? storedSpeed : 1.0);
+	}
 
 	auto* pauseOnSeekCheck = new QCheckBox(tr("Pause on seek"), this);
 	pauseOnSeekCheck->setChecked(_pauseOnSeek);
