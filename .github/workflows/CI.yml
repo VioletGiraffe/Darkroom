@@ -77,7 +77,7 @@ jobs:
         arch: ${{ matrix.qt_arch }}
         archives: 'qtbase icu qtsvg'
         modules: 'qtimageformats qtmultimedia'
-        cache: 'true'
+        cache: 'false'
 
     - name: Windows - set up MSVC environment
       if: startsWith(matrix.os, 'windows')
