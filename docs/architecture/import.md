@@ -114,7 +114,7 @@ or rewrites it (it only ever lists/writes files directly in `outputFolder`, neve
 and `CatalogIntegrity::scan`'s `extractedFramesMissing` verdict is guarded by `splitIntoFrames` specifically so a
 video that's legitimately still preview-only (zero real frames yet, by design) is never misreported.
 
-`MainWindow::buildMediaCard` builds a card's thumbnail set from `<folder>/preview/` — this is what lets a
+`MediaBrowserWidget::buildMediaCard` builds a card's thumbnail set from `<folder>/preview/` — this is what lets a
 not-yet-split video still show a real thumbnail, and means the grid never has to branch on split status for
 *where* to read images from. Only when `preview/` is empty does it fall back to the real frame folder, and
 with neither the card renders a "No preview" placeholder. Every catalog item gets a card either way: hiding
@@ -229,7 +229,7 @@ just an ordinary additional tag, applied the same way Best is.
    Best flags and extra-label picks to the Catalog — guarded by `Catalog::containsMediaItem` (a
    frame-folder-exists check wouldn't work for photos), wrapped in one `Catalog::BatchScope`
    (see [catalog-and-labels.md](catalog-and-labels.md)) so a multi-item Import session writes the store once.
-5. If anything succeeded, `viewChanged()` fires once (`MainWindow` wires it to `refreshLibraryView()`):
+5. If anything succeeded, `viewChanged()` fires once (`MainWindow` wires it to `MediaBrowserWidget::refreshLibraryView()`):
    `addMediaItemsRequested` → `importVideoBatch` already refreshes mid-Import as each group lands, but only with
    folder labels — the Best/extra-label flush in step 4 runs *after* that, with no refresh of its own. Since
    the dialog stays open after an Import, that gap would otherwise be visible until the dialog closes.

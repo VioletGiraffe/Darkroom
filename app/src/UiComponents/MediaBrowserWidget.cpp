@@ -1,0 +1,676 @@
+#include "UiComponents/MediaBrowserWidget.h"
+#include "Core/Catalog.h"
+#include "Core/Library.h"
+#include "Settings.h"
+#include "Theme/Icons.h"
+#include "Theme/Style.h"
+#include "Theme/Theme.h"
+#include "UiComponents/LabelSidebar.h"
+#include "UiComponents/MediaGrid.h"
+#include "UiComponents/MediaItemWidget.h"
+#include "UiComponents/SegmentedToggle.h"
+#include "UiComponents/SortControl.h"
+#include "Utils.h"
+
+#include <QAbstractItemView>
+#include <QAction>
+#include <QColor>
+#include <QComboBox>
+#include <QDateTime>
+#include <QDir>
+#include <QFile>
+#include <QHBoxLayout>
+#include <QIcon>
+#include <QItemSelectionModel>
+#include <QKeySequence>
+#include <QLineEdit>
+#include <QListWidget>
+#include <QMetaObject>
+#include <QSettings>
+#include <QShortcut>
+#include <QSignalBlocker>
+#include <QSet>
+#include <QSplitter>
+#include <QStyleOptionViewItem>
+#include <QStyledItemDelegate>
+#include <QTimer>
+#include <QUrl>
+#include <QVBoxLayout>
+
+#include <algorithm>
+#include <utility>
+#include <vector>
+
+namespace {
+
+// QComboBox paints the current item's icon itself; popup rows should remain undecorated.
+class ClosedControlIconDelegate final : public QStyledItemDelegate {
+public:
+	using QStyledItemDelegate::QStyledItemDelegate;
+	void initStyleOption(QStyleOptionViewItem* option, const QModelIndex& index) const override
+	{
+		QStyledItemDelegate::initStyleOption(option, index);
+		option->features &= ~QStyleOptionViewItem::HasDecoration;
+		option->icon = QIcon();
+	}
+};
+
+// Card width scales with this per-frame height.
+const QString CARD_IMAGE_HEIGHT_KEY = QStringLiteral("mainWindow/cardImageHeight");
+const QString MEDIA_TYPE_FILTER_KEY = QStringLiteral("mainWindow/mediaTypeFilter");
+constexpr int DEFAULT_CARD_IMAGE_HEIGHT = 120;
+constexpr int MIN_CARD_IMAGE_HEIGHT = 60;
+constexpr int MAX_CARD_IMAGE_HEIGHT = 360;
+constexpr int CARD_IMAGE_HEIGHT_STEP = 20;
+
+constexpr int MIN_PREVIEW_FRAME_COUNT = 1;
+constexpr int MAX_PREVIEW_FRAME_COUNT = 10;
+
+int cardImageHeight()
+{
+	return QSettings{}.value(CARD_IMAGE_HEIGHT_KEY, DEFAULT_CARD_IMAGE_HEIGHT).toInt();
+}
+
+// Cached so sorting never performs filesystem I/O.
+struct ItemInfo
+{
+	bool isBest = false;
+	QDateTime date;
+	QString name;
+};
+
+ItemInfo itemInfoFor(Catalog& catalog, const MediaId& id, bool isBest, bool sortByDate)
+{
+	const QString name = catalog.displayName(id);
+	return { isBest, sortByDate ? getSourceFileDate(catalog.sourcePathForMediaItem(id), catalog.folderForMediaItem(id)) : QDateTime{}, name };
+}
+
+// Sort mode is shared by every item in a sort and set immediately before sortItems().
+class GridItem final : public QListWidgetItem {
+public:
+	static int sortBy;
+	static bool descending;
+	static bool favoritesFirst;
+
+	static void setSortMode(const SortControl* control)
+	{
+		sortBy = control->sortBy();
+		descending = control->descending();
+		favoritesFirst = control->favoritesFirst();
+	}
+
+	MediaId mediaId;
+	ItemInfo info;
+
+	bool operator<(const QListWidgetItem& other) const override
+	{
+		const ItemInfo& b = static_cast<const GridItem&>(other).info;
+		if (favoritesFirst && info.isBest != b.isBest)
+			return info.isBest;
+		if (sortBy == SortBy::Date)
+			return descending ? b.date < info.date : info.date < b.date;
+
+		const int cmp = QString::compare(info.name, b.name, Qt::CaseInsensitive);
+		return descending ? cmp > 0 : cmp < 0;
+	}
+};
+
+int GridItem::sortBy = SortBy::Name;
+bool GridItem::descending = false;
+bool GridItem::favoritesFirst = false;
+
+QString gridCaption(int displayNumber, const QString& name)
+{
+	return QString::number(displayNumber) + ":  " + name;
+}
+
+void applyLabelDots(Catalog& catalog, const MediaId& id, MediaItemWidget* card)
+{
+	std::vector<QColor> dotColors;
+	QStringList dotNames;
+	for (const LabelId labelId : catalog.labelsForMediaItem(id))
+	{
+		const Catalog::Label* label = catalog.labelById(labelId);
+		if (!label)
+			continue;
+		dotColors.push_back(label->color.isEmpty() ? QColor() : QColor(label->color));
+		dotNames.push_back(label->displayName);
+	}
+
+	QString stateLine;
+	if (catalog.mediaType(id) == Catalog::MediaType::Video)
+		stateLine = (catalog.isSplitIntoFrames(id) ? MediaBrowserWidget::tr("Frames extracted")
+		                                         : MediaBrowserWidget::tr("Not extracted yet - middle-click to extract"))
+		            + QLatin1String("\n");
+	card->setLabelDots(dotColors, stateLine + MediaBrowserWidget::tr("Labels: %1").arg(dotNames.join(", ")));
+}
+
+void renumberGridCaptions(QListWidget* grid)
+{
+	int visibleNumber = 0;
+	for (int row = 0; row < grid->count(); ++row)
+	{
+		QListWidgetItem* item = grid->item(row);
+		if (item->isHidden())
+			continue;
+		auto* card = static_cast<MediaItemWidget*>(grid->itemWidget(item));
+		card->setLabel(gridCaption(++visibleNumber, static_cast<GridItem*>(item)->info.name));
+	}
+}
+
+// A leading '^' anchors the otherwise substring-based, case-insensitive match.
+bool nameMatchesFilter(const QString& name, const QString& query)
+{
+	if (query.isEmpty())
+		return true;
+	if (query.startsWith('^'))
+		return name.startsWith(query.mid(1), Qt::CaseInsensitive);
+	return name.contains(query, Qt::CaseInsensitive);
+}
+
+} // namespace
+
+struct MediaBrowserWidget::GridViewState
+{
+	QString scrollAnchorKey;
+	QSet<QString> selectedKeys;
+	QString currentKey;
+};
+
+MediaBrowserWidget::MediaBrowserWidget(Library& library, QWidget* parent)
+	: QWidget(parent)
+	, _library(library)
+{
+	setupUi();
+}
+
+void MediaBrowserWidget::setupUi()
+{
+	auto* rootLayout = new QHBoxLayout(this);
+	rootLayout->setContentsMargins(0, 0, 0, 0);
+	rootLayout->setSpacing(0);
+
+	_labelSidebar = new LabelSidebar(_library);
+	connect(_labelSidebar, &LabelSidebar::filterChanged, this, &MediaBrowserWidget::refreshMediaGrid);
+	connect(_labelSidebar, &LabelSidebar::addLabelRequested, this, &MediaBrowserWidget::addLabelRequested);
+	connect(_labelSidebar, &LabelSidebar::renameLabelRequested, this, &MediaBrowserWidget::renameLabelRequested);
+	connect(_labelSidebar, &LabelSidebar::setLabelColorRequested, this, &MediaBrowserWidget::setLabelColorRequested);
+	connect(_labelSidebar, &LabelSidebar::deleteLabelRequested, this, &MediaBrowserWidget::deleteLabelRequested);
+
+	auto* rightPanel = new QWidget();
+	auto* mainLayout = new QVBoxLayout(rightPanel);
+	mainLayout->setContentsMargins(0, 0, 0, 0);
+	mainLayout->setSpacing(0);
+
+	auto* headerWidget = new QWidget();
+	auto* headerLayout = new QHBoxLayout(headerWidget);
+	headerLayout->setContentsMargins(0, 4, 4, 4);
+	headerLayout->setSpacing(4);
+
+	_nameFilter = new QLineEdit();
+	_nameFilter->setPlaceholderText(tr("filter by name..."));
+	_nameFilter->setClearButtonEnabled(true);
+	_nameFilter->setMinimumWidth(220);
+	_nameFilter->addAction(Theme::tintedIcon(QStringLiteral(":/UI/icon_search.svg"), &Theme::ThemeColors::MutedText),
+		QLineEdit::LeadingPosition);
+	connect(_nameFilter, &QLineEdit::textChanged, this, &MediaBrowserWidget::applyNameFilter);
+	headerLayout->addWidget(_nameFilter, 0, Qt::AlignVCenter);
+
+	_mediaTypeFilter = new SegmentedToggle({ tr("All"), tr("Videos"), tr("Photos") });
+	_mediaTypeFilter->setCurrentIndex(qBound(0, QSettings{}.value(MEDIA_TYPE_FILTER_KEY, 0).toInt(), 2));
+	connect(_mediaTypeFilter, &SegmentedToggle::currentChanged, this, [this](int index) {
+		QSettings{}.setValue(MEDIA_TYPE_FILTER_KEY, index);
+		refreshMediaGrid();
+	});
+	headerLayout->addWidget(_mediaTypeFilter, 0, Qt::AlignVCenter);
+
+	auto* focusFilterShortcut = new QShortcut(QKeySequence("Ctrl+F"), this);
+	focusFilterShortcut->setContext(Qt::ApplicationShortcut);
+	connect(focusFilterShortcut, &QShortcut::activated, this, [this] {
+		window()->raise();
+		window()->activateWindow();
+		_nameFilter->setFocus();
+		_nameFilter->selectAll();
+	});
+
+	headerLayout->addStretch(1);
+
+	_previewFrameCountCombo = new QComboBox();
+	_previewFrameCountCombo->setToolTip(tr("Number of preview frames shown on each video card"));
+	const QIcon previewCountIcon = Theme::tintedIcon(QStringLiteral(":/UI/icon_columns.svg"), &Theme::ThemeColors::InstructionText);
+	for (int n = MIN_PREVIEW_FRAME_COUNT; n <= MAX_PREVIEW_FRAME_COUNT; ++n)
+		_previewFrameCountCombo->addItem(previewCountIcon, (n == 1 ? tr("%1 frame per preview") : tr("%1 frames per preview")).arg(n), n);
+	_previewFrameCountCombo->view()->setItemDelegate(new ClosedControlIconDelegate(_previewFrameCountCombo));
+
+	const int savedFrameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
+	const int savedFrameIdx = _previewFrameCountCombo->findData(savedFrameCount);
+	_previewFrameCountCombo->setCurrentIndex(savedFrameIdx >= 0 ? savedFrameIdx
+		: _previewFrameCountCombo->findData(Defaults::PreviewFrameCount));
+
+	connect(_previewFrameCountCombo, &QComboBox::currentIndexChanged, this, [this] {
+		QSettings{}.setValue(Settings::PreviewFrameCount, previewFrameCount());
+		refreshMediaGrid();
+	});
+	headerLayout->addWidget(_previewFrameCountCombo, 0, Qt::AlignVCenter);
+
+	_sortControl = new SortControl();
+	connect(_sortControl, &SortControl::changed, this, &MediaBrowserWidget::resortMediaGrid);
+	headerLayout->addWidget(_sortControl, 0, Qt::AlignVCenter);
+
+	mainLayout->addWidget(headerWidget);
+
+	_mediaGrid = new MediaGrid();
+	_mediaGrid->setViewMode(QListView::IconMode);
+	_mediaGrid->setFlow(QListView::LeftToRight);
+	_mediaGrid->setWrapping(true);
+	_mediaGrid->setResizeMode(QListView::Adjust);
+	// Video and photo cards have different fixed sizes.
+	_mediaGrid->setUniformItemSizes(false);
+	_mediaGrid->setMovement(QListView::Static);
+	_mediaGrid->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+	_mediaGrid->setSelectionMode(QAbstractItemView::ExtendedSelection);
+	_mediaGrid->setDragEnabled(true);
+	_mediaGrid->setDragUrlsProvider([this](const QList<QListWidgetItem*>& items) { return dragUrlsForItems(items); });
+	_mediaGrid->setSpacing(10);
+	Style::applyThemedSheet(_mediaGrid, [] {
+		return QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().AccentBg);
+	});
+	connect(_mediaGrid, &QListWidget::itemSelectionChanged, this, &MediaBrowserWidget::selectionChanged);
+
+	mainLayout->addWidget(_mediaGrid, 1);
+
+	// Coalesce wheel steps into one grid rebuild.
+	_gridZoomDebounce = new QTimer(this);
+	_gridZoomDebounce->setSingleShot(true);
+	_gridZoomDebounce->setInterval(80);
+	connect(_gridZoomDebounce, &QTimer::timeout, this, &MediaBrowserWidget::refreshMediaGrid);
+
+	auto* splitter = new QSplitter(Qt::Horizontal);
+	splitter->addWidget(_labelSidebar);
+	splitter->addWidget(rightPanel);
+	splitter->setStretchFactor(0, 0);
+	splitter->setStretchFactor(1, 1);
+	splitter->setCollapsible(0, false);
+	rootLayout->addWidget(splitter);
+}
+
+void MediaBrowserWidget::saveSettings()
+{
+	QVariantList activeIds;
+	for (const LabelId id : _labelSidebar->activeLabelIds())
+		activeIds.push_back(static_cast<qulonglong>(toUInt64(id)));
+	QSettings{}.setValue("mainWindow/activeLabelIds", activeIds);
+	QSettings{}.setValue("mainWindow/labelsAndMode", _labelSidebar->isAndMode());
+	QSettings{}.setValue("mainWindow/scrollAnchor", topAnchorKey());
+}
+
+void MediaBrowserWidget::restoreSettings()
+{
+	QList<LabelId> activeIds;
+	for (const QVariant& v : QSettings{}.value("mainWindow/activeLabelIds").toList())
+		activeIds.push_back(labelIdFromUInt64(v.toULongLong()));
+	const bool andMode = QSettings{}.value("mainWindow/labelsAndMode", false).toBool();
+	_labelSidebar->setActiveFilter(activeIds, andMode);
+	refreshMediaGrid();
+
+	// The wrapped grid's final row layout is available only after post-show resize events.
+	const QString scrollAnchorKey = QSettings{}.value("mainWindow/scrollAnchor").toString();
+	if (!scrollAnchorKey.isEmpty())
+		QMetaObject::invokeMethod(this, [this, scrollAnchorKey] { scrollGridToAnchorKey(scrollAnchorKey); }, Qt::QueuedConnection);
+}
+
+void MediaBrowserWidget::resetForLibrarySwitch()
+{
+	_mediaGrid->clear();
+	_labelSidebar->setActiveFilter({}, _labelSidebar->isAndMode());
+}
+
+// Keep sidebar rebuilding out of refreshMediaGrid(): that function can run from a sidebar item's click signal.
+void MediaBrowserWidget::refreshLibraryView()
+{
+	refreshMediaGrid();
+	_labelSidebar->refresh();
+}
+
+int MediaBrowserWidget::previewFrameCount() const
+{
+	return _previewFrameCountCombo->currentData().toInt();
+}
+
+void MediaBrowserWidget::installGridAction(QAction* action)
+{
+	_mediaGrid->addAction(action);
+}
+
+bool MediaBrowserWidget::isGridDragSource(const QObject* source) const
+{
+	return source == _mediaGrid;
+}
+
+void MediaBrowserWidget::zoomCards(int steps)
+{
+	const int current = cardImageHeight();
+	const int next = qBound(MIN_CARD_IMAGE_HEIGHT, current + steps * CARD_IMAGE_HEIGHT_STEP, MAX_CARD_IMAGE_HEIGHT);
+	if (next == current)
+		return;
+
+	QSettings{}.setValue(CARD_IMAGE_HEIGHT_KEY, next);
+	_gridZoomDebounce->start();
+}
+
+std::vector<MediaId> MediaBrowserWidget::mediaItemsMatchingFilters() const
+{
+	const Catalog& catalog = _library.catalog();
+
+	const QList<LabelId> activeLabelIds = _labelSidebar->activeLabelIds();
+	std::vector<MediaId> mediaItems;
+	if (activeLabelIds.empty())
+	{
+		const auto& all = catalog.mediaItems();
+		mediaItems.assign(all.keyBegin(), all.keyEnd());
+	}
+	else
+	{
+		QSet<MediaId> matched = catalog.mediaItemsForLabel(activeLabelIds.front());
+		for (qsizetype i = 1; i < activeLabelIds.size(); ++i)
+		{
+			const QSet<MediaId> next = catalog.mediaItemsForLabel(activeLabelIds[i]);
+			if (_labelSidebar->isAndMode())
+				matched.intersect(next);
+			else
+				matched.unite(next);
+		}
+		mediaItems.assign(matched.cbegin(), matched.cend());
+	}
+
+	if (const int typeFilterIdx = _mediaTypeFilter->currentIndex(); typeFilterIdx != 0)
+	{
+		const Catalog::MediaType wanted = typeFilterIdx == 2 ? Catalog::MediaType::Photo : Catalog::MediaType::Video;
+		std::erase_if(mediaItems, [&](const MediaId& id) { return catalog.mediaType(id) != wanted; });
+	}
+
+	return mediaItems;
+}
+
+MediaItemWidget* MediaBrowserWidget::buildMediaCard(
+	const MediaId& id, bool isBest, const QSize& photoCanvas, const QSize& videoCanvas, int previewFrameCount)
+{
+	Catalog& catalog = _library.catalog();
+	const QString folderPath = catalog.folderForMediaItem(id);
+	const bool isPhoto = catalog.mediaType(id) == Catalog::MediaType::Photo;
+	QStringList previewPaths;
+	if (isPhoto)
+	{
+		previewPaths.push_back(catalog.sourcePathForMediaItem(id));
+	}
+	else
+	{
+		// Fall back to full-size frames when the preview cache is missing.
+		QDir frameSource(Catalog::previewDirFor(folderPath));
+		QStringList imageFiles = listFrameImageFiles(frameSource);
+		if (imageFiles.empty())
+		{
+			frameSource.setPath(folderPath);
+			imageFiles = listFrameImageFiles(frameSource);
+		}
+
+		previewPaths = pickEvenlySpacedFrames(frameSource, imageFiles, previewFrameCount);
+	}
+
+	auto* card = new MediaItemWidget(
+		isPhoto ? photoCanvas : videoCanvas,
+		previewPaths, QString(),
+		id,
+		isBest,
+		[this, id] { toggleBest(id); },
+		[this, id, isPhoto] {
+			if (isPhoto)
+				emit openSourceRequested(id);
+			else
+				emit playVideoRequested(id);
+		},
+		[this, id](QPoint globalPos) { emit mediaItemContextMenuRequested(id, globalPos); },
+		/* dynamic size hint */false,
+		/* film strip */ !isPhoto
+	);
+	if (!isPhoto)
+		card->setOnMiddleButtonClick([this, id] { emit frameViewerRequested(id); });
+	card->setOnMouseWheelCallback([this](int steps) { zoomCards(steps); });
+	card->setFramesExtracted(!isPhoto && catalog.isSplitIntoFrames(id));
+	card->setDuration(catalog.durationMsForMediaItem(id));
+
+	// Defer rebuilding the grid until this card's dropEvent has unwound.
+	card->setOnLabelDropped([this, id](const QString& labelId) {
+		const std::vector<MediaId> targets = effectiveSelection(id);
+		const LabelId dropped = labelIdFromString(labelId);
+		const uint64_t libraryGeneration = _library.generation();
+		QMetaObject::invokeMethod(this, [this, libraryGeneration, targets, dropped] {
+			if (_library.generation() != libraryGeneration)
+				return;
+			Catalog::BatchScope batch(_library.catalog());
+			for (const MediaId& target : targets)
+				_library.catalog().addLabel(target, dropped);
+			refreshLibraryView();
+		}, Qt::QueuedConnection);
+	});
+
+	applyLabelDots(catalog, id, card);
+	return card;
+}
+
+void MediaBrowserWidget::refreshMediaGrid()
+{
+	const GridViewState viewState = captureGridViewState();
+	_mediaGrid->clear();
+
+	const int frameCount = previewFrameCount();
+	const int imageHeight = cardImageHeight();
+
+	// Make each video span the same grid width as previewFrameCount photo cards.
+	const QSize photoCanvas{ imageHeight, imageHeight };
+	const QSize videoCanvas{ MediaItemWidget::videoCanvasWidthForTiling(imageHeight, frameCount, _mediaGrid->spacing()), imageHeight };
+
+	Catalog& catalog = _library.catalog();
+	const QSet<MediaId> bestSet = catalog.mediaItemsForLabel(Catalog::BestLabelId);
+
+	GridItem::setSortMode(_sortControl);
+	const bool sortByDate = GridItem::sortBy == SortBy::Date;
+
+	const std::vector<MediaId> mediaItems = mediaItemsMatchingFilters();
+
+	_mediaGrid->setEmptyMessage(catalog.mediaItemCount() == 0
+		? tr("The library is empty.\nDrop media files here, or use Tools > Import.")
+		: tr("No items match the current filters."));
+
+	// Attaching widgets while inserting makes Qt walk a growing set of persistent indexes: O(N^2).
+	std::vector<std::pair<GridItem*, MediaItemWidget*>> pendingAttach;
+	pendingAttach.reserve(mediaItems.size());
+
+	// A card's size depends only on its media type.
+	QSize videoCardHint, photoCardHint;
+
+	for (const MediaId& id : mediaItems)
+	{
+		const bool isBest = bestSet.contains(id);
+		MediaItemWidget* card = buildMediaCard(id, isBest, photoCanvas, videoCanvas, frameCount);
+
+		auto* item = new GridItem();
+		item->mediaId = id;
+		item->info = itemInfoFor(catalog, id, isBest, sortByDate);
+		QSize& typeHint = catalog.mediaType(id) == Catalog::MediaType::Photo ? photoCardHint : videoCardHint;
+		if (!typeHint.isValid())
+			typeHint = card->sizeHint();
+		item->setSizeHint(typeHint);
+		_mediaGrid->addItem(item);
+
+		pendingAttach.emplace_back(item, card);
+	}
+
+	_mediaGrid->sortItems(Qt::AscendingOrder);
+
+	for (const auto& [item, card] : pendingAttach)
+		_mediaGrid->setItemWidget(item, card);
+
+	applyNameFilter();
+
+	// Restore against the final post-filter layout.
+	restoreGridViewState(viewState);
+}
+
+QString MediaBrowserWidget::topAnchorKey() const
+{
+	for (int row = 0; row < _mediaGrid->count(); ++row)
+	{
+		const QListWidgetItem* item = _mediaGrid->item(row);
+		if (!item->isHidden() && _mediaGrid->visualItemRect(item).bottom() >= 0)
+			return static_cast<const GridItem*>(item)->mediaId.key();
+	}
+	return {};
+}
+
+void MediaBrowserWidget::scrollGridToAnchorKey(const QString& anchorKey)
+{
+	if (anchorKey.isEmpty())
+		return;
+	for (int row = 0; row < _mediaGrid->count(); ++row)
+	{
+		QListWidgetItem* item = _mediaGrid->item(row);
+		if (!item->isHidden() && static_cast<const GridItem*>(item)->mediaId.key() == anchorKey)
+		{
+			_mediaGrid->scrollToItem(item, QAbstractItemView::PositionAtTop);
+			return;
+		}
+	}
+}
+
+MediaBrowserWidget::GridViewState MediaBrowserWidget::captureGridViewState() const
+{
+	GridViewState state;
+	state.scrollAnchorKey = topAnchorKey();
+	for (const QListWidgetItem* item : _mediaGrid->selectedItems())
+		state.selectedKeys.insert(static_cast<const GridItem*>(item)->mediaId.key());
+	if (const QListWidgetItem* current = _mediaGrid->currentItem())
+		state.currentKey = static_cast<const GridItem*>(current)->mediaId.key();
+	return state;
+}
+
+void MediaBrowserWidget::restoreGridViewState(const GridViewState& state)
+{
+	if (!state.selectedKeys.empty() || !state.currentKey.isEmpty())
+	{
+		QListWidgetItem* currentItem = nullptr;
+		{
+			const QSignalBlocker blocker{ _mediaGrid };
+			for (int row = 0; row < _mediaGrid->count(); ++row)
+			{
+				auto* item = static_cast<GridItem*>(_mediaGrid->item(row));
+				if (item->isHidden())
+					continue;
+				const QString key = item->mediaId.key();
+				if (state.selectedKeys.contains(key))
+					item->setSelected(true);
+				if (!state.currentKey.isEmpty() && key == state.currentKey)
+					currentItem = item;
+			}
+			if (currentItem)
+				_mediaGrid->setCurrentItem(currentItem, QItemSelectionModel::NoUpdate);
+		}
+		emit selectionChanged();
+	}
+
+	scrollGridToAnchorKey(state.scrollAnchorKey);
+}
+
+// Reorder existing cards to avoid re-decoding their thumbnails.
+void MediaBrowserWidget::resortMediaGrid()
+{
+	const int count = _mediaGrid->count();
+	if (count == 0)
+		return;
+
+	Catalog& catalog = _library.catalog();
+	const QSet<MediaId> bestSet = catalog.mediaItemsForLabel(Catalog::BestLabelId);
+
+	GridItem::setSortMode(_sortControl);
+	const bool sortByDate = GridItem::sortBy == SortBy::Date;
+
+	for (int row = 0; row < count; ++row)
+	{
+		auto* item = static_cast<GridItem*>(_mediaGrid->item(row));
+		item->info = itemInfoFor(catalog, item->mediaId, bestSet.contains(item->mediaId), sortByDate);
+	}
+
+	_mediaGrid->sortItems(Qt::AscendingOrder);
+	renumberGridCaptions(_mediaGrid);
+}
+
+void MediaBrowserWidget::applyNameFilter()
+{
+	const QString query = _nameFilter->text().trimmed();
+	for (int row = 0; row < _mediaGrid->count(); ++row)
+	{
+		auto* item = static_cast<GridItem*>(_mediaGrid->item(row));
+		const bool hide = !nameMatchesFilter(item->info.name, query);
+		item->setHidden(hide);
+		if (hide)
+			item->setSelected(false);
+	}
+	renumberGridCaptions(_mediaGrid);
+}
+
+std::vector<MediaId> MediaBrowserWidget::selectedMediaItems() const
+{
+	const QList<QListWidgetItem*> selectedItems = _mediaGrid->selectedItems();
+	std::vector<MediaId> selected;
+	selected.reserve(selectedItems.size());
+	for (const QListWidgetItem* item : selectedItems)
+		selected.push_back(static_cast<const GridItem*>(item)->mediaId);
+	return selected;
+}
+
+std::vector<MediaId> MediaBrowserWidget::effectiveSelection(std::optional<MediaId> target) const
+{
+	std::vector<MediaId> selected = selectedMediaItems();
+	if (target && std::find(selected.cbegin(), selected.cend(), *target) == selected.cend())
+		selected = { *target };
+	return selected;
+}
+
+QList<QUrl> MediaBrowserWidget::dragUrlsForItems(const QList<QListWidgetItem*>& items) const
+{
+	const Catalog& catalog = _library.catalog();
+	QList<QUrl> urls;
+	urls.reserve(items.size());
+	for (const QListWidgetItem* item : items)
+	{
+		const QString path = catalog.sourcePathForMediaItem(static_cast<const GridItem*>(item)->mediaId);
+		if (!path.isEmpty() && QFile::exists(path))
+			urls.push_back(QUrl::fromLocalFile(path));
+	}
+	return urls;
+}
+
+void MediaBrowserWidget::toggleBest(const MediaId& id)
+{
+	Catalog& catalog = _library.catalog();
+	if (catalog.mediaItemHasLabel(id, Catalog::BestLabelId))
+		catalog.removeLabel(id, Catalog::BestLabelId);
+	else
+		catalog.addLabel(id, Catalog::BestLabelId);
+
+	// Toggling the star does not recreate the card's label dots.
+	for (int row = 0; row < _mediaGrid->count(); ++row)
+	{
+		auto* item = static_cast<GridItem*>(_mediaGrid->item(row));
+		if (item->mediaId == id)
+		{
+			applyLabelDots(catalog, id, static_cast<MediaItemWidget*>(_mediaGrid->itemWidget(item)));
+			break;
+		}
+	}
+
+	if (_labelSidebar->activeLabelIds().contains(Catalog::BestLabelId))
+		QMetaObject::invokeMethod(this, &MediaBrowserWidget::refreshMediaGrid, Qt::QueuedConnection);
+	else if (_sortControl->favoritesFirst())
+		QMetaObject::invokeMethod(this, &MediaBrowserWidget::resortMediaGrid, Qt::QueuedConnection);
+}

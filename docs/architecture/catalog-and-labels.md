@@ -182,7 +182,7 @@ splitIntoFrames, durationMs, type, referenced}` — this **is** the catalog; see
 `rebuildIndex()` re-seeds the registry from the model and reloads every entry from the store.
 A folder-less record is skipped as a non-item (a legacy orphan carrying only labels) **unless** its `type`
 says photo: a folder-less photo is a referenced photo, a real item tracked in place. It runs at construction
-and inside `renameLabel`/`deleteLabel` — **not** on every grid refresh. `MainWindow::refreshMediaGrid`
+and inside `renameLabel`/`deleteLabel` — **not** on every grid refresh. `MediaBrowserWidget::refreshMediaGrid`
 deliberately does **not** call it: the model is kept current by its own mutation API, so re-reading the store
 on every refresh would be redundant work and would also re-save the registry on every sort/filter/zoom.
 `addLabel`/`removeLabel` patch the affected entry in place instead of triggering any reload.

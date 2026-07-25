@@ -2,11 +2,15 @@
 
 [← Back to architecture index](../../ARCHITECTURE.md)
 
-`MainWindow.h/.cpp` owns a stable `Library` member, the `LabelSidebar`, the card grid (`MediaGrid`), and a persistent
-`FrameViewerWindow` (reused, not recreated).
+`MainWindow.h/.cpp` owns a stable `Library` member, a `MediaBrowserWidget`, and a persistent `FrameViewerWindow`
+(reused, not recreated). `MediaBrowserWidget` is the main-window content composite: it owns the `LabelSidebar`,
+browser toolbar, card grid (`MediaGrid`), browser-local settings, filtering/sorting, selection/view-state preservation,
+card construction, Best toggles, and label drops. It borrows the stable `Library&`; `MainWindow` handles the
+high-level intents it emits (open/play, inspect frames, context menu, and label-management dialogs).
 
 The **constructor** runs `loadInitialLibrary()` before building anything — loading first is not stylistic: `setupUI()`
-hands the sidebar a `Library&` it keeps for life, so there is no window to build without one. On the **first run**
+constructs the browser with a `Library&`, which its sidebar also keeps for life, so there is no window to build without
+one. On the **first run**
 (`Settings::RootFolder` unset), `chooseFirstRunLibraryFolder()` prompts before feeding the same recovery loop.
 Cancelling leaves the window unbuilt and `main()` drops it after asking `isLibraryLoaded()`; the destructor returns
 early for the same reason. The library loads through
@@ -15,9 +19,10 @@ parallel load path of its own.
 
 Library > Open library and Library > Create new library share `pickAndSwitchLibrary()`. `Library::setRoot()` validates
 and fully loads the requested root; `setRoot()` first flushes the current library, so a persistent save failure blocks
-replacement. On success it synchronously destroys player windows, clears the persistent frame viewer, grid, and the
-library-specific label filter before returning to the event loop. The sidebar borrows the stable `Library&`, so it needs
-no replacement/rebinding. Library switching and Settings are refused while `_isProcessing`: import/re-export pumps
+replacement. On success it synchronously destroys player windows, clears the persistent frame viewer, and asks the
+browser to clear its grid and library-specific label filter before returning to the event loop. The browser and sidebar
+borrow the stable `Library&`, so they need no replacement/rebinding. Library switching and Settings are refused while
+`_isProcessing`: import/re-export pumps
 events while holding a catalog batch, and settings changes partway through could give one batch mixed encoding behavior.
 
 ## The Library menu and its recent list
@@ -49,8 +54,8 @@ choice before closing with unsaved changes.
 
 ## Media-type switch
 
-`_mediaTypeFilter` (a `SegmentedToggle`): **All / Videos / Photos**, ANDed with the other filters. A *structural*
-filter — changing it rebuilds the grid (`refreshMediaGrid`), unlike the name filter's cheap hide/show.
+`MediaBrowserWidget::_mediaTypeFilter` (a `SegmentedToggle`): **All / Videos / Photos**, ANDed with the other filters.
+A *structural* filter — changing it rebuilds the grid (`refreshMediaGrid`), unlike the name filter's cheap hide/show.
 
 **Photo cards** use the decoded photo file directly as the image strip — no preview cache; an unloadable path (e.g. a
 referenced photo on an unmounted drive) renders a blank card. Videos read `preview/`, falling back to the real frame
@@ -61,7 +66,7 @@ is not wired; the green "frames extracted" badge is gated to videos; the context
 
 ## Name filter
 
-`_nameFilter` (toolbar `QLineEdit`): an item-name substring filter ANDed with the sidebar's label filter. It's a
+`MediaBrowserWidget::_nameFilter` (toolbar `QLineEdit`): an item-name substring filter ANDed with the sidebar's label filter. It's a
 **view-level hide/show**, not a rebuild: `textChanged` runs `applyNameFilter`, which only toggles each card's
 `setHidden` — no grid rebuild and no thumbnail re-decode. (The label filter, by contrast, *does* drive which cards get
 built, in `refreshMediaGrid`.)
@@ -70,11 +75,11 @@ built, in `refreshMediaGrid`.)
 
 A single **`SortControl`** chip widget bundles the three ordering options (sort field, ascending/descending, "Favorites
 first"). It **owns its own persistence** and emits a single **`changed()`** signal whenever the user adjusts any option;
-`MainWindow` connects that to `resortMediaGrid()` and reads the state back through the control's getters.
+`MediaBrowserWidget` connects that to `resortMediaGrid()` and reads the state back through the control's getters.
 
 ## Key methods
 
-- `refreshMediaGrid()` — clears and rebuilds the grid from `Catalog::mediaItems()` filtered by the label filter, ending
+- `MediaBrowserWidget::refreshMediaGrid()` — clears and rebuilds the grid from `Catalog::mediaItems()` filtered by the label filter, ending
   with `applyNameFilter()`. Deliberately does **not** call `Catalog::rebuildIndex()` — see
   [catalog-and-labels.md](catalog-and-labels.md#in-memory-model) for why. A rebuild preserves the scroll position and
   selection by re-anchoring on `MediaId` identity — not scroll offset or row index, which shift as items are
@@ -82,8 +87,8 @@ first"). It **owns its own persistence** and emits a single **`changed()`** sign
 - `showMediaItemContextMenu()` — multi-select-aware right-click menu. **"Remove from library"** drops the selection from
   the catalog only — since the catalog is never re-derived from a disk walk, an untracked video's frame folder stays on
   disk, surfaced again only by the integrity tool or a re-import.
-- `effectiveSelection(id)` — **shared** by the context menu, the Edit menu actions, and the label-drop handler.
-- `refreshLibraryView()` — `refreshMediaGrid()` plus the sidebar refresh: the entry point for **structural** changes
+- `MediaBrowserWidget::effectiveSelection(id)` — **shared** by the context menu, the Edit menu actions, and the label-drop handler.
+- `MediaBrowserWidget::refreshLibraryView()` — `refreshMediaGrid()` plus the sidebar refresh: the entry point for **structural** changes
   (add/delete/rename an item, create a label), where plain `refreshMediaGrid()` covers filter/sort/zoom.
 
 ## Label assignment
@@ -110,7 +115,8 @@ row via the delegate.
 ## Sidebar label management
 
 Right-clicking an ordinary label row opens a **Rename / Set color / Delete** menu; `LabelSidebar` emits the
-corresponding signal carrying the label id, and `MainWindow` handles each. `MainWindow` does not duplicate name/path
+corresponding signal carrying the label id, `MediaBrowserWidget` forwards it, and `MainWindow` handles each.
+`MainWindow` does not duplicate name/path
 rules or create the backing folder itself — those live in the `Catalog` API (see
 [catalog-and-labels.md](catalog-and-labels.md)). Import callbacks likewise resolve the destination through the Catalog's
 verified path accessors.
@@ -146,9 +152,9 @@ not implemented: Explorer's release-without-drag collapse-to-single nuance.
 
 **Dragging cards out (file export)**: the grid is a **`MediaGrid`** (`src/UiComponents/MediaGrid.h/.cpp`), a
 `QListWidget` subclass whose `startDrag` exports the current selection's **source files** as `file://` URLs
-(`CopyAction`) to Explorer or another app. Catalog access stays out of the view — `MainWindow` sets the URL provider
-(`dragUrlsForItems`), following the same "MainWindow computes, card draws" split. `MainWindow::dragEnterEvent` guards
-against the export dropping back onto the import handler (`event->source() == _mediaGrid` → ignored).
+(`CopyAction`) to Explorer or another app. Catalog access stays out of `MediaGrid` — `MediaBrowserWidget` sets the URL
+provider (`dragUrlsForItems`), following the same "browser computes, card draws" split. `MainWindow::dragEnterEvent`
+asks the browser whether the event source is its grid, guarding against the export dropping back onto the import handler.
 
 **Empty state**: `MediaGrid` paints a caller-set message whenever **no item is visible** — whether none were built or
 the name filter hid them all; the paint checks live visibility, so it needs no hooks in `applyNameFilter`.
@@ -159,7 +165,7 @@ the name filter hid them all; the paint checks live visibility, so it needs no h
 
 **`MediaRename`** (`src/Windows/MediaRename.h/.cpp`) is the module — free functions with entry
 `MediaRename::renameItemInteractive(id, dialogParent)`, dispatching by media type. `MainWindow::renameItemInteractive`
-is a thin wrapper: on success it calls `refreshLibraryView()` and repoints the frame viewer when needed. Both the
+is a thin wrapper: on success it calls `MediaBrowserWidget::refreshLibraryView()` and repoints the frame viewer when needed. Both the
 Edit-menu **Rename** action and the card context menu go through that wrapper.
 
 `renameVideo` is the **one place a video's frame folder moves on disk outside the label-mutation paths in `Catalog`**

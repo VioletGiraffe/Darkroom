@@ -150,7 +150,7 @@ their label-assign drags — neither hand-rolls the gesture (see [main-window.md
 
 `ThumbnailWidget` detects Ctrl+wheel and fires a zoom callback (consuming the event); plain wheel falls
 through so the view scrolls. **Owners apply the same shape**: bound, persist to `QSettings`, and
-debounce-rebuild — `MainWindow::zoomCards` (card height) → `refreshMediaGrid()`,
+debounce-rebuild — `MediaBrowserWidget::zoomCards` (card height) → `refreshMediaGrid()`,
 `FrameViewerWindow::zoomThumbnails` (frame-viewer thumbnail size).
 
 The two owners' bound/persist/debounce logic is intentionally **not** de-duplicated yet (each is a few

@@ -12,7 +12,10 @@ Qt's stylesheet style does not render horizontal slider tick marks. The global s
 
 ## Large UI coordinators
 
-`MainWindow`, `ImportDialog`, and `PhotoCompareWindow` combine many related state transitions and responsibilities. The code is coherent, but their breadth increases regression risk and makes isolated testing difficult. This is a maintainability concern, not by itself a reason to refactor.
+`MainWindow`, `ImportDialog`, and `PhotoCompareWindow` combine many related state transitions and responsibilities.
+Main-window browsing state is isolated in `MediaBrowserWidget`, but the remaining application-level workflows are
+still broad. The code is coherent, but this breadth increases regression risk and makes isolated testing difficult.
+This is a maintainability concern, not by itself a reason to refactor.
 
 ## Photo Compare shutdown latency
 

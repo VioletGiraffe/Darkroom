@@ -39,8 +39,9 @@ orient, then follow the link for the subsystem you're touching.
 - **Generated artifacts are not sources of truth.** Do not edit `Darkroom.sln`, `Makefile`, `.qmake.stash`,
   `.vs/`, `.qtcreator/`, `.qtc_clangd/`, `bin/`, or `build/`; qmake/project configuration and `app/src/`
   are authoritative.
-- **Source layout** (under `app/src/`): reusable UI widgets in `UiComponents/` (`ThumbnailWidget`,
-  `MediaItemWidget`, `MarkerSlider`, `SortControl`, `SegmentedToggle`, `LabelSidebar`) plus their close UI
+- **Source layout** (under `app/src/`): reusable UI widgets and feature-level composites in `UiComponents/`
+  (`ThumbnailWidget`, `MediaItemWidget`, `MediaBrowserWidget`, `MarkerSlider`, `SortControl`, `SegmentedToggle`,
+  `LabelSidebar`) plus their close UI
   helpers (`LabelVisuals`, `DragGestureHelper`, `LabelMimeType`); top-level windows + dialogs in `Windows/`
   (`MainWindow`, `CompareWindow`, `PhotoCompareWindow`, `FrameViewerWindow`, `VideoPlayerWindow`, the `*Dialog`s); the non-UI core
   model in `Core/` (`Library`, `Catalog`, `MetadataStore`, `MediaId`); and the visual theming in `Theme/` (`Theme`,
@@ -136,7 +137,7 @@ query/mutation API, import lifecycle (`addMediaItem`/`removeMediaItem`/`applyRen
 `BatchScope`), label-name/path safety, the design rationale, and the on-demand integrity tool.
 
 ### [Main window](docs/architecture/main-window.md)
-`MainWindow`'s library startup/switching policy, grid + sidebar layout, the name filter, the
+`MainWindow`'s library startup/switching policy, `MediaBrowserWidget`'s grid + sidebar layout, the name filter, the
 All/Videos/Photos media-type switch (and how photo cards render), label assignment (context menu + drag-from-sidebar), sidebar label management
 (rename/color/delete), the media grid's multi-select implementation (and the regression history behind it),
 renaming a media item on disk, and the in-memory Qt-message log + Help → Show log viewer.

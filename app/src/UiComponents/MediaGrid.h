@@ -7,7 +7,7 @@
 class QUrl;
 
 // Icon-mode media grid that exports the selected source URLs with CopyAction and paints an empty message when
-// no item is visible. MainWindow supplies both data sources; the view contains no catalog logic.
+// no item is visible. MediaBrowserWidget supplies both data sources; the view contains no catalog logic.
 class MediaGrid final : public QListWidget {
 public:
 	using QListWidget::QListWidget;
