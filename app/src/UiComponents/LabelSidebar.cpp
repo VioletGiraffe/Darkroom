@@ -24,7 +24,7 @@
 #include <QVBoxLayout>
 
 namespace {
-constexpr int kLabelIdRole = Qt::UserRole;   // LabelId (QVariant::fromValue): the row's label; AllLabelId on the All row
+constexpr int kLabelIdRole = Qt::UserRole;
 
 // The All row carries no real label - None is distinct from Best and every generated id.
 constexpr LabelId AllLabelId = LabelId::None;
@@ -46,22 +46,16 @@ LabelSidebar::LabelSidebar(Library& library, QWidget* parent) : QWidget(parent),
 	layout->addLayout(header);
 
 	connect(_andOrToggle, &SegmentedToggle::currentChanged, this, [this] {
-		// Only emit when more than 1 filter is selected, otherwise there is no actual change
 		if (_activeLabelIds.size() > 1)
 			emit filterChanged();
 	});
 
-	// A flat single-column list used purely as a row container; LabelRowDelegate paints each row (color swatch,
-	// name, right-aligned count, plus the active tint/spine highlight and the hover outline).
-	// ContentWidthListWidget sizes the panel to the widest row, so names never need to clip.
 	_list = new ContentWidthListWidget();
 	_list->setItemDelegate(new LabelRowDelegate(_list));
-	_list->setSelectionMode(QAbstractItemView::NoSelection);  // we manage active state ourselves (click toggles)
-	_list->setMouseTracking(true);   // so the delegate's hover highlight repaints as the cursor moves
+	_list->setSelectionMode(QAbstractItemView::NoSelection);
+	_list->setMouseTracking(true);
 	_list->setMinimumWidth(140);
 
-	// A press-and-drag on an ordinary label row drags the label out, to be dropped onto a card. "All" and the
-	// virtual Best are filter-only, so they don't drag. Plain clicks are untouched: click-to-filter still works.
 	new ListRowDragFilter(_list, [](const QListWidgetItem* item) -> QMimeData* {
 		const LabelId labelId = item->data(kLabelIdRole).value<LabelId>();
 		if (labelId == AllLabelId || labelId == Catalog::BestLabelId)
@@ -80,8 +74,6 @@ LabelSidebar::LabelSidebar(Library& library, QWidget* parent) : QWidget(parent),
 	auto* btnCreateLabel = new QPushButton(tr("Create label"));
 	btnCreateLabel->setObjectName("addLabelButton");
 	btnCreateLabel->setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_plus.svg"), &Theme::ThemeColors::TextPrimary));
-	// Ctrl+L is mirrored on ImportDialog's Create-label button; keep the two in sync. The tooltip surfaces the
-	// shortcut (derived from it, so there's a single source of truth) since a button doesn't advertise one otherwise.
 	btnCreateLabel->setShortcut(QKeySequence(Shortcuts::CreateLabel));
 	btnCreateLabel->setToolTip(tr("Create a new label (%1)").arg(btnCreateLabel->shortcut().toString(QKeySequence::NativeText)));
 	layout->addWidget(btnCreateLabel);
@@ -111,10 +103,9 @@ void LabelSidebar::rebuildRows()
 			item->setData(LabelRowDelegate::StarRole, true);
 	};
 
-	// Pinned rows: All, then Best (gold swatch + star), separated from the ordinary labels by a divider.
 	auto* allItem = new QListWidgetItem(tr("All"), _list);
 	allItem->setData(kLabelIdRole, QVariant::fromValue(AllLabelId));
-	allItem->setData(LabelRowDelegate::AllRole, true);   // stack icon instead of a swatch
+	allItem->setData(LabelRowDelegate::AllRole, true);
 	allItem->setData(LabelRowDelegate::CountRole, QString::number(catalog.mediaItemCount()));
 
 	for (const Catalog::Label& l : labels)
@@ -128,21 +119,20 @@ void LabelSidebar::rebuildRows()
 	{
 		auto* divider = new QListWidgetItem(_list);
 		divider->setData(LabelRowDelegate::DividerRole, true);
-		divider->setFlags(Qt::NoItemFlags);   // not selectable, clickable or hoverable
+		divider->setFlags(Qt::NoItemFlags);
 	}
 
 	for (const Catalog::Label& l : labels)
 		if (l.id != Catalog::BestLabelId)
 			addLabelRow(l, /*star*/ false);
 
-	// Drop any active ids whose label no longer exists.
 	QSet<LabelId> existing;
 	for (const Catalog::Label& l : labels)
 		existing.insert(l.id);
 	_activeLabelIds.intersect(existing);
 
 	applyRowHighlight();
-	_list->updateGeometry();  // row set/text changed the content width; let the layout/splitter re-fit
+	_list->updateGeometry();
 }
 
 void LabelSidebar::applyRowHighlight()
@@ -156,24 +146,23 @@ void LabelSidebar::applyRowHighlight()
 		const bool active = id == AllLabelId ? _activeLabelIds.isEmpty() : _activeLabelIds.contains(id);
 		item->setData(LabelRowDelegate::ActiveRole, active);
 	}
-	_list->viewport()->update();   // repaint with the new active flags (the delegate reads ActiveRole)
+	_list->viewport()->update();
 }
 
 void LabelSidebar::onItemClicked(QListWidgetItem* item)
 {
 	if (item->data(LabelRowDelegate::DividerRole).toBool())
-		return;   // the separator isn't a filter (also disabled, so this shouldn't be called at all)
+		return;
 	const LabelId id = item->data(kLabelIdRole).value<LabelId>();
 	if (id == AllLabelId)
 	{
-		// If 'All' is already applied - don't emit a change (there was none)
 		if (_activeLabelIds.empty())
 			return;
 
-		_activeLabelIds.clear();           // "All" clears the filter
+		_activeLabelIds.clear();
 	}
 	else if (!_activeLabelIds.remove(id))
-		_activeLabelIds.insert(id);        // toggle this label in/out of the filter
+		_activeLabelIds.insert(id);
 
 	applyRowHighlight();
 	emit filterChanged();
@@ -186,7 +175,7 @@ void LabelSidebar::showRowContextMenu(const QPoint& pos)
 		return;
 	const LabelId labelId = item->data(kLabelIdRole).value<LabelId>();
 	if (labelId == AllLabelId || labelId == Catalog::BestLabelId)
-		return;  // "All" and the virtual Best aren't user-managed
+		return;
 
 	QMenu menu(this);
 	menu.addAction(tr("Rename..."), this, [this, labelId] { emit renameLabelRequested(labelId); });
@@ -203,14 +192,14 @@ QList<LabelId> LabelSidebar::activeLabelIds() const
 
 bool LabelSidebar::isAndMode() const
 {
-	return _andOrToggle->currentIndex() == 1;   // segment 1 == AND
+	return _andOrToggle->currentIndex() == 1;
 }
 
 void LabelSidebar::setActiveFilter(const QList<LabelId>& labelIds, bool andMode)
 {
 	_activeLabelIds = QSet<LabelId>(labelIds.cbegin(), labelIds.cend());
 
-	_andOrToggle->setCurrentIndex(andMode ? 1 : 0);   // silent; the caller refreshes the grid
+	_andOrToggle->setCurrentIndex(andMode ? 1 : 0);
 
 	applyRowHighlight();
 }

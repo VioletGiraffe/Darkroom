@@ -10,41 +10,9 @@
 
 #include <algorithm>
 
-// --- Integrity check -------------------------------------------------------------------------------------
-//
-// Compares the catalog model against what's on disk. Two directions: (A) per entry - is this entry's backing
-// intact? (grids below); (B) on-disk content no entry claims - a whole video frame folder, or a stray image
-// file under Photos/ - surfaced by the "untracked" walk lower down.
-//
-// (A) VIDEO  <folder> = frame folder. Cell = verdict; columns are what the folder holds, rows the split flag.
-//            preview/ is the card's normal render source (both rows); real frames are the deliverable, due once split.
-//
-//     | split       | frames+preview | preview only   | frames only      | empty / gone
-//     |-------------|----------------|----------------|------------------|---------------------
-//     | split=true  | ok             | NO FRAMES      | NO PREVIEW       | NO FRAMES+NO PREVIEW
-//     | split=false | STALE FLAG     | ok             | STALE+NO PREVIEW | NO PREVIEW
-//
-//       NO FRAMES  = extractedFramesMissing() - the deliverable is gone (source present -> re-import, else remove)
-//       NO PREVIEW = previewMissing() - preview/ gone; the card falls back to the real frames, or to a placeholder if there are none
-//       STALE FLAG = splitFlagStale() - real frames exist but entry still marked preview-only
-//     + source missing (overlays ANY cell): source unavailable - frames may be intact, but re-extract/re-import
-//       is blocked, and a not-yet-split entry can never complete its split.
-//
-// (A) PHOTO  the file IS the item (no preview, no frames; the card decodes it). Only the source file matters:
-//
-//     |            | present | missing
-//     |------------|---------|-------------------------------------------------
-//     | owned      | ok      | LOST - the library's own file (was <root>/Photos/<label>)
-//     | referenced | ok      | GONE - external file moved or unmounted
-//
-// Overlay (optional, any entry): sourcePath exists but no longer matches the recorded MediaId (size differs)
-//   -> the source was replaced by a different file. Needs a per-entry stat; not done by default.
-//
-// Status: all VIDEO verdicts above are implemented (each non-healthy video emits one MediaIssue carrying the
-// flags that hold). PHOTO entries emit a PhotoIssue when the source file is missing (owned -> LOST, referenced
-// -> GONE). (B) untracked covers both media kinds: a video frame folder no entry claims (UntrackedFolder), and
-// an image file under Photos/<label> that no entry claims as its source (UntrackedPhoto).
-// ---------------------------------------------------------------------------------------------------------
+// Video verdicts are independent: a completed split needs real frames, every video needs a preview, and real
+// frames behind a preview-only flag make that flag stale. Source absence overlays any combination. A photo has
+// only its source file. The final disk walk reports frame folders and owned photos no entry claims.
 
 namespace CatalogIntegrity {
 
@@ -52,10 +20,7 @@ IntegrityReport scan(const Catalog& catalog, const QString& rootFolder)
 {
 	IntegrityReport report;
 
-	// Phases 1 + 2 in one pass over the model: record a per-entry issue for anything non-healthy, and collect the
-	// disk facts the untracked walk needs - every entry's folder (to skip claimed video folders) and every entry's
-	// source file (to skip claimed photo files). Both keyed by pathComparisonKey so a case difference between the
-	// stored and on-disk path still matches.
+	// Collect issues and the case-insensitive claimed paths needed by the untracked walk in one model pass.
 	QSet<QString> knownFolders;
 	QSet<QString> trackedSources;
 	for (const auto& [id, entry] : catalog.mediaItems().asKeyValueRange())
@@ -66,15 +31,11 @@ IntegrityReport scan(const Catalog& catalog, const QString& rootFolder)
 
 		if (entry.type == Catalog::MediaType::Photo)
 		{
-			// A photo is source-only (the card decodes the file itself) - no frames or preview to probe. Its
-			// sole failure is the file going missing: owned -> LOST, referenced -> GONE.
 			if (entry.sourcePath.isEmpty() || !QFileInfo::exists(entry.sourcePath))
 				report.photoIssues.push_back({ id, entry.sourcePath, entry.referenced });
 			continue;
 		}
 
-		// Probe the entry's on-disk backing; record a MediaIssue for anything non-healthy. The verdicts
-		// (no frames / no preview / stale flag / source missing) are orthogonal - see the state grid above.
 		MediaIssue issue;
 		issue.id                = id;
 		issue.folder            = entry.folder;
@@ -87,15 +48,12 @@ IntegrityReport scan(const Catalog& catalog, const QString& rootFolder)
 			report.issues.push_back(issue);
 	}
 
-	// Untracked - on-disk content no entry claims. forEachFolder yields the second level: for a normal label
-	// storage folder that's a video frame folder; for the reserved Photos folder it's a <label> dir whose untracked
-	// units are the image FILES inside (owned photos), not the folder itself.
+	// forEachFolder yields video frame folders, except under Photos where it yields label directories.
 	forEachFolder(rootFolder, [&](const QString& storageFolder, const QString& folderPath) {
 		if (storageFolder.compare(Catalog::PhotosDirectoryName.toString(), Qt::CaseInsensitive) == 0)
 		{
 			const QString labelName = QFileInfo(folderPath).fileName();
-			// Owned photos may be any importable format (isSupportedImageFile - incl. webp/bmp), not only the frame
-			// formats in IMAGE_FILE_FILTERS, so scan by that predicate. Sorted for a stable, name-ordered report.
+			// Owned photos include formats outside the extracted-frame set.
 			QStringList photoFiles = collectFilesInDirectory(folderPath, /*recursive=*/false, isSupportedImageFile);
 			std::ranges::sort(photoFiles, &NaturalSort::lessCaseSensitive);
 			for (const QString& file : photoFiles)
@@ -106,7 +64,7 @@ IntegrityReport scan(const Catalog& catalog, const QString& rootFolder)
 		if (knownFolders.contains(pathComparisonKey(folderPath)))
 			return;
 		if (listFrameImageFiles(QDir(folderPath)).isEmpty())
-			return;  // an empty/junk dir, not a video the catalog is missing
+			return;
 		report.untracked.push_back({ folderPath });
 	});
 

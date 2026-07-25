@@ -63,25 +63,22 @@
 
 namespace Settings {
 	constexpr const char* PauseOnSeek  = "VideoPlayer/PauseOnSeek";
-	constexpr const char* Volume       = "VideoPlayer/Volume"; // UI slider position, 0..100 (perceptual)
+	constexpr const char* Volume       = "VideoPlayer/Volume";
 	constexpr const char* Muted        = "VideoPlayer/Muted";
-	constexpr const char* LastFrameExtractionMode   = "VideoPlayer/LastFrameExtractionMode";   // "library" or "folder"; unset = no extraction done yet
+	constexpr const char* LastFrameExtractionMode   = "VideoPlayer/LastFrameExtractionMode";
 	constexpr const char* LastFrameExtractionFolder = "VideoPlayer/LastFrameExtractionFolder";
 }
 
 namespace Defaults {
 	constexpr bool PauseOnSeek = true;
-	constexpr int  Volume      = 100; // full, on the 0..100 UI scale
+	constexpr int  Volume      = 100;
 	constexpr bool Muted       = false;
 }
 
 namespace {
-// Item-data roles under which a saved-loop combo entry stores its interval endpoints (ms), optional name, and
-// playback speed (0 for legacy loops saved before the speed attribute existed).
+// A zero speed preserves legacy loops saved before speed became an attribute.
 enum LoopItemDataRole { LoopStartRole = Qt::UserRole, LoopEndRole = Qt::UserRole + 1, LoopNameRole = Qt::UserRole + 2, LoopSpeedRole = Qt::UserRole + 3 };
 
-// A saved loop's dropdown label: optional name first, then the start as a clock time and the duration as
-// fractional seconds to 1 digit, then the playback speed when it isn't 1× (e.g. "warmup   0:12 + 2.3s @2×").
 QString formatLoopLabel(qint64 startMs, qint64 endMs, const QString& name, double speed)
 {
 	const QString start = QTime::fromMSecsSinceStartOfDay(static_cast<int>(startMs)).toString(startMs >= 3600000 ? "h:mm:ss" : "m:ss");
@@ -91,11 +88,9 @@ QString formatLoopLabel(qint64 startMs, qint64 endMs, const QString& name, doubl
 	return name.isEmpty() ? label : name + "   " + label;
 }
 
-// Settings::LastFrameExtractionMode values.
 constexpr const char* ExtractToLibraryMode = "library";
 constexpr const char* ExtractToFolderMode  = "folder";
 
-// Volume-slider units (0..100) changed per wheel notch over the video.
 constexpr int VolumeWheelStep = 5;
 
 constexpr qint64 MaxOscillationDurationMs = 30000;
@@ -670,25 +665,22 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	const QSettings settings;
 
 	_instances.push_back(this);
-	// Initialize Player & Output
 	_videoWidget = new QVideoWidget(this);
 	_player = new QMediaPlayer(this);
 	_audioOutput = new QAudioOutput(this);
 	_player->setVideoOutput(_videoWidget);
-	_player->setAudioOutput(_audioOutput); // Qt6 QMediaPlayer is silent until an audio sink is attached
+	_player->setAudioOutput(_audioOutput);
 	_player->setSource(QUrl::fromLocalFile(videoPath));
 	_oscillatingPlayback = std::make_unique<OscillatingPlayback>(*this);
 
 	_videoWidget->installEventFilter(this);
 
-	// Build Layout Structure
 	QWidget* centralWidget = new QWidget(this);
 	QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
 	mainLayout->setContentsMargins(4, 0, 4, 4);
 	mainLayout->setSpacing(0);
 	mainLayout->addWidget(_videoWidget, 1);
 
-	// Controls layout (Slider + Text)
 	QHBoxLayout* controlsLayout = new QHBoxLayout();
 	controlsLayout->setSpacing(6);
 	_seekSlider = new MarkerSlider(Qt::Horizontal, this);
@@ -702,8 +694,6 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 
 	_pauseOnSeek = settings.value(Settings::PauseOnSeek, Defaults::PauseOnSeek).toBool();
 
-	// Applies a speed to the player and oscillation, without persisting. Speed is remembered per video, so only
-	// an explicit user pick (the combo handler below) writes it; restore and loop activation apply without saving.
 	const auto applySpeed = [this](double speed) {
 		_player->setPlaybackRate(speed);
 		_oscillatingPlayback->setMaximumSpeed(speed);
@@ -713,8 +703,6 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 			return;
 		const double speed = speedCombo->itemData(index).toDouble();
 		applySpeed(speed);
-		// Remember this video's speed, but store nothing for the 1× default - drop any override so untouched
-		// (and reverted) videos carry no metadata at all.
 		auto writer = _library.metadataStore().beginBatch();
 		if (qAbs(speed - 1.0) < 0.001)
 			writer.removeField(_mediaId, u"playbackSpeed");
@@ -722,10 +710,6 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 			writer.set(_mediaId, u"playbackSpeed", speed);
 	});
 
-	// Programmatically selects the combo entry nearest to a target speed (for restore and loop activation) and
-	// applies it, blocking the change signal so the apply happens exactly once (and does not persist) even when
-	// the index is unchanged. A non-positive target is "unset" and left alone, so legacy saved loops (no stored
-	// speed) keep the current one.
 	const auto selectSpeed = [speedCombo, applySpeed](double speed) {
 		if (!(speed > 0))
 			return;
@@ -747,8 +731,6 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 		applySpeed(speedCombo->itemData(nearest).toDouble());
 	};
 
-	// Restore this video's remembered speed (absent/≤0 means never customized → default 1.0×). Passing 1.0
-	// explicitly (rather than letting selectSpeed no-op on ≤0) keeps the combo and player in sync at 1.0×.
 	{
 		const double storedSpeed = _library.metadataStore().get(_mediaId, u"playbackSpeed").toDouble();
 		selectSpeed(storedSpeed > 0 ? storedSpeed : 1.0);
@@ -762,8 +744,6 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 		QSettings{}.setValue(Settings::PauseOnSeek, checked);
 	});
 
-	// Volume: the slider is a perceptual 0..100 position; the audio device wants a linear gain, so map through
-	// QAudio::convertVolume. Mute is an independent flag on the sink and leaves the volume position untouched.
 	_volumeSlider = new QSlider(Qt::Horizontal, this);
 	_volumeSlider->setRange(0, 100);
 	_volumeSlider->setFixedWidth(90);
@@ -781,7 +761,6 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 		                    &Theme::ThemeColors::TextPrimary));
 	};
 
-	// Restore persisted volume/mute directly; the handlers below are wired afterwards, so this doesn't re-persist.
 	{
 		const int savedVolume = settings.value(Settings::Volume, Defaults::Volume).toInt();
 		_userMuted = settings.value(Settings::Muted, Defaults::Muted).toBool();
@@ -803,8 +782,6 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 		QSettings{}.setValue(Settings::Muted, muted);
 	});
 
-	// Loop controls. A/B/Clear define the current ("live") loop; the combo holds this video's saved loops
-	// (persisted in MetadataStore), and selecting one makes it the active loop.
 	auto* setLoopStartButton = new QPushButton("A", this);
 	auto* setLoopEndButton = new QPushButton("B", this);
 	auto* clearLoopButton = new QPushButton(tr("Clear"), this);
@@ -815,7 +792,7 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 
 	auto* loopCombo = new QComboBox(this);
 	loopCombo->setToolTip(tr("Saved loops for this video"));
-	loopCombo->addItem(tr("No loop")); // index 0: placeholder for "no saved loop selected"
+	loopCombo->addItem(tr("No loop"));
 	auto* saveLoopButton = new QPushButton(tr("Save"), this);
 	auto* renameLoopButton = new QPushButton(tr("Rename"), this);
 	auto* deleteLoopButton = new QPushButton(tr("Delete"), this);
@@ -837,7 +814,6 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	_oscillationCurveCombo->setCurrentIndex(_oscillationCurveCombo->findData(savedCurveSetting));
 	_oscillatingPlayback->setCurve(savedCurve);
 
-	// Shared loop-control helpers.
 	const auto activateLoop = [this, setLoopStartButton, setLoopEndButton, selectSpeed](qint64 start, qint64 end, double speed) {
 		exitOscillatingPlayback();
 		_loopStart = start;
@@ -846,8 +822,8 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 		_seekSlider->setMarkerB(static_cast<int>(end));
 		setLoopStartButton->setChecked(true);
 		setLoopEndButton->setChecked(true);
-		selectSpeed(speed);  // a stored non-1× loop speed becomes the active speed; legacy loops (0) keep the current one
-		_player->setPosition(start);  // rewind so looping starts now, rather than after the playhead drifts past the end
+		selectSpeed(speed);
+		_player->setPosition(start);
 		updateOscillationAvailability();
 	};
 	const auto clearLoop = [this, setLoopStartButton, setLoopEndButton] {
@@ -869,7 +845,7 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	};
 	const auto persistIntervals = [this, loopCombo] {
 		QJsonArray array;
-		for (int i = 1; i < loopCombo->count(); ++i) // skip index 0 ("No loop")
+		for (int i = 1; i < loopCombo->count(); ++i)
 		{
 			QJsonObject object;
 			object.insert("start", loopCombo->itemData(i, LoopStartRole).toLongLong());
@@ -878,9 +854,8 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 			object.insert("speed", loopCombo->itemData(i, LoopSpeedRole).toDouble());
 			array.append(object);
 		}
-		_library.metadataStore().beginBatch().set(_mediaId, u"intervals", array);  // single write; the temporary Writer flushes right here
+		_library.metadataStore().beginBatch().set(_mediaId, u"intervals", array);
 	};
-	// Optional-name prompt shared by save-new and rename; nullopt only when cancelled (empty string = unnamed).
 	const auto promptLoopName = [this](const QString& title, const QString& initial) -> std::optional<QString> {
 		bool ok = false;
 		const QString name = QInputDialog::getText(this, title, tr("Loop name (optional):"), QLineEdit::Normal, initial, &ok).trimmed();
@@ -889,7 +864,6 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 		return name;
 	};
 
-	// Load this video's saved loops into the combo without firing the activation handler wired below.
 	{
 		const QSignalBlocker blocker{ loopCombo };
 		const QJsonArray saved = _library.metadataStore().get(_mediaId, u"intervals").toArray();
@@ -920,10 +894,9 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	connect(clearLoopButton, &QPushButton::clicked, this, [loopCombo, clearLoop] {
 		clearLoop();
 		const QSignalBlocker blocker{ loopCombo };
-		loopCombo->setCurrentIndex(0); // deselect any saved loop without re-clearing via the handler
+		loopCombo->setCurrentIndex(0);
 	});
 
-	// Selecting a saved loop activates it; selecting "No loop" (index 0) clears the live loop.
 	connect(loopCombo, &QComboBox::currentIndexChanged, this, [loopCombo, activateLoop, clearLoop](int index) {
 		if (index <= 0)
 		{
@@ -936,20 +909,19 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	});
 	connect(saveLoopButton, &QPushButton::clicked, this, [this, loopCombo, speedCombo, addIntervalItem, persistIntervals, promptLoopName] {
 		if (!hasAbInterval())
-			return; // nothing valid to save
+			return;
 		const std::optional<QString> name = promptLoopName(tr("Save loop"), {});
 		if (!name)
-			return; // cancelled
+			return;
 		const int index = addIntervalItem(_loopStart, _loopEnd, *name, speedCombo->currentData().toDouble());
 		persistIntervals();
-		loopCombo->setCurrentIndex(index); // reflect the saved loop as the active selection
+		loopCombo->setCurrentIndex(index);
 	});
 	connect(deleteLoopButton, &QPushButton::clicked, this, [loopCombo, persistIntervals] {
 		const int index = loopCombo->currentIndex();
 		if (index <= 0)
 			return;
-		// Block signals across the removal: removing the current item would otherwise auto-select (and
-		// activate) a neighbour. The live loop is left as-is; only the saved entry is removed.
+		// Removing the current item would otherwise activate its neighbour.
 		const QSignalBlocker blocker{ loopCombo };
 		loopCombo->removeItem(index);
 		loopCombo->setCurrentIndex(0);
@@ -959,10 +931,10 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	connect(renameLoopButton, &QPushButton::clicked, this, [loopCombo, promptLoopName, persistIntervals] {
 		const int index = loopCombo->currentIndex();
 		if (index <= 0)
-			return; // "No loop" selected - nothing to rename
+			return;
 		const std::optional<QString> name = promptLoopName(tr("Rename loop"), loopCombo->itemData(index, LoopNameRole).toString());
 		if (!name)
-			return; // cancelled
+			return;
 		const qint64 start = loopCombo->itemData(index, LoopStartRole).toLongLong();
 		const qint64 end   = loopCombo->itemData(index, LoopEndRole).toLongLong();
 		const double speed = loopCombo->itemData(index, LoopSpeedRole).toDouble();
@@ -971,7 +943,6 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 		persistIntervals();
 	});
 
-	// Keyboard equivalents for the loop endpoint buttons; route through click() to reuse their handlers.
 	QShortcut* setLoopStartShortcut = new QShortcut(QKeySequence(Qt::Key_BracketLeft), this);
 	connect(setLoopStartShortcut, &QShortcut::activated, setLoopStartButton, &QPushButton::click);
 	QShortcut* setLoopEndShortcut = new QShortcut(QKeySequence(Qt::Key_BracketRight), this);
@@ -984,7 +955,6 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	controlsLayout->addWidget(muteButton);
 	controlsLayout->addWidget(_volumeSlider);
 
-	// Loop controls live on their own row to keep the seek row uncluttered.
 	QHBoxLayout* loopLayout = new QHBoxLayout();
 	loopLayout->setSpacing(6);
 	loopLayout->addWidget(new QLabel(tr("Loop:"), this));
@@ -1017,18 +987,14 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 
 	setCentralWidget(centralWidget);
 
-	// Configure Looping
 	_player->setLoops(QMediaPlayer::Infinite);
 
-	// Progress Tracking & Seeking Connections
 	connect(_player, &QMediaPlayer::durationChanged, this, [this](qint64 duration) {
 		_seekSlider->setRange(0, static_cast<int>(duration));
 		updateOscillationAvailability();
 	});
 
 	connect(_player, &QMediaPlayer::positionChanged, this, [this](qint64 position) {
-		// A-B loop: jump back to the start once playback reaches the end marker.
-		// The follow-up positionChanged from the seek refreshes the slider/label below.
 		if (!_oscillatingPlayback->active() && hasAbInterval() && position >= _loopEnd)
 		{
 			_player->setPosition(_loopStart);
@@ -1038,8 +1004,7 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 			updatePlaybackPositionUi(position);
 	});
 
-	// Mouse drag: always pause on press, resume on release if pause-on-seek is off.
-	// Keyboard seeks don't fire sliderPressed/Released, so valueChanged handles them.
+	// Keyboard seeks do not emit sliderPressed/sliderReleased.
 	connect(_seekSlider, &QAbstractSlider::sliderPressed, this, [this] {
 		_wasPlayingBeforeSeek = isPlaybackActive();
 		setPlaybackActive(false);
@@ -1056,17 +1021,14 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 			setPlaybackActive(true);
 	});
 
-	// Resize to the video size
 	connect(_videoWidget->videoSink(), &QVideoSink::videoSizeChanged, this, [this] {
 		resizeAndMoveWindow();
 		updateOscillationAvailability();
 	});
 
-	// Spacebar Play/Pause Toggle
 	QShortcut* spaceShortcut = new QShortcut(QKeySequence(Qt::Key_Space), this);
 	connect(spaceShortcut, &QShortcut::activated, this, &VideoPlayerWindow::togglePlayPause);
 
-	// Escape leaves fullscreen if in it, otherwise closes the window.
 	QShortcut* closeWindowShortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
 	connect(closeWindowShortcut, &QShortcut::activated, this, [this] {
 		if (isFullScreen())
@@ -1078,15 +1040,12 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	QShortcut* fullScreenShortcut = new QShortcut(QKeySequence(Qt::Key_F), this);
 	connect(fullScreenShortcut, &QShortcut::activated, this, &VideoPlayerWindow::toggleFullScreen);
 
-	// 'M' toggles mute via the button, so its handler (icon + persistence) runs.
 	QShortcut* muteShortcut = new QShortcut(QKeySequence(Qt::Key_M), this);
 	connect(muteShortcut, &QShortcut::activated, muteButton, &QAbstractButton::toggle);
 
-	// 'E' repeats the last frame extraction at the current position.
 	QShortcut* extractFrameShortcut = new QShortcut(QKeySequence(Qt::Key_E), this);
 	connect(extractFrameShortcut, &QShortcut::activated, this, [this] { repeatLastExtraction(currentPlaybackPosition()); });
 
-	// Start playback
 	updateOscillationAvailability();
 	setPlaybackActive(true);
 }
@@ -1106,7 +1065,7 @@ void VideoPlayerWindow::restartAll()
 		win->_player->setPosition(0);
 	}
 
-	// Small delay to ensure all players have reset before starting playback again
+	// Let every paused seek settle before restarting.
 	QTimer::singleShot(100, [] {
 		for (VideoPlayerWindow* win : _instances)
 		{
@@ -1168,7 +1127,7 @@ void VideoPlayerWindow::resizeAndMoveWindow()
 		resize(qMax(1, available.width() - decorationSize.width()), qMax(1, available.height() - decorationSize.height()));
 	}
 
-	constexpr int preferredZoneOrder[]{ 1, 0, 2 };  // center wins ties, followed by left and right
+	constexpr int preferredZoneOrder[]{ 1, 0, 2 };
 	QRect bestFrame;
 	int64_t leastOverlap = std::numeric_limits<int64_t>::max();
 	for (const int zone : preferredZoneOrder)
@@ -1241,7 +1200,6 @@ bool VideoPlayerWindow::buildOscillationRequest(OscillationRequest* request, QSt
 		return false;
 	}
 
-	// Without an A-B interval the whole video is oscillated.
 	const qint64 startMs = hasAbInterval() ? _loopStart : 0;
 	const qint64 endMs = hasAbInterval() ? _loopEnd : duration;
 	if (endMs > duration)
@@ -1435,7 +1393,6 @@ void VideoPlayerWindow::toggleFullScreen()
 
 bool VideoPlayerWindow::eventFilter(QObject* watched, QEvent* event)
 {
-	// Left click pauses/plays, right click opens the context menu.
 	if (event->type() == QEvent::MouseButtonRelease)
 	{
 		const auto* mouseEvent = static_cast<const QMouseEvent*>(event);
@@ -1443,10 +1400,9 @@ bool VideoPlayerWindow::eventFilter(QObject* watched, QEvent* event)
 			togglePlayPause();
 		else if (mouseEvent->button() == Qt::RightButton)
 			showContextMenu(mouseEvent->globalPosition().toPoint());
-		return true; // Consume the event so it doesn't propagate to the widget
+		return true;
 	}
 
-	// Wheel over the video adjusts volume through the slider, which owns the apply-and-persist logic.
 	if (event->type() == QEvent::Wheel)
 	{
 		const int notches = static_cast<const QWheelEvent*>(event)->angleDelta().y() / 120;
@@ -1460,8 +1416,7 @@ bool VideoPlayerWindow::eventFilter(QObject* watched, QEvent* event)
 
 void VideoPlayerWindow::showContextMenu(const QPoint& globalPos)
 {
-	// Captured at click time: playback may keep running while the menu is open, and the frame the user
-	// right-clicked is the one they mean.
+	// Playback may continue while the menu is open; preserve the clicked frame.
 	const qint64 timestampMs = currentPlaybackPosition();
 
 	QMenu menu(this);
@@ -1473,8 +1428,6 @@ void VideoPlayerWindow::showContextMenu(const QPoint& globalPos)
 			extractFrameToFolder(timestampMs, folder);
 	});
 
-	// Third item: repeat the last extraction with no picker, its label naming that destination; enabled only
-	// once one has run.
 	const QString lastMode   = QSettings{}.value(Settings::LastFrameExtractionMode).toString();
 	const QString lastFolder = QSettings{}.value(Settings::LastFrameExtractionFolder).toString();
 	QString repeatText;
@@ -1483,7 +1436,6 @@ void VideoPlayerWindow::showContextMenu(const QPoint& globalPos)
 	else if (lastMode == ExtractToFolderMode && !lastFolder.isEmpty())
 		repeatText = tr("Extract frame → %1").arg(QDir::toNativeSeparators(lastFolder));
 
-	// "\tE" is a display-only hint in the menu's shortcut column; the actual key is the constructor's QShortcut.
 	QAction* repeatAction = menu.addAction((repeatText.isEmpty() ? tr("Extract frame (last used)") : repeatText) + "\tE",
 		this, [this, timestampMs] { repeatLastExtraction(timestampMs); });
 	repeatAction->setEnabled(!repeatText.isEmpty());
@@ -1505,17 +1457,14 @@ void VideoPlayerWindow::repeatLastExtraction(qint64 timestampMs)
 		if (!lastFolder.isEmpty())
 			extractFrameToFolder(timestampMs, lastFolder);
 	}
-	// No prior extraction (or a folder setting since cleared) - nothing to repeat.
 }
 
 QString VideoPlayerWindow::extractFrameInto(qint64 timestampMs, const QString& destinationFolder)
 {
-	// Format and quality follow the full-split settings, so a player-extracted frame matches split output.
 	const bool tiff       = QSettings{}.value(Settings::UseTiff, Defaults::UseTiff).toBool();
 	const int jpegQuality = QSettings{}.value(Settings::JpegQuality, Defaults::JpegQuality).toInt();
 
-	// The timestamp in the name makes each extracted instant a distinct file (and MediaId); dots instead of
-	// colons because Windows forbids colons in file names.
+	// Windows filenames cannot use colon-separated timestamps.
 	const QString timestampText = QTime::fromMSecsSinceStartOfDay(static_cast<int>(timestampMs)).toString("h.mm.ss.zzz");
 	const QString filePath = destinationFolder + '/' + QFileInfo{ _videoPath }.completeBaseName() + ' ' + timestampText + (tiff ? ".tif" : ".jpg");
 
@@ -1561,8 +1510,7 @@ void VideoPlayerWindow::extractFrameToLibrary(qint64 timestampMs)
 		return;
 	}
 
-	// Extract into a temp dir under the library root rather than the system temp, so the Move below is a
-	// same-drive rename, never a cross-drive copy.
+	// Keep the final Move on the library's filesystem.
 	QTemporaryDir tempDir(_library.rootFolder() + "/.extract-XXXXXX");
 	if (!tempDir.isValid())
 	{

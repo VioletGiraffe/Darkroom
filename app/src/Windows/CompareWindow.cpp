@@ -20,24 +20,19 @@ CompareWindow::CompareWindow(const QStringList& folderPaths, QWidget* parent) : 
 	setWindowTitle(tr("Compare Frames"));
 	resize(1200, COMPARE_CELL_HEIGHT + 60);
 
-	// Collect sorted frame lists for each folder.
 	for (const QString& folder : folderPaths) {
 		QDir dir(folder);
 		QStringList files = listFrameImageFiles(dir);
-		// Prepend the full path so ThumbnailWidget can load them directly.
 		for (QString& f : files)
 			f = dir.filePath(f);
 		_folderFrames.push_back(std::move(files));
 	}
 
-	// The slider spans 0 .. maxFrameCount-1 (the longest folder); a folder with no frame at the current
-	// index just shows an empty cell (see loadCurrentFrame).
 	int maxFrameCount = 0;
 	for (const QStringList& frames : std::as_const(_folderFrames))
 		maxFrameCount = qMax(maxFrameCount, static_cast<int>(frames.size()));
 
 	QHBoxLayout* thumbnailRow = new QHBoxLayout();
-	// No initial paths, no size required here - the first load will happen on resize
 	for (int i = 0; i < folderPaths.size(); ++i)
 	{
 		_thumbnailWidgets.push_back(new ThumbnailWidget(QString{}, QString{}, 0, this));
@@ -62,7 +57,6 @@ CompareWindow::CompareWindow(const QStringList& folderPaths, QWidget* parent) : 
 	mainLayout->addLayout(thumbnailRow, 1);
 	mainLayout->addLayout(sliderRow, 0);
 
-	// Debounce timer: single-shot, fires after DEBOUNCE_MS of slider inactivity.
 	_debounceTimer = new QTimer(this);
 	_debounceTimer->setSingleShot(true);
 	connect(_debounceTimer, &QTimer::timeout, this, &CompareWindow::loadCurrentFrame);
@@ -113,6 +107,6 @@ void CompareWindow::loadCurrentFrame()
 			widget->loadFrame(framePath, caption);
 		}
 		else
-			widget->loadFrame(QString{}, QString{}); // Clear the thumbnail if there's no matching frame index
+			widget->loadFrame(QString{}, QString{});
 	}
 }

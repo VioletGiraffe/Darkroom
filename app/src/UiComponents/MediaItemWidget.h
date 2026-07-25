@@ -19,7 +19,6 @@ class ThumbnailWidget;
 
 class MediaItemWidget final : public QWidget {
 public:
-	// maxImageSize bounds the thumbnail's preview area; the actual size best-fits the loaded image within it.
 	MediaItemWidget(
 		QSize maxImageSize, const QStringList& previewPaths, const QString& label,
 		const MediaId& mediaId,
@@ -33,56 +32,37 @@ public:
 
 	[[nodiscard]] QSize sizeHint() const override;
 
-	// Card chrome (frame border + inner padding) reserved around the thumbnail canvas on every side. Public so
-	// the grid can size cards to tile together (see videoCanvasWidthForTiling).
+	// Public so the grid can solve mixed-card tiling.
 	static constexpr int CardBorder = 1;
 	static constexpr int CardPadding = 6;
 	static constexpr int CardChromePerSide = CardBorder + CardPadding;
 
-	// A video card shows `frameCount` preview frames in a horizontal strip; a photo card shows one square image
-	// (side = photoSide). Returns the video card's thumbnail-canvas width chosen so the video card spans exactly
-	// `frameCount` photo-card columns plus the gaps between them - i.e. (video width + gap) == frameCount x
-	// (photo width + gap). This makes mixed video/photo cards align on a single column grid in the media grid's
-	// flow layout. `gridGap` is the grid's item spacing (QListView::spacing()).
+	// Solves (video card width + gap) == frameCount * (photo card width + gap).
 	[[nodiscard]] inline static constexpr int videoCanvasWidthForTiling(int photoSide, int frameCount, int gridGap)
 	{
-		// A card's width is its canvas + 2*CardChromePerSide; solving the tiling equation above for the canvas.
 		return frameCount * photoSide + (frameCount - 1) * (gridGap + 2 * CardChromePerSide);
 	}
 
-	// The card's stable identity (source video name + size). Carried so label ops and the label-drop target
-	// (see setOnLabelDropped) address the video directly. Invalid if the source video is missing.
 	[[nodiscard]] const MediaId& mediaId() const { return _mediaId; }
 
-	// Updates the card's caption (the "N:  name" label) without re-rendering its thumbnail.
 	void setLabel(const QString& label);
 
-	// Reflects a Best change made elsewhere (e.g. a context-menu toggle) on the card's star, without invoking the
-	// onToggleBest callback - the caller owns the Best state; this only syncs the visual.
+	// Updates the visual without invoking onToggleBest.
 	void setInBest(bool inBest);
 
-	// Sets the colored dots overlaid on the thumbnail (one per label the item carries, including Best). An
-	// empty list hides the overlay. Colors are computed by the caller (MainWindow) from the Catalog. `tooltip`
-	// is the card's whole-thumbnail tooltip, composed by the caller (a video's extraction state, then labels).
+	// Empty colors hide the overlay; the caller computes both colors and tooltip.
 	void setLabelDots(const std::vector<QColor>& colors, const QString& tooltip);
 
-	// Shows/hides a small top-right badge (a green contact-sheet grid icon) marking a video whose full frame set has
-	// been extracted - hidden while only preview frames exist, and never shown for photos (the caller gates it).
-	// See Catalog::isSplitIntoFrames.
 	void setFramesExtracted(bool extracted);
 
-	// Shows a small bottom-right overlay - a play triangle followed by the video's duration (M:SS, or H:MM:SS
-	// past an hour) - marking the card as a video. A non-positive ms hides it: a photo, or a video whose
-	// duration isn't known yet (see Catalog::durationMsForMediaItem).
+	// Non-positive duration hides the video overlay.
 	void setDuration(qint64 durationMs);
 
 	void setOnMiddleButtonClick(std::function<void()> onClick);
 
-	// See ThumbnailWidget::setOnMouseWheelCallback — Ctrl+wheel over the card delegates the zoom policy here.
 	void setOnMouseWheelCallback(std::function<void(int steps)> handler);
 
-	// Makes the card a drop target for a label dragged from the LabelSidebar: dropping invokes handler with
-	// the dropped label's id (the caller assigns it). Only set on grid cards; unset cards reject the drop.
+	// Unset cards reject label drops.
 	void setOnLabelDropped(std::function<void(const QString& labelId)> handler);
 
 protected:
@@ -92,23 +72,19 @@ protected:
 	void dropEvent(QDropEvent* event) override;
 
 private:
-	// Keeps the badge pinned to the thumbnail's top-right corner across resizes (unlike the top-left label
-	// dots, its position depends on the thumbnail's width).
 	void repositionFramesReadyBadge();
-	// Pins the duration overlay to the thumbnail's bottom-right corner across resizes (depends on both the
-	// thumbnail's size and the overlay's own, which varies with the duration text).
 	void repositionDurationBadge();
 
 private:
 	ThumbnailWidget*             _thumb = nullptr;
-	QWidget*                     _footer = nullptr;     // bottom row: star + dots + name (sibling of _thumb)
-	QPushButton*                 _starButton = nullptr; // Best toggle in the footer; setInBest() syncs its checked state
-	QLabel*                      _name = nullptr;       // elided, right-aligned item name in the footer
-	QWidget*                     _labelDots = nullptr;  // colored-dot strip (LabelDotStrip), child of _footer
-	QWidget*                     _framesReadyBadge = nullptr;   // top-right green "frames extracted" badge, child of _thumb
-	QWidget*                     _durationBadge = nullptr;      // bottom-right play-triangle + duration overlay, child of _thumb (shown for videos with a known duration)
+	QWidget*                     _footer = nullptr;
+	QPushButton*                 _starButton = nullptr;
+	QLabel*                      _name = nullptr;
+	QWidget*                     _labelDots = nullptr;
+	QWidget*                     _framesReadyBadge = nullptr;
+	QWidget*                     _durationBadge = nullptr;
 	MediaId                      _mediaId;
-	bool                         _filmStrip = false;    // video film-strip styling: reserves sprocket bands, so the corner badges lift clear of them
+	bool                         _filmStrip = false;
 	std::function<void()>               _onMiddleButtonClick;
 	std::function<void()>               _onDoubleClick;
 	std::function<void(QPoint)>         _onContextMenu;

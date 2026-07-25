@@ -20,15 +20,14 @@ class Library;
 class VideoPlayerWindow final : public QMainWindow
 {
 public:
-	// mediaId keys the saved loop intervals in MetadataStore; pass the catalog's id for a tracked video, or
-	// MediaId::fromFile(videoPath) for an ad-hoc one (a staging/untracked preview not in the catalog).
+	// mediaId keys per-video metadata; derive it from videoPath for ad-hoc playback.
 	VideoPlayerWindow(Library& library, const QString& videoPath, const MediaId& mediaId, QWidget* parent);
 	~VideoPlayerWindow() override;
 
 	static void restartAll();
 	static void closeAll();
 
-	// Convenience: opens a self-managing player window for the file as an ad-hoc playback (the MediaId is derived from the file, so an untracked/staged video works too)
+	// Opens a self-managing ad-hoc player.
 	static void createPlayerWindow(Library& library, const QString& videoPath, QWidget* parent);
 
 private:
@@ -41,7 +40,6 @@ private:
 	[[nodiscard]] qint64 currentPlaybackPosition() const;
 	[[nodiscard]] bool isPlaybackActive() const;
 	void setPlaybackActive(bool active);
-	// True while a usable A-B interval is set. When false, oscillation covers the whole video and no loop-back happens.
 	[[nodiscard]] bool hasAbInterval() const { return _loopStart >= 0 && _loopEnd > _loopStart; }
 	void exitOscillatingPlayback(bool restorePlaybackState = true);
 	void updatePlaybackPositionUi(qint64 position);
@@ -51,20 +49,15 @@ private:
 	[[nodiscard]] bool buildOscillationRequest(OscillationRequest* request, QString* error) const;
 	void onOscillationPrepared();
 	void onOscillationPositionChanged(qint64 position);
-	// `diagnostics` is ffmpeg's raw output, kept separate from `error` (the one-line reason) so it can be shown in a
-	// bounded scrolling area instead of stretching the message box; empty when the process said nothing.
+	// diagnostics is raw ffmpeg output for a bounded detail pane; error is the summary.
 	void onOscillationFailed(const QString& error, const QString& diagnostics, qint64 displayedPosition,
 		bool hasDisplayedPosition, bool shouldResumePlayback);
 
-	// The video's right-click menu: frame extraction (to a folder or into the library as an owned photo) and a
-	// fullscreen toggle.
 	void showContextMenu(const QPoint& globalPos);
 	void extractFrameToLibrary(qint64 timestampMs);
 	void extractFrameToFolder(qint64 timestampMs, const QString& folder);
-	// Replays the last extraction (library or folder, same destination) at timestampMs; no-op until one has run.
-	// Bound to the 'E' shortcut and the menu's "last used" item.
 	void repeatLastExtraction(qint64 timestampMs);
-	// The shared extraction step: runs ffmpeg, reports any failure. Returns the written file's path, empty on failure.
+	// Runs ffmpeg and reports failure; empty return means no file was written.
 	[[nodiscard]] QString extractFrameInto(qint64 timestampMs, const QString& destinationFolder);
 
 	bool eventFilter(QObject* watched, QEvent* event) override;
@@ -73,7 +66,7 @@ private:
 	static std::vector<VideoPlayerWindow*> _instances;
 
 	Library& _library;
-	MediaId _mediaId; // identity of the played source video; keys its saved loops in MetadataStore
+	MediaId _mediaId;
 	const QString _videoPath;
 
 	QMediaPlayer* _player = nullptr;
@@ -90,7 +83,6 @@ private:
 	bool _wasPlayingBeforeSeek = false;
 	bool _userMuted = false;
 
-	// A-B loop interval, in milliseconds; -1 means the respective endpoint is unset. See hasAbInterval().
 	qint64 _loopStart = -1;
 	qint64 _loopEnd = -1;
 };

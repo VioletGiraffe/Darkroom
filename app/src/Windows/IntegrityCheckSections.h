@@ -24,16 +24,6 @@
 #include <utility>
 #include <vector>
 
-// ============================================================================
-// Private implementation detail of IntegrityCheckDialog - included only by its .cpp. Header-only by design:
-// declarations first, out-of-line definitions below in the same file.
-// ============================================================================
-
-// Shared state for one issue row: its status label, its buttons, and whether it's been dealt with. Both the row's
-// own buttons and its section's blanket action resolve through close(), so a row settled either way updates once and
-// is skipped by the other. onClosed lets the section re-evaluate which blanket buttons still apply; reorderSection
-// sinks the settled row below its section's still-open ones. Rows are owned by IntegrityCheckSections::_rows, which
-// the dialog keeps alive as long as itself - so every handler capturing a ResolvableRow* dies no later than the row.
 struct ResolvableRow
 {
 	QLabel*                   statusLabel = nullptr;
@@ -42,19 +32,10 @@ struct ResolvableRow
 	std::function<void()>     onClosed;
 	std::function<void()>     reorderSection;
 
-	// Settles the row: rewrites its status (a resolved row is prefixed with a check; either way the text dims),
-	// disables its buttons, sinks it below the section's still-open rows, and lets the section re-evaluate its
-	// blanket buttons. resolved=false is the Skip path - dimmed and sunk like the rest, but without the check.
 	void close(const QString& status, bool resolved = true);
-	// Runs one resolution and, on success, closes the row (records successText, disables the row's buttons).
-	// Returns success so the caller - a single-row button, or a blanket driver - can react (warn, or tally).
 	bool tryResolve(const QString& successText, const std::function<bool()>& action);
 };
 
-// Builds the dialog's issue sections into the scroll-area content widget and services their button handlers:
-// one hairline-card row per finding with its own resolution buttons, plus per-section blanket actions that run
-// the same per-row callbacks in a loop. Owns the row state those handlers share, so it must outlive the buttons -
-// the dialog holds it as a member.
 class IntegrityCheckSections
 {
 public:
@@ -62,7 +43,6 @@ public:
 	                       QWidget* content, QVBoxLayout* contentLayout, QWidget* dialog);
 
 private:
-	// Per-section row state: the shared ResolvableRow plus what the section's blanket actions need per item.
 	struct AdoptRow        { ResolvableRow* row; QString filePath; };
 	struct VideoRow        { ResolvableRow* row; MediaId id; bool canReimport; bool canRegenerate; bool sourceMissing; };
 	struct MissingPhotoRow { ResolvableRow* row; MediaId id; bool referenced; };
@@ -72,79 +52,47 @@ private:
 	void buildVideoIssues(const CatalogIntegrity::IntegrityReport& report);
 	void buildMissingPhotos(const CatalogIntegrity::IntegrityReport& report);
 
-	// Adds one issue row (a hairline card holding the status label) and returns its layout for buttons plus the row state.
 	std::pair<QHBoxLayout*, ResolvableRow*> addRow(const QString& statusText);
-	// Creates one row button, adds it to the row's layout, and registers it so the row's close() disables it later.
 	static QPushButton* addRowButton(QHBoxLayout* rowLayout, ResolvableRow* row, const QString& text);
-	// A section header: the bold class caption on the left, its blanket-action buttons (appended by the caller)
-	// pushed to the right. Returns the header layout so the caller can add those buttons after the stretch.
 	QHBoxLayout* addSectionHeader(const QString& html);
 
-	// Wires a single-row action button: on click run the resolution; on success the row records it and disables
-	// (stays visible as a record of what happened); on failure warn and leave the row active so the user can retry.
-	// The blanket drivers reuse the very same callbacks but aggregate into one summary instead of warning per item.
 	void wireAction(QPushButton* button, ResolvableRow* row, const QString& successText, const QString& failureText,
 	                std::function<bool()> action);
-	// Wires a "browse then act" button (the untracked Register and the photo Locate share this shape): opens a file
-	// picker; if the user picked something, runs action(picked) and, on success, sets the row status from successFmt
-	// (a "...%1..." string filled with the picked path); on failure warns.
 	void wireBrowse(QPushButton* button, ResolvableRow* row, std::function<QString()> browse,
 	                std::function<bool(const QString&)> action, const QString& successFmt, const QString& failureText);
-	// A "Skip" button just acknowledges the row without acting - closes it so it reads as dealt-with for this session;
-	// it resurfaces on the next scan since nothing was changed.
 	static void wireSkip(QPushButton* skipButton, ResolvableRow* row);
 
-	// Opens a file picker for the user to manually point at a source video, starting near hint (a path that
-	// doesn't have to exist - only its directory is used) if given, else a sensible catalog-wide default.
 	QString browseForSourceVideo(const QString& hint) const;
-	// The photo counterpart (the referenced-photo Locate resolution): point at an image file, starting in hint's
-	// directory if given. The filter is built from the app-wide image extensions (IMAGE_FILE_FILTERS).
 	QString browseForSourcePhoto(const QString& hint) const;
 
-	// The batch analog of tryResolve: run a blanket action over rows. For each still-open row that `applies`, run the
-	// resolution; a success closes the row and counts toward done, a failure counts toward failed. The {done, failed}
-	// tally lets the driver compose its summary; rows re-enable their blanket buttons via onClosed.
 	template <class Row, class Applies, class Act>
 	static std::pair<int, int> runBlanket(std::vector<Row>& rows, Applies applies, Act act, const QString& successText);
 
-	// The blanket drivers' summary box: doneFmt.arg(done), plus a failedFmt.arg(failed) line when anything failed.
 	void showBlanketTally(const QString& title, const QString& doneFmt, int done, const QString& failedFmt, int failed) const;
 
-	// What locateAllByIdentity reports back: how the chosen folder's contents matched the still-open rows.
 	struct LocateTally { int relocated = 0; int unmatched = 0; int failed = 0; };
-	// The shared "Locate all" driver behind both the missing-photo and moved-source-video sections: ask for a folder,
-	// index every file under it that `filePredicate` accepts by its MediaId identity (name + size), then relink each
-	// still-open row that `applies` to the file carrying its identity. The moved file keeps that identity, so the
-	// match is exact - and it's the only signal left, since the original is gone (no content to compare against).
-	// Closes each relinked row; returns the tally, or nullopt if the user cancelled the folder pick. Refresh and
-	// summary wording stay at the call site (the two sections count photos vs videos and re-enable different buttons).
+	// A moved file can still be matched exactly by its name/size identity.
 	template <class Row, class Applies, class Relocate>
 	std::optional<LocateTally> locateAllByIdentity(std::vector<Row>& rows, Applies applies,
 	                                               const std::function<bool(const QString&)>& filePredicate, Relocate relocate,
 	                                               const QString& folderPrompt);
 
-	// The shared "Remove all" driver: destructive, so confirm with the count of still-open rows first (questionFmt and
-	// doneFmt are "...%1..." strings filled with it). Removal always succeeds - it only forgets the catalog record.
 	template <class Row>
 	void confirmAndRemoveAll(std::vector<Row>& rows, const QString& title, const QString& questionFmt, const QString& doneFmt);
 
 	const Catalog& _catalog;
 	IntegrityCheckDialog::Callbacks& _callbacks;
-	QWidget*     _dialog;   // parent for message boxes and file pickers
-	QWidget*     _content;  // the scroll-area content widget rows and headers are parented to
-	QVBoxLayout* _layout;   // its layout
-	QVBoxLayout* _currentRowsLayout = nullptr;  // the section being built: its own rows container, where addRow appends
+	QWidget*     _dialog;
+	QWidget*     _content;
+	QVBoxLayout* _layout;
+	QVBoxLayout* _currentRowsLayout = nullptr;
 	const QString _rowStyle;
 
-	std::deque<ResolvableRow>    _rows;  // deque: handlers hold ResolvableRow*, so addresses must be stable
+	std::deque<ResolvableRow>    _rows;  // Handlers retain row pointers; deque preserves their addresses.
 	std::vector<AdoptRow>        _untrackedPhotoRows;
 	std::vector<VideoRow>        _videoRows;
 	std::vector<MissingPhotoRow> _missingPhotoRows;
 };
-
-// ============================================================================
-// Definitions
-// ============================================================================
 
 inline void ResolvableRow::close(const QString& status, bool resolved)
 {
@@ -171,8 +119,6 @@ inline IntegrityCheckSections::IntegrityCheckSections(const Catalog& catalog, co
                                                       IntegrityCheckDialog::Callbacks& callbacks,
                                                       QWidget* content, QVBoxLayout* contentLayout, QWidget* dialog)
 	: _catalog(catalog), _callbacks(callbacks), _dialog(dialog), _content(content), _layout(contentLayout),
-	  // One issue per row, drawn as a hairline card (BorderSubtle - a passive separator, not an interactive
-	  // control) rather than the native StyledPanel bevel. One sheet string shared by every row.
 	  _rowStyle(QStringLiteral("QFrame#integrityRow { border: 1px solid %1; border-radius: %2px; }")
 		.arg(Theme::current().BorderSubtle).arg(Theme::ControlRadius))
 {
@@ -187,8 +133,7 @@ inline void IntegrityCheckSections::buildUntrackedFolders(const CatalogIntegrity
 	if (report.untracked.empty())
 		return;
 
-	// Registering an untracked folder needs a per-folder source pick (name alone can't safely identify the
-	// source video), so this class has no blanket action - only per-row Browse.
+	// Name alone cannot safely identify the source video for a blanket registration.
 	addSectionHeader(QObject::tr("<b>Untracked folders</b> - on disk, not in the catalog"));
 	for (const CatalogIntegrity::UntrackedFolder& u : report.untracked)
 	{
@@ -199,7 +144,6 @@ inline void IntegrityCheckSections::buildUntrackedFolders(const CatalogIntegrity
 
 		const QString folderPath = u.folderPath;
 
-		// The only resolution is to point at a source video, which registers the folder against it.
 		wireBrowse(browseButton, row,
 			[this, folderPath] { return browseForSourceVideo(folderPath); },
 			[this, folderPath](const QString& picked) { return _callbacks.registerRequested(folderPath, picked); },
@@ -219,7 +163,6 @@ inline void IntegrityCheckSections::buildUntrackedPhotos(const CatalogIntegrity:
 	QPushButton* addAllButton = new QPushButton(QObject::tr("Add all"), _content);
 	header->addWidget(addAllButton);
 
-	// Add all applies to any still-open row, so it stays enabled while one exists.
 	const auto refreshBlanket = [this, addAllButton] {
 		addAllButton->setEnabled(std::any_of(_untrackedPhotoRows.cbegin(), _untrackedPhotoRows.cend(),
 			[](const AdoptRow& r) { return !r.row->closed; }));
@@ -235,7 +178,6 @@ inline void IntegrityCheckSections::buildUntrackedPhotos(const CatalogIntegrity:
 
 		const QString filePath = p.filePath;
 
-		// The file already lives in its label's Photos dir, so adopting it is a one-click register as an owned photo.
 		wireAction(addButton, row, QObject::tr("Added to catalog."),
 			QObject::tr("Could not add - a file with the same name and size is already tracked elsewhere."),
 			[this, filePath] { return _callbacks.adoptPhotoRequested(filePath); });
@@ -244,8 +186,6 @@ inline void IntegrityCheckSections::buildUntrackedPhotos(const CatalogIntegrity:
 		_untrackedPhotoRows.push_back({ row, filePath });
 	}
 
-	// Add all: adopt every still-open untracked photo. Each already sits in its label's Photos dir, so this is
-	// just the row action run in a loop; a name+size clash counts as a failure and leaves that row open.
 	QObject::connect(addAllButton, &QPushButton::clicked, addAllButton, [this] {
 		const auto [added, failed] = runBlanket(_untrackedPhotoRows, [](const AdoptRow&) { return true; },
 			[this](AdoptRow& r) { return _callbacks.adoptPhotoRequested(r.filePath); }, QObject::tr("Added to catalog."));
@@ -271,9 +211,6 @@ inline void IntegrityCheckSections::buildVideoIssues(const CatalogIntegrity::Int
 	header->addWidget(regenerateAllButton);
 	header->addWidget(removeAllButton);
 
-	// Each blanket action stays enabled only while some open row still admits it: Remove applies to any open row;
-	// Locate to a row whose source is missing; Re-import to a row whose extracted frames are gone but whose source
-	// is present; Regenerate to a rebuildable entry with no preview.
 	const auto refreshBlanket = [this, locateAllButton, reimportAllButton, regenerateAllButton, removeAllButton] {
 		bool anyOpen = false, anyLocate = false, anyReimport = false, anyRegenerate = false;
 		for (const VideoRow& v : _videoRows)
@@ -293,8 +230,7 @@ inline void IntegrityCheckSections::buildVideoIssues(const CatalogIntegrity::Int
 
 	for (const CatalogIntegrity::MediaIssue& issue : report.issues)
 	{
-		// One line per broken video listing everything wrong with it - the grid's verdicts are orthogonal,
-		// so several can apply at once (e.g. frames gone and source also missing).
+		// Integrity verdicts are orthogonal, so report every applicable problem.
 		QStringList problems;
 		if (issue.extractedFramesMissing())
 			problems << QObject::tr("extracted frames are gone");
@@ -313,10 +249,6 @@ inline void IntegrityCheckSections::buildVideoIssues(const CatalogIntegrity::Int
 		const MediaId id = issue.id;
 		const QString recordedSource = issue.sourcePath;
 
-		// Which fixes are offered follows the grid's recovery notes: Locate repoints a moved/unmounted source (and is
-		// the precondition for Re-import when the source is gone); Re-import re-extracts a gone deliverable (needs the
-		// source present); Regenerate rebuilds a missing preview from real frames or the source; Mark-split fixes only
-		// a stale flag. Remove/Skip are always available.
 		const bool canReimport   = issue.extractedFramesMissing() && issue.sourcePresent;
 		const bool canRegenerate = issue.previewMissing() && !issue.extractedFramesMissing() && (issue.realFramesPresent || issue.sourcePresent);
 		const bool canMarkSplit  = issue.splitFlagStale() && !issue.previewMissing();
@@ -358,9 +290,6 @@ inline void IntegrityCheckSections::buildVideoIssues(const CatalogIntegrity::Int
 		_videoRows.push_back({ row, id, canReimport, canRegenerate, canLocate });
 	}
 
-	// Locate all: relink every open source-missing video to its identity-match (name + size) under a chosen folder -
-	// the batch form of the per-row Locate, for when a whole tree of sources moved at once. A relinked row becomes
-	// re-importable, but its frames stay gone until the next scan surfaces it with Re-import enabled.
 	QObject::connect(locateAllButton, &QPushButton::clicked, locateAllButton, [this, refreshBlanket] {
 		const auto tally = locateAllByIdentity(_videoRows, [](const VideoRow& v) { return v.sourceMissing; }, isSupportedVideoFile,
 			[this](const MediaId& id, const QString& picked) { return _callbacks.locateSourceRequested(id, picked); },
@@ -377,8 +306,6 @@ inline void IntegrityCheckSections::buildVideoIssues(const CatalogIntegrity::Int
 		QMessageBox::information(_dialog, QObject::tr("Locate all videos"), msg.join(QStringLiteral("\n")));
 	});
 
-	// Re-import all: re-extract every open row whose frames are gone and whose source is present. Heavy (an ffmpeg
-	// run per video), so confirm first and show a wait cursor for the batch.
 	QObject::connect(reimportAllButton, &QPushButton::clicked, reimportAllButton, [this] {
 		if (QMessageBox::question(_dialog, QObject::tr("Re-import all"),
 		        QObject::tr("Re-extract frames for every re-importable video? This re-runs ffmpeg and can take a while."))
@@ -391,8 +318,6 @@ inline void IntegrityCheckSections::buildVideoIssues(const CatalogIntegrity::Int
 		showBlanketTally(QObject::tr("Re-import all"), QObject::tr("Re-imported %1 video(s)."), done, QObject::tr("%1 could not be re-imported."), failed);
 	});
 
-	// Regenerate all previews: rebuild the preview for every open entry that lacks one and can be rebuilt (from
-	// real frames where present, else the source). Lighter than re-import but still worth a wait cursor.
 	QObject::connect(regenerateAllButton, &QPushButton::clicked, regenerateAllButton, [this] {
 		QApplication::setOverrideCursor(Qt::WaitCursor);
 		const auto [done, failed] = runBlanket(_videoRows, [](const VideoRow& v) { return v.canRegenerate; },
@@ -422,8 +347,6 @@ inline void IntegrityCheckSections::buildMissingPhotos(const CatalogIntegrity::I
 	header->addWidget(locateAllButton);
 	header->addWidget(removeAllButton);
 
-	// Locate applies only to a referenced photo (an owned photo's file belongs in the library tree, so a missing
-	// one is Remove-only); Remove applies to any open row.
 	const auto refreshBlanket = [this, locateAllButton, removeAllButton] {
 		bool anyOpen = false, anyReferenced = false;
 		for (const MissingPhotoRow& m : _missingPhotoRows)
@@ -447,8 +370,6 @@ inline void IntegrityCheckSections::buildMissingPhotos(const CatalogIntegrity::I
 		const MediaId id = photo.id;
 		const QString recordedPath = photo.sourcePath;
 
-		// Locate is offered only for a referenced photo - its file may have just moved, so pointing at it
-		// repoints the entry. An owned photo lives in the library tree, so a missing owned file is Remove/Skip.
 		QPushButton* locateButton = photo.referenced ? addRowButton(rowLayout, row, QObject::tr("Locate...")) : nullptr;
 		QPushButton* removeButton = addRowButton(rowLayout, row, QObject::tr("Remove"));
 		QPushButton* skipButton   = addRowButton(rowLayout, row, QObject::tr("Skip"));
@@ -468,7 +389,6 @@ inline void IntegrityCheckSections::buildMissingPhotos(const CatalogIntegrity::I
 		_missingPhotoRows.push_back({ row, id, photo.referenced });
 	}
 
-	// Locate all: relink every open referenced photo to its identity-match under a chosen folder (see locateAllByIdentity).
 	QObject::connect(locateAllButton, &QPushButton::clicked, locateAllButton, [this, refreshBlanket] {
 		const auto tally = locateAllByIdentity(_missingPhotoRows, [](const MissingPhotoRow& m) { return m.referenced; }, isSupportedImageFile,
 			[this](const MediaId& id, const QString& picked) { return _callbacks.locatePhotoRequested(id, picked); },
@@ -496,7 +416,7 @@ inline void IntegrityCheckSections::buildMissingPhotos(const CatalogIntegrity::I
 
 inline std::pair<QHBoxLayout*, ResolvableRow*> IntegrityCheckSections::addRow(const QString& statusText)
 {
-	QVBoxLayout* rowsLayout = _currentRowsLayout;   // this section's container; captured per-row for the sink below
+	QVBoxLayout* rowsLayout = _currentRowsLayout;
 	QFrame* frame = new QFrame(rowsLayout->parentWidget());
 	frame->setObjectName("integrityRow");
 	frame->setStyleSheet(_rowStyle);
@@ -506,7 +426,6 @@ inline std::pair<QHBoxLayout*, ResolvableRow*> IntegrityCheckSections::addRow(co
 	row.statusLabel->setWordWrap(true);
 	rowLayout->addWidget(row.statusLabel, 1);
 	rowsLayout->addWidget(frame);
-	// Settling the row re-appends it, dropping it below the section's still-open rows (its layout holds only them).
 	row.reorderSection = [rowsLayout, frame] { rowsLayout->removeWidget(frame); rowsLayout->addWidget(frame); };
 	return { rowLayout, &row };
 }
@@ -526,9 +445,7 @@ inline QHBoxLayout* IntegrityCheckSections::addSectionHeader(const QString& html
 	headerRow->addStretch(1);
 	_layout->addLayout(headerRow);
 
-	// Each section's rows go in their own container so a settled row can sink to the section's bottom by simple
-	// re-append, with no index bookkeeping and without disturbing other sections. Zero margins so rows stay flush
-	// with the header; spacing is left at the layout default, matching _layout.
+	// Per-section containers let settled rows sink without crossing section boundaries.
 	QWidget* rowsContainer = new QWidget(_content);
 	_currentRowsLayout = new QVBoxLayout(rowsContainer);
 	_currentRowsLayout->setContentsMargins(0, 0, 0, 0);

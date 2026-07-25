@@ -46,8 +46,7 @@ bool MetadataStore::flushPendingSave(QString* error)
 	return false;
 }
 
-// Reject only a nameless (default-constructed) identity - it has no usable key(). Everything with a name
-// persists; the store is a dumb key->fields map and doesn't interpret records.
+// A nameless default id has no usable key; the store does not otherwise interpret identities.
 QJsonValue MetadataStore::get(const MediaId& id, QStringView field) const
 {
 	if (id.name().isEmpty())
@@ -62,7 +61,7 @@ void MetadataStore::set(const MediaId& id, QStringView field, const QJsonValue& 
 		return;
 
 	QJsonObject record = _records.value(id.key()).toObject();
-	record.insert(QStringLiteral("name"), id.name()); // keep a human-readable name in each record (debugging / future catalog display)
+	record.insert(QStringLiteral("name"), id.name());
 	record.insert(field.toString(), value);
 	_records.insert(id.key(), record);
 
@@ -81,10 +80,9 @@ void MetadataStore::removeField(const MediaId& id, QStringView field)
 
 	QJsonObject record = it.value().toObject();
 	if (record.take(field.toString()).isUndefined())
-		return;  // field wasn't there - nothing changed, so no save
+		return;
 
-	// Only the reserved "name" can remain (set() always stamps it); a record down to just that carries no real
-	// metadata, so drop it whole instead of leaving a phantom entry for allMediaIds() to resurrect.
+	// A name-only record would become a phantom catalog item through allMediaIds().
 	if (record.size() <= 1)
 		_records.remove(key);
 	else
@@ -95,16 +93,12 @@ void MetadataStore::removeField(const MediaId& id, QStringView field)
 
 void MetadataStore::remove(const MediaId& id)
 {
-	// QJsonObject::remove returns void; take() removes and hands back the old value (undefined if it wasn't
-	// there), so it doubles as the "was anything actually removed?" check that avoids a needless save.
 	if (!_records.take(id.key()).isUndefined())
 		scheduleSave();
 }
 
 void MetadataStore::scheduleSave()
 {
-	// A Writer is necessarily alive here (mutations only run through one), so the actual save always
-	// happens at the outermost Writer's destruction.
 	_dirty = true;
 }
 
@@ -151,13 +145,11 @@ std::vector<MediaId> MetadataStore::allMediaIds() const
 	ids.reserve(_records.size());
 	for (auto it = _records.begin(); it != _records.end(); ++it)
 	{
-		// key() is "<size>:<lowercased-name>"; the size is the numeric prefix before the first ':'. The
-		// record's "name" carries the original case (the key's name part is lowercased), so prefer it.
+		// key() contributes size; the reserved field preserves original-case name.
 		const QString name = it.value().toObject().value(QStringLiteral("name")).toString();
 		const qint64 size = it.key().section(':', 0, 0).toLongLong();
 		if (name.isEmpty() || size < 0)
-			continue;  // skip a nameless record or a legacy negative-size (source-unavailable) key - neither
-			           // resolves to a real catalog identity
+			continue;
 		ids.push_back(MediaId::fromNameAndSize(name, size));
 	}
 	return ids;
@@ -167,13 +159,12 @@ void MetadataStore::rekey(const MediaId& oldId, const MediaId& newId)
 {
 	if (!oldId.isValid() || !newId.isValid() || !_records.contains(oldId.key()))
 		return;
-	// operator== folds case, so equal ids alone are not enough to bail: a case-only rename must still pass
-	// through to update the record's original-case "name".
+	// A case-only rename still updates the reserved original-case name.
 	if (oldId == newId && oldId.name() == newId.name())
 		return;
 
 	QJsonObject record = _records.take(oldId.key()).toObject();
-	record.insert(QStringLiteral("name"), newId.name()); // record now describes the renamed file
+	record.insert(QStringLiteral("name"), newId.name());
 	_records.insert(newId.key(), record);
 
 	scheduleSave();

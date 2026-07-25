@@ -43,15 +43,12 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog& catalog, const Catalog
 
 	QScrollArea* scroll = new QScrollArea(this);
 	scroll->setWidgetResizable(true);
-	// The dialog-body scroll region gets the central sheet's QListWidget vocabulary (hairline frame, no fill
-	// of its own) in place of the native sunken panel; QScrollArea isn't styled centrally because its other
-	// use (FrameViewerWindow) wants no frame at all.
 	scroll->setStyleSheet(QStringLiteral("QScrollArea { border: 1px solid %1; border-radius: %2px; background: transparent; }")
 		.arg(Theme::current().BorderMedium).arg(Theme::ControlRadius));
 	QWidget* content = new QWidget(scroll);
 	QVBoxLayout* contentLayout = new QVBoxLayout(content);
 
-	// A member (not a local) because it owns the row state the section button handlers share.
+	// Section button handlers borrow this state.
 	_sections = std::make_unique<IntegrityCheckSections>(catalog, report, _callbacks, content, contentLayout, this);
 
 	contentLayout->addStretch(1);

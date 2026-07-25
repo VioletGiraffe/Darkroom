@@ -5,10 +5,7 @@
 
 class QMouseEvent;
 
-// A small segmented control: a row of mutually-exclusive segments inside one rounded pill, the selected
-// one filled. A non-stock stand-in for a pair of radio buttons or a two-state toggle button. Generic over
-// its segment labels so it serves both the sidebar's OR/AND combine mode and the sort popover's
-// field/direction toggles.
+// Mutually exclusive text segments painted inside one rounded control.
 class SegmentedToggle final : public QWidget
 {
 	Q_OBJECT
@@ -17,8 +14,7 @@ public:
 
 	[[nodiscard]] int currentIndex() const { return _current; }
 
-	// Selects a segment programmatically. Silent by design (no currentChanged) so callers can restore
-	// persisted state without re-triggering the work the signal drives; only user clicks emit.
+	// Programmatic selection is silent; only user clicks emit currentChanged.
 	void setCurrentIndex(int index);
 
 	[[nodiscard]] QSize sizeHint() const override;

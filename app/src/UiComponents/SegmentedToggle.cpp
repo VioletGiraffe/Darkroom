@@ -9,10 +9,10 @@
 
 namespace {
 constexpr int BORDER   = 1;
-constexpr int SEG_HPAD = 12;  // horizontal padding inside each segment
-constexpr int SEG_VPAD = 4;   // vertical padding inside each segment
-constexpr int RADIUS   = Theme::ControlRadius;   // outer pill corner radius
-constexpr int INSET    = 2;   // gap from a segment's edge to its selected/hover fill
+constexpr int SEG_HPAD = 12;
+constexpr int SEG_VPAD = 4;
+constexpr int RADIUS   = Theme::ControlRadius;
+constexpr int INSET    = 2;
 
 inline QColor colorFromHex(const char* hex) { return QColor(QString::fromLatin1(hex)); }
 }
@@ -20,7 +20,7 @@ inline QColor colorFromHex(const char* hex) { return QColor(QString::fromLatin1(
 SegmentedToggle::SegmentedToggle(const QStringList& segments, QWidget* parent)
 	: QWidget(parent), _segments(segments)
 {
-	setMouseTracking(true);                 // hover repaint without a button held
+	setMouseTracking(true);
 	setCursor(Qt::PointingHandCursor);
 	setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 }
@@ -72,7 +72,7 @@ void SegmentedToggle::paintEvent(QPaintEvent*)
 	{
 		const QRectF seg(BORDER + i * segW, BORDER, segW, height() - 2.0 * BORDER);
 
-		if (i > 0)   // hairline separator between adjacent segments
+		if (i > 0)
 		{
 			QColor sep = border;
 			sep.setAlpha(140);
@@ -85,7 +85,7 @@ void SegmentedToggle::paintEvent(QPaintEvent*)
 		if (selected)
 		{
 			p.setPen(Qt::NoPen);
-			p.setBrush(colorFromHex(t.AccentBg));   // soft accent surface (the mockup's "info" fill)
+			p.setBrush(colorFromHex(t.AccentBg));
 			p.drawRoundedRect(seg.adjusted(INSET, INSET, -INSET, -INSET), RADIUS - INSET, RADIUS - INSET);
 		}
 		else if (hovered)
@@ -97,7 +97,7 @@ void SegmentedToggle::paintEvent(QPaintEvent*)
 			p.drawRoundedRect(seg.adjusted(INSET, INSET, -INSET, -INSET), RADIUS - INSET, RADIUS - INSET);
 		}
 
-		p.setPen(selected ? colorFromHex(t.AccentText) : textCol);   // accent text on the selected fill, normal text on the rest
+		p.setPen(selected ? colorFromHex(t.AccentText) : textCol);
 		p.drawText(seg, Qt::AlignCenter, _segments[i]);
 	}
 }
@@ -108,7 +108,6 @@ void SegmentedToggle::mousePressEvent(QMouseEvent* event)
 	{
 		if (_segments.size() == 2)
 		{
-			// Clicking anywhere toggles the switch - intentional
 			_current = _current == 0 ? 1 : 0;
 		}
 		else

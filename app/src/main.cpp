@@ -45,7 +45,7 @@ void memoryLogMessageHandler(QtMsgType type, const QMessageLogContext& context, 
 {
 	loggerInstance<CLoggerInMemory>().log(formatQtMessage(type, context, message));
 	if (g_previousMessageHandler)
-		g_previousMessageHandler(type, context, message);  // keep the default handler's stderr output
+		g_previousMessageHandler(type, context, message);
 }
 
 } // namespace
@@ -62,8 +62,8 @@ int main(int argc, char* argv[])
 	QApplication app(argc, argv);
 	app.setOrganizationName("VioletGiraffe");
 	app.setApplicationName("Darkroom");
-	app.setApplicationVersion(STRINGIFY_EXPANDED_ARGUMENT(DARKROOM_VERSION));  // from VERSION in app.pro; surfaced in Help > About
-	app.setWindowIcon(QIcon(":/icon.svg"));  // default window icon; Windows rides on RC_ICONS, this is for Linux/macOS
+	app.setApplicationVersion(STRINGIFY_EXPANDED_ARGUMENT(DARKROOM_VERSION));
+	app.setWindowIcon(QIcon(":/icon.svg"));
 
 	CCrashHandler::setMinidumpsStorageFolderPath(QDir::tempPath().toStdString());
 	CCrashHandler crashHandler([](const wchar_t* msg) {
@@ -75,11 +75,11 @@ int main(int argc, char* argv[])
 	const int scheme = QSettings{}.value(Settings::ColorScheme, Defaults::ColorScheme).toInt();
 	app.styleHints()->setColorScheme(static_cast<Qt::ColorScheme>(scheme));
 
-	Style::install();  // app-wide non-stock style; re-applies on a light/dark switch
+	Style::install();
 
 	MainWindow window;
 	if (!window.isLibraryLoaded())
-		return 0;  // the user cancelled the library picker; the window was never built
+		return 0;
 	window.show();
 
 	const int result = app.exec();

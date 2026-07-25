@@ -31,8 +31,7 @@ void MarkerSlider::paintEvent(QPaintEvent* event)
 	if (_markerA < 0 && _markerB < 0)
 		return;
 
-	// Derive the exact handle-center x for a value the same way the style positions the handle,
-	// so the markers line up with where the handle sits at those values rather than approximating.
+	// Match the style's exact handle-center calculation.
 	QStyleOptionSlider opt;
 	initStyleOption(&opt);
 	const QRect groove = style()->subControlRect(QStyle::CC_Slider, &opt, QStyle::SC_SliderGroove, this);
@@ -40,7 +39,7 @@ void MarkerSlider::paintEvent(QPaintEvent* event)
 	const int available = groove.width() - handle.width();
 
 	QPainter painter{ this };
-	painter.setPen(QPen{ QColor{ QString::fromLatin1(Theme::StarActive) }, 2 }); // gold: legible on both themes, and a strong hue contrast with the accent-filled groove
+	painter.setPen(QPen{ QColor{ QString::fromLatin1(Theme::StarActive) }, 2 });
 
 	for (const int value : { _markerA, _markerB })
 	{

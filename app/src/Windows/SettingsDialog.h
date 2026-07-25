@@ -7,8 +7,6 @@ class QLineEdit;
 class QSpinBox;
 class SegmentedToggle;
 
-// ── General page: ffmpeg path + color scheme ──────────────────────────────────
-
 class GeneralSettingsPage final : public CSettingsPage
 {
 public:
@@ -18,13 +16,9 @@ public:
 private:
 	QLineEdit*       _ffmpegPath    = nullptr;
 	SegmentedToggle* _schemeToggle  = nullptr;
-	// The scheme applied when the dialog opened; restored live if the dialog is cancelled. Holds the stored
-	// Qt::ColorScheme value (not the effective one), so a "System" choice reverts back to System, not its
-	// resolved light/dark.
+	// Stored, not effective, scheme so cancellation can restore "System".
 	int              _originalScheme = 0;
 };
-
-// ── Encoding page: output format + JPEG quality ───────────────────────────────
 
 class EncodingSettingsPage final : public CSettingsPage
 {
@@ -37,8 +31,6 @@ private:
 	QSpinBox*        _quality      = nullptr;
 	QSpinBox*        _frameStep    = nullptr;
 };
-
-// ── Top-level dialog ─────────────────────────────────────────────────────────
 
 class SettingsDialog final : public CSettingsDialog
 {

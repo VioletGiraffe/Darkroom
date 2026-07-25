@@ -20,7 +20,7 @@ LogViewerDialog::LogViewerDialog(QWidget* parent)
 	_view = new QPlainTextEdit(this);
 	_view->setReadOnly(true);
 	_view->setLineWrapMode(QPlainTextEdit::NoWrap);
-	_view->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));  // monospaced keeps the file:line columns readable
+	_view->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
 
 	auto* buttons = new QDialogButtonBox(this);
 	QPushButton* refreshButton = buttons->addButton(tr("Refresh"), QDialogButtonBox::ActionRole);
@@ -41,5 +41,5 @@ LogViewerDialog::LogViewerDialog(QWidget* parent)
 void LogViewerDialog::refresh()
 {
 	_view->setPlainText(loggerInstance<CLoggerInMemory>().contents().join('\n'));
-	_view->moveCursor(QTextCursor::End);  // entries are appended in order, so the newest sit at the bottom
+	_view->moveCursor(QTextCursor::End);
 }

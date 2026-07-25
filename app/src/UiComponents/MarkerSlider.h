@@ -2,10 +2,7 @@
 
 #include <QSlider>
 
-// A horizontal QSlider that additionally paints up to two position markers on top of the groove,
-// used to denote the A/B endpoints of a playback loop. A marker value of -1 means "unset".
-// Everything QSlider provides (mouse/keyboard seeking, styling, the seek signals) is kept as-is;
-// this class only adds the marker rendering.
+// QSlider with two painted A/B markers; -1 means unset.
 class MarkerSlider final : public QSlider
 {
 public:

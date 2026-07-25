@@ -19,8 +19,6 @@
 #include <QSpinBox>
 #include <QVBoxLayout>
 
-// ── GeneralSettingsPage ───────────────────────────────────────────────────────
-
 GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent)
 {
 	setWindowTitle(tr("General"));
@@ -28,8 +26,7 @@ GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent
 	QSettings s;
 	_ffmpegPath = new QLineEdit(s.value(Settings::FfmpegPath).toString(), this);
 
-	// What leaving the field empty resolves to. Deliberately not ffmpegPath(): with a path configured it answers with
-	// that, which is the one thing a placeholder must not echo.
+	// Show the empty-field fallback, not the configured path.
 	const QString detectedFfmpeg = autoDetectedFfmpegPath();
 	_ffmpegPath->setPlaceholderText(detectedFfmpeg.isEmpty()
 		? tr("Not found - set the path to the ffmpeg binary")
@@ -41,7 +38,7 @@ GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent
 #ifdef Q_OS_WIN
 		const QString filter = tr("Executables (*.exe);;All files (*)");
 #else
-		const QString filter = tr("All files (*)");   // nothing to filter on: Unix executables carry no extension
+		const QString filter = tr("All files (*)");
 #endif
 		const QString path = QFileDialog::getOpenFileName(this, tr("Select ffmpeg executable"), _ffmpegPath->text(), filter);
 		if (!path.isEmpty())
@@ -55,20 +52,15 @@ GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent
 	auto* form = new QFormLayout;
 	form->addRow(tr("ffmpeg path:"), ffmpegRow);
 
-	// Segment order matches Qt::ColorScheme's own values (Unknown/System = 0, Light = 1, Dark = 2), so the
-	// segment index is directly the scheme value - no lookup table needed here or in acceptSettings().
 	_originalScheme = s.value(Settings::ColorScheme, Defaults::ColorScheme).toInt();
 	_schemeToggle = new SegmentedToggle({ tr("System"), tr("Light"), tr("Dark") }, this);
-	_schemeToggle->setCurrentIndex(_originalScheme);   // silent
+	_schemeToggle->setCurrentIndex(_originalScheme);
 
-	// Apply the scheme live as the user toggles, for immediate preview (Style::install() re-themes the app on
-	// QStyleHints::colorSchemeChanged). acceptSettings() only persists it; a cancel reverts it below.
 	connect(_schemeToggle, &SegmentedToggle::currentChanged, this, [](int index) {
 		QGuiApplication::styleHints()->setColorScheme(static_cast<Qt::ColorScheme>(index));
 	});
 
-	// Undo the live preview when the dialog is dismissed without accepting (Cancel / Esc / close button all
-	// route through QDialog::reject()). On accept, only accepted() fires, so this leaves the choice in place.
+	// Reject must undo the live theme preview.
 	if (auto* dialog = qobject_cast<QDialog*>(parent))
 		connect(dialog, &QDialog::rejected, this, [this] {
 			QGuiApplication::styleHints()->setColorScheme(static_cast<Qt::ColorScheme>(_originalScheme));
@@ -84,12 +76,9 @@ GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent
 void GeneralSettingsPage::acceptSettings()
 {
 	QSettings s;
-	// The scheme is already applied live; persist it here.
 	s.setValue(Settings::ColorScheme, _schemeToggle->currentIndex());
 	s.setValue(Settings::FfmpegPath, _ffmpegPath->text().trimmed());
 }
-
-// ── EncodingSettingsPage ──────────────────────────────────────────────────────
 
 EncodingSettingsPage::EncodingSettingsPage(QWidget* parent) : CSettingsPage(parent)
 {
@@ -100,11 +89,9 @@ EncodingSettingsPage::EncodingSettingsPage(QWidget* parent) : CSettingsPage(pare
 	const int  quality  = s.value(Settings::JpegQuality, Defaults::JpegQuality).toInt();
 	const int  step     = s.value(Settings::FrameStep,   Defaults::FrameStep).toInt();
 
-	// Output format - segment 0 = JPEG, 1 = TIFF
 	_formatToggle = new SegmentedToggle({ tr("JPEG"), tr("TIFF") }, this);
-	_formatToggle->setCurrentIndex(useTiff ? 1 : 0);   // silent
+	_formatToggle->setCurrentIndex(useTiff ? 1 : 0);
 
-	// JPEG quality (disabled when TIFF is selected)
 	_quality = new QSpinBox(this);
 	_quality->setRange(1, 31);
 	_quality->setValue(quality);
@@ -116,7 +103,6 @@ EncodingSettingsPage::EncodingSettingsPage(QWidget* parent) : CSettingsPage(pare
 	});
 	qualityHint->setEnabled(!useTiff);
 
-	// JPEG quality only applies to JPEG output; grey it out (with its hint) while TIFF is selected.
 	connect(_formatToggle, &SegmentedToggle::currentChanged, this, [this, qualityHint](int index) {
 		const bool jpeg = index == 0;
 		_quality->setEnabled(jpeg);
@@ -151,8 +137,6 @@ void EncodingSettingsPage::acceptSettings()
 	s.setValue(Settings::JpegQuality, _quality->value());
 	s.setValue(Settings::FrameStep,   _frameStep->value());
 }
-
-// ── SettingsDialog ────────────────────────────────────────────────────────────
 
 SettingsDialog::SettingsDialog(QWidget* parent) : CSettingsDialog(parent)
 {

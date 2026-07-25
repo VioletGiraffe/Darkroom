@@ -45,10 +45,6 @@
 #include <numbers>
 #include <thread>
 
-// This window's persisted UI state. These keys live here, not in Settings.h, because they are local to the
-// compare tool rather than app-wide configuration - but stay under the Settings namespace for the uniform
-// QSettings{}.value(Settings::Foo) call style. The align region is stored as a QRectF of fractions of the
-// reference frame (resolution-independent); an empty/absent value means no region.
 namespace Settings {
 	constexpr const char* PhotoCompareIgnoreRotation = "photoCompare/ignoreRotation";
 	constexpr const char* PhotoCompareAoi = "photoCompare/aoiNormalized";
@@ -56,19 +52,15 @@ namespace Settings {
 
 namespace {
 
-// The compare window shows at most this many photos: each holds a full-resolution image plus a mipmap chain, so
-// the working set stays bounded, and beyond roughly this count an N-way visual comparison stops being useful.
+// Each photo retains a full-resolution image and mipmap chain.
 constexpr qsizetype MaxImages = 50;
 
-// p rotated by angle (radians) about the origin - the R factor of a photo's image -> subject similarity.
 QPointF rotated(const QPointF& p, double angle)
 {
 	const double c = std::cos(angle), s = std::sin(angle);
 	return QPointF(c * p.x() - s * p.y(), s * p.x() + c * p.y());
 }
 
-// Maps an axis-aligned subject-space rect through the INVERSE of an image -> subject similarity (scale,
-// rotation, offset) into image coordinates - the bounding rect when rotation makes the image non-axis-aligned.
 QRectF subjectRectToImage(const QRectF& rect, double scale, double rotation, const QPointF& offset)
 {
 	QPolygonF corners;
@@ -79,21 +71,17 @@ QRectF subjectRectToImage(const QRectF& rect, double scale, double rotation, con
 
 } // namespace
 
-// The load work and results of one addPhotosFromFiles call, shared between the GUI thread and the two loading
-// stages (the file reads on the process-wide I/O thread, the decodes on _workerPool).
+// Shared by the GUI, I/O, and decode stages of one load.
 struct PhotoCompareWindow::PhotoLoadBatch
 {
 	QStringList paths;
-	std::vector<QImage> images;  // [i] decoded from paths[i]; null = the file failed to load
-	QString completionNotice;    // transient status to show once the batch is applied (e.g. the drop-truncation notice)
-	std::atomic<int> completedCount{ 0 };  // decoded-or-failed so far; drives the progress line in updateHintText
-	std::atomic<bool> abort{ false };      // set by the destructor: the remaining reads and decodes become no-ops, so its waits stay short
+	std::vector<QImage> images;
+	QString completionNotice;
+	std::atomic<int> completedCount{ 0 };
+	std::atomic<bool> abort{ false };
 };
 
-// One grid cell: a viewport onto the shared view. All state (images, alignment, the view itself) lives in
-// the owning PhotoCompareWindow; the pane renders and translates mouse input into owner calls.
-// The same class also serves as the full-view pane (index -1), which shows whatever photo the owner's
-// _fullViewIndex selects - photoIndex() resolves that indirection.
+// A pane is either a grid cell or, at index -1, the full-view viewport.
 class PhotoComparePane final : public QWidget
 {
 public:
@@ -114,24 +102,20 @@ protected:
 	void resizeEvent(QResizeEvent* event) override { QWidget::resizeEvent(event); _owner.onPaneResized(); }
 
 private:
-	// The photo this pane represents: its own grid position, or the slider-picked one for the full-view pane.
 	[[nodiscard]] int photoIndex() const { return _index >= 0 ? _index : _owner._fullViewIndex; }
 
 	void drawCaption(QPainter& painter, const PhotoCompareWindow::Photo& photo, int renderIndex) const;
 
 	PhotoCompareWindow& _owner;
-	const int _index;  // grid/photo index, or -1 for the full-view pane
+	const int _index;
 
-	// Click-vs-drag: a press starts drag tracking; a release that never crossed the threshold is a click
-	// (which is how calibration points are placed - so panning stays available while calibrating).
 	QPointF _pressPos;
 	QPointF _lastDragPos;
 	bool _leftButtonDown = false;
 	bool _dragConfirmed = false;
 	bool _ctrlDrag = false;
 
-	// Shift+drag rubber-bands the owner's auto-align region; the anchor is held in subject space so the
-	// rect stays glued to the content even if the view is somehow moved mid-drag.
+	// Subject-space anchoring keeps the selection attached to content while the view moves.
 	bool _aoiDrag = false;
 	QPointF _aoiAnchor;
 };
@@ -151,15 +135,12 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 		painter.save();
 		painter.setRenderHint(QPainter::SmoothPixmapTransform);
 		painter.translate(_owner._viewZoom * drawn.alignOffset + _owner._viewPan);
-		painter.rotate(qRadiansToDegrees(drawn.alignRotation));  // rotation and uniform scale commute, so the order is free
+		painter.rotate(qRadiansToDegrees(drawn.alignRotation));
 		painter.scale(residualScale, residualScale);
 		painter.drawImage(0, 0, source);
 		painter.restore();
 	};
 
-	// Difference mode renders every photo except the reference as its per-channel |photo - reference|:
-	// the reference is drawn first, the photo on top of it in Difference composition mode. Where only one
-	// of the two covers, that image differences against the matte, i.e. shows (nearly) unchanged.
 	if (_owner._differenceMode && renderIndex != _owner._refIndex)
 	{
 		drawPhoto(_owner._photos[_owner._refIndex]);
@@ -173,7 +154,6 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 
 	painter.setRenderHint(QPainter::Antialiasing);
 
-	// Calibration crosshairs - the pane's OWN points ('photo' is exactly that: flicker is inert while calibrating).
 	if (_owner._calibrating)
 	{
 		painter.setPen(QPen(QColor(Theme::current().AccentBorder), 2));
@@ -185,10 +165,6 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 		}
 	}
 
-	// Auto-align diagnostics: where the aligner took its evidence in the RENDERED photo, drawn at the
-	// patch's true on-screen footprint. Accent = used for the fit (dashed = used via a coarser-level match
-	// only, e.g. defocused at full res); orange = matched well but inconsistent with the fitted transform
-	// (outlier - locally moved content, parallax, ...); red = failed to match.
 	if (_owner._showAlignDiagnostics)
 	{
 		painter.setBrush(Qt::NoBrush);
@@ -208,8 +184,6 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 		}
 	}
 
-	// The auto-align region (Shift+drag): one subject-space rect, so it frames the same content in every
-	// pane. Dashed light gray, to stay distinct from the accent patch marks.
 	if (!_owner._alignAoi.isEmpty())
 	{
 		painter.setPen(QPen(QColor(0xe8, 0xe8, 0xe8), 1, Qt::DashLine));
@@ -220,7 +194,6 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 
 	drawCaption(painter, photo, renderIndex);
 
-	// The reference pane - the photo difference mode and both alignment paths work against - is outlined in yellow
 	if (photoIndex() == _owner._refIndex && _owner._photos.size() > 1)
 	{
 		painter.setPen(QPen(QColor(240, 224, 64), 2.0));
@@ -228,7 +201,6 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 		painter.drawRect(rect().adjusted(1, 1, -1, -1));
 	}
 
-	// A flickered pane shows a photo other than its own - flag it with an accent frame.
 	if (renderIndex != photoIndex())
 	{
 		painter.setPen(QPen(QColor(Theme::current().AccentBorder), 3));
@@ -237,14 +209,6 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 	}
 }
 
-// Corner caption, stacked lines. Headline "2 · name.jpg · 6000x4000 (24 MP) · 63%": the leading digit
-// doubles as the pane's flicker key, then the photo's pixel resolution, then its on-screen scale in device
-// pixels (100% = 1 image px per physical device px, i.e. the Ctrl+1 actual-pixels view), making any
-// compensation difference between panes visible at a glance. The
-// alignment line spells out this photo's raw similarity into subject space (scale, rotation in degrees,
-// offset in subject px). The score line appears only once auto-align has evaluated this photo: the run's
-// two quality measures (conf = weighted patch ZNCC fitness, coarse = coarse whole-frame score), the fitted
-// rotation's 1-sigma error bar, and the align call's runtime.
 void PhotoComparePane::drawCaption(QPainter& painter, const PhotoCompareWindow::Photo& photo, int renderIndex) const
 {
 	QStringList captionLines;
@@ -262,7 +226,7 @@ void PhotoComparePane::drawCaption(QPainter& painter, const PhotoCompareWindow::
 		QString scoreLine = QString("conf %1 · coarse %2 · rot ±%3° · %4 ms")
 			.arg(photo.alignConfidence, 0, 'f', 2).arg(photo.alignBootstrapZncc, 0, 'f', 2)
 			.arg(qRadiansToDegrees(photo.alignRotationSigma), 0, 'f', 2).arg(photo.alignTimeMs, 0, 'f', 0);
-		if (!photo.alignSucceeded)  // the alignment on screen is the kept previous one - make that impossible to miss
+		if (!photo.alignSucceeded)
 			scoreLine.prepend(tr("FAILED · "));
 		captionLines << scoreLine;
 	}
@@ -295,7 +259,6 @@ void PhotoComparePane::mousePressEvent(QMouseEvent* event)
 {
 	if (event->button() == Qt::LeftButton && event->modifiers().testFlag(Qt::ShiftModifier))
 	{
-		// Shift+drag marks the auto-align region; clearing on press makes a plain Shift+click the eraser.
 		_aoiDrag = true;
 		_aoiAnchor = _owner.subjectFromWidget(event->position());
 		_owner._alignAoi = QRectF();
@@ -345,7 +308,6 @@ void PhotoComparePane::mouseReleaseEvent(QMouseEvent* event)
 	{
 		_aoiDrag = false;
 		setCursor(_owner.idleCursor());
-		// A degenerate rect (a stray wiggle of a clearing Shift+click) is not a usable region - drop it.
 		if (std::min(_owner._alignAoi.width(), _owner._alignAoi.height()) * _owner._viewZoom < 8.0)
 			_owner._alignAoi = QRectF();
 		_owner.updateAllPanes();
@@ -361,8 +323,6 @@ void PhotoComparePane::mouseReleaseEvent(QMouseEvent* event)
 
 void PhotoComparePane::mouseDoubleClickEvent(QMouseEvent* event)
 {
-	// While calibrating, a double-click is just a second press - route it as one so its release goes through
-	// the normal click path (addCalibrationPoint's proximity guard swallows the would-be duplicate point).
 	if (_owner._calibrating)
 		mousePressEvent(event);
 	else if (event->button() == Qt::LeftButton)
@@ -371,7 +331,7 @@ void PhotoComparePane::mouseDoubleClickEvent(QMouseEvent* event)
 
 void PhotoComparePane::contextMenuEvent(QContextMenuEvent* event)
 {
-	if (_owner._calibrating)  // right-click means "undo a point" while calibrating
+	if (_owner._calibrating)
 		return;
 	const int index = photoIndex();
 	QMenu menu;
@@ -381,13 +341,11 @@ void PhotoComparePane::contextMenuEvent(QContextMenuEvent* event)
 	});
 	QAction* makeReference = menu.addAction(tr("Make this the reference image"), [this, index] {
 		_owner._refIndex = index;
-		_owner.updateAllPanes();  // difference mode and the next align/calibration now work against this photo
+		_owner.updateAllPanes();
 	});
 	makeReference->setEnabled(index != _owner._refIndex);
 	menu.exec(event->globalPos());
 }
-
-// ---------------------------------------------------------------------------------------------------------
 
 void PhotoCompareWindow::showForFiles(const QStringList& candidatePaths, QWidget* parent)
 {
@@ -414,18 +372,17 @@ void PhotoCompareWindow::showForFiles(const QStringList& candidatePaths, QWidget
 }
 
 PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* parent) : QWidget(parent, Qt::Window),
-	// Hardware threads minus one, so the GUI thread keeps a core while the workers decode and align
 	_workerPool(std::max(std::thread::hardware_concurrency(), 2u) - 1, "photo-compare")
 {
 	setWindowTitle(tr("Compare Photos"));
-	setFocusPolicy(Qt::StrongFocus);  // the panes never take focus, so key events land here
-	setAcceptDrops(true);  // no child accepts drops, so a drop anywhere in the window lands here
+	setFocusPolicy(Qt::StrongFocus);
+	setAcceptDrops(true);
 
 	QVBoxLayout* mainLayout = new QVBoxLayout(this);
 	mainLayout->setContentsMargins(4, 4, 4, 4);
 
 	_gridPage = new QWidget(this);
-	_dropHintLabel = new QLabel(_gridPage);  // the text is set in rebuildPaneGrid (drop prompt, or a loading notice)
+	_dropHintLabel = new QLabel(_gridPage);
 	_dropHintLabel->setAlignment(Qt::AlignCenter);
 
 	_fullPane = new PhotoComparePane(*this, -1);
@@ -434,17 +391,13 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 	_viewStack->addWidget(_fullPane);
 	mainLayout->addLayout(_viewStack, 1);
 
-	// Bottom toolbar: the full-view picker slider stretching across; the align-option checkbox and the
-	// render-mode toggle at the right.
 	QHBoxLayout* toolbar = new QHBoxLayout();
 
-	// Full-view picker: one detent per photo; pressing the handle or changing the value enters the full
-	// view, dragging back and forth scrubs between the aligned photos (a flicker gesture at full size).
 	_slider = new QSlider(Qt::Horizontal, this);
 	_slider->setPageStep(1);
 	_slider->setTickPosition(QSlider::TicksBelow);
 	_slider->setTickInterval(1);
-	_slider->setFocusPolicy(Qt::NoFocus);  // all keyboard input stays on the window
+	_slider->setFocusPolicy(Qt::NoFocus);
 	connect(_slider, &QSlider::sliderPressed, this, [this] { setFullViewIndex(_slider->value()); });
 	connect(_slider, &QSlider::valueChanged, this, [this](int value) { setFullViewIndex(value); });
 	toolbar->addWidget(_slider, 1);
@@ -452,7 +405,7 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 	_ignoreRotationCheck = new QCheckBox(tr("Ignore rotation"), this);
 	_ignoreRotationCheck->setToolTip(tr("Auto-align fits scale and offset only, treating any apparent rotation as spurious\n"
 	                                     "(e.g. depth parallax between focus-stack slices can read as a slight tilt)"));
-	_ignoreRotationCheck->setFocusPolicy(Qt::NoFocus);  // all keyboard input stays on the window
+	_ignoreRotationCheck->setFocusPolicy(Qt::NoFocus);
 	_ignoreRotationCheck->setChecked(QSettings{}.value(Settings::PhotoCompareIgnoreRotation, false).toBool());
 	connect(_ignoreRotationCheck, &QCheckBox::toggled, this,
 	        [](bool checked) { QSettings{}.setValue(Settings::PhotoCompareIgnoreRotation, checked); });
@@ -469,14 +422,12 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 	_hintLabel->setAlignment(Qt::AlignCenter);
 	mainLayout->addWidget(_hintLabel, 0);
 
-	addPhotosFromFiles(photoPaths);  // async: the photos appear once decoded; an empty list puts the empty drop-target
-	                                 // state in place immediately (the saved align region is restored on apply, once
-	                                 // the first photos actually exist)
+	addPhotosFromFiles(photoPaths);
 
 	if (!restoreWindowGeometry(this, "photoCompareWindow"))
 	{
-		resize(1200, 800);  // the size the window falls back to when un-maximized
-		setWindowState(Qt::WindowMaximized);  // "use the whole screen" by default; the saved geometry rules thereafter
+		resize(1200, 800);
+		setWindowState(Qt::WindowMaximized);
 	}
 }
 
@@ -484,14 +435,12 @@ PhotoCompareWindow::~PhotoCompareWindow()
 {
 	if (_loadBatch)
 	{
-		_loadBatch->abort = true;  // the remaining reads and decodes become no-ops, bounding the waits below to one file each
-		// After retire() the read loop is gone (not merely aborted): it can no longer touch the dying window or
-		// enqueue into _workerPool. The decodes already enqueued are dropped or joined by _workerPool's destruction.
+		_loadBatch->abort = true;
+		// retire() prevents the I/O task from touching this window or enqueueing more decode work.
 		IoThreadPool::retire(reinterpret_cast<uint64_t>(this));
 	}
 	saveWindowGeometry(this, "photoCompareWindow");
-	// Persist the align region as fractions of the reference frame (resolution-independent). Empty (no region,
-	// or no photos to anchor it) stores an empty rect, which reads back as "no region".
+	// Persist the region relative to the reference resolution.
 	const QRectF normalizedAoi = !_alignAoi.isEmpty() && !_photos.empty() ? normalizedFromSubjectRect(_alignAoi) : QRectF();
 	QSettings{}.setValue(Settings::PhotoCompareAoi, normalizedAoi);
 }
@@ -512,9 +461,7 @@ QRectF PhotoCompareWindow::subjectRectFromNormalized(const QRectF& normalized) c
 
 QRectF PhotoCompareWindow::referenceSubjectRect() const
 {
-	// The reference's image rect placed into subject space. Assumes the reference carries no rotation - which
-	// holds for the default alignment and, after an auto-align/calibration fold, by construction; the same
-	// assumption is baked into the default alignment and the view fit that also build this rect.
+	// Reference rotation is zero after every supported alignment path.
 	const Photo& ref = _photos[_refIndex];
 	return QRectF(ref.alignOffset, QSizeF(ref.image.size()) * ref.alignScale);
 }
@@ -536,9 +483,6 @@ void PhotoCompareWindow::resetToInitialState()
 	exitFullView();
 	setDifferenceMode(false);
 	_flickerIndex = -1;
-	// The current reference keeps its role and defines subject space again (identity); every other photo
-	// returns to the default height-normalized alignment against it - the same layout a fresh open produces,
-	// only anchored on whichever photo is the reference now rather than forcing it back to photo 1.
 	Photo& ref = _photos[_refIndex];
 	ref.alignScale = 1.0;
 	ref.alignRotation = 0.0;
@@ -549,10 +493,10 @@ void PhotoCompareWindow::resetToInitialState()
 		photo.alignMarks.clear();
 		photo.alignScored = false;
 		if (static_cast<int>(i) != _refIndex)
-			setDefaultAlignment(photo);  // reads the now-identity reference
+			setDefaultAlignment(photo);
 	}
 	_alignAoi = QRectF();
-	_viewTouched = false;  // like a fresh open: pane resizes re-fit again until the user navigates
+	_viewTouched = false;
 	fitView();
 	updateHintText();
 	updateAllPanes();
@@ -560,11 +504,11 @@ void PhotoCompareWindow::resetToInitialState()
 
 void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
 {
-	assert_debug_only(!_loadBatch);  // drops are denied while a batch is in flight, so batches never overlap
+	assert_debug_only(!_loadBatch);
 	if (photoPaths.isEmpty())
 	{
 		PhotoLoadBatch emptyBatch;
-		applyLoadedPhotoBatch(emptyBatch);  // still (re)builds the count-dependent state - the empty drop-target UI
+		applyLoadedPhotoBatch(emptyBatch);
 		return;
 	}
 
@@ -574,15 +518,12 @@ void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
 	_loadBatch = batch;
 	if (_photos.empty())
 	{
-		rebuildPaneGrid();  // no photos to show while decoding: put the centered "Loading photos..." placeholder in the grid page
+		rebuildPaneGrid();
 		_slider->setEnabled(false);
 	}
 	updateHintText();
 
-	// Two-stage load (see ARCHITECTURE.md "Core principles"). Stage 1, the process-wide I/O pool (routed by the
-	// storage medium under the batch's first path): read the files one at a time, handing each one's bytes to
-	// the compute pool to decode as soon as they arrive. Tagged with this window so the destructor can retire()
-	// the read loop. The tasks own a share of the batch state, so nothing here outlives the window's teardown guarantees.
+	// Serialize reads per storage device, then decode each completed read in the compute pool.
 	IoThreadPool::enqueue(batch->paths.front(), [this, batch] {
 		for (qsizetype i = 0; i < batch->paths.size(); ++i)
 		{
@@ -594,14 +535,12 @@ void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
 				fileBytes = file.readAll();
 			else
 				qWarning() << "PhotoCompareWindow: failed to read" << batch->paths[i] << "-" << file.errorString();
-			// Stage 2, the compute pool: decode in parallel; the decode that completes the batch hands the whole
-			// ordered batch to the GUI thread.
 			_workerPool.enqueue([this, batch, i, fileBytes = std::move(fileBytes)]() mutable {
 				if (!batch->abort)
 				{
 					QBuffer buffer(&fileBytes);
-					QImageReader reader(&buffer);  // Do not provide a format hint, that suppresses detection by contents
-					reader.setAutoTransform(true);  // apply the EXIF orientation
+					QImageReader reader(&buffer);  // A format hint would suppress content detection.
+					reader.setAutoTransform(true);
 					QImage& image = batch->images[static_cast<size_t>(i)];
 					image = reader.read();
 					if (image.isNull())
@@ -610,7 +549,6 @@ void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
 				if (++batch->completedCount == static_cast<int>(batch->paths.size()))
 					QMetaObject::invokeMethod(this, [this, batch] { applyLoadedPhotoBatch(*batch); }, Qt::QueuedConnection);
 				else
-					// The _loadBatch check keeps a late progress update from overwriting a transient completion notice
 					QMetaObject::invokeMethod(this, [this] { if (_loadBatch) updateHintText(); }, Qt::QueuedConnection);
 			});
 		}
@@ -626,14 +564,12 @@ void PhotoCompareWindow::applyLoadedPhotoBatch(PhotoLoadBatch& batch)
 	{
 		QImage& image = batch.images[static_cast<size_t>(i)];
 		if (image.isNull())
-			continue;  // failed to load; the decode already logged the warning
+			continue;
 		Photo photo;
 		photo.image = std::move(image);
 		photo.filePath = batch.paths[i];
 		photo.caption = QFileInfo(batch.paths[i]).fileName();
-		// Default alignment: normalize the photo's height to the reference's subject-space height and center
-		// the two on each other - so identical shots that only differ in export resolution line up with no
-		// user action at all. The very first photo keeps the identity default: it defines subject space.
+		// Normalize height so resolution-only differences align by default.
 		if (!_photos.empty())
 			setDefaultAlignment(photo);
 		_photos.push_back(std::move(photo));
@@ -644,9 +580,7 @@ void PhotoCompareWindow::applyLoadedPhotoBatch(PhotoLoadBatch& batch)
 	_slider->setEnabled(!_photos.empty() && !_calibrating);
 	if (!_viewTouched)
 		fitView();
-	// The first photos to arrive (the constructor batch, or the first drop into a window opened empty) get the
-	// saved align region restored - only now does a reference exist to un-normalize the stored frame-fractions
-	// against. Apply-once, and never over a region the user has already drawn.
+	// Restore the normalized region only once a reference exists.
 	if (oldCount == 0 && !_photos.empty() && _alignAoi.isEmpty())
 	{
 		const QRectF normalizedAoi = QSettings{}.value(Settings::PhotoCompareAoi).toRectF();
@@ -655,7 +589,6 @@ void PhotoCompareWindow::applyLoadedPhotoBatch(PhotoLoadBatch& batch)
 	}
 	updateHintText();
 	updateAllPanes();
-	// Transient status, like the auto-align summary: set after updateHintText, which would otherwise overwrite it
 	if (_photos.size() == oldCount && !batch.paths.isEmpty())
 		_hintLabel->setText(tr("None of the files could be loaded as images."));
 	else if (!batch.completionNotice.isEmpty())
@@ -664,8 +597,6 @@ void PhotoCompareWindow::applyLoadedPhotoBatch(PhotoLoadBatch& batch)
 
 void PhotoCompareWindow::rebuildPaneGrid()
 {
-	// Rebuilt from scratch on every photo count change: recreate the layout (panes stay children of the page)
-	// and re-place every pane - a fresh layout also drops the previous geometry's row/column stretches.
 	delete _gridPage->layout();
 	QGridLayout* grid = new QGridLayout(_gridPage);
 	grid->setContentsMargins(0, 0, 0, 0);
@@ -687,9 +618,7 @@ void PhotoCompareWindow::rebuildPaneGrid()
 	const int rows = (photoCount + columns - 1) / columns;
 	for (int i = 0; i < photoCount; ++i)
 		grid->addWidget(_paneWidgets[i], i / columns, i % columns);
-	// Equal stretch keeps every cell the same size (including a 3-way compare's empty 4th cell): the
-	// shared pan is in widget coordinates, so equally sized panes is what makes the same widget position
-	// show the same subject point in each.
+	// Shared widget-space pan requires equally sized panes.
 	for (int c = 0; c < columns; ++c)
 		grid->setColumnStretch(c, 1);
 	for (int r = 0; r < rows; ++r)
@@ -699,8 +628,7 @@ void PhotoCompareWindow::rebuildPaneGrid()
 void PhotoCompareWindow::dragEnterEvent(QDragEnterEvent* event)
 {
 	if (_loadBatch)
-		return;  // one batch at a time: deny drops until the current load is applied
-	// Accept any local path; folders are expanded and non-images filtered out on drop.
+		return;
 	const QList<QUrl> urls = event->mimeData()->urls();
 	if (std::any_of(urls.cbegin(), urls.cend(), [](const QUrl& url) { return url.isLocalFile(); }))
 		event->acceptProposedAction();
@@ -708,10 +636,6 @@ void PhotoCompareWindow::dragEnterEvent(QDragEnterEvent* event)
 
 void PhotoCompareWindow::dropEvent(QDropEvent* event)
 {
-	// A dropped folder is scanned recursively for image files (so a whole shoot drops in at once); plain files
-	// pass straight to the load attempt in addPhotosFromFiles. The total is capped at MaxImages, counting photos
-	// already loaded: each photo holds a full-resolution image plus its mipmap chain, so an unbounded folder would
-	// exhaust memory - and, as in showForFiles, a larger set stops being a useful comparison.
 	QStringList paths;
 	for (const QUrl& url : event->mimeData()->urls())
 	{
@@ -724,7 +648,6 @@ void PhotoCompareWindow::dropEvent(QDropEvent* event)
 			continue;
 		}
 		QStringList folderImages = collectFilesInDirectory(localPath, /*recursive=*/true, isSupportedImageFile);
-		// filesystem order is unspecified; sort so the panes follow file-name order
 		std::ranges::sort(folderImages, &NaturalSort::lessCaseSensitive);
 		paths += folderImages;
 	}
@@ -738,9 +661,9 @@ void PhotoCompareWindow::dropEvent(QDropEvent* event)
 	{
 		const QString notice = tr("The comparison is limited to %1 photos; the remaining dropped files were skipped.").arg(MaxImages);
 		if (_loadBatch)
-			_loadBatch->completionNotice = notice;  // shown on apply; the load's own hint updates would overwrite it if set now
+			_loadBatch->completionNotice = notice;
 		else
-			_hintLabel->setText(notice);  // capacity was 0, so no load started and nothing will overwrite the notice
+			_hintLabel->setText(notice);
 	}
 	event->acceptProposedAction();
 }
@@ -762,11 +685,11 @@ void PhotoCompareWindow::keyPressEvent(QKeyEvent* event)
 	{
 		if (event->modifiers().testFlag(Qt::ShiftModifier))
 		{
-			exitFullView();  // calibration points are placed per grid pane
+			exitFullView();
 			setCalibrating(!_calibrating);
 		}
 		else
-			autoAlignPhotos();  // works in the full view too
+			autoAlignPhotos();
 	}
 	else if (key == Qt::Key_F || key == Qt::Key_Home || (ctrl && key == Qt::Key_0))
 		fitView();
@@ -782,7 +705,7 @@ void PhotoCompareWindow::keyPressEvent(QKeyEvent* event)
 	else if (key == Qt::Key_R && !event->isAutoRepeat() && !_photos.empty())
 		resetToInitialState();
 	else if (_fullViewIndex >= 0 && (key == Qt::Key_Left || key == Qt::Key_Right))
-		_slider->setValue(_slider->value() + (key == Qt::Key_Right ? 1 : -1));  // setValue clamps to the range
+		_slider->setValue(_slider->value() + (key == Qt::Key_Right ? 1 : -1));
 	else if (!ctrl && !_calibrating && !event->isAutoRepeat() &&
 	         key >= Qt::Key_1 && key <= Qt::Key_9 && key < Qt::Key_1 + static_cast<int>(_photos.size()))
 	{
@@ -821,11 +744,7 @@ QPointF PhotoCompareWindow::imageFromWidget(const Photo& photo, const QPointF& w
 
 const QImage& PhotoCompareWindow::imageForScale(Photo& photo, double effectiveScale, double devicePixelRatio, double& residualScale)
 {
-	// Pick the halving-chain level against the PHYSICAL target (effectiveScale * devicePixelRatio): the widget
-	// paints in logical units, but Qt blits to a devicePixelRatio-denser backing store, so choosing by the
-	// logical scale alone hands a too-coarse mip to be upscaled on HiDPI. Selecting by the physical scale keeps
-	// the painter's live bilinear pass minifying by <= 2x in REAL pixels - bilinear aliases badly past that (the
-	// same lesson as ThumbnailWidget's pre-resample fix). Levels are built once, on demand.
+	// Select mipmaps in physical pixels; logical scale alone is too coarse on HiDPI.
 	const double pickScale = effectiveScale * devicePixelRatio;
 	int level = 0;
 	double levelScale = 1.0;
@@ -838,12 +757,12 @@ const QImage& PhotoCompareWindow::imageForScale(Photo& photo, double effectiveSc
 	{
 		const QImage& prev = photo.mipmaps.empty() ? photo.image : photo.mipmaps.back();
 		if (prev.width() <= 1 || prev.height() <= 1)
-			break;  // can't halve any further; level is clamped to what exists below
+			break;
 		photo.mipmaps.push_back(prev.scaled((prev.width() + 1) / 2, (prev.height() + 1) / 2,
 		                                    Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
 	}
 	level = std::min(level, static_cast<int>(photo.mipmaps.size()));
-	residualScale = effectiveScale * std::pow(2.0, level);  // logical: the painter still works in device-independent units
+	residualScale = effectiveScale * std::pow(2.0, level);
 	return level == 0 ? photo.image : photo.mipmaps[level - 1];
 }
 
@@ -852,7 +771,7 @@ void PhotoCompareWindow::zoomView(double factor, const QPointF& widgetAnchor)
 	const double newZoom = std::clamp(_viewZoom * factor, 0.01, 100.0);
 	const double applied = newZoom / _viewZoom;
 	_viewZoom = newZoom;
-	_viewPan = widgetAnchor - applied * (widgetAnchor - _viewPan);  // keeps the subject point under the cursor fixed
+	_viewPan = widgetAnchor - applied * (widgetAnchor - _viewPan);
 	_viewTouched = true;
 	updateAllPanes();
 }
@@ -887,22 +806,20 @@ void PhotoCompareWindow::zoomToActualPixels()
 	const QSizeF paneSize = pane->size();
 	if (paneSize.isEmpty())
 		return;
-	// The reference's on-screen scale is _viewZoom * alignScale in LOGICAL pixels; dividing by the pane's
-	// devicePixelRatio is what makes it a true 1:1 with physical pixels on HiDPI rather than DPR-magnified.
+	// Actual pixels means physical, not Qt logical, pixels.
 	const double targetZoom = 1.0 / (pane->devicePixelRatioF() * _photos[_refIndex].alignScale);
-	zoomView(targetZoom / _viewZoom, QPointF(paneSize.width() / 2.0, paneSize.height() / 2.0));  // keep the center fixed
+	zoomView(targetZoom / _viewZoom, QPointF(paneSize.width() / 2.0, paneSize.height() / 2.0));
 }
 
 void PhotoCompareWindow::adjustPhotoScale(int index, double factor, const QPointF& widgetAnchor)
 {
-	// Rescale one photo's alignment keeping ITS point under the cursor fixed (the other panes don't move).
 	Photo& photo = _photos[index];
 	const QPointF subjectAnchor = subjectFromWidget(widgetAnchor);
 	const QPointF imageAnchor = imageFromWidget(photo, widgetAnchor);
 	photo.alignScale = std::clamp(photo.alignScale * factor, 0.01, 100.0);
 	photo.alignOffset = subjectAnchor - photo.alignScale * rotated(imageAnchor, photo.alignRotation);
 	_viewTouched = true;
-	updateAllPanes();  // flicker can be rendering this photo in other panes, so update all (it's <= 4 repaints)
+	updateAllPanes();
 }
 
 void PhotoCompareWindow::movePhotoOffset(int index, const QPointF& widgetDelta)
@@ -912,11 +829,7 @@ void PhotoCompareWindow::movePhotoOffset(int index, const QPointF& widgetDelta)
 	updateAllPanes();
 }
 
-// Folds the reference's alignment into the view transform, making subject space the reference's pixel coords
-// (the frame both alignment paths work in) while the reference stays pixel-frozen on screen. The view has no
-// rotation, so only the scale+offset part can be folded: a (rare) rotation on the reference itself becomes a
-// small one-time visual jump as it rebases; subject space stays exact. The user's align region lives in
-// subject space, so it is rebased along, keeping it glued to its content.
+// Rebase subject space to reference pixels while preserving its on-screen scale and offset.
 AlignmentTransform PhotoCompareWindow::rebaseSubjectSpaceToReference()
 {
 	Photo& ref = _photos[_refIndex];
@@ -941,45 +854,37 @@ void PhotoCompareWindow::autoAlignPhotos()
 	for (Photo& photo : _photos)
 	{
 		photo.alignMarks.clear();
-		photo.alignScored = false;  // re-derived below for each non-reference photo; the reference stays unscored
+		photo.alignScored = false;
 	}
 
 	Photo& ref = _photos[_refIndex];
-	// The library works in the reference's PIXEL space - rebase subject space onto it. From here on each
-	// photo's current mapping serves both as the initial guess and as the kept alignment when the aligner
-	// reports failure, and the rebased _alignAoi is directly usable as the library's areaOfInterest.
 	const AlignmentTransform refTransform = rebaseSubjectSpaceToReference();
 
-	// Non-reference photos align against the reference independently, so run them across the window pool. Each
-	// task writes only its own _photos[targets[k]] and its own contrib[k]; the reference-side marks (every
-	// photo appends to the single ref.alignMarks) and _alignMarkSize are merged on this thread after the
-	// region, in photo order, so the outcome is bit-identical to a serial run. alignImages still receives the
-	// pool: nesting parallelFor on it is deadlock-free and self-balancing - few photos let each inner fit use
-	// the spare cores, many photos saturate the pool from the outer loop so each fit then runs mostly inline.
-	const bool fitRotation = !_ignoreRotationCheck->isChecked();  // hoisted: no widget access off the GUI thread
+	// Workers write disjoint photos; reference-side diagnostics are merged serially below.
+	const bool fitRotation = !_ignoreRotationCheck->isChecked();  // Do not access widgets from workers.
 
-	std::vector<size_t> targets;  // the non-reference photos, in order
+	std::vector<size_t> targets;
 	for (size_t i = 0; i < _photos.size(); ++i)
 		if (static_cast<int>(i) != _refIndex)
 			targets.push_back(i);
 
 	struct RefContribution { std::vector<AlignmentMark> refMarks; double patchSize = 0.0; };
-	std::vector<RefContribution> contrib(targets.size());  // one slot per task, merged serially below
+	std::vector<RefContribution> contrib(targets.size());
 
 	_workerPool.parallelFor(targets.size(), [&](size_t k) {
 		Photo& photo = _photos[targets[k]];
 		AlignmentOptions options;
-		options.areaOfInterest = _alignAoi;  // empty = whole frame
+		options.areaOfInterest = _alignAoi;
 		options.fitRotation = fitRotation;
-		// refTransform^-1 * photoTransform: the photo's mapping into the rebased subject space.
+		// refTransform^-1 * photoTransform.
 		options.initialGuess = { photo.alignScale / refTransform.scale, photo.alignRotation - refTransform.rotation,
 		                         rotated(photo.alignOffset - refTransform.offset, -refTransform.rotation) / refTransform.scale };
 		QElapsedTimer alignTimer;
 		alignTimer.start();
 		const AlignmentResult result = alignImages(ref.image, photo.image, options, &_workerPool);
-		photo.alignTimeMs = alignTimer.nsecsElapsed() / 1e6;  // wall time; under the parallel run it reflects core contention
+		photo.alignTimeMs = alignTimer.nsecsElapsed() / 1e6;
 		contrib[k].patchSize = result.patchSize;
-		photo.alignConfidence = result.confidence;        // all surfaced in this photo's corner caption, success or not
+		photo.alignConfidence = result.confidence;
 		photo.alignBootstrapZncc = result.bootstrapZncc;
 		photo.alignRotationSigma = result.rotationSigma;
 		photo.alignSucceeded = result.succeeded;
@@ -991,7 +896,7 @@ void PhotoCompareWindow::autoAlignPhotos()
 			                : patchInfo.fate == AlignmentPatchFate::Outlier ? AlignmentMark::Kind::Outlier
 			                                                                : AlignmentMark::Kind::Failed;
 			contrib[k].refMarks.push_back({ patchInfo.refPoint, kind });
-			if (patchInfo.zncc > 0.0)  // targetPoint is meaningless for a patch that never matched
+			if (patchInfo.zncc > 0.0)  // targetPoint is undefined when no match was found.
 				photo.alignMarks.push_back({ patchInfo.targetPoint, kind });
 		}
 		if (result.succeeded)
@@ -1000,7 +905,7 @@ void PhotoCompareWindow::autoAlignPhotos()
 			photo.alignRotation = result.transform.rotation;
 			photo.alignOffset = result.transform.offset;
 		}
-		else  // keep the (rebased) current alignment; the caption's conf/coarse scores tell the story
+		else
 		{
 			photo.alignScale = options.initialGuess.scale;
 			photo.alignRotation = options.initialGuess.rotation;
@@ -1008,10 +913,9 @@ void PhotoCompareWindow::autoAlignPhotos()
 		}
 	});
 
-	// Merge each photo's reference-side marks in photo order (identical to the serial accumulation).
 	for (const RefContribution& c : contrib)
 		ref.alignMarks.insert(ref.alignMarks.end(), c.refMarks.begin(), c.refMarks.end());
-	_alignMarkSize = contrib.front().patchSize;  // every call returns the same patchSize; in reference px == subject units
+	_alignMarkSize = contrib.front().patchSize;
 	QApplication::restoreOverrideCursor();
 	updateAllPanes();
 }
@@ -1024,15 +928,14 @@ Qt::CursorShape PhotoCompareWindow::idleCursor() const
 void PhotoCompareWindow::setCalibrating(bool calibrating)
 {
 	_calibrating = calibrating;
-	_slider->setEnabled(!calibrating);  // the full view has no per-pane clicks, so it is off-limits mid-calibration
-	// Calibration clicks map to the pane's own photo, so a still-held flicker override (panes showing some
-	// other photo) would have the user placing points against the wrong picture - drop it.
+	_slider->setEnabled(!calibrating);
+	// Calibration clicks must correspond to each pane's own photo.
 	_flickerIndex = -1;
 	for (Photo& photo : _photos)
 	{
 		photo.calibPoints.clear();
-		photo.alignMarks.clear();  // stale auto-align circles would only be clutter under the crosshairs
-		photo.alignScored = false;  // and the auto-align scores they went with
+		photo.alignMarks.clear();
+		photo.alignScored = false;
 	}
 	for (PhotoComparePane* paneWidget : _paneWidgets)
 		paneWidget->setCursor(idleCursor());
@@ -1045,10 +948,9 @@ void PhotoCompareWindow::addCalibrationPoint(int index, const QPointF& imagePos)
 	auto& points = _photos[index].calibPoints;
 	if (points.size() >= 2)
 		return;
-	// A near-duplicate would make the two-point distance ratio meaningless (or divide by ~zero) - ignore it.
+	// Near-duplicates make the two-point distance ratio unstable.
 	if (points.size() == 1 && QLineF(points[0], imagePos).length() < 4.0)
 		return;
-	// The pane receiving the session's very first point becomes the reference the others are mapped onto.
 	if (std::all_of(_photos.cbegin(), _photos.cend(), [](const Photo& photo) { return photo.calibPoints.empty(); }))
 		_refIndex = index;
 	points.push_back(imagePos);
@@ -1073,14 +975,10 @@ void PhotoCompareWindow::undoCalibrationPoint(int index)
 
 void PhotoCompareWindow::applyCalibration()
 {
-	// The reference is the pane that received the session's first point: subject space becomes its pixel
-	// coords. Every other photo maps onto it by the similarity that carries its two clicked points exactly
-	// onto the reference's two: scale = the distance ratio, rotation = the angle between the segments,
-	// offset = what maps the midpoints. Two point pairs determine all four parameters, so this handles
-	// arbitrary angles - beyond auto-align's small-angle capture range.
+	// Two point pairs determine the scale, rotation, and offset similarity exactly.
 	const Photo& ref = _photos[_refIndex];
 	const QLineF refLine(ref.calibPoints[0], ref.calibPoints[1]);
-	rebaseSubjectSpaceToReference();  // the reference image stays exactly where it was on screen; only the other photos move to meet it
+	rebaseSubjectSpaceToReference();
 	for (size_t i = 0; i < _photos.size(); ++i)
 	{
 		if (static_cast<int>(i) == _refIndex)
@@ -1088,24 +986,23 @@ void PhotoCompareWindow::applyCalibration()
 		Photo& photo = _photos[i];
 		const QLineF line(photo.calibPoints[0], photo.calibPoints[1]);
 		photo.alignScale = refLine.length() / line.length();
-		// std::remainder wraps the atan2 difference back into [-Pi, Pi]
 		const double rotation = std::remainder(std::atan2(refLine.dy(), refLine.dx()) - std::atan2(line.dy(), line.dx()), 2.0 * std::numbers::pi);
 		photo.alignRotation = rotation;
 		photo.alignOffset = refLine.center() - photo.alignScale * rotated(line.center(), rotation);
 	}
-	setCalibrating(false);  // also repaints all panes
+	setCalibrating(false);
 }
 
 void PhotoCompareWindow::setFullViewIndex(int index)
 {
 	const bool entering = _fullViewIndex < 0;
 	_fullViewIndex = index;
-	_slider->setValue(index);  // no-op when the slider itself is the source
-	if (entering)  // the viewport grows from one grid cell to the whole stack area
+	_slider->setValue(index);
+	if (entering)
 		switchViewportPage(1, _paneWidgets[0]->size(), _viewStack->widget(0)->size());
 	else
 	{
-		updateHintText();  // the "N/M" position readout
+		updateHintText();
 		updateAllPanes();
 	}
 }
@@ -1115,19 +1012,17 @@ void PhotoCompareWindow::exitFullView()
 	if (_fullViewIndex < 0)
 		return;
 	_fullViewIndex = -1;
-	// Grid panes keep their pre-full-view geometry while hidden, so pane 0's size is the new viewport.
 	switchViewportPage(0, _fullPane->size(), _paneWidgets[0]->size());
 }
 
 void PhotoCompareWindow::switchViewportPage(int page, const QSizeF& oldViewportSize, const QSizeF& newViewportSize)
 {
 	_viewStack->setCurrentIndex(page);
-	// A touched view keeps the subject point at the viewport's center fixed (both sizes were read before the
-	// switch); an untouched one re-fits to the new viewport as it would on any resize.
+	// Preserve the center for a user-positioned view; otherwise keep fitting automatically.
 	if (_viewTouched)
 		_viewPan += QPointF(newViewportSize.width() - oldViewportSize.width(), newViewportSize.height() - oldViewportSize.height()) / 2.0;
 	else
-		fitView();  // a stale new-pane size here self-corrects: the layout resizes it -> onPaneResized -> re-fit
+		fitView();
 	updateHintText();
 	updateAllPanes();
 }
@@ -1135,14 +1030,12 @@ void PhotoCompareWindow::switchViewportPage(int page, const QSizeF& oldViewportS
 void PhotoCompareWindow::setDifferenceMode(bool difference)
 {
 	_differenceMode = difference;
-	_diffToggle->setCurrentIndex(difference ? 1 : 0);  // silent; a no-op when the toggle itself is the source
+	_diffToggle->setCurrentIndex(difference ? 1 : 0);
 	updateAllPanes();
 }
 
 void PhotoCompareWindow::onPaneResized()
 {
-	// Until the user navigates, every layout change (first show, maximize, a later window resize) re-fits
-	// the view; after that the view is theirs and resizes leave it alone.
 	if (!_viewTouched)
 		fitView();
 }

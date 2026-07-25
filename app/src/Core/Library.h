@@ -10,32 +10,22 @@ class Catalog;
 class LibraryState;
 class MetadataStore;
 
-// The current Darkroom library. Its root, persistence store, and catalog form one private State that is
-// replaced only after a new root has loaded successfully. The Library object itself is stable - immovable, and
-// never rebuilt - so persistent collaborators can borrow it across root changes. GUI-thread only.
-//
-// A default-constructed Library is EMPTY: it holds no root, store or catalog, and only setRoot(),
-// isLoaded(), flushPendingWrites() and pendingPersistenceError() may be called on it. That state exists so the
-// owner can construct the Library as a plain member and load it afterwards; everything else asserts. Loading is
-// setRoot()'s job whether it is the first root or a later one - there is deliberately no second way in.
+// Stable, immovable GUI-thread owner of one root-bound Catalog and MetadataStore. setRoot() atomically replaces
+// that private state, so persistent collaborators may borrow Library across root changes. A default Library is
+// empty; only loading/status/persistence operations are valid until setRoot() succeeds.
 class Library
 {
 public:
 	Library();
 
-	// Flushes the current state, then loads a complete candidate State before replacing it. Failure leaves every
-	// current object and path untouched; unsaved current state can therefore never be discarded by switching.
-	// The first successful call loads an empty Library: a missing root/files is a valid new library, so the root
-	// directory and initial label registry are created here, and failing to save that registry fails the load.
+	// Flushes first, then loads a complete candidate before replacement. Failure preserves the current state.
+	// Missing roots/files create a new library; failure to persist its initial registry fails the load.
 	[[nodiscard]] bool setRoot(const QString& root, QString* error = nullptr);
 
-	// Whether the folder has already been used as a library root. setRoot() does not care - a fresh folder is a
-	// valid new library - so this exists for callers that must tell "create a new library here" apart from
-	// "adopt the library that is already here".
+	// Distinguishes "create here" from adopting an existing library; setRoot() accepts either.
 	[[nodiscard]] static bool holdsLibrary(const QString& folder);
 
-	// False until the first setRoot() succeeds. The accessors below assert on an empty Library rather than
-	// inventing a value, so ask this only where "no library yet" is genuinely reachable - i.e. at startup.
+	// Accessors below assert until the first successful setRoot().
 	[[nodiscard]] bool isLoaded() const { return _state != nullptr; }
 
 	[[nodiscard]] const QString& rootFolder() const;
@@ -44,9 +34,7 @@ public:
 	[[nodiscard]] const Catalog& catalog() const;
 	[[nodiscard]] MetadataStore& metadataStore();
 	[[nodiscard]] const MetadataStore& metadataStore() const;
-	// Retries every dirty JSON store. A failed store remains dirty; error combines every path that still could
-	// not be saved. The failure handler fires when a store first gains a pending error; the caller decides how
-	// and when to present it. An empty Library has nothing to flush and no error to report.
+	// Retries every dirty JSON store. Failures remain dirty and error combines their paths. An empty Library succeeds.
 	[[nodiscard]] bool flushPendingWrites(QString* error = nullptr);
 	[[nodiscard]] QString pendingPersistenceError() const;
 	void setPersistenceFailureHandler(std::function<void()> handler);

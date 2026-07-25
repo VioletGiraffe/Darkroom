@@ -6,11 +6,8 @@
 #include <QStringBuilder>
 
 namespace {
-	// key() (hence qHash, hence the persisted catalog key) and operator== must fold case identically, or QHash's
-	// "a == b implies qHash(a) == qHash(b)" breaks and equal ids miss on lookup - hence one shared fold rather than
-	// two spellings of "ignore case": toLower() is lowercase mapping, QString::compare's Qt::CaseInsensitive is case
-	// folding, and the two are not guaranteed to agree on every input. toLower() is the one that stays, because
-	// key() is persisted - a different fold would orphan every existing record whose name it moves.
+	// Equality and the persisted hash key must share this exact fold. Switching from toLower() would also orphan
+	// records whose canonical names change.
 	QString nameForMatching(const QString& name) { return name.toLower(); }
 }
 
@@ -47,6 +44,5 @@ uint64_t MediaId::hash() const
 
 bool MediaId::operator==(const MediaId& other) const
 {
-	// Size first: it settles almost every comparison without folding anything.
 	return _size == other._size && nameForMatching(_name) == nameForMatching(other._name);
 }

@@ -12,7 +12,6 @@ class ThumbnailWidget;
 
 class CompareWindow final : public QWidget {
 public:
-	// folderPaths: the selected video-frame folders to compare side by side.
 	explicit CompareWindow(const QStringList& folderPaths, QWidget* parent = nullptr);
 	~CompareWindow();
 
@@ -24,7 +23,6 @@ private:
 	void loadCurrentFrame();
 
 private:
-	// Per-folder sorted image file lists.
 	std::vector<QStringList> _folderFrames;
 
 	std::vector<ThumbnailWidget*> _thumbnailWidgets;

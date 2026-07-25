@@ -18,8 +18,6 @@ namespace {
 
 using SourceRelocation::Mode;
 
-// Performs the actual copy/move; on failure, warns and falls back to leaving
-// the file at srcPath so the caller can still import it from there.
 [[nodiscard]] QString copyOrMove(QWidget* dialogParent, const QString& srcPath, const QString& destPath, bool isMove)
 {
 	const bool ok = isMove ? QFile{ srcPath }.rename(destPath) : QFile::copy(srcPath, destPath);
@@ -32,15 +30,6 @@ using SourceRelocation::Mode;
 	return destPath;
 }
 
-// ============================================================================
-// FileCollisionDialog - shown when the relocation destination already has a
-// file with the same name as the one being added.
-//
-// Not a plain QMessageBox because the "files differ" case offers Play buttons
-// that must NOT close the dialog (they let the user preview both files before
-// deciding), alongside the decision buttons that do.
-// ============================================================================
-
 class FileCollisionDialog final : public QDialog
 {
 public:
@@ -51,10 +40,7 @@ public:
 	{
 		setWindowTitle(isDuplicate ? tr("Duplicate File Found") : tr("File Already Exists"));
 
-		// WindowModal (not the exec()-default ApplicationModal) blocks only this
-		// dialog's parent (ImportDialog) and up - it deliberately leaves sibling
-		// top-level windows, such as the VideoPlayerWindow opened by the Play
-		// buttons below, interactive.
+		// Keep preview player windows interactive while this decision is open.
 		setWindowModality(Qt::WindowModal);
 
 		QVBoxLayout* layout = new QVBoxLayout(this);
@@ -70,10 +56,7 @@ public:
 
 		if (!isDuplicate)
 		{
-			// Play buttons open a preview parented to the outer ImportDialog
-			// (this dialog's parent), not to this dialog - this dialog is
-			// destroyed as soon as Overwrite/Skip is clicked, which would
-			// otherwise kill an in-progress preview along with it.
+			// Preview windows must outlive this short-lived collision dialog.
 			QWidget* previewParent = parent;
 			Library* const playerLibrary = &library;
 
@@ -112,8 +95,6 @@ public:
 			connect(skip, &QPushButton::clicked, this, [this] { _result = Result::Skip; accept(); });
 			buttonRow->addWidget(skip);
 
-			// Defer: import nothing, touch no file, and leave the entry staged so
-			// the user can deal with the name clash later.
 			QPushButton* cancel = new QPushButton(tr("Cancel"), this);
 			connect(cancel, &QPushButton::clicked, this, [this] { _result = Result::Cancel; accept(); });
 			buttonRow->addWidget(cancel);
@@ -125,43 +106,30 @@ public:
 	[[nodiscard]] Result result() const { return _result; }
 
 private:
-	// Cancel is the default so dismissing the dialog (Escape / window close) defers
-	// rather than taking any action - the safe no-op for either flavor.
 	Result _result = Result::Cancel;
 };
 
-// Outcome of relocating one file. importPath empty => don't import it; of those, keepStaged true => the
-// user deferred (Cancel), so leave it staged for a later retry, while keepStaged false => the collision was
-// resolved as "don't import" (Skip / Skip and Delete), so the entry should be cleared from staging.
 struct RelocationOutcome
 {
 	QString importPath;
 	bool keepStaged = false;
 };
 
-// Resolves relocation (including any naming collision) for a single file.
-// On a collision "Skip"/"Skip and Delete" the destination is treated as the
-// already-catalogued copy and this item is not imported; "Cancel" additionally
-// keeps it staged. File-operation *failures* fall back to importing from the
-// original path, so an I/O error never silently drops a file the user wanted.
+// I/O failures fall back to the original path so relocation cannot silently drop an import.
 [[nodiscard]] RelocationOutcome performRelocation(Library& library, QWidget* dialogParent, const QString& path, Mode mode,
 	const QString& destFolder)
 {
 	const QString destPath = destFolder + "/" + QFileInfo(path).fileName();
 	const bool isMove = (mode == Mode::Move);
 
-	// Already at the destination - e.g. a retry after an earlier Copy/Move whose import was declined (the
-	// staged entry follows the file, see ImportDialog::runImport) - so there is nothing to relocate and,
-	// critically, no "collision": without this the file would be compared against itself and offered up as a duplicate.
+	// A retry may already point at the destination; do not compare the file with itself.
 	if (QFileInfo(path) == QFileInfo(destPath))
 		return { path, false };
 
 	if (!QFile::exists(destPath))
 		return { copyOrMove(dialogParent, path, destPath, isMove), false };
 
-	// A name+size match (MediaId) is the cheap first gate; on that collision a full byte comparison confirms
-	// a genuine duplicate, so the astronomically-rare same-name/same-size/different-content case is still
-	// classified as "files differ". The && short-circuits the byte read when the MediaIds (sizes) differ.
+	// MediaId is only the cheap gate; confirm duplicates byte-for-byte.
 	const bool isDuplicate = (MediaId::fromFile(path) == MediaId::fromFile(destPath)) && filesAreIdentical(path, destPath);
 	FileCollisionDialog collisionDialog(library, path, destPath, isDuplicate, dialogParent);
 	collisionDialog.exec();
@@ -172,23 +140,23 @@ struct RelocationOutcome
 		if (!QFile::remove(destPath))
 		{
 			QMessageBox::warning(dialogParent, QObject::tr("Error"), QObject::tr("Failed to overwrite existing file:\n%1").arg(destPath));
-			return { path, false }; // I/O failure - fall back to importing from the original
+			return { path, false };
 		}
 		return { copyOrMove(dialogParent, path, destPath, isMove), false };
 
 	case FileCollisionDialog::Result::SkipAndDelete:
 		if (!QFile::remove(path))
 			QMessageBox::warning(dialogParent, QObject::tr("Error"), QObject::tr("Failed to delete duplicate file:\n%1").arg(path));
-		return { {}, false }; // not imported, removed from staging
+		return { {}, false };
 
 	case FileCollisionDialog::Result::Skip:
-		return { {}, false }; // not imported, removed from staging
+		return { {}, false };
 
 	case FileCollisionDialog::Result::Cancel:
 		break;
 	}
 
-	return { {}, true }; // deferred - not imported, kept staged
+	return { {}, true };
 }
 
 } // namespace

@@ -45,7 +45,7 @@ FrameViewerWindow::FrameViewerWindow(QWidget* parent)
 
 	_scrollArea = new QScrollArea(this);
 	_scrollArea->setWidgetResizable(true);
-	_scrollArea->setFrameShape(QFrame::NoFrame);   // the whole client area is this scroll area - nothing to frame off
+	_scrollArea->setFrameShape(QFrame::NoFrame);
 	_scrollArea->setFocusPolicy(Qt::StrongFocus);
 	_scrollArea->viewport()->setMouseTracking(true);
 
@@ -144,7 +144,7 @@ void FrameViewerWindow::zoomThumbnails(int steps)
 
 	_thumbnailSize = next;
 	QSettings{}.setValue(SETTINGS_KEY_THUMBNAIL_SIZE, _thumbnailSize);
-	_refreshDebounceTimer->start(); // rebuild once the wheel settles
+	_refreshDebounceTimer->start();
 }
 
 void FrameViewerWindow::showThumbnailContextMenu(const QPoint& pos)
@@ -163,5 +163,5 @@ void FrameViewerWindow::showThumbnailContextMenu(const QPoint& pos)
 	});
 	menu.exec(senderWidget->mapToGlobal(pos));
 
-	clearStuckHoverIfCursorLeft(senderWidget);  // else the popup grab leaves #framedThumbnail:hover stuck on
+	clearStuckHoverIfCursorLeft(senderWidget);
 }

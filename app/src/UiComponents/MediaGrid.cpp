@@ -14,11 +14,8 @@
 
 namespace {
 
-// Largest edge of the card drag image; a bigger card is scaled down so the drag cursor stays a reasonable size.
 static constexpr int MAX_DRAG_IMAGE_EDGE = 180;
 
-// Draws a small count badge onto the top-right of the drag image to signal that more than one file is being
-// dragged (mirrors the card's split-pending badge look: translucent black disc, white glyph).
 void paintDragCountBadge(QPixmap& pixmap, int count)
 {
 	QPainter p{ &pixmap };
@@ -60,7 +57,7 @@ void MediaGrid::paintEvent(QPaintEvent* event)
 
 	if (_emptyMessage.isEmpty())
 		return;
-	for (int row = 0; row < count(); ++row)   // any visible item -> no empty state (cheap: bool checks only)
+	for (int row = 0; row < count(); ++row)
 		if (!item(row)->isHidden())
 			return;
 
@@ -69,13 +66,12 @@ void MediaGrid::paintEvent(QPaintEvent* event)
 	QFont font = p.font();
 	font.setPointSizeF(font.pointSizeF() + 2);
 	p.setFont(font);
-	// Inset so a long message wraps well clear of the edges and any scrollbar.
 	p.drawText(viewport()->rect().adjusted(20, 20, -20, -20), Qt::AlignCenter | Qt::TextWordWrap, _emptyMessage);
 }
 
 void MediaGrid::wheelEvent(QWheelEvent* event)
 {
-	// QListView forces the scrollbar's singleStep to the row height on every layout pass. Bypass that by scrolling the viewport directly with a fixed pixel step.
+	// QListView resets the scrollbar step to the row height on every layout pass.
 	const int dy = event->angleDelta().y();
 	if (dy != 0)
 	{
@@ -88,16 +84,13 @@ void MediaGrid::wheelEvent(QWheelEvent* event)
 
 void MediaGrid::startDrag(Qt::DropActions /*supportedActions*/)
 {
-	// The view already resolved the selection on press (a plain press on an unselected card selects just it; a
-	// press within a multi-selection keeps the group - see the setDragEnabled note in MainWindow::setupUI), so
-	// the current selection is exactly what the user grabbed.
 	const QList<QListWidgetItem*> items = selectedItems();
 	if (items.isEmpty() || !_dragUrlsProvider)
 		return;
 
 	const QList<QUrl> urls = _dragUrlsProvider(items);
 	if (urls.isEmpty())
-		return;   // nothing to export (e.g. every selected file is missing / on an unmounted drive)
+		return;
 
 	auto* mime = new QMimeData();
 	mime->setUrls(urls);
@@ -105,7 +98,6 @@ void MediaGrid::startDrag(Qt::DropActions /*supportedActions*/)
 	auto* drag = new QDrag(this);
 	drag->setMimeData(mime);
 
-	// Drag image: the card actually under the cursor (falls back to the first selected one).
 	QListWidgetItem* grabbed = itemAt(viewport()->mapFromGlobal(QCursor::pos()));
 	if (!grabbed || !grabbed->isSelected())
 		grabbed = items.first();
@@ -120,6 +112,5 @@ void MediaGrid::startDrag(Qt::DropActions /*supportedActions*/)
 		drag->setHotSpot(QPoint(pixmap.width() / 2, pixmap.height() / 2));
 	}
 
-	// Copy only: dragging a card out must never move or delete the original in the library.
 	drag->exec(Qt::CopyAction);
 }

@@ -20,201 +20,124 @@ class QWidget;
 class MediaItemWidget;
 class Library;
 
-// ============================================================================
-// ImportDialog - stage new video and photo files, label them, then import everything labeled in one
-// "Import" step.
-//
-// Mirrors the main window's own label model: a small label-list panel (like LabelSidebar, minus
-// filtering) sits next to a big grid of staged item cards (MediaItemWidget, same as the main grid).
-// Dragging a label from the list onto a staged card tags it, exactly like dragging a label onto an item
-// card in the main window; the star button toggles Best the same way too.
-//
-// The label list holds the Catalog's real labels plus this session's *provisional* ones: dropping a folder mints
-// one per folder (named for the folder's relative path, e.g. "Root-cars-2026") and pre-assigns its files, and
-// "Create label" mints one too. Provisional labels live only in this dialog - right-click to rename/recolor/delete
-// them - while a real label can't be edited from here.
-//
-// Nothing is written to the Catalog until "Import" runs: it materializes the provisional labels actually used
-// (see runImport), then imports every labeled staged item, clearing it from staging on success. An item stays
-// staged with its labels intact on failure or a deferred (Cancel) relocation collision; a collision resolved as
-// Skip / "Skip and Delete" clears it too - the destination copy stands in for it. Unlabeled items are left
-// alone. Files or folders can also be dropped straight onto the dialog (a folder is scanned recursively).
-// ============================================================================
+// Stages dropped videos/photos as media cards, assigns real or session-provisional labels, then imports every
+// labeled item in one pass. Provisional labels reach Catalog only when used by Import. Failed, cancelled, and
+// unlabeled items remain staged; successful and explicitly skipped collisions leave staging.
 
 class ImportDialog final : public QDialog
 {
 public:
-	// An ordinary (non-virtual) label, for the label-list panel.
 	struct LabelOption
 	{
 		QString id;
 		QString displayName;
-		QString color;  // hex string e.g. "#378ADD"; empty = unset - mirrors Catalog::Label::color
-		bool provisional = false;  // true = minted in this dialog (id "new:<n>"), not yet in the Catalog; created on Import
+		QString color;
+		bool provisional = false;
 	};
 
-	// Host (MainWindow) actions the dialog can't do itself: each either drives host-owned state (the busy
-	// guard, progress UI, view refresh) or is shared with other host flows (label creation). Plain
-	// Catalog reads and writes are done directly - the dialog makes no attempt to be Catalog-agnostic.
+	// Host-owned operations; the dialog accesses Catalog directly for everything else.
 	struct Callbacks
 	{
-		// Adds the given video files to the identified label. stagedPreviewDirs maps each staged video's MediaId to
-		// the temp dir whose preview/ holds the frames already extracted for its card, so import can copy them
-		// instead of re-running ffmpeg (see Import::importVideo); a video absent from the map, or whose staged
-		// frames are gone, is extracted fresh. stagedDurations likewise carries each video's already-probed
-		// duration, so import records it without re-probing.
+		// Staged preview directories contain frames directly; missing entries fall back to extraction.
 		std::function<void(const QString& labelId, const QStringList& videoPaths,
 			const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations)> addMediaItemsRequested;
-		// Imports the given photos under the label (owned modes copy/move each file into the label's photo
-		// dir, Reference tracks them in place - see Import::importPhoto). Returns one result per path, in
-		// order; the host reports Error results itself, so the dialog only branches on the status (an
-		// IdCollision in Reference mode gets the "import an owned copy instead?" escape hatch). A result's
-		// registeredId is the identity actually registered - an owned-import auto-rename changes it from the
-		// staged id, so all post-import bookkeeping (Best, extra labels) must use it.
+		// Returns results in path order; registeredId must key post-import Best/label updates.
 		std::function<std::vector<Import::PhotoResult>(const QString& labelId, const QStringList& photoPaths,
 			Import::PhotoImportMode mode)> importPhotosRequested;
-		// Materializes one provisional label at Import time (called per used provisional from runImport): ensures a
-		// label with this name exists in the catalog and returns its id, which the dialog then rewrites the staged
-		// picks to in place of the provisional stand-in. The color applies only when the label is genuinely new; an
-		// existing same-name label keeps its own. Empty return = creation refused (reserved/invalid name), and the
-		// affected picks are dropped rather than remapped.
+		// Materializes a provisional label; empty means refusal and drops affected picks.
 		std::function<QString(const QString& name, const QString& color)> createLabelRequested;
-		// Called once at the end of an Import that imported at least one item, after the dialog's own
-		// Best/extra-label flush, to repaint the host with the fully-applied state. addMediaItemsRequested may
-		// refresh the host view mid-Import (it imports folder-by-folder), but that refresh predates the flush -
-		// and since the dialog stays open afterwards, the host would visibly show each item's folder label
-		// without its extra labels or Best.
+		// Called after Best/extra-label flushing when at least one item imported.
 		std::function<void()> viewChanged;
 	};
 
-	// suggestedRelocateFolder pre-fills the relocation destination on first use (when
-	// nothing's been persisted yet); see "Source file relocation row" in the .cpp.
 	ImportDialog(Library& library, Callbacks callbacks, const QString& suggestedRelocateFolder, QWidget* parent = nullptr);
 	~ImportDialog() override;
 
-	// Pre-populates the staging area with the given files and/or folders (a folder is scanned recursively for the
-	// supported media under it). Used when handing paths over from the main window's drop or the "Scan for
-	// untracked files" tool. The staging itself is deferred to the event loop - see the .cpp.
+	// Defers staging to the event loop; folders expand recursively.
 	void addToStaging(const QStringList& paths);
 
 protected:
-	// Accepts files and folders dropped anywhere on the dialog (mirrors MainWindow's own top-level drop
-	// handling), staging them directly - same entry point as addToStaging (a folder is expanded to its
-	// supported files).
 	void dragEnterEvent(QDragEnterEvent* event) override;
 	void dropEvent(QDropEvent* event) override;
 
 private:
 	void refreshLabelList();
-	// Extracts temp preview frames for each path and adds it to the staged grid.
 	void stageMediaItems(const QStringList& paths);
-	// Builds and wires one staged card for the given identity/file (the caller inserts it into the grid). Per-type
-	// differences (canvas size, preview images) are derived from the path here; durationMs is passed in because it
-	// isn't. Shared by stageMediaItems and renameStagedItem.
 	[[nodiscard]] MediaItemWidget* buildStagedCard(const MediaId& id, const QString& path, const QString& tempPreviewDir, qint64 durationMs);
-	// Deletes a staged entry's temp preview dir and removes its card; used by "Remove from staging" and
-	// once an entry has been successfully imported by runImport().
+	// Removes the card and its temporary preview directory.
 	void unstage(const MediaId& id);
-	// Re-derives a staged card's label dots from its pendingLabelIds.
 	void updateCardLabelDots(const MediaId& id);
-	// The staged items a card-targeted action applies to: the whole staged selection when `id` is part of a
-	// multi-selection, otherwise just `id`. Mirrors MainWindow::effectiveSelection for the staged grid.
+	// Whole selection when id is selected; otherwise id alone.
 	[[nodiscard]] std::vector<MediaId> effectiveStagedSelection(const MediaId& id) const;
 	void showStagedCardContextMenu(const MediaId& id, const QPoint& globalPos);
-	// Staged-card actions, mirroring MainWindow's media-item context menu but adapted for untracked items. The
-	// single-id ones act on the right-clicked card; the vector ones act on the effective staged selection.
-	void previewStagedItem(const MediaId& id);                       // open a photo in the system viewer / play a video
-	void locateStagedSourceFile(const MediaId& id);                  // reveal the source file in the file manager
-	void copyStagedSourcePath(const MediaId& id);                    // copy the native source path to the clipboard
-	void compareStagedPhotos(const std::vector<MediaId>& photoIds);  // open the staged photos in a PhotoCompareWindow
-	void setBestForStagedSelection(const std::vector<MediaId>& ids, bool inBest);  // set pendingBest + sync each card's star
-	void removeStagedItems(const std::vector<MediaId>& ids);         // drop from staging; no change on disk
-	void deleteStagedSourceFiles(const std::vector<MediaId>& ids);   // delete the source files from disk (confirmed), then unstage
-	[[nodiscard]] std::vector<MediaId> selectedStagedIds() const;    // ids under the grid's current selection (keyboard accelerators)
-	// Renames the staged file on disk and re-keys the entry to the new name-derived MediaId, rebuilding the card in
-	// place (same grid item) so its callbacks bind to the new id - preserving the "staged key == current file's
-	// MediaId" invariant runImport relies on. The extension is kept fixed so the type stays valid.
+	void previewStagedItem(const MediaId& id);
+	void locateStagedSourceFile(const MediaId& id);
+	void copyStagedSourcePath(const MediaId& id);
+	void compareStagedPhotos(const std::vector<MediaId>& photoIds);
+	void setBestForStagedSelection(const std::vector<MediaId>& ids, bool inBest);
+	void removeStagedItems(const std::vector<MediaId>& ids);
+	void deleteStagedSourceFiles(const std::vector<MediaId>& ids);
+	[[nodiscard]] std::vector<MediaId> selectedStagedIds() const;
+	// Renames and re-keys in place, preserving "staged key == current file id"; extension remains fixed.
 	void renameStagedItem(const MediaId& id);
-	// --- Import (the "Import" button); see runImport for the flow ------------------------------------------
-	// One imported item's extra-label picks (every pending label beyond the destination-deciding first one).
-	// Keyed by the *registered* id - an owned-photo auto-rename changes the identity from the staged one.
+
+	// Keyed by registered id because owned-photo import may auto-rename.
 	struct ExtraLabelAssignment
 	{
 		MediaId mediaId;
 		QStringList labelIds;
 	};
-	// Everything one Import run accomplished, accumulated across the per-type group importers below and
-	// applied by runImport's epilogue: succeeded and skipped entries leave staging; the Best flags and
-	// extra-label picks of what landed are flushed to the Catalog.
 	struct ImportOutcome
 	{
 		std::vector<MediaId> succeededIds;
-		std::vector<MediaId> skippedIds;  // relocation collision resolved as "don't import" - cleared from staging like a success, minus the label flush
+		std::vector<MediaId> skippedIds;
 		std::vector<MediaId> bestItems;
 		std::vector<ExtraLabelAssignment> extraLabelAssignments;
 	};
-	// Imports one first-label group's photos under the label via the host, with the "import an owned copy
-	// instead?" escape hatch for a Reference-mode id collision.
 	void importPhotoGroup(const QString& labelId, const std::vector<MediaId>& photoIds, Import::PhotoImportMode mode, ImportOutcome& outcome);
-	// Imports one first-label group's videos: optionally relocates each source file (SourceRelocation), hands
-	// the batch to the host, then classifies each entry into the outcome; a relocated-but-not-imported entry's
-	// staged path follows the file, so a later retry starts from where the file really is.
+	// A relocated but unimported entry follows its file so retry starts from the actual path.
 	void importVideoGroup(const QString& labelId, const std::vector<MediaId>& videoIds, SourceRelocation::Mode relocateMode, ImportOutcome& outcome);
-	// Every staged entry whose pendingLabelIds isn't empty: grouped by the first label dropped on it (which
-	// decides the import destination) and handed to the per-type group importers above, then the accumulated
-	// outcome is applied - the Catalog label flush, unstaging, one host repaint.
+	// Groups labeled entries by their first (destination) label, imports, flushes labels, and unstages outcomes.
 	void runImport();
 	[[nodiscard]] const LabelOption* findLabelOption(const QString& id) const;
 
-	// --- Provisional labels (folder-derived or "Create label"); all mutate _provisionalLabels and re-render via
-	// refreshLabelList. See ImportDialog.cpp for the model. ---------------------------------------------------
 	[[nodiscard]] static bool isProvisionalId(const QString& id);
-	// The id of the label whose display name matches (case-insensitive), skipping excludeId; empty if none.
 	[[nodiscard]] QString findLabelIdByName(const QString& name, const QString& excludeId) const;
-	QString addProvisionalLabel(const QString& name);        // unconditionally mints one, returns its id
-	QString ensureLabelForFolderName(const QString& name);   // reuse an existing same-name label, else mint provisional
+	QString addProvisionalLabel(const QString& name);
+	QString ensureLabelForFolderName(const QString& name);
 	void showLabelListContextMenu(const QPoint& pos);
 	void renameProvisionalLabel(const QString& provisionalId);
 	void setProvisionalLabelColor(const QString& provisionalId);
 	void deleteProvisionalLabel(const QString& provisionalId);
-	// Reassign every staged pick from provisionalId to targetId, then drop the merged provisional (purely local).
 	void mergeProvisionalInto(const QString& provisionalId, const QString& targetId);
-	// The shared mechanics of the label ops above and of materialization below: rewrites every staged entry's
-	// pendingLabelIds through the mapping - an unmapped id passes through, an id mapped to empty is dropped,
-	// and a duplicate the rewrite produces is collapsed (order kept, so the destination-deciding first pick
-	// stays first). Re-derives the dots of every changed card. Returns whether any pick was dropped.
+	// Rewrites staged ids, dropping empty mappings and duplicate results while preserving first-label order.
 	bool remapStagedLabelIds(const QHash<QString, QString>& mapping);
-	void updateAllCardLabelDots();  // re-derive every staged card's dots after a label name/color change
-	// Import prologue: create in the Catalog each provisional label a staged item actually uses, then rewrite every
-	// staged pick from its provisional stand-in to the real id, so the rest of runImport sees only real labels.
+	void updateAllCardLabelDots();
+	// Materializes used provisional labels and rewrites staged picks to real ids.
 	void materializeUsedProvisionalLabels();
 
 private:
-	// Per-staged-item state, accumulated by dragging labels from _labelList onto the card in _stagedGrid and
-	// toggling its Best star; applied (and removed from here) only once "Import" runs successfully. The first id
-	// in pendingLabelIds resolves the item's destination folder at Import time (see runImport) - the one place
-	// this ordering matters, and the only "destination" state there is.
+	// pendingLabelIds[0] is the destination label; the remaining ids are extra labels.
 	struct StagedEntry
 	{
 		QString path;
-		QString tempPreviewDir;      // a video's temp N-frame preview, deleted on unstage/dialog close; empty for a photo (its card decodes the file directly)
-		qint64 durationMs = -1;      // a video's source length in ms, probed during staging; -1 for a photo / an unprobed video. Carried into the Catalog at import
+		QString tempPreviewDir;
+		qint64 durationMs = -1;
 		bool pendingBest = false;
 		QStringList pendingLabelIds;
-		QListWidgetItem* item = nullptr;  // the grid item carrying this entry's MediaItemWidget card
+		QListWidgetItem* item = nullptr;
 	};
 
 	Library& _library;
 	Callbacks _callbacks;
-	std::vector<LabelOption> _labelOptions;       // cached list: _provisionalLabels + the Catalog's real labels
-	std::vector<LabelOption> _provisionalLabels;  // labels minted in-dialog, not in the Catalog until Import materializes them
-	int _provisionalSeq = 0;                      // mints unique provisional ids ("new:<n>")
+	std::vector<LabelOption> _labelOptions;
+	std::vector<LabelOption> _provisionalLabels;
+	int _provisionalSeq = 0;
 	QHash<MediaId, StagedEntry> _staged;
 
 	QListWidget* _labelList  = nullptr;
 	QListWidget* _stagedGrid = nullptr;
 
-	// Source-file relocation controls - the machinery lives in SourceRelocation.h (see runImport for the use).
 	QComboBox* _relocateModeCombo = nullptr;
 	QLineEdit* _relocateFolderEdit = nullptr;
 	QSplitter* _splitter = nullptr;

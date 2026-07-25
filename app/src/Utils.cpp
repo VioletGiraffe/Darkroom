@@ -80,7 +80,7 @@ bool isSupportedVideoFile(const QString& filePath)
 
 bool isSupportedImageFile(const QString& filePath)
 {
-	// Importable photo formats - bounded by what Qt's image plugins decode (cards render via QImage).
+	// Keep this to formats the deployed Qt image plugins decode.
 	static const QStringList supportedExtensions { "jpg", "jpeg", "png", "tif", "tiff", "webp", "bmp" };
 	const QString extension = QFileInfo(filePath).suffix().toLower();
 	return supportedExtensions.contains(extension);
@@ -122,7 +122,6 @@ bool hasSupportedPaths(const QMimeData* mime)
 QStringList supportedPaths(const QMimeData* mime)
 {
 	QStringList paths;
-	// A non-local URL yields an empty local path, which isDirectoryOrSupportedFile rejects - so this also filters those out.
 	for (const QUrl& url : mime->urls())
 	{
 		if (const QString path = url.toLocalFile(); isDirectoryOrSupportedFile(path))
@@ -152,9 +151,7 @@ bool filesAreIdentical(const QString& pathA, const QString& pathB)
 
 QString pathComparisonKey(const QString& path)
 {
-	// Lexical, no stat: every per-item caller compares paths that share a real root prefix, where resolving
-	// symlinks can't change the verdict. The two callers that must see through an alias (untracked scan, "same
-	// library already open") canonicalize their one root themselves. Folds like normalizedRoot, so keys and roots agree.
+	// Callers that must see through aliases canonicalize their shared root before using this lexical key.
 	return QDir::cleanPath(QDir::fromNativeSeparators(path)).toLower();
 }
 
@@ -167,7 +164,6 @@ QChar invalidFilenameChar(const QString& name)
 	return {};
 }
 
-// Lowercase; listFrameImageFiles matches against these case-insensitively.
 static const QStringList FRAME_IMAGE_SUFFIXES { "jpg", "jpeg", "tif", "tiff", "png" };
 
 const QStringList IMAGE_FILE_FILTERS = [] {
@@ -240,16 +236,13 @@ bool revealInFileManager(const QString& path)
 #elif defined Q_OS_MACOS
 	QProcess::startDetached("open", { "-R", canonicalPath });
 #else
-	// The only interface that selects the item instead of merely opening its folder; Nautilus/Dolphin/Nemo/Caja/Thunar
-	// implement it, and the name is D-Bus-activatable, so this also starts a file manager that isn't running yet.
-	// Raw method call: QDBusInterface's constructor would spend a blocking introspection round-trip first.
+	// This D-Bus interface selects the item and activates a supported file manager if necessary. Construct the
+	// call directly to avoid QDBusInterface's blocking introspection.
 	QDBusMessage showItems = QDBusMessage::createMethodCall("org.freedesktop.FileManager1", "/org/freedesktop/FileManager1",
 	                                                        "org.freedesktop.FileManager1", "ShowItems");
 	showItems.setArguments({ QStringList{ QUrl::fromLocalFile(canonicalPath).toString() }, QString{} });
 
-	// Async: that activation can take seconds, which a blocking call() would spend with the UI frozen. qApp parents the
-	// watcher (bounding its life if no reply comes) and is the connect context, putting the GUI-thread-only openUrl on
-	// the main thread.
+	// Activation can take seconds. qApp bounds the async watcher's lifetime and keeps the fallback on the GUI thread.
 	const QUrl folderUrl = QUrl::fromLocalFile(fi.isDir() ? canonicalPath : fi.absolutePath());
 	auto* watcher = new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(showItems), qApp);
 	QObject::connect(watcher, &QDBusPendingCallWatcher::finished, qApp, [folderUrl](QDBusPendingCallWatcher* self) {
@@ -318,9 +311,7 @@ QString autoDetectedFfmpegPath()
 {
 	const QString executableName = QStringLiteral("ffmpeg");
 
-	// Beside the app first: that's the precedence Windows gives a local binary when handed a bare name. On macOS
-	// applicationDirPath() points inside the bundle (Darkroom.app/Contents/MacOS), so climb out of it - a
-	// hand-placed binary sits next to Darkroom.app, not within it.
+	// Search beside the app first. On macOS, climb out of Contents/MacOS to the directory beside the bundle.
 #ifdef Q_OS_MACOS
 	const QString appDir = QDir::cleanPath(QCoreApplication::applicationDirPath() + "/../../..");
 #else
@@ -333,9 +324,7 @@ QString autoDetectedFfmpegPath()
 		return onPath;
 
 #ifdef Q_OS_MACOS
-	// A Finder-launched app inherits launchd's minimal PATH, so a Homebrew or MacPorts ffmpeg that runs fine from a
-	// terminal is invisible to the PATH search above. Compiled out elsewhere rather than handed an empty directory
-	// list, which findExecutable would answer by searching PATH a second time.
+	// Finder-launched apps do not inherit the shell PATH containing Homebrew or MacPorts.
 	return QStandardPaths::findExecutable(executableName, { "/opt/homebrew/bin", "/usr/local/bin", "/opt/local/bin" });
 #else
 	return {};

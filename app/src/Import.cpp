@@ -11,10 +11,7 @@
 #include <QObject>
 #include <QSettings>
 
-// Copies preview frames from an existing preview/ dir into a fresh one at the destination (created as needed),
-// returning true only if at least one frame was copied. A false return - nothing to reuse - tells import
-// to fall back to a fresh ffmpeg extraction. The destination is always a just-created empty folder here
-// (callers wipe/recreate the output folder first), so QFile::copy never has to overwrite.
+// False tells import to extract afresh. dstPreviewDir is always initially empty.
 static bool copyPreviewFrames(const QString& srcPreviewDir, const QString& dstPreviewDir)
 {
 	const QDir src{ srcPreviewDir };
@@ -35,8 +32,6 @@ Import::Result Import::importVideo(Catalog& catalog, const QString& videoPath, c
 	if (!videoInfo.exists())
 		return { Status::Error, QObject::tr("Video file does not exist:\n%1").arg(videoPath) };
 
-	// Create output folder. Its leaf carries a hash of the item's identity (see Catalog::frameFolderName), so it
-	// is always a valid, unique folder name whatever the video's base name happens to be.
 	const MediaId id = MediaId::fromFile(videoPath);
 	const QString outputFolder = storageFolderPath + "/" + Catalog::frameFolderName(videoInfo.completeBaseName(), id);
 	if (!QDir{}.mkpath(storageFolderPath))
@@ -46,7 +41,6 @@ Import::Result Import::importVideo(Catalog& catalog, const QString& videoPath, c
 	{
 		if (!overwriteExisting)
 			return { Status::FolderConflict };
-		// A failed wipe aborts the item rather than proceed and mix the stale frames with the new ones
 		if (!QDir(outputFolder).removeRecursively())
 			return { Status::Error, QObject::tr("Failed to delete folder: %1").arg(outputFolder) };
 	}
@@ -54,12 +48,8 @@ Import::Result Import::importVideo(Catalog& catalog, const QString& videoPath, c
 	if (!QDir{}.mkpath(outputFolder))
 		return { Status::Error, QObject::tr("Failed to create output folder:\n%1").arg(outputFolder) };
 
-	// The full frame set is extracted on demand (see MainWindow::ensureFramesSplit), not here - import only
-	// needs a few permanent preview frames up front, then registers the video right away. The Import dialog already
-	// extracted exactly these for its staging card, so reuse them by copy; fall back to a fresh ffmpeg pass only
-	// when there's nothing staged to reuse (not reached via the Import dialog, or staging's probe produced no frames).
-	// The staged scratch dir holds those frames directly; the frame folder nests its own under preview/.
-	qint64 durationMs = stagedDurationMs;   // reuse the duration staging already probed; superseded below if we extract fresh
+	// Full extraction is deferred; reuse the staging preview and its probe result when possible.
+	qint64 durationMs = stagedDurationMs;
 	if (stagedPreviewDir.isEmpty() || !copyPreviewFrames(stagedPreviewDir, Catalog::previewDirFor(outputFolder)))
 	{
 		const int previewFrameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
@@ -86,9 +76,7 @@ Import::PhotoResult Import::importPhoto(Catalog& catalog, const QString& labelPh
 	if (mode == PhotoImportMode::Reference)
 	{
 		const MediaId id = MediaId::fromFile(photoPath);
-		// A same-path re-import (this exact file already tracked in place) falls through to the upsert below;
-		// any other tracked use of the id is a collision Reference mode cannot resolve - there is no owned
-		// copy whose name a rename could change.
+		// Reference mode can reuse only the same path; it has no owned filename to change around a collision.
 		if (catalog.containsMediaItem(id) && !(catalog.isReferenced(id) && catalog.sourcePathForMediaItem(id) == photoPath))
 			return { PhotoStatus::IdCollision, {}, {} };
 
@@ -97,14 +85,10 @@ Import::PhotoResult Import::importPhoto(Catalog& catalog, const QString& labelPh
 		return { PhotoStatus::Success, {}, id };
 	}
 
-	// Owned import: land the file in the label's photo dir, auto-renaming around collisions.
 	if (!QDir{}.mkpath(labelPhotoFolder))
 		return { PhotoStatus::Error, QObject::tr("Failed to create photo folder:\n%1").arg(labelPhotoFolder), {} };
 
-	// Pick a destination name that is free both on disk and in the catalog - the id is name+size and a
-	// copy/move preserves the size, so one rename resolves a path collision and an id collision alike. A
-	// byte-identical file already at the destination (including this very file on a re-import) is adopted
-	// as-is instead of being copied again.
+	// Preserving the byte size lets one rename resolve both path and identity collisions.
 	const QString baseName = photoInfo.completeBaseName();
 	const QString suffix   = photoInfo.suffix();
 	QString destPath;
@@ -120,13 +104,13 @@ Import::PhotoResult Import::importPhoto(Catalog& catalog, const QString& labelPh
 		if (QFile::exists(candidatePath))
 		{
 			if (!filesAreIdentical(photoPath, candidatePath))
-				continue;  // the name is taken by different content - try the next numbered name
+				continue;
 			destPath = candidatePath;
 			adoptExisting = true;
 			break;
 		}
 		if (catalog.containsMediaItem(MediaId::fromNameAndSize(candidateName, photoInfo.size())))
-			continue;  // the id is taken by an item stored elsewhere (or a drifted record) - a fresh name sidesteps it
+			continue;
 		destPath = candidatePath;
 		break;
 	}
@@ -143,7 +127,6 @@ Import::PhotoResult Import::importPhoto(Catalog& catalog, const QString& labelPh
 	if (!catalog.addPhoto(registeredId, destPath, labelPhotoFolder, /*referenced=*/false))
 	{
 		QString message = QObject::tr("An item with the same name and file size is already tracked elsewhere:\n%1").arg(photoPath);
-		// Undo the relocation rather than leave an untracked copy behind (mirrors importVideo's cleanup).
 		if (!adoptExisting && !(mode == PhotoImportMode::Move ? QFile{ destPath }.rename(photoPath) : QFile::remove(destPath)))
 			message += "\n\n" + QObject::tr("Additionally, the imported file could not be cleaned up and remains at:\n%1").arg(destPath);
 		return { PhotoStatus::Error, message, {} };

@@ -33,8 +33,7 @@ struct LoadedLibraryData
 	return QDir(QDir::cleanPath(QDir::fromNativeSeparators(root.trimmed()))).absolutePath();
 }
 
-// The two files a library root is made of - written by MetadataStore and Catalog respectively, both on the
-// first successful load, which is why either one already marks a folder as taken.
+// Either persisted store marks a folder as an existing library.
 [[nodiscard]] QString metadataFilePath(const QString& root) { return root + "/catalog.json"; }
 [[nodiscard]] QString labelRegistryFilePath(const QString& root) { return root + "/labels.json"; }
 
@@ -203,7 +202,7 @@ namespace {
 
 } // namespace
 
-// Both defaulted here, not in the header: LibraryState is incomplete there, and ~unique_ptr needs it complete.
+// LibraryState must be complete where unique_ptr's destructor is instantiated.
 Library::Library() = default;
 Library::~Library() = default;
 
@@ -236,8 +235,7 @@ bool Library::setRoot(const QString& root, QString* error)
 	return true;
 }
 
-// The accessors below are reachable only once the owner has loaded the library (see isLoaded), so an empty
-// state here is a programming error rather than a case to handle - assert and let the deref speak.
+// Empty access is a programming error; startup callers gate it with isLoaded().
 const QString& Library::rootFolder() const
 {
 	assert_r(_state);
@@ -273,8 +271,6 @@ const MetadataStore& Library::metadataStore() const
 	return _state->metadataStore;
 }
 
-// An empty library has nothing to flush - and saying so is what lets setRoot() below load the first root
-// through the same path as every later one.
 bool Library::flushPendingWrites(QString* error)
 {
 	return _state ? _state->flushPendingWrites(error) : true;
