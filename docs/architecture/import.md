@@ -4,33 +4,34 @@
 
 ## Full frame extraction — on-demand, not at import
 
-`MainWindow::splitVideoIntoFrames` extracts a candidate complete real frame set. It's never called during
-import anymore (see "Import: preview frames only" below) — `resplitVideoIntoFrames` uses it for the first
-on-demand split, Re-export all, and the integrity tool's re-import of an entry whose extracted frames are gone.
-`reExportAllVideos` skips photo entries when collecting its worklist — a photo has no frames, and its
-"folder" is the shared `Photos/<label>` dir, which frame-folder replacement would destroy.
-- The raw ffmpeg invocation lives in `Ffmpeg::splitVideoIntoFrames` (the module owns *all* ffmpeg calls now);
-  `MainWindow::splitVideoIntoFrames` is a thin wrapper. It runs ffmpeg synchronously, freezing the UI during
-  extraction — decided not worth making async (see [backlog](../../ARCHITECTURE.md#improvement-backlog)).
-- Only `resplitVideoIntoFrames` publishes success via `Catalog::markSplitComplete`, after the new folder and
-  its preview policy have reached the transaction's commit point. Extraction itself never mutates the catalog.
+**`FrameExtraction`** (`src/Windows/FrameExtraction.h/.cpp`) owns configured full-frame extraction, transactional
+frame-folder replacement, preview repair, and the Re-export all workflow. Its raw process call is
+`Ffmpeg::splitVideoIntoFrames`; extraction remains synchronous and freezes the UI, which was decided not worth making
+async (see [backlog](../../ARCHITECTURE.md#improvement-backlog)).
 
-`MainWindow::ensureFramesSplit(id)` is the *only* place that triggers a full split on demand: if
-`!Catalog::isSplitIntoFrames(id)`, it calls `resplitVideoIntoFrames(id, /*preserveExistingPreview=*/true)`.
-Wired into the grid card's middle-click handler — opening the viewer is what "pays for" a video's full
-split. Deliberately not wired into `CompareWindow`: triggering a synchronous multi-second extraction from a
-side-effect of a multi-select action was judged too easy to hit by accident.
+`FrameExtraction::ensureFramesExtracted(id, previewFrameCount, parent)` is the only path that pays for the first full
+split. If `Catalog::isSplitIntoFrames(id)` is false, it calls `reextractVideoFrames` with
+`PreviewHandling::PreserveExisting`. MainWindow invokes it for the grid's middle-click intent before showing its
+persistent frame viewer. It remains deliberately absent from `CompareWindow`: triggering a synchronous multi-second
+extraction as a side effect of multi-select compare was judged too easy to hit by accident.
 
-`MainWindow::resplitVideoIntoFrames(id, preserveExistingPreview)` transactionally replaces an existing frame
-folder with rollback on failure. Old and new frame sets coexist during extraction; low peak disk usage is
-not a design goal.
+`FrameExtraction::reextractVideoFrames` transactionally replaces an existing frame folder with rollback on failure.
+Old and new frame sets coexist during extraction; low peak disk usage is not a design goal. It publishes its completed
+split via `Catalog::markSplitComplete` only after the new folder and its preview policy have reached the transaction's
+commit point. Integrity repair's `regeneratePreview` prefers already-present real frames and repairs the split flag
+when it finds them; only with no real frames does it fall back to extracting a preview from the source video.
 
-`preserveExistingPreview` controls the candidate's preview before commit:
-- **`true`** (`ensureFramesSplit` only) — `preview/` is still fresh from import, nothing changed that
-  would make it stale, so the wrapper moves it from the preserved old folder into the successful candidate.
-- **`false`** (`reExportAllVideos`, integrity re-import) — the caller explicitly wants a clean start (re-export
-  may follow a settings change; the frames disappeared for an unknown reason), so a fresh one is generated
-  via `Ffmpeg::generatePreviewFrames`. A requested preserved preview that does not exist takes this same fallback.
+`PreviewHandling` controls the candidate's preview before commit:
+- **`PreserveExisting`** (first on-demand split) — `preview/` is still fresh from import, so the module moves it from
+  the preserved old folder into the successful candidate.
+- **`Regenerate`** (Re-export all and integrity re-import) — the caller explicitly wants a clean start (re-export may
+  follow a settings change; the frames disappeared for an unknown reason), so a fresh preview is generated through
+  `Ffmpeg::generatePreviewFrames`. A requested preserved preview that does not exist takes this same fallback.
+
+`FrameExtraction::reExportAllVideosInteractive` skips photos when collecting its worklist — a photo has no frames,
+and its "folder" is the shared `Photos/<label>` dir, which frame-folder replacement would destroy. It owns confirmation,
+progress, the catalog batch, and per-video replacement. MainWindow's thin wrapper owns only the app-wide
+`_isProcessing` lock shared with import and refreshes the browser afterward.
 
 Neither path is used by `Import::importVideo`'s own overwrite-existing-folder path, which can be replacing a stale
 folder left behind by a completely different prior video — there's no related `preview/` worth preserving or
@@ -49,7 +50,7 @@ It does not extract the full frame set. It creates the output folder, puts a few
 permanent preview frames into `outputFolder/preview/`, then registers the video via `Catalog::addMediaItem(...,
 /*splitIntoFrames=*/false)` immediately — the video appears in the grid right away (see
 [media-widgets.md](media-widgets.md)), and the expensive full
-extraction only happens later via `ensureFramesSplit`.
+extraction only happens later via `FrameExtraction::ensureFramesExtracted`.
 
 Those preview frames are normally *reused, not re-extracted*: `ImportDialog` already ran ffmpeg to build
 each staged card's preview (see "Staging area" below), so import is handed each video's staging temp dir —

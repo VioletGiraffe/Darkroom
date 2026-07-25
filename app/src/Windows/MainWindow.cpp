@@ -2,8 +2,8 @@
 #include "Core/Catalog.h"
 #include "Core/Library.h"
 #include "Windows/PhotoCompareWindow.h"
-#include "Ffmpeg.h"
 #include "Import.h"
+#include "Windows/FrameExtraction.h"
 #include "Windows/FrameViewerWindow.h"
 #include "Windows/IntegrityCheckDialog.h"
 #include "UiComponents/MediaBrowserWidget.h"
@@ -17,7 +17,6 @@
 #include "Shortcuts.h"
 
 #include "aboutdialog/caboutdialog.h"
-#include "assert/advanced_assert.h"
 #include "dialogs/messagebox.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
@@ -26,7 +25,6 @@
 #include <QCloseEvent>
 #include <QDir>
 #include <QDragEnterEvent>
-#include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QMenu>
@@ -36,17 +34,12 @@
 #include <QSet>
 #include <QSettings>
 #include <QStandardPaths>
-#include <QUuid>
 
 #include <QScopeGuard>
 
 #include <algorithm>
 #include <utility>
 #include <vector>
-
-inline bool    useTiff()     { return QSettings{}.value(Settings::UseTiff,      Defaults::UseTiff).toBool(); }
-inline int     jpegQuality() { return QSettings{}.value(Settings::JpegQuality,  Defaults::JpegQuality).toInt(); }
-inline int     frameStep()   { return QSettings{}.value(Settings::FrameStep,    Defaults::FrameStep).toInt(); }
 
 namespace {
 
@@ -187,7 +180,8 @@ void MainWindow::setupUI()
 	setCentralWidget(_mediaBrowser);
 
 	connect(_mediaBrowser, &MediaBrowserWidget::inspectVideoFramesRequested, this, [this](const MediaId& id) {
-		if (ensureFramesSplit(id))
+		if (FrameExtraction::ensureFramesExtracted(
+				libraryCatalog(), id, _mediaBrowser->previewFrameCount(), this))
 			_frameViewer->showForFolder(libraryCatalog().folderForMediaItem(id), libraryCatalog().displayName(id));
 	});
 	connect(_mediaBrowser, &MediaBrowserWidget::frameFolderPathChanged, this,
@@ -470,53 +464,6 @@ void MainWindow::closeEvent(QCloseEvent* event)
 	QMainWindow::closeEvent(event);
 }
 
-bool MainWindow::regeneratePreviewFromRealFrames(const QString& folderPath, int frameCount)
-{
-	QDir folderDir(folderPath);
-	const QStringList realFrames = listFrameImageFiles(folderDir);
-	if (realFrames.isEmpty())
-		return false;
-
-	const QString previewFolder = Catalog::previewDirFor(folderPath);
-	if (!QDir{}.mkpath(previewFolder))
-		return false;
-
-	// Partial previews are useful, so attempt every copy and succeed if any landed.
-	bool anyCopied = false;
-	for (const QString& sourceFrame : pickEvenlySpacedFrames(folderDir, realFrames, frameCount))
-	{
-		if (QFile::copy(sourceFrame, previewFolder + "/" + QFileInfo(sourceFrame).fileName()))
-			anyCopied = true;
-	}
-	return anyCopied;
-}
-
-bool MainWindow::regeneratePreviewFor(const MediaId& id)
-{
-	Catalog& catalog = libraryCatalog();
-	const QString folder = catalog.folderForMediaItem(id);
-	const int frameCount = _mediaBrowser->previewFrameCount();
-
-	// Real frames are authoritative even if the stored split state disagrees.
-	if (regeneratePreviewFromRealFrames(folder, frameCount))
-	{
-		catalog.markSplitComplete(id);
-		return true;
-	}
-
-	const QString source = catalog.sourcePathForMediaItem(id);
-	if (!QFile::exists(source))
-		return false;
-
-	const QString previewDirPath = Catalog::previewDirFor(folder);
-	if (!QDir{}.mkpath(previewDirPath))
-		assert_and_return_unconditional_r("Failed to create preview folder " + previewDirPath.toStdString(), false);
-
-	const Ffmpeg::PreviewResult result = Ffmpeg::generatePreviewFrames(source, previewDirPath, frameCount);
-	catalog.setDurationMs(id, result.durationMs);
-	return result.ok();
-}
-
 void MainWindow::updateEditActions()
 {
 	const std::vector<MediaId> selected = _mediaBrowser->selectedMediaItems();
@@ -525,97 +472,6 @@ void MainWindow::updateEditActions()
 	_removeFromLibraryAction->setEnabled(hasSelection);
 
 	_renameAction->setEnabled(selected.size() == 1);
-}
-
-bool MainWindow::resplitVideoIntoFrames(const MediaId& id, bool preserveExistingPreview)
-{
-	Catalog& catalog = libraryCatalog();
-	assert_and_return_r(catalog.containsMediaItem(id), false);
-	const QString videoFilePath = catalog.sourcePathForMediaItem(id);
-	const QString outputFolder = catalog.folderForMediaItem(id);
-	assert_and_return_r(!outputFolder.isEmpty(), false);  // QDir("") addresses the working directory
-	const bool hadExistingFolder = QDir(outputFolder).exists();
-	const QString preservedFolder = hadExistingFolder
-		? QFileInfo(outputFolder).dir().filePath(".darkroom-resplit-" + QUuid::createUuid().toString(QUuid::Id128))
-		: QString{};
-
-	if (hadExistingFolder && !QDir{}.rename(outputFolder, preservedFolder))
-	{
-		QMessageBox::critical(this, tr("Error"), tr("Failed to preserve the existing frame folder before replacing it:\n%1").arg(outputFolder));
-		return false;
-	}
-
-	// Until commit, every exit restores the previous folder with same-filesystem renames.
-	auto rollback = qScopeGuard([&] {
-		if (!deleteFolderRecursivelyIfPresent(outputFolder))
-		{
-			QString message = tr("Failed to discard the replacement frame folder:\n%1").arg(outputFolder);
-			if (hadExistingFolder)
-				message += "\n\n" + tr("The previous frame folder remains preserved at:\n%1").arg(preservedFolder);
-			QMessageBox::critical(this, tr("Error"), message);
-			return;
-		}
-
-		if (hadExistingFolder && !QDir{}.rename(preservedFolder, outputFolder))
-		{
-			QMessageBox::critical(this, tr("Error"),
-				tr("Failed to restore the previous frame folder.\n\nPreserved folder:\n%1\n\nOriginal location:\n%2")
-					.arg(preservedFolder).arg(outputFolder));
-		}
-	});
-
-	if (!splitVideoIntoFrames(videoFilePath, outputFolder))
-		return false;
-
-	const QString preservedPreviewDir = Catalog::previewDirFor(preservedFolder);
-	const bool hasPreviewToPreserve = preserveExistingPreview && hadExistingFolder && QDir(preservedPreviewDir).exists();
-	if (hasPreviewToPreserve)
-	{
-		if (!QDir{}.rename(preservedPreviewDir, Catalog::previewDirFor(outputFolder)))
-		{
-			QMessageBox::critical(this, tr("Error"),
-				tr("Failed to carry the existing preview into the new frame folder.\n\nPreserved folder:\n%1\n\nNew folder:\n%2")
-					.arg(preservedFolder).arg(outputFolder));
-			return false;
-		}
-	}
-	else
-	{
-		const Ffmpeg::PreviewResult result = Ffmpeg::generatePreviewFrames(
-			videoFilePath, Catalog::previewDirFor(outputFolder), _mediaBrowser->previewFrameCount());
-		catalog.setDurationMs(id, result.durationMs);
-	}
-
-	rollback.dismiss();
-	catalog.markSplitComplete(id);
-
-	if (hadExistingFolder && !deleteFolderRecursivelyIfPresent(preservedFolder))
-	{
-		QMessageBox::warning(this, tr("Cleanup incomplete"),
-			tr("The new frames are ready, but the previous frame folder could not be completely removed:\n%1").arg(preservedFolder));
-	}
-	return true;
-}
-
-bool MainWindow::ensureFramesSplit(const MediaId& id)
-{
-	Catalog& catalog = libraryCatalog();
-	if (catalog.isSplitIntoFrames(id))
-		return true;
-
-	return resplitVideoIntoFrames(id, /*preserveExistingPreview=*/true);
-}
-
-bool MainWindow::splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder)
-{
-	const Ffmpeg::SplitOptions options{ .tiff = useTiff(), .jpegQuality = jpegQuality(), .frameStep = frameStep() };
-	const Ffmpeg::SplitResult result = Ffmpeg::splitVideoIntoFrames(videoFilePath, outputFolder, options);
-	if (!result.ok())
-	{
-		reportFfmpegFailure(this, result, videoFilePath, outputFolder);
-		return false;
-	}
-	return true;
 }
 
 void MainWindow::importVideoBatch(QStringList videoPaths, const QString& storageFolderPath, const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations)
@@ -733,50 +589,12 @@ void MainWindow::reExportAllVideos()
 		return;
 	}
 
-	const auto confirm = QMessageBox::question(this, tr("Re-export all videos"),
-		tr("This will delete and re-export all video frame folders where the source video is still available.\n\n"
-		   "This applies to all videos in the library.\n\nContinue?"),
-		QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-	if (confirm != QMessageBox::Yes)
-		return;
-
-	std::vector<MediaId> toReExport;
-	Catalog& catalog = libraryCatalog();
-	for (const auto& [id, entry] : catalog.mediaItems().asKeyValueRange())
-	{
-		if (entry.type != Catalog::MediaType::Video)
-			continue;
-
-		if (!entry.sourcePath.isEmpty() && QFile::exists(entry.sourcePath))
-			toReExport.push_back(id);
-	}
-
-	if (toReExport.empty())
-	{
-		QMessageBox::information(this, tr("Re-export all videos"), tr("No folders with an available source video were found."));
-		return;
-	}
-
 	_isProcessing = true;
 	const auto processingGuard = qScopeGuard([this] { _isProcessing = false; });
 
-	Catalog::BatchScope batch(catalog);
-
-	QMessageBox progressBox(this);
-	progressBox.setWindowTitle(tr("Re-exporting"));
-	progressBox.setStandardButtons(QMessageBox::NoButton);
-	progressBox.setModal(true);
-	progressBox.show();
-
-	for (size_t i = 0, total = toReExport.size(); i < total; ++i)
-	{
-		progressBox.setText(tr("Re-exporting video %1/%2...").arg(i + 1).arg(total));
-		QApplication::processEvents();
-
-		static_cast<void>(resplitVideoIntoFrames(toReExport[i], /*preserveExistingPreview=*/false));
-	}
-
-	_mediaBrowser->refreshMediaGrid();
+	if (FrameExtraction::reExportAllVideosInteractive(
+			libraryCatalog(), _mediaBrowser->previewFrameCount(), this))
+		_mediaBrowser->refreshMediaGrid();
 }
 
 void MainWindow::openImportDialog(const QStringList& initialStaging)
@@ -877,10 +695,11 @@ void MainWindow::checkCatalogIntegrity()
 			return catalog.addPhoto(MediaId::fromFile(filePath), filePath, labelDir, /*referenced=*/false);
 		},
 		.reimportRequested = [this](const MediaId& id) {
-			return resplitVideoIntoFrames(id, /*preserveExistingPreview=*/false);
+			return FrameExtraction::reextractVideoFrames(libraryCatalog(), id,
+				FrameExtraction::PreviewHandling::Regenerate, _mediaBrowser->previewFrameCount(), this);
 		},
 		.regeneratePreviewRequested = [this](const MediaId& id) {
-			return regeneratePreviewFor(id);
+			return FrameExtraction::regeneratePreview(libraryCatalog(), id, _mediaBrowser->previewFrameCount());
 		},
 		.markSplitRequested = [this](const MediaId& id) {
 			libraryCatalog().markSplitComplete(id);

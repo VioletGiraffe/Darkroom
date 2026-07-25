@@ -162,7 +162,8 @@ app-wide `Accent`/`AccentBg` tokens), and the central `Style` stylesheet + custo
 ### [Import: the Import module, ffmpeg, Utils, ImportDialog](docs/architecture/import.md)
 `Import::importVideo` and `Import::importPhoto` — the per-item import workers (`MainWindow::importVideoBatch` /
 `importPhotoBatch` remain the batch coordinators over them; photos land in `<root>/Photos/<label>/` or are
-referenced in place, with collision auto-rename), the `ffmpeg` invocation (`Ffmpeg::generatePreviewFrames` —
+referenced in place, with collision auto-rename), full-frame replacement and repair (`FrameExtraction`), the `ffmpeg`
+invocation (`Ffmpeg::generatePreviewFrames` —
 a batch/concurrent preview extractor that `ImportDialog`'s staging runs across several videos at once,
 whose frames import then reuses by copy instead of re-extracting), `Utils.h`'s grab-bag of free functions,
 and `ImportDialog` itself: a staging grid + label-list panel mirroring the main window's own label

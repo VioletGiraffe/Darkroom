@@ -7,8 +7,8 @@
 browser toolbar, card grid (`MediaGrid`), browser-local settings, filtering/sorting, selection/view-state preservation,
 card construction, activation, context menu, Best/label mutations, and item rename/remove/delete workflows. It borrows
 the stable `Library&`. Its remaining signals cross a real ownership boundary: `MainWindow` updates its Edit-menu state
-from browser selection, performs on-demand frame extraction into its persistent frame viewer, and keeps that viewer
-coherent when a browser operation renames or deletes its current folder.
+from browser selection, asks `FrameExtraction` to satisfy an on-demand split before presenting its persistent frame
+viewer, and keeps that viewer coherent when a browser operation renames or deletes its current folder.
 
 The **constructor** runs `loadInitialLibrary()` before building anything — loading first is not stylistic: `setupUI()`
 constructs the browser with a `Library&`, which its sidebar also keeps for life, so there is no window to build without

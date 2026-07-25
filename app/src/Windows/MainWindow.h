@@ -41,12 +41,6 @@ private:
 	void saveSettings();
 	void restoreSettings();
 
-	[[nodiscard]] bool splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder);
-	// A pre-commit failure restores the complete previous frame folder.
-	[[nodiscard]] bool resplitVideoIntoFrames(const MediaId& id, bool preserveExistingPreview);
-	[[nodiscard]] bool ensureFramesSplit(const MediaId& id);
-	[[nodiscard]] bool regeneratePreviewFromRealFrames(const QString& folderPath, int frameCount);
-	[[nodiscard]] bool regeneratePreviewFor(const MediaId& id);
 	void reExportAllVideos();
 	void importVideoBatch(QStringList videoPaths, const QString& storageFolderPath, const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations);
 	std::vector<Import::PhotoResult> importPhotoBatch(LabelId labelId, const QStringList& photoPaths, Import::PhotoImportMode mode);

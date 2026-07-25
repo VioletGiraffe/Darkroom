@@ -97,12 +97,10 @@ that case stays clean.
   [import.md](import.md)). `addMediaItem` ensures the folder label for its storage folder exists. **Refuses** (returns
   `false`, logs a `qWarning`, leaves the existing
   entry untouched) if `id` already names an item tracked under a *different* folder — a name+size collision
-  with an existing item. `splitVideoIntoFrames` (the one caller that calls this after a real, full
-  extraction) treats refusal as a failure: it deletes the just-extracted frames rather than leave them on
-  disk as an untracked, catalog-invisible duplicate. Re-registering the same id at its *current* folder
-  (re-export re-extracting in place, or a later on-demand split flipping `splitIntoFrames` from `false` to
-  `true`) is not a collision and succeeds normally, upserting the entry's fields. The catalog is
-  one-folder-per-`MediaId` by construction, so it structurally cannot hold a same-source duplicate — the
+  with an existing item. Re-registering the same id at its current folder is allowed, which lets integrity recovery
+  adopt an already-known folder without manufacturing a collision. Full extraction does not re-register the item:
+  `FrameExtraction` replaces its existing frame folder transactionally, then calls `markSplitComplete` at commit.
+  The catalog is one-folder-per-`MediaId` by construction, so it structurally cannot hold a same-source duplicate — the
   collision is caught here at registration, not by any disk scan.
   `splitIntoFrames`: `false` means only permanent preview frames exist yet, a full extraction is still owed;
   `Catalog::isSplitIntoFrames(id)`
