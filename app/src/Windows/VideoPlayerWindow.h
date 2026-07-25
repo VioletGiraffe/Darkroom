@@ -16,6 +16,8 @@ class QCheckBox;
 class QComboBox;
 class MarkerSlider;
 class Library;
+class OscillatingPlayback;
+struct OscillationRequest;
 
 class VideoPlayerWindow final : public QMainWindow
 {
@@ -31,8 +33,7 @@ public:
 	static void createPlayerWindow(Library& library, const QString& videoPath, QWidget* parent);
 
 private:
-	class OscillatingPlayback;
-	struct OscillationRequest;
+	friend class OscillatingPlayback;
 
 	void resizeAndMoveWindow();
 	void togglePlayPause();
@@ -57,8 +58,6 @@ private:
 	void extractFrameToLibrary(qint64 timestampMs);
 	void extractFrameToFolder(qint64 timestampMs, const QString& folder);
 	void repeatLastExtraction(qint64 timestampMs);
-	// Runs ffmpeg and reports failure; empty return means no file was written.
-	[[nodiscard]] QString extractFrameInto(qint64 timestampMs, const QString& destinationFolder);
 
 	bool eventFilter(QObject* watched, QEvent* event) override;
 
@@ -77,6 +76,7 @@ private:
 	QSlider* _volumeSlider = nullptr;
 	QCheckBox* _oscillationCheck = nullptr;
 	QComboBox* _oscillationCurveCombo = nullptr;
+	// Borrows this window and its video sink; the destructor resets it before QObject child teardown begins.
 	std::unique_ptr<OscillatingPlayback> _oscillatingPlayback;
 	bool _windowPlacementDone = false;
 	bool _pauseOnSeek = true;
