@@ -1,7 +1,3 @@
-# Provisional flags
-
-These observations came from incidental reading during a comment audit. They are not confirmed bugs or the result of a dedicated code review.
-
 ## Filesystem and catalog consistency
 
 Import, rename, relocation, and catalog updates approximate transactions across filesystem operations and JSON metadata updates. Runtime failures have compensating cleanup, but an abrupt termination between the two can leave catalog state out of sync with the filesystem. The integrity checker mitigates this, but this remains the most consequential risk noted.
