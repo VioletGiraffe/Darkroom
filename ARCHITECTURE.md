@@ -149,7 +149,7 @@ and the card zoom/preview-count mechanism.
 
 ### [Frame viewer & video player](docs/architecture/playback.md)
 `FrameViewerWindow` (persistent per-folder thumbnail popup), `VideoPlayerWindow` (built-in player: seek,
-A–B loop, saved loops persisted per-video), its `OscillatingPlayback` process/cache controller and `FrameCapture`
+A–B loop, saved loops persisted per-video), its `OscillatingPlayback` process/cache controller and `SingleFrameExtraction`
 single-frame workflow, `MarkerSlider`, and
 `PhotoCompareWindow` (N-way photo compare:
 one shared zoom/pan view + a per-photo alignment transform, one-click auto-align via the `magic-alignment`

@@ -8,7 +8,7 @@ class Library;
 class QWidget;
 
 // Interactive single-frame extraction and optional import into the library.
-namespace FrameCapture
+namespace SingleFrameExtraction
 {
 	enum class LastDestination
 	{

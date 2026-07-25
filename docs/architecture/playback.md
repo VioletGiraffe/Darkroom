@@ -12,7 +12,7 @@ which needs the native multi-select `CFlowLayout` lacks (see
 
 ---
 
-## `VideoPlayerWindow`, `OscillatingPlayback`, `FrameCapture`, and `MarkerSlider`
+## `VideoPlayerWindow`, `OscillatingPlayback`, `SingleFrameExtraction`, and `MarkerSlider`
 
 Built-in player (`QMediaPlayer` + `QVideoWidget` + `QAudioOutput`) for the double-click-to-play path. Keeps a
 static list of open instances (app-wide restart/close) and auto-tiles each window into screen thirds once the
@@ -20,7 +20,7 @@ video size is known. Offers an A–B loop plus multiple saved loops per video. T
 position/play-state seam so controls keep referring to the frame actually shown when the optional oscillating
 mode temporarily takes presentation over from `QMediaPlayer`. The window owns controls, saved-loop UI/persistence,
 and coordination; the process/cache state machine lives in `OscillatingPlayback`, and single-frame extraction/import
-lives in `FrameCapture`.
+lives in `SingleFrameExtraction`.
 
 `QMediaPlayer` error observation is installed before assigning the source. Resource, access, network, invalid-media,
 and format failures that leave no playable video are reported once with the backend detail and close the unusable
@@ -55,7 +55,7 @@ toggle and cache are per-window/transient.
 
 ### Frame extraction
 
-`FrameCapture` (`src/Windows/FrameCapture.h/.cpp`) owns the configured blocking `Ffmpeg::extractSingleFrame` call,
+`SingleFrameExtraction` (`src/Windows/SingleFrameExtraction.h/.cpp`) owns the configured blocking `Ffmpeg::extractSingleFrame` call,
 failure reporting, last-destination settings, and the optional library import. Right-clicking the video extracts
 the frame at the clicked moment (left click stays play/pause) to one of three destinations: the library, a picked
 folder, or a repeat of whichever ran last

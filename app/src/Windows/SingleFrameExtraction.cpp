@@ -1,4 +1,4 @@
-#include "Windows/FrameCapture.h"
+#include "Windows/SingleFrameExtraction.h"
 
 #include "Core/Catalog.h"
 #include "Core/Library.h"
@@ -63,7 +63,7 @@ constexpr const char* ExtractToFolderMode  = "folder";
 
 } // namespace
 
-FrameCapture::LastDestination FrameCapture::lastDestination()
+SingleFrameExtraction::LastDestination SingleFrameExtraction::lastDestination()
 {
 	const QString mode = QSettings{}.value(Settings::LastFrameExtractionMode).toString();
 	if (mode == ExtractToLibraryMode)
@@ -73,12 +73,12 @@ FrameCapture::LastDestination FrameCapture::lastDestination()
 	return LastDestination::None;
 }
 
-QString FrameCapture::lastFolder()
+QString SingleFrameExtraction::lastFolder()
 {
 	return QSettings{}.value(Settings::LastFrameExtractionFolder).toString();
 }
 
-void FrameCapture::extractToFolderInteractive(const QString& videoPath, qint64 timestampMs, const QString& folder,
+void SingleFrameExtraction::extractToFolderInteractive(const QString& videoPath, qint64 timestampMs, const QString& folder,
 	const std::function<void()>& extractionFinished, QWidget* dialogParent)
 {
 	const QString filePath = extractSingleFrameInto(videoPath, timestampMs, folder, extractionFinished, dialogParent);
@@ -91,7 +91,7 @@ void FrameCapture::extractToFolderInteractive(const QString& videoPath, qint64 t
 	QToolTip::showText(QCursor::pos(), QObject::tr("Frame saved:\n%1").arg(QDir::toNativeSeparators(filePath)), dialogParent);
 }
 
-void FrameCapture::extractToLibraryInteractive(Library& library, const QString& videoPath, qint64 timestampMs,
+void SingleFrameExtraction::extractToLibraryInteractive(Library& library, const QString& videoPath, qint64 timestampMs,
 	const std::function<void()>& extractionFinished, QWidget* dialogParent)
 {
 	Catalog& catalog = library.catalog();

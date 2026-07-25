@@ -1,5 +1,5 @@
 #include "Windows/VideoPlayerWindow.h"
-#include "Windows/FrameCapture.h"
+#include "Windows/SingleFrameExtraction.h"
 #include "Windows/OscillatingPlayback.h"
 #include "UiComponents/MarkerSlider.h"
 #include "Core/Library.h"
@@ -965,17 +965,17 @@ void VideoPlayerWindow::showContextMenu(const QPoint& globalPos)
 	menu.addAction(tr("Extract frame and import to library"), this, [this, timestampMs] { extractFrameToLibrary(timestampMs); });
 	menu.addAction(tr("Extract frame to folder..."), this, [this, timestampMs] {
 		const QString folder = QFileDialog::getExistingDirectory(this, tr("Extract frame to folder"),
-			FrameCapture::lastFolder());
+			SingleFrameExtraction::lastFolder());
 		if (!folder.isEmpty())
 			extractFrameToFolder(timestampMs, folder);
 	});
 
-	const FrameCapture::LastDestination lastDestination = FrameCapture::lastDestination();
-	const QString lastFolder = FrameCapture::lastFolder();
+	const SingleFrameExtraction::LastDestination lastDestination = SingleFrameExtraction::lastDestination();
+	const QString lastFolder = SingleFrameExtraction::lastFolder();
 	QString repeatText;
-	if (lastDestination == FrameCapture::LastDestination::Library)
+	if (lastDestination == SingleFrameExtraction::LastDestination::Library)
 		repeatText = tr("Extract frame → library");
-	else if (lastDestination == FrameCapture::LastDestination::Folder && !lastFolder.isEmpty())
+	else if (lastDestination == SingleFrameExtraction::LastDestination::Folder && !lastFolder.isEmpty())
 		repeatText = tr("Extract frame → %1").arg(QDir::toNativeSeparators(lastFolder));
 
 	QAction* repeatAction = menu.addAction((repeatText.isEmpty() ? tr("Extract frame (last used)") : repeatText) + "\tE",
@@ -990,12 +990,12 @@ void VideoPlayerWindow::showContextMenu(const QPoint& globalPos)
 
 void VideoPlayerWindow::repeatLastExtraction(qint64 timestampMs)
 {
-	const FrameCapture::LastDestination lastDestination = FrameCapture::lastDestination();
-	if (lastDestination == FrameCapture::LastDestination::Library)
+	const SingleFrameExtraction::LastDestination lastDestination = SingleFrameExtraction::lastDestination();
+	if (lastDestination == SingleFrameExtraction::LastDestination::Library)
 		extractFrameToLibrary(timestampMs);
-	else if (lastDestination == FrameCapture::LastDestination::Folder)
+	else if (lastDestination == SingleFrameExtraction::LastDestination::Folder)
 	{
-		const QString lastFolder = FrameCapture::lastFolder();
+		const QString lastFolder = SingleFrameExtraction::lastFolder();
 		if (!lastFolder.isEmpty())
 			extractFrameToFolder(timestampMs, lastFolder);
 	}
@@ -1003,12 +1003,12 @@ void VideoPlayerWindow::repeatLastExtraction(qint64 timestampMs)
 
 void VideoPlayerWindow::extractFrameToFolder(qint64 timestampMs, const QString& folder)
 {
-	FrameCapture::extractToFolderInteractive(_videoPath, timestampMs, folder,
+	SingleFrameExtraction::extractToFolderInteractive(_videoPath, timestampMs, folder,
 		[this] { _oscillatingPlayback->resetElapsedBaselineAfterGuiBlock(); }, this);
 }
 
 void VideoPlayerWindow::extractFrameToLibrary(qint64 timestampMs)
 {
-	FrameCapture::extractToLibraryInteractive(_library, _videoPath, timestampMs,
+	SingleFrameExtraction::extractToLibraryInteractive(_library, _videoPath, timestampMs,
 		[this] { _oscillatingPlayback->resetElapsedBaselineAfterGuiBlock(); }, this);
 }
