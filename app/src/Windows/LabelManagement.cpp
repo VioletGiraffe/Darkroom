@@ -28,48 +28,45 @@ LabelId LabelManagement::createLabelInteractive(Catalog& catalog, QWidget* dialo
 	return createLabelOrReport(catalog, name, {}, dialogParent);
 }
 
-bool LabelManagement::renameLabelInteractive(Catalog& catalog, LabelId labelId, QWidget* dialogParent)
+void LabelManagement::renameLabelInteractive(Catalog& catalog, LabelId labelId, QWidget* dialogParent)
 {
 	const Catalog::Label* label = catalog.labelById(labelId);
 	if (!label)
-		return false;
+		return;
 	const QString currentName = label->displayName;
 
 	bool accepted = false;
 	const QString newName = QInputDialog::getText(
 		dialogParent, QObject::tr("Rename label"), QObject::tr("New name:"), QLineEdit::Normal, currentName, &accepted);
 	if (!accepted || newName == currentName)
-		return false;
+		return;
 
+	Catalog::ChangeBatchScope catalogChanges(catalog);
 	QString error;
 	if (!catalog.renameLabel(labelId, newName, &error))
-	{
 		QMessageBox::warning(dialogParent, QObject::tr("Rename label"), error);
-		return false;
-	}
-	return true;
 }
 
-bool LabelManagement::setLabelColorInteractive(Catalog& catalog, LabelId labelId, QWidget* dialogParent)
+void LabelManagement::setLabelColorInteractive(Catalog& catalog, LabelId labelId, QWidget* dialogParent)
 {
 	const Catalog::Label* label = catalog.labelById(labelId);
 	if (!label)
-		return false;
+		return;
 
 	const QColor initial = label->color.isEmpty() ? QColor(Qt::white) : QColor(label->color);
 	const QColor chosen = QColorDialog::getColor(initial, dialogParent, QObject::tr("Label color"));
 	if (!chosen.isValid())
-		return false;
+		return;
 
+	Catalog::ChangeBatchScope catalogChanges(catalog);
 	catalog.setColor(labelId, chosen.name());
-	return true;
 }
 
-bool LabelManagement::deleteLabelInteractive(Catalog& catalog, LabelId labelId, QWidget* dialogParent)
+void LabelManagement::deleteLabelInteractive(Catalog& catalog, LabelId labelId, QWidget* dialogParent)
 {
 	const Catalog::Label* label = catalog.labelById(labelId);
 	if (!label)
-		return false;
+		return;
 	const QString name = label->displayName;
 
 	const Catalog::DeleteImpact impact = catalog.deleteLabelImpact(labelId);
@@ -78,7 +75,7 @@ bool LabelManagement::deleteLabelInteractive(Catalog& catalog, LabelId labelId, 
 		QMessageBox::warning(dialogParent, QObject::tr("Delete label"),
 			QObject::tr("Cannot delete \"%1\": some items are stored only under this label, with no other label to "
 				"fall back on. Give those items another label first, then delete this one.").arg(name));
-		return false;
+		return;
 	}
 
 	QString message = QObject::tr("Delete the label \"%1\"?").arg(name);
@@ -90,12 +87,12 @@ bool LabelManagement::deleteLabelInteractive(Catalog& catalog, LabelId labelId, 
 
 	if (QMessageBox::warning(dialogParent, QObject::tr("Delete label"), message,
 			QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
-		return false;
+		return;
 
+	Catalog::ChangeBatchScope catalogChanges(catalog);
 	if (!catalog.deleteLabel(labelId))
 	{
 		QMessageBox::warning(dialogParent, QObject::tr("Delete label"),
 			QObject::tr("Could not fully delete \"%1\" - some items may not have been moved.").arg(name));
 	}
-	return true;
 }

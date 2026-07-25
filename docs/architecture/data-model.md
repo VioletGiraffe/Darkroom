@@ -13,6 +13,11 @@ change borrow `Library&` and resolve its current catalog/store when needed. Narr
 `MetadataStore&` borrows are for synchronous operations that cannot span `Library::setRoot()`; modal
 root-bound flows may borrow `Library&` for their entire, switch-blocking lifetime.
 
+`Library` also publishes the stable `catalogChanged` Qt signal. Its active `Catalog` reports successful
+browser-visible mutations through an internal callback, and `Library` forwards them along with successful root
+replacement. A persistent view therefore connects once to `Library`; it never has to reconnect to the replaceable
+`Catalog` held by the private state.
+
 **`setRoot()` is the only way to load a library** — the first root and every later one take the identical
 path. A default-constructed `Library` is *empty* (its `State` is simply null); the flush operations answer
 "nothing to do" in that state, so `setRoot()`'s flush-before-replace step works on the very first load too.

@@ -90,5 +90,6 @@ private:
 	QComboBox*       _previewFrameCountCombo = nullptr;
 	SortControl*     _sortControl = nullptr;
 	MediaGrid*       _mediaGrid = nullptr;
+	QTimer*          _catalogRefreshTimer = nullptr;
 	QTimer*          _gridZoomDebounce = nullptr;
 };

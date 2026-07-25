@@ -75,6 +75,34 @@ Catalog::Catalog(QString rootFolder, MetadataStore& metadataStore, const QJsonOb
 	rebuildIndex();
 }
 
+void Catalog::notifyCatalogChanged()
+{
+	if (_catalogChangeBatchDepth > 0)
+	{
+		_catalogChangePending = true;
+		return;
+	}
+	if (_catalogChangeHandler)
+		_catalogChangeHandler();
+}
+
+void Catalog::finishChangeBatch()
+{
+	if (_catalogChangeBatchDepth <= 0)
+	{
+		assert_r(_catalogChangeBatchDepth > 0);
+		return;
+	}
+
+	--_catalogChangeBatchDepth;
+	if (_catalogChangeBatchDepth == 0 && _catalogChangePending)
+	{
+		_catalogChangePending = false;
+		if (_catalogChangeHandler)
+			_catalogChangeHandler();
+	}
+}
+
 QString Catalog::registryPath() const
 {
 	return _rootFolder + "/labels.json";
@@ -311,6 +339,7 @@ void Catalog::rebuildIndex()
 		e.labelIds        = computeLabelIds(id, e);
 		_mediaItems.insert(id, e);
 	}
+	notifyCatalogChanged();
 }
 
 void Catalog::refreshMediaItemLabels(const MediaId& id)
@@ -429,6 +458,7 @@ void Catalog::addLabel(const MediaId& id, LabelId labelId)
 		ids << labelId;
 		writeStoredLabelIds(id, ids);
 		refreshMediaItemLabels(id);
+		notifyCatalogChanged();
 	}
 }
 
@@ -466,6 +496,7 @@ void Catalog::removeLabel(const MediaId& id, LabelId labelId)
 	{
 		writeStoredLabelIds(id, ids);
 		refreshMediaItemLabels(id);
+		notifyCatalogChanged();
 	}
 }
 
@@ -507,6 +538,7 @@ bool Catalog::addMediaItem(const MediaId& id, const QString& sourcePath, const Q
 	e.durationMs      = effectiveDurationMs;
 	e.labelIds        = computeLabelIds(id, e);
 	_mediaItems.insert(id, e);
+	notifyCatalogChanged();
 	return true;
 }
 
@@ -543,13 +575,15 @@ bool Catalog::addPhoto(const MediaId& id, const QString& sourcePath, const QStri
 	e.referenced = referenced;
 	e.labelIds   = computeLabelIds(id, e);
 	_mediaItems.insert(id, e);
+	notifyCatalogChanged();
 	return true;
 }
 
 void Catalog::removeMediaItem(const MediaId& id)
 {
 	_metadataStore.beginBatch().remove(id);
-	_mediaItems.remove(id);
+	if (_mediaItems.remove(id) > 0)
+		notifyCatalogChanged();
 }
 
 bool Catalog::applyRename(const MediaId& oldId, const MediaId& newId, const QString& newSourcePath, const QString& newFolderAbs)
@@ -572,6 +606,7 @@ bool Catalog::applyRename(const MediaId& oldId, const MediaId& newId, const QStr
 	e.sourcePath = newSourcePath;
 	e.labelIds   = computeLabelIds(newId, e);
 	_mediaItems.insert(newId, e);
+	notifyCatalogChanged();
 	return true;
 }
 
@@ -584,6 +619,7 @@ void Catalog::markSplitComplete(const MediaId& id)
 	MetadataStore::Writer writer = _metadataStore.beginBatch();
 	writer.set(id, kSplitIntoFramesField, true);
 	it->splitIntoFrames = true;
+	notifyCatalogChanged();
 }
 
 void Catalog::setDurationMs(const MediaId& id, qint64 durationMs)
@@ -594,6 +630,7 @@ void Catalog::setDurationMs(const MediaId& id, qint64 durationMs)
 
 	_metadataStore.beginBatch().set(id, kDurationMsField, durationMs);
 	it->durationMs = durationMs;
+	notifyCatalogChanged();
 }
 
 bool Catalog::hasOtherOrdinaryLabel(const MediaId& id, LabelId excludedLabelId) const
@@ -699,6 +736,7 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, LabelId removedLabelId)
 	writer.set(id, kFolderField, relativeFolder(newFolderAbs));
 	entryIt->folder   = newFolderAbs;
 	entryIt->labelIds = computeLabelIds(id, *entryIt);
+	notifyCatalogChanged();
 }
 
 const char* Catalog::labelNameValidationError(const QString& displayName)
@@ -836,6 +874,7 @@ void Catalog::setColor(LabelId labelId, const QString& color)
 		return;
 	label->color = color;
 	saveRegistry();
+	notifyCatalogChanged();
 }
 
 LabelId Catalog::createLabel(const QString& displayName, const QString& color, QString* error)
@@ -864,7 +903,10 @@ LabelId Catalog::createLabel(const QString& displayName, const QString& color, Q
 	}
 
 	if (ensureFolderLabelExists(displayName, color))
+	{
 		saveRegistry();
+		notifyCatalogChanged();
+	}
 	return ordinaryLabelIdByName(displayName);
 }
 
@@ -901,6 +943,7 @@ bool Catalog::deleteLabel(LabelId labelId)
 		return false;
 	if (deleteLabelImpact(labelId).wouldOrphan)
 		return false;
+	BatchScope batch(*this);
 
 	// Collect first because relocation mutates _mediaItems.
 	std::vector<MediaId> storedHere;

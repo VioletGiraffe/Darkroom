@@ -33,7 +33,9 @@ INCLUDEPATH += \
 	../cpputils \
 	../cpp-template-utils
 
-HEADERS += TestHelpers.h
+HEADERS += \
+	TestHelpers.h \
+	../app/src/Core/Library.h
 
 # The app sources under test are compiled in directly (the app is not a library). Utils.cpp is here because
 # Catalog.cpp calls its path helpers; its error-reporting functions are what pull in the widgets and qtutils

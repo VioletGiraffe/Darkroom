@@ -41,10 +41,6 @@ public:
 	// Defers staging to the event loop; folders expand recursively.
 	void addToStaging(const QStringList& paths);
 
-signals:
-	// Emitted after imported items and their staged metadata have both reached the Catalog.
-	void itemsImported();
-
 protected:
 	void dragEnterEvent(QDragEnterEvent* event) override;
 	void dropEvent(QDropEvent* event) override;

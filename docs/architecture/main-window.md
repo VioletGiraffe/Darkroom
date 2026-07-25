@@ -93,13 +93,18 @@ first"). It **owns its own persistence** and emits a single **`changed()`** sign
 - `MediaBrowserWidget::effectiveSelection(id)` — **shared** by the context menu and label-drop handler. The Edit-menu
   actions call the browser's selected-item entry points directly, so right-click targeting needs no ambient MainWindow
   state.
-- `MediaBrowserWidget::refreshLibraryView()` — `refreshMediaGrid()` plus the sidebar refresh: the entry point for **structural** changes
-  (add/delete/rename an item, create a label), where plain `refreshMediaGrid()` covers filter/sort/zoom.
+- `MediaBrowserWidget::refreshLibraryView()` — `refreshMediaGrid()` plus the sidebar refresh. Browser-visible Catalog
+  mutations and library replacement reach it through the stable `Library::catalogChanged` signal; delivery is
+  zero-delay queued and coalesced so mutation call stacks never synchronously destroy cards and compound operations
+  rebuild only once. Plain `refreshMediaGrid()` remains for view-only filter/sort/zoom changes. Direct library-view
+  refreshes remain only where files can change without a corresponding Catalog mutation, such as an incomplete
+  physical deletion or preview regeneration.
 
 Physical Delete and catalog-only Remove confirmations live in **`MediaItemManagement`**
-(`src/Windows/MediaItemManagement.h/.cpp`). The result tells the browser whether a refresh is required and which video
-frame folders may have changed, including a partially failed recursive deletion. The browser then emits only the
-folder-path effect needed to synchronize MainWindow's persistent frame viewer.
+(`src/Windows/MediaItemManagement.h/.cpp`). Catalog record removal reaches the browser through `catalogChanged`; the
+delete result carries only effects the blanket model notification cannot express: whether a failed operation may have
+changed storage while retaining its catalog record, and which video frame folders may have changed. The browser emits
+the latter to synchronize MainWindow's persistent frame viewer.
 
 ## Label assignment
 
@@ -126,11 +131,11 @@ row via the delegate.
 
 Right-clicking an ordinary label row opens a **Rename / Set color / Delete** menu; `LabelSidebar` emits the
 corresponding signal carrying the label id. `MediaBrowserWidget` handles these local requests through
-**`LabelManagement`** (`src/Windows/LabelManagement.h/.cpp`) and refreshes itself when the module reports a possible
-catalog change; `MainWindow` is not involved. The module owns the create/rename/color/delete prompts, confirmations,
-and error reporting; the `Catalog` API owns all name/path rules, backing-folder creation, relocation, and persistence
-(see [catalog-and-labels.md](catalog-and-labels.md)). `ImportDialog` materializes provisional labels through the same
-module.
+**`LabelManagement`** (`src/Windows/LabelManagement.h/.cpp`); successful Catalog mutations trigger the blanket
+library notification, so the workflow module returns no refresh status and `MainWindow` is not involved. The module
+owns the create/rename/color/delete prompts, confirmations, and error reporting; the `Catalog` API owns all name/path
+rules, backing-folder creation, relocation, persistence, and change reporting (see
+[catalog-and-labels.md](catalog-and-labels.md)). `ImportDialog` materializes provisional labels through the same module.
 
 ## Card interactions
 
@@ -176,8 +181,9 @@ the name filter hid them all; the paint checks live visibility, so it needs no h
 
 **`MediaRename`** (`src/Windows/MediaRename.h/.cpp`) is the module — free functions with entry
 `MediaRename::renameItemInteractive(id, dialogParent)`, dispatching by media type. `MediaBrowserWidget` calls it from
-both the Edit-menu entry point and the card context menu, refreshes itself on success, and emits the old/new frame
-folder paths when MainWindow's persistent frame viewer may need repointing.
+both the Edit-menu entry point and the card context menu. Catalog notification refreshes the browser on success; the
+result retains only the old/new frame-folder payload needed when MainWindow's persistent frame viewer may need
+repointing.
 
 `renameVideo` is the **one place a video's frame folder moves on disk outside the label-mutation paths in `Catalog`**
 (see [catalog-and-labels.md](catalog-and-labels.md)). It renames the source file, then the frame folder, then calls

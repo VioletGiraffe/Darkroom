@@ -16,9 +16,7 @@ namespace LabelManagement
 
 	[[nodiscard]] LabelId createLabelInteractive(Catalog& catalog, QWidget* dialogParent);
 
-	// True means the caller should refresh its catalog view. A partially failed deletion also returns true because
-	// Catalog may already have relocated some items before reporting the incomplete operation.
-	[[nodiscard]] bool renameLabelInteractive(Catalog& catalog, LabelId labelId, QWidget* dialogParent);
-	[[nodiscard]] bool setLabelColorInteractive(Catalog& catalog, LabelId labelId, QWidget* dialogParent);
-	[[nodiscard]] bool deleteLabelInteractive(Catalog& catalog, LabelId labelId, QWidget* dialogParent);
+	void renameLabelInteractive(Catalog& catalog, LabelId labelId, QWidget* dialogParent);
+	void setLabelColorInteractive(Catalog& catalog, LabelId labelId, QWidget* dialogParent);
+	void deleteLabelInteractive(Catalog& catalog, LabelId labelId, QWidget* dialogParent);
 }

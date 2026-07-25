@@ -96,16 +96,33 @@ public:
 	void addLabel(const MediaId& id, LabelId labelId);
 	void removeLabel(const MediaId& id, LabelId labelId);
 
+	// Coalesces catalog-change notification without extending a persistence batch. Use around compound,
+	// event-pumping workflows whose intermediate model states should not reach observers.
+	class ChangeBatchScope
+	{
+	public:
+		explicit ChangeBatchScope(Catalog& catalog) : _catalog(catalog) { ++_catalog._catalogChangeBatchDepth; }
+		~ChangeBatchScope() { _catalog.finishChangeBatch(); }
+		ChangeBatchScope(const ChangeBatchScope&) = delete;
+		ChangeBatchScope& operator=(const ChangeBatchScope&) = delete;
+
+	private:
+		Catalog& _catalog;
+	};
+
 	// Coalesces nested catalog mutations into the outermost Writer's single flush. Use around loops because
-	// each standalone mutation otherwise rewrites the complete metadata document.
+	// each standalone mutation otherwise rewrites the complete metadata document. Change notification is
+	// likewise emitted once, after the outermost Writer has flushed.
 	class BatchScope
 	{
 	public:
-		explicit BatchScope(Catalog& catalog) : _writer(catalog._metadataStore.beginBatch()) {}
+		explicit BatchScope(Catalog& catalog) : _changeBatch(catalog), _writer(catalog._metadataStore.beginBatch()) {}
 		BatchScope(const BatchScope&) = delete;
 		BatchScope& operator=(const BatchScope&) = delete;
 
 	private:
+		// Destruction order is intentional: flush the Writer before the change batch emits.
+		ChangeBatchScope _changeBatch;
 		MetadataStore::Writer _writer;
 	};
 
@@ -167,6 +184,9 @@ private:
 	[[nodiscard]] bool flushPendingRegistrySave(QString* error = nullptr);
 	[[nodiscard]] const QString& pendingRegistrySaveError() const { return _pendingRegistrySaveError; }
 	void setPersistenceFailureHandler(std::function<void()> handler) { _persistenceFailureHandler = std::move(handler); }
+	void setCatalogChangeHandler(std::function<void()> handler) { _catalogChangeHandler = std::move(handler); }
+	void notifyCatalogChanged();
+	void finishChangeBatch();
 	void ensureBestAndFolderLabels();
 	bool ensureBestLabelExists();
 	bool ensureFolderLabelExists(const QString& displayName, const QString& color = {});
@@ -202,4 +222,7 @@ private:
 	bool                  _registryDirty = false;
 	QString               _pendingRegistrySaveError;
 	std::function<void()> _persistenceFailureHandler;
+	std::function<void()> _catalogChangeHandler;
+	int                   _catalogChangeBatchDepth = 0;
+	bool                  _catalogChangePending = false;
 };

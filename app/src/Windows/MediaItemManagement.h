@@ -15,13 +15,12 @@ namespace MediaItemManagement
 {
 	struct DeleteResult
 	{
-		// A confirmed deletion attempt can partially alter storage even when no catalog record is removed.
-		bool refreshRequired = false;
+		// A failed deletion can partially alter storage without changing the Catalog.
+		bool storageRefreshRequired = false;
 		QStringList affectedFrameFolders;
 	};
 
 	[[nodiscard]] DeleteResult deleteItemsInteractive(
 		Catalog& catalog, const std::vector<MediaId>& selection, QWidget* dialogParent);
-	[[nodiscard]] bool removeItemsFromLibraryInteractive(
-		Catalog& catalog, const std::vector<MediaId>& selection, QWidget* dialogParent);
+	void removeItemsFromLibraryInteractive(Catalog& catalog, const std::vector<MediaId>& selection, QWidget* dialogParent);
 }

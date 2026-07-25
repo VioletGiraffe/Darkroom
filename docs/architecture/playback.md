@@ -64,7 +64,8 @@ folder, or a repeat of whichever ran last
 under the library root (not system temp) so that move is a same-drive rename. Frames deliberately never go
 into the video's frame folder — a regenerable artifact a re-split wipes wholesale. Folder extraction selects
 the first free `name`, `name (1)`, ... path and ffmpeg refuses overwrites; a failed extraction may leave its new
-partial file. Untracked (staging-preview) videos work too; the main window does not yet refresh when a frame lands.
+partial file. Untracked (staging-preview) videos work too. A successful library import mutates the Catalog, whose
+blanket notification refreshes the browser without routing through the player or MainWindow.
 
 ### Saved loops
 

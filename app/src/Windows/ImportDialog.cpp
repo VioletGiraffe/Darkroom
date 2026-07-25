@@ -1141,6 +1141,7 @@ void ImportDialog::runImport()
 			return;
 	}
 
+	Catalog::ChangeBatchScope catalogChanges(_library.catalog());
 	materializeUsedProvisionalLabels();
 
 	// Keep the pre-relocation MediaId: Move may delete the path before bookkeeping completes.
@@ -1198,8 +1199,4 @@ void ImportDialog::runImport()
 		unstage(id);
 	for (const MediaId& id : outcome.skippedIds)
 		unstage(id);
-
-	// Refresh only after staged metadata has also been applied.
-	if (!outcome.succeededIds.empty())
-		emit itemsImported();
 }

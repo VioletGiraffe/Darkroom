@@ -45,6 +45,39 @@ namespace
 	};
 }
 
+TEST_CASE("Library forwards coalesced Catalog change notifications", "[catalog]")
+{
+	LibraryFixture f;
+	Catalog& catalog = f.library.catalog();
+	int notificationCount = 0;
+	QObject::connect(&f.library, &Library::catalogChanged, [&notificationCount] { ++notificationCount; });
+
+	catalog.setColor(f.alpha, "#123456");
+	REQUIRE(notificationCount == 1);
+	catalog.setColor(f.alpha, "#123456");
+	REQUIRE(notificationCount == 1);
+
+	MediaId video;
+	{
+		Catalog::ChangeBatchScope changes(catalog);
+		catalog.setColor(f.beta, "#654321");
+		video = f.addVideo("Clip.mp4", 1000, "Alpha");
+		catalog.addLabel(video, f.beta);
+	}
+	REQUIRE(notificationCount == 2);
+	{
+		Catalog::BatchScope batch(catalog);
+		catalog.setDurationMs(video, 5000);
+		catalog.addLabel(video, Catalog::BestLabelId);
+	}
+	REQUIRE(notificationCount == 3);
+
+	QTemporaryDir replacement;
+	REQUIRE(replacement.isValid());
+	REQUIRE(f.library.setRoot(replacement.path()));
+	REQUIRE(notificationCount == 4);
+}
+
 TEST_CASE("addMediaItem: collision and re-registration rules", "[catalog]")
 {
 	LibraryFixture f;

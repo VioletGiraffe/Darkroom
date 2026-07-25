@@ -141,8 +141,8 @@ Import dialog: copy/move source files under a label.
 `ImportDialog` borrows its modal lifetime's `Library&` and reads its `Catalog` directly for lookups (label
 options, photo-content duplicates, the
 id-tracking check, random label colors). It invokes the interactive `ImportExecution` batch workflows directly;
-its sole outward notification is the semantic `itemsImported` signal emitted after imported items and their
-staged metadata have both reached the Catalog. MainWindow connects that signal to the browser refresh.
+it has no outward refresh signal. Catalog mutations reach the browser through `Library::catalogChanged`, with the
+whole Import command wrapped in `Catalog::ChangeBatchScope` so the browser observes only the completed result.
 Provisional-label materialization calls
 `LabelManagement::createLabelOrReport` directly, sharing the sidebar's creation workflow without routing through the
 host. The Best/extra-label flush and the tracked-under-label check are done
@@ -234,9 +234,9 @@ just an ordinary additional tag, applied the same way Best is.
    Best flags and extra-label picks to the Catalog — guarded by `Catalog::containsMediaItem` (a
    frame-folder-exists check wouldn't work for photos), wrapped in one `Catalog::BatchScope`
    (see [catalog-and-labels.md](catalog-and-labels.md)) so a multi-item Import session writes the store once.
-5. If anything succeeded, `itemsImported` fires once after the Best/extra-label flush; MainWindow connects it
-   directly to `MediaBrowserWidget::refreshLibraryView()`. There is no partial mid-Import refresh: the browser observes
-   the complete result of the command while the dialog remains open.
+5. `runImport`'s outer `Catalog::ChangeBatchScope` releases after the Best/extra-label flush and staging cleanup.
+   Any actual catalog mutations then produce one `Library::catalogChanged`; there is no partial mid-Import refresh,
+   and label materialization is visible even if every item import subsequently fails.
 
 Nothing here is deferred past the click that triggers it, so there's no `QDialog::done(int)` override and no
 caller-visible close-time flush to get right — the dialog's destructor only deletes leftover temp preview

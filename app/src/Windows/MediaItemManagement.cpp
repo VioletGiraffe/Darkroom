@@ -87,7 +87,8 @@ MediaItemManagement::DeleteResult MediaItemManagement::deleteItemsInteractive(
 			QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
 		return {};
 
-	DeleteResult result{ .refreshRequired = true };
+	Catalog::ChangeBatchScope catalogChanges(catalog);
+	DeleteResult result;
 	QStringList failedItems;
 	{
 		// Photo folders are shared by siblings and must never be deleted here.
@@ -129,7 +130,10 @@ MediaItemManagement::DeleteResult MediaItemManagement::deleteItemsInteractive(
 			if (failedParts.empty())
 				catalog.removeMediaItem(id);
 			else
+			{
+				result.storageRefreshRequired = true;
 				failedItems << QObject::tr("%1:\n%2").arg(id.name(), failedParts.join("\n"));
+			}
 		}
 	}
 
@@ -142,11 +146,11 @@ MediaItemManagement::DeleteResult MediaItemManagement::deleteItemsInteractive(
 	return result;
 }
 
-bool MediaItemManagement::removeItemsFromLibraryInteractive(
+void MediaItemManagement::removeItemsFromLibraryInteractive(
 	Catalog& catalog, const std::vector<MediaId>& selection, QWidget* dialogParent)
 {
 	if (selection.empty())
-		return false;
+		return;
 
 	QString message;
 	if (selection.size() == 1)
@@ -168,10 +172,10 @@ bool MediaItemManagement::removeItemsFromLibraryInteractive(
 
 	if (QMessageBox::question(dialogParent, QObject::tr("Remove from library"), message,
 			QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
-		return false;
+		return;
 
+	Catalog::ChangeBatchScope catalogChanges(catalog);
 	Catalog::BatchScope batch(catalog);
 	for (const MediaId& id : selection)
 		catalog.removeMediaItem(id);
-	return true;
 }

@@ -89,7 +89,9 @@ not just when reading existing code.
   open a root, or pick one of the recent ones); `main()` never handles a `Library`. Persistent consumers borrow
   `Library&`, while synchronous operations may borrow its current
   `Catalog` or `MetadataStore`. There is no global active-library/catalog/store accessor. See
-  [data-model.md](docs/architecture/data-model.md).
+  [data-model.md](docs/architecture/data-model.md). `Library::catalogChanged` is the stable invalidation seam across
+  both catalog mutations and state replacement; persistent views subscribe to the `Library`, never to the replaceable
+  `Catalog` instance.
 - **Persistent JSON is read and written through one checked path.** Library loading distinguishes absent files
   from unreadable, malformed, or schema-invalid files and passes the validated objects directly into the
   model - loaders never parse them a second time. Atomic writes check directory creation, open, full byte

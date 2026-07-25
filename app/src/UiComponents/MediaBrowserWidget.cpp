@@ -199,6 +199,12 @@ MediaBrowserWidget::MediaBrowserWidget(Library& library, QWidget* parent)
 
 void MediaBrowserWidget::setupUi()
 {
+	_catalogRefreshTimer = new QTimer(this);
+	_catalogRefreshTimer->setSingleShot(true);
+	_catalogRefreshTimer->setInterval(0);
+	connect(_catalogRefreshTimer, &QTimer::timeout, this, &MediaBrowserWidget::refreshLibraryView);
+	connect(&_library, &Library::catalogChanged, this, [this] { _catalogRefreshTimer->start(); });
+
 	auto* rootLayout = new QHBoxLayout(this);
 	rootLayout->setContentsMargins(0, 0, 0, 0);
 	rootLayout->setSpacing(0);
@@ -206,20 +212,16 @@ void MediaBrowserWidget::setupUi()
 	_labelSidebar = new LabelSidebar(_library);
 	connect(_labelSidebar, &LabelSidebar::filterChanged, this, &MediaBrowserWidget::refreshMediaGrid);
 	connect(_labelSidebar, &LabelSidebar::addLabelRequested, this, [this] {
-		if (LabelManagement::createLabelInteractive(_library.catalog(), window()) != LabelId::None)
-			refreshLibraryView();
+		static_cast<void>(LabelManagement::createLabelInteractive(_library.catalog(), window()));
 	});
 	connect(_labelSidebar, &LabelSidebar::renameLabelRequested, this, [this](LabelId labelId) {
-		if (LabelManagement::renameLabelInteractive(_library.catalog(), labelId, window()))
-			refreshLibraryView();
+		LabelManagement::renameLabelInteractive(_library.catalog(), labelId, window());
 	});
 	connect(_labelSidebar, &LabelSidebar::setLabelColorRequested, this, [this](LabelId labelId) {
-		if (LabelManagement::setLabelColorInteractive(_library.catalog(), labelId, window()))
-			refreshLibraryView();
+		LabelManagement::setLabelColorInteractive(_library.catalog(), labelId, window());
 	});
 	connect(_labelSidebar, &LabelSidebar::deleteLabelRequested, this, [this](LabelId labelId) {
-		if (LabelManagement::deleteLabelInteractive(_library.catalog(), labelId, window()))
-			refreshLibraryView();
+		LabelManagement::deleteLabelInteractive(_library.catalog(), labelId, window());
 	});
 
 	auto* rightPanel = new QWidget();
@@ -452,7 +454,6 @@ void MediaBrowserWidget::showMediaItemContextMenu(const MediaId& id, const QPoin
 					else
 						_library.catalog().removeLabel(selectedId, labelId);
 				}
-				refreshLibraryView();
 			} });
 	}
 	LabelVisuals::buildChecklistMenu(menu.addMenu(tr("Labels")), std::move(labelRows));
@@ -473,18 +474,15 @@ void MediaBrowserWidget::deleteMediaItemsInteractive(const std::vector<MediaId>&
 {
 	const MediaItemManagement::DeleteResult result =
 		MediaItemManagement::deleteItemsInteractive(_library.catalog(), selection, window());
-	if (!result.refreshRequired)
-		return;
-
-	refreshLibraryView();
+	if (result.storageRefreshRequired)
+		refreshLibraryView();
 	for (const QString& folderPath : result.affectedFrameFolders)
 		emit frameFolderPathChanged(folderPath, {}, {});
 }
 
 void MediaBrowserWidget::removeMediaItemsFromLibraryInteractive(const std::vector<MediaId>& selection)
 {
-	if (MediaItemManagement::removeItemsFromLibraryInteractive(_library.catalog(), selection, window()))
-		refreshLibraryView();
+	MediaItemManagement::removeItemsFromLibraryInteractive(_library.catalog(), selection, window());
 }
 
 void MediaBrowserWidget::renameMediaItemInteractive(const MediaId& id)
@@ -493,7 +491,6 @@ void MediaBrowserWidget::renameMediaItemInteractive(const MediaId& id)
 	if (!result.renamed)
 		return;
 
-	refreshLibraryView();
 	if (!result.oldFolderPath.isEmpty())
 		emit frameFolderPathChanged(result.oldFolderPath, result.newFolderPath, result.newName);
 }
@@ -549,6 +546,7 @@ void MediaBrowserWidget::resetForLibrarySwitch()
 // Keep sidebar rebuilding out of refreshMediaGrid(): that function can run from a sidebar item's click signal.
 void MediaBrowserWidget::refreshLibraryView()
 {
+	_catalogRefreshTimer->stop();
 	refreshMediaGrid();
 	_labelSidebar->refresh();
 }
@@ -666,7 +664,6 @@ MediaItemWidget* MediaBrowserWidget::buildMediaCard(
 			Catalog::BatchScope batch(_library.catalog());
 			for (const MediaId& target : targets)
 				_library.catalog().addLabel(target, dropped);
-			refreshLibraryView();
 		}, Qt::QueuedConnection);
 	});
 
@@ -873,20 +870,4 @@ void MediaBrowserWidget::toggleBest(const MediaId& id)
 		catalog.removeLabel(id, Catalog::BestLabelId);
 	else
 		catalog.addLabel(id, Catalog::BestLabelId);
-
-	// Toggling the star does not recreate the card's label dots.
-	for (int row = 0; row < _mediaGrid->count(); ++row)
-	{
-		auto* item = static_cast<GridItem*>(_mediaGrid->item(row));
-		if (item->mediaId == id)
-		{
-			applyLabelDots(catalog, id, static_cast<MediaItemWidget*>(_mediaGrid->itemWidget(item)));
-			break;
-		}
-	}
-
-	if (_labelSidebar->activeLabelIds().contains(Catalog::BestLabelId))
-		QMetaObject::invokeMethod(this, &MediaBrowserWidget::refreshMediaGrid, Qt::QueuedConnection);
-	else if (_sortControl->favoritesFirst())
-		QMetaObject::invokeMethod(this, &MediaBrowserWidget::resortMediaGrid, Qt::QueuedConnection);
 }

@@ -173,6 +173,11 @@ public:
 		catalog.setPersistenceFailureHandler(std::move(handler));
 	}
 
+	void setCatalogChangeHandler(std::function<void()> handler)
+	{
+		catalog.setCatalogChangeHandler(std::move(handler));
+	}
+
 private:
 	friend class Library;
 
@@ -229,9 +234,11 @@ bool Library::setRoot(const QString& root, QString* error)
 	if (!replacement)
 		return false;
 	replacement->setPersistenceFailureHandler(_persistenceFailureHandler);
+	replacement->setCatalogChangeHandler([this] { emit catalogChanged(); });
 	_state = std::move(replacement);
 	++_generation;
 	qInfo() << "Library: opened, catalog folder" << QDir::toNativeSeparators(_state->rootFolder);
+	emit catalogChanged();
 	return true;
 }
 

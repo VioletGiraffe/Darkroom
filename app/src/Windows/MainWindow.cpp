@@ -380,7 +380,6 @@ bool MainWindow::switchLibraryTo(const QString& root, QString* error)
 	_mediaBrowser->resetForLibrarySwitch();
 
 	recordCurrentLibrary(_library.rootFolder());
-	_mediaBrowser->refreshLibraryView();
 	return true;
 }
 
@@ -486,19 +485,15 @@ void MainWindow::reExportAllVideos()
 
 	if (FrameExtraction::reExportAllVideosInteractive(
 			libraryCatalog(), _mediaBrowser->previewFrameCount(), this))
-		_mediaBrowser->refreshMediaGrid();
+		_mediaBrowser->refreshLibraryView();
 }
 
 void MainWindow::openImportDialog(const QStringList& initialStaging)
 {
 	ImportDialog dialog(_library, libraryCatalog().anySourceDir(), nullptr);
-	connect(&dialog, &ImportDialog::itemsImported, _mediaBrowser, &MediaBrowserWidget::refreshLibraryView);
 	if (!initialStaging.isEmpty())
 		dialog.addToStaging(initialStaging);
 	dialog.exec();
-
-	// Label materialization may succeed even when every item import fails, so itemsImported was not emitted.
-	_mediaBrowser->refreshLibraryView();
 }
 
 void MainWindow::scanForUntrackedFiles()
@@ -591,6 +586,11 @@ void MainWindow::checkCatalogIntegrity()
 		},
 	};
 
-	if (IntegrityCheckDialog::scanAndShowUi(libraryCatalog(), _library.rootFolder(), std::move(callbacks), this))
+	bool catalogOrStorageChanged = false;
+	{
+		Catalog::ChangeBatchScope catalogChanges(libraryCatalog());
+		catalogOrStorageChanged = IntegrityCheckDialog::scanAndShowUi(libraryCatalog(), _library.rootFolder(), std::move(callbacks), this);
+	}
+	if (catalogOrStorageChanged)
 		_mediaBrowser->refreshLibraryView();
 }

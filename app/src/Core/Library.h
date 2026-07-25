@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QObject>
 #include <QString>
 
 #include <stdint.h>
@@ -13,8 +14,9 @@ class MetadataStore;
 // Stable, immovable GUI-thread owner of one root-bound Catalog and MetadataStore. setRoot() atomically replaces
 // that private state, so persistent collaborators may borrow Library across root changes. A default Library is
 // empty; only loading/status/persistence operations are valid until setRoot() succeeds.
-class Library
+class Library : public QObject
 {
+	Q_OBJECT
 public:
 	Library();
 
@@ -44,7 +46,11 @@ public:
 	Library& operator=(const Library&) = delete;
 	Library(Library&&) = delete;
 	Library& operator=(Library&&) = delete;
-	~Library();
+	~Library() override;
+
+signals:
+	// Emitted after a successful root replacement or a browser-visible change to the active Catalog.
+	void catalogChanged();
 
 private:
 	std::function<void()> _persistenceFailureHandler;

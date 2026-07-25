@@ -134,7 +134,9 @@ re-serialize the *entire* store once per call, making an n-item loop write O(n²
 `Catalog::BatchScope` is an RAII guard — construct one at the top of such a loop — that defers the physical
 write until the **outermost** scope is destroyed (nests freely), collapsing the whole loop into one write.
 Used by the multi-item loops: the Import dialog's batch import, re-export-all, and the post-Import Best/extra-label
-flush.
+flush. It also coalesces catalog-change notification until the outermost batch completes. `ChangeBatchScope`
+provides notification-only coalescing for compound workflows that pump events and therefore must not expose an
+intermediate catalog state, without retaining a persistence writer across the whole workflow.
 
 ## Registry mutations (the label objects themselves)
 
@@ -187,8 +189,11 @@ on every refresh would be redundant work and would also re-save the registry on 
 
 ## UI integration
 
-See [main-window.md](main-window.md), [media-widgets.md](media-widgets.md), and [import.md](import.md) for the UI wiring
-(sidebar filter, per-card assignment, sidebar label management, Import dialog assignment).
+Successful browser-visible mutations report one blanket change through `Library::catalogChanged`; no-op/refused
+mutations remain silent, and nested batches coalesce. `MediaBrowserWidget` queues and coalesces that signal into a
+complete library-view refresh, keeping Catalog independent of any particular UI. See [main-window.md](main-window.md),
+[media-widgets.md](media-widgets.md), and [import.md](import.md) for the UI wiring (sidebar filter, per-card assignment,
+sidebar label management, Import dialog assignment).
 
 ---
 
