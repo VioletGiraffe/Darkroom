@@ -1780,7 +1780,7 @@ void MainWindow::openImportDialog(const QStringList& initialStaging)
 		.viewChanged = [this] { refreshLibraryView(); }
 	};
 
-	ImportDialog dialog(_library, std::move(callbacks), libraryCatalog().anySourceDir(), this);
+	ImportDialog dialog(_library, std::move(callbacks), libraryCatalog().anySourceDir(), nullptr);
 	if (!initialStaging.isEmpty())
 		dialog.addToStaging(initialStaging);
 	dialog.exec();
