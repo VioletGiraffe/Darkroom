@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784993400659,
+  "lastUpdate": 1784997439524,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -8776,6 +8776,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .text",
             "value": 683,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 331.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 32.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 33,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "105b7c216f0b87cabf601cf069822c15a565ab12",
+          "message": "More complete code extraction from MainWindow into MediaBrowserWidget and MediaItemManagement",
+          "timestamp": "2026-07-25T19:32:35+03:00",
+          "tree_id": "3725757c1aab8aa465e7c6de73fff9e4a0487d3f",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/105b7c216f0b87cabf601cf069822c15a565ab12"
+        },
+        "date": 1784997436951,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 13393,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 8055,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1118,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 682.5,
             "unit": "KB"
           },
           {
