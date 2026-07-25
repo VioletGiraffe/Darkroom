@@ -147,7 +147,7 @@ QStringList buildExtractionArguments(const QString& videoFilePath, const QString
 namespace Ffmpeg {
 
 std::vector<PreviewResult> generatePreviewFrames(const std::vector<PreviewJob>& jobs, int frameCount, int maxConcurrentProcesses,
-	const std::atomic<bool>& cancelled, const std::function<void(int, int)>& onProgress)
+	const std::atomic<bool>& cancelled, const std::function<void(int, int, Phase)>& onProgress)
 {
 	const int total = static_cast<int>(jobs.size());
 	std::vector<PreviewResult> results(total);   // one per job, jobs order; default { Ok, -1 } refined below
@@ -160,7 +160,13 @@ std::vector<PreviewResult> generatePreviewFrames(const std::vector<PreviewJob>& 
 	// exactly what never got here, and is marked Cancelled once both passes are done.
 	int completed = 0;
 	std::vector<bool> reachedTerminalState(total, false);
-	const auto reportCompleted = [&](int i) { reachedTerminalState[i] = true; ++completed; if (onProgress) onProgress(completed, total); };
+	const auto markTerminal    = [&](int i) { reachedTerminalState[i] = true; ++completed; };
+	const auto reportCompleted = [&](int i) { markTerminal(i); if (onProgress) onProgress(completed, total, Phase::Extracting); };
+
+	// Pass 1 reports a count of its own: a successfully probed job is not terminal yet, so counting only terminal
+	// states would leave progress frozen through the whole probe pass and move it only when a job failed there.
+	int probed = 0;
+	const auto reportProbed = [&] { ++probed; if (onProgress) onProgress(probed, total, Phase::Probing); };
 
 	// Pass 1: probe each job's duration and build its extraction arguments, up to maxProcesses probes at once
 	// (probing is size-independent, so the solo rule below doesn't apply - every window is packed full). A job
@@ -184,7 +190,8 @@ std::vector<PreviewResult> generatePreviewFrames(const std::vector<PreviewJob>& 
 			if (!probeStarted[i])
 			{
 				results[i].status = PreviewResult::Status::FolderCreateFailed;
-				reportCompleted(i);
+				markTerminal(i);
+				reportProbed();
 				return;
 			}
 			const qint64 durationMs = parseProbedDurationMs(probe, cancelled);
@@ -193,7 +200,7 @@ std::vector<PreviewResult> generatePreviewFrames(const std::vector<PreviewJob>& 
 			if (durationMs <= 0)
 			{
 				results[i].status = PreviewResult::Status::ProbeFailed;
-				reportCompleted(i);  // best-effort: leave this job's destination empty rather than guessing seek points
+				markTerminal(i);  // best-effort: leave this job's destination empty rather than guessing seek points
 			}
 			else
 			{
@@ -201,6 +208,7 @@ std::vector<PreviewResult> generatePreviewFrames(const std::vector<PreviewJob>& 
 				extractionArguments[i] = buildExtractionArguments(jobs[i].videoFilePath, jobs[i].destinationFolder,
 					pickEvenlySpacedTimestampsMs(durationMs, frameCount));
 			}
+			reportProbed();
 		});
 
 	// Pass 2: run the extractions for the jobs that probed successfully. Windows pack maxProcesses at a time,

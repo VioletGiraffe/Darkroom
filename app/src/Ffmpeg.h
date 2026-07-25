@@ -41,6 +41,15 @@ struct PreviewResult
 	[[nodiscard]] bool ok() const { return status == Status::Ok; }
 };
 
+// Which of generatePreviewFrames' two passes an onProgress report comes from. Probing counts jobs leaving the
+// probe pass, whether they probed or failed there; Extracting counts jobs reaching their terminal state, so it
+// also carries over the jobs that failed in pass 1. Both count against jobs.size().
+enum class Phase
+{
+	Probing,
+	Extracting,
+};
+
 // Generates frameCount evenly-spaced preview frames for each job into its destinationFolder (created if
 // needed), running up to maxConcurrentProcesses ffmpeg processes at once. Each ffmpeg is its own OS process, so
 // this parallelizes without any worker threads: it starts a window of processes and then waits on that window,
@@ -59,12 +68,13 @@ struct PreviewResult
 // can keep the work already paid for. Cancelled jobs leave whatever partial frames ffmpeg had written in their
 // destinationFolder - the caller owns that cleanup.
 //
-// onProgress, if set, is invoked as each job reaches its terminal state (extracted or skipped), with
-// (completedJobs, totalJobs) where totalJobs == jobs.size(); use it to drive UI. It runs on the calling thread,
-// which is not the GUI thread if the caller followed the cancellation contract above - so a UI callback must
-// marshal to the GUI thread rather than touching widgets directly.
+// onProgress, if set, is invoked as each job leaves the probe pass and again as each reaches its terminal state
+// (extracted or skipped), with (completedJobs, totalJobs, phase) where totalJobs == jobs.size(); use it to drive
+// UI. Each phase counts up to totalJobs of its own, so the two are not one continuous run of numbers. It runs on
+// the calling thread, which is not the GUI thread if the caller followed the cancellation contract above - so a
+// UI callback must marshal to the GUI thread rather than touching widgets directly.
 [[nodiscard]] std::vector<PreviewResult> generatePreviewFrames(const std::vector<PreviewJob>& jobs, int frameCount, int maxConcurrentProcesses,
-	const std::atomic<bool>& cancelled, const std::function<void(int completedJobs, int totalJobs)>& onProgress = {});
+	const std::atomic<bool>& cancelled, const std::function<void(int completedJobs, int totalJobs, Phase phase)>& onProgress = {});
 
 // Single-video convenience: the batch form with one job run one process at a time, returning its lone
 // PreviewResult. Used by the import and re-split paths, which handle a single video.

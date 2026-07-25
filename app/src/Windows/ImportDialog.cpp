@@ -754,7 +754,9 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 	for (const QString& path : videoPaths)
 		jobs.push_back({ path, uniqueTempPreviewDir() });
 
-	QProgressDialog progress(tr("Generating preview %1/%2...").arg(0).arg(jobs.size()), tr("Cancel"), 0, static_cast<int>(jobs.size()), this);
+	// The bar measures the extraction pass alone. The probe pass that precedes it (see Ffmpeg::Phase) only drives
+	// the label, so a large drop says what it's busy with instead of sitting silent at zero.
+	QProgressDialog progress(tr("Examining video %1/%2...").arg(0).arg(jobs.size()), tr("Cancel"), 0, static_cast<int>(jobs.size()), this);
 	progress.setWindowTitle(tr("Staging"));
 	progress.setModal(true);
 	progress.setMinimumDuration(0);  // extracting even one preview is never instant, so don't sit invisible for the default delay
@@ -778,11 +780,16 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 		// Each result carries the duration the probe read, stashed on the staged entry so import records it
 		// without probing the same file again.
 		results = Ffmpeg::generatePreviewFrames(jobs, frameCount, PREVIEW_EXTRACTION_CONCURRENCY, cancelled,
-			[&](int done, int total) {
-				QMetaObject::invokeMethod(&progress, [&progress, &previewThread, done, total] {
+			[&](int done, int total, Ffmpeg::Phase phase) {
+				QMetaObject::invokeMethod(&progress, [&progress, &previewThread, done, total, phase] {
 					// A job that happened to finish just as Cancel was pressed must not put the old text back.
 					if (previewThread.cancellationRequested())
 						return;
+					if (phase == Ffmpeg::Phase::Probing)
+					{
+						progress.setLabelText(tr("Examining video %1/%2...").arg(done).arg(total));
+						return;
+					}
 					progress.setValue(done);
 					progress.setLabelText(tr("Generating preview %1/%2...").arg(done).arg(total));
 				}, Qt::QueuedConnection);
