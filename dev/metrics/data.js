@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784986623659,
+  "lastUpdate": 1784991274504,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -8594,6 +8594,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .reloc",
             "value": 9.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "6bc37d7eb54f3c467900638552ba6fc48da410fb",
+          "message": "MediaBrowserWidget extracted out of MainWindow",
+          "timestamp": "2026-07-25T17:44:54+03:00",
+          "tree_id": "05832b845fb6f7dba0c3c9db5985f519f10bd58d",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/6bc37d7eb54f3c467900638552ba6fc48da410fb"
+        },
+        "date": 1784991271196,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 13299,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 8055,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1121,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 686.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 328,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 33,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 34.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 10,
             "unit": "KB"
           }
         ]
