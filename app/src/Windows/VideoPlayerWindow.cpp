@@ -381,10 +381,11 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 		persistIntervals();
 		loopCombo->setCurrentIndex(index);
 	});
-	connect(deleteLoopButton, &QPushButton::clicked, this, [loopCombo, persistIntervals] {
+	connect(deleteLoopButton, &QPushButton::clicked, this, [loopCombo, persistIntervals, clearLoop] {
 		const int index = loopCombo->currentIndex();
 		if (index <= 0)
 			return;
+		clearLoop();
 		// Removing the current item would otherwise activate its neighbour.
 		const QSignalBlocker blocker{ loopCombo };
 		loopCombo->removeItem(index);

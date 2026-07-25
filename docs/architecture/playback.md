@@ -72,7 +72,8 @@ Persisted via `MetadataStore` (see [data-model.md](data-model.md)) under the `"i
 `{start, end, name, speed}` objects keyed by the played video's `MediaId`; (de)serialization owned here per the
 field-owns-its-format convention. `speed` is the playback speed captured when the loop was saved; activating a
 loop restores it (a missing/zero `speed`, from loops saved before the attribute existed, leaves the current speed
-untouched).
+untouched). Deleting the selected saved loop also clears the active A–B interval and any oscillating playback before
+removing its persisted entry.
 
 ### Playback speed
 
