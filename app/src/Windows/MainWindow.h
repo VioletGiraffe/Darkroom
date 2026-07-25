@@ -1,11 +1,7 @@
 #pragma once
 
 #include "Core/Library.h"
-#include "Core/LabelId.h"
-#include "Core/MediaId.h"
-#include "Import.h"
 
-#include <QHash>
 #include <QMainWindow>
 #include <QStringList>
 
@@ -42,8 +38,6 @@ private:
 	void restoreSettings();
 
 	void reExportAllVideos();
-	void importVideoBatch(QStringList videoPaths, const QString& storageFolderPath, const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations);
-	std::vector<Import::PhotoResult> importPhotoBatch(LabelId labelId, const QStringList& photoPaths, Import::PhotoImportMode mode);
 	void openImportDialog(const QStringList& initialStaging = {});
 	void scanForUntrackedFiles();
 	void checkCatalogIntegrity();

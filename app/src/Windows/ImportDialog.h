@@ -1,14 +1,13 @@
 #pragma once
 
 #include "Core/MediaId.h"
-#include "Import.h"  // Import::PhotoImportMode / PhotoResult, used in the importPhotosRequested callback
+#include "Import.h"  // Import::PhotoImportMode, used by importPhotoGroup
 #include "Windows/SourceRelocation.h"  // SourceRelocation::Mode, importVideoGroup's parameter
 
 #include <QDialog>
 #include <QHash>
 #include <QStringList>
 
-#include <functional>
 #include <vector>
 
 class QComboBox;
@@ -26,6 +25,7 @@ class Library;
 
 class ImportDialog final : public QDialog
 {
+	Q_OBJECT
 public:
 	struct LabelOption
 	{
@@ -35,24 +35,15 @@ public:
 		bool provisional = false;
 	};
 
-	// Host-owned operations; the dialog accesses Catalog directly for everything else.
-	struct Callbacks
-	{
-		// Staged preview directories contain frames directly; missing entries fall back to extraction.
-		std::function<void(const QString& labelId, const QStringList& videoPaths,
-			const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations)> addMediaItemsRequested;
-		// Returns results in path order; registeredId must key post-import Best/label updates.
-		std::function<std::vector<Import::PhotoResult>(const QString& labelId, const QStringList& photoPaths,
-			Import::PhotoImportMode mode)> importPhotosRequested;
-		// Called after Best/extra-label flushing when at least one item imported.
-		std::function<void()> viewChanged;
-	};
-
-	ImportDialog(Library& library, Callbacks callbacks, const QString& suggestedRelocateFolder, QWidget* parent = nullptr);
+	ImportDialog(Library& library, const QString& suggestedRelocateFolder, QWidget* parent = nullptr);
 	~ImportDialog() override;
 
 	// Defers staging to the event loop; folders expand recursively.
 	void addToStaging(const QStringList& paths);
+
+signals:
+	// Emitted after imported items and their staged metadata have both reached the Catalog.
+	void itemsImported();
 
 protected:
 	void dragEnterEvent(QDragEnterEvent* event) override;
@@ -127,7 +118,6 @@ private:
 	};
 
 	Library& _library;
-	Callbacks _callbacks;
 	std::vector<LabelOption> _labelOptions;
 	std::vector<LabelOption> _provisionalLabels;
 	int _provisionalSeq = 0;

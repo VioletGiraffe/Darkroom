@@ -10,6 +10,7 @@
 #include "UiComponents/LabelVisuals.h"
 #include "Settings.h"
 #include "Shortcuts.h"
+#include "Windows/ImportExecution.h"
 #include "Windows/LabelManagement.h"
 #include "Windows/SourceRelocation.h"
 #include "Theme/Icons.h"
@@ -126,10 +127,9 @@ using RelocateMode = SourceRelocation::Mode;
 
 } // namespace
 
-ImportDialog::ImportDialog(Library& library, Callbacks callbacks, const QString& suggestedRelocateFolder, QWidget* parent)
+ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFolder, QWidget* parent)
 	: QDialog(parent)
 	, _library(library)
-	, _callbacks(std::move(callbacks))
 {
 	setWindowTitle(tr("Import"));
 	// Qt::Window gives this workspace its own taskbar and Alt-Tab presence.
@@ -1030,7 +1030,8 @@ void ImportDialog::importPhotoGroup(const QString& labelId, const std::vector<Me
 	for (const MediaId& id : photoIds)
 		photoPaths << _staged.value(id).path;
 
-	const std::vector<Import::PhotoResult> results = _callbacks.importPhotosRequested(labelId, photoPaths, mode);
+	const std::vector<Import::PhotoResult> results =
+		ImportExecution::importPhotosInteractive(_library.catalog(), labelIdFromString(labelId), photoPaths, mode, this);
 	for (size_t i = 0; i < photoIds.size() && i < results.size(); ++i)
 	{
 		const MediaId& id = photoIds[i];
@@ -1045,8 +1046,8 @@ void ImportDialog::importPhotoGroup(const QString& labelId, const std::vector<Me
 				.arg(QDir::toNativeSeparators(_staged.value(id).path)),
 				QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes)
 		{
-			const std::vector<Import::PhotoResult> retried =
-				_callbacks.importPhotosRequested(labelId, { _staged.value(id).path }, Import::PhotoImportMode::Copy);
+			const std::vector<Import::PhotoResult> retried = ImportExecution::importPhotosInteractive(
+				_library.catalog(), labelIdFromString(labelId), { _staged.value(id).path }, Import::PhotoImportMode::Copy, this);
 			if (!retried.empty())
 				result = retried.front();
 		}
@@ -1069,7 +1070,9 @@ void ImportDialog::importVideoGroup(const QString& labelId, const std::vector<Me
 	const LabelOption* label = findLabelOption(labelId);
 	if (!label)
 		return;
-	if (_library.catalog().storageFolderForLabel(labelIdFromString(labelId)).isEmpty())
+	Catalog& catalog = _library.catalog();
+	const QString storageFolder = catalog.storageFolderForLabel(labelIdFromString(labelId));
+	if (storageFolder.isEmpty())
 	{
 		QMessageBox::warning(this, tr("Import"),
 			tr("This label does not have a safe storage path:\n%1").arg(label->displayName));
@@ -1092,7 +1095,7 @@ void ImportDialog::importVideoGroup(const QString& labelId, const std::vector<Me
 
 	const SourceRelocation::BatchResult relocated = SourceRelocation::relocateIfNeeded(
 		_library, this, paths, relocateMode, _relocateFolderEdit->text());
-	_callbacks.addMediaItemsRequested(labelId, relocated.toImport, stagedPreviewDirs, stagedDurations);
+	ImportExecution::importVideosInteractive(catalog, relocated.toImport, storageFolder, stagedPreviewDirs, stagedDurations, this);
 
 	for (const MediaId& id : videoIds)
 	{
@@ -1110,7 +1113,7 @@ void ImportDialog::importVideoGroup(const QString& labelId, const std::vector<Me
 		if (const QString newPath = relocated.relocatedTo.value(entry.path); !newPath.isEmpty())
 			_staged[id].path = newPath;
 
-		if (!isTrackedUnderLabel(_library.catalog(), id, labelId))
+		if (!isTrackedUnderLabel(catalog, id, labelId))
 			continue;
 
 		outcome.succeededIds.push_back(id);
@@ -1197,6 +1200,6 @@ void ImportDialog::runImport()
 		unstage(id);
 
 	// Refresh only after staged metadata has also been applied.
-	if (!outcome.succeededIds.empty() && _callbacks.viewChanged)
-		_callbacks.viewChanged();
+	if (!outcome.succeededIds.empty())
+		emit itemsImported();
 }

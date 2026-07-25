@@ -1,4 +1,4 @@
-# Import: the Import module, ffmpeg, Utils, ImportDialog
+# Import: workers, interactive execution, ffmpeg, Utils, and ImportDialog
 
 [← Back to architecture index](../../ARCHITECTURE.md)
 
@@ -31,7 +31,7 @@ when it finds them; only with no real frames does it fall back to extracting a p
 `FrameExtraction::reExportAllVideosInteractive` skips photos when collecting its worklist — a photo has no frames,
 and its "folder" is the shared `Photos/<label>` dir, which frame-folder replacement would destroy. It owns confirmation,
 progress, the catalog batch, and per-video replacement. MainWindow's thin wrapper owns only the app-wide
-`_isProcessing` lock shared with import and refreshes the browser afterward.
+`_isProcessing` lock that protects the shell while re-export pumps events, and refreshes the browser afterward.
 
 Neither path is used by `Import::importVideo`'s own overwrite-existing-folder path, which can be replacing a stale
 folder left behind by a completely different prior video — there's no related `preview/` worth preserving or
@@ -42,9 +42,10 @@ regenerating-in-place there; it just goes through the normal import flow from sc
 `Import::importVideo` (`src/Import.h/.cpp`, a free-function module in the same style as `Ffmpeg`) is the
 per-item import worker. It is deliberately UI-free — it never prompts or pops a message box; every outcome
 comes back as an `Import::Result` (`Success` / `FolderConflict` / `Error` with a user-presentable message).
-`MainWindow::importVideoBatch` stays the batch coordinator on top of it and owns all the import UI: the
-app-wide `_isProcessing` lock shared with `reExportAllVideos`, the progress modal, the folder-conflict
-prompt, the per-item error boxes, `Catalog::BatchScope`, and the view refresh.
+`ImportExecution::importVideosInteractive` is the batch coordinator on top of it and owns the progress modal,
+folder-conflict decisions, per-item error boxes, and `Catalog::BatchScope`. The application-modal Import dialog
+prevents interaction with library-switch and Settings commands while this event-pumping operation runs, so import
+does not route through MainWindow or share its re-export busy flag.
 
 It does not extract the full frame set. It creates the output folder, puts a few
 permanent preview frames into `outputFolder/preview/`, then registers the video via `Catalog::addMediaItem(...,
@@ -67,8 +68,8 @@ other import failure.
 `Import::importPhoto(labelPhotoFolder, photoPath, mode)` is the photo counterpart to `importVideo` — equally
 UI-free, taking the verified destination produced by `Catalog::photoFolderForLabel` and returning an
 `Import::PhotoResult` (`Success` / `IdCollision` / `Error` + message + the
-**`registeredId`** actually registered). `MainWindow::importPhotoBatch` is its coordinator (batch scope,
-error boxes, view refresh), driven from the Import dialog via the `importPhotosRequested` callback.
+**`registeredId`** actually registered). `ImportExecution::importPhotosInteractive` is its coordinator
+(destination validation, batch scope, and error boxes), called directly by the Import dialog.
 **Copy/Move** land the file in `<root>/Photos/<label>/` (created lazily); **"leave in place" means Reference** —
 the file is tracked where it is and the catalog entry is marked referenced (`Catalog::addPhoto`,
 see [catalog-and-labels.md](catalog-and-labels.md)).
@@ -82,7 +83,8 @@ see [catalog-and-labels.md](catalog-and-labels.md)).
 - **Reference import collision**: a referenced photo has no owned copy to rename, so an id already tracked
   as a different item is refused with `IdCollision`; the Import dialog then offers the escape hatch — "import an
   owned copy instead?" — which routes the file through the Copy path where the auto-rename works.
-- **A referenced photo's first label** is applied by `importPhotoBatch` via `Catalog::addLabel` right after
+- **A referenced photo's first label** is applied by `ImportExecution::importPhotosInteractive` via
+  `Catalog::addLabel` right after
   registration (it has no storage folder to derive a label from); an owned photo's first label derives from
   the `Photos/<label>` dir it landed in, exactly like a video's storage folder.
 
@@ -138,10 +140,10 @@ Import dialog: copy/move source files under a label.
 
 `ImportDialog` borrows its modal lifetime's `Library&` and reads its `Catalog` directly for lookups (label
 options, photo-content duplicates, the
-id-tracking check, random label colors) and calls back into its host (`MainWindow`) only for host-owned
-actions it can't do itself. The `Callbacks` struct is three members:
-`addMediaItemsRequested` / `importPhotosRequested` (the import workers, which own the app-wide busy lock and
-the progress modal), and `viewChanged` (the host repaint). Provisional-label materialization calls
+id-tracking check, random label colors). It invokes the interactive `ImportExecution` batch workflows directly;
+its sole outward notification is the semantic `itemsImported` signal emitted after imported items and their
+staged metadata have both reached the Catalog. MainWindow connects that signal to the browser refresh.
+Provisional-label materialization calls
 `LabelManagement::createLabelOrReport` directly, sharing the sidebar's creation workflow without routing through the
 host. The Best/extra-label flush and the tracked-under-label check are done
 in-dialog, not through callbacks (below). Source-file relocation lives in its own **`SourceRelocation`** module
@@ -213,28 +215,28 @@ just an ordinary additional tag, applied the same way Best is.
 1. Groups staged entries by first label id; entries with no label are left staged. It never reconstructs a
    destination from the display name — always asks `Catalog::storageFolderForLabel` / `photoFolderForLabel`
    for a verified path.
-2. **Photos in the group** (`importPhotoGroup`) go through `importPhotosRequested` (→ `MainWindow::importPhotoBatch` →
-   `Import::importPhoto`, see "Photo import" above). An `IdCollision` result (Reference mode's unresolvable
+2. **Photos in the group** (`importPhotoGroup`) go through `ImportExecution::importPhotosInteractive` →
+   `Import::importPhoto` (see "Photo import" above). An `IdCollision` result (Reference mode's unresolvable
    name+size clash) triggers the "import an owned copy instead?" escape hatch, retrying through the Copy
    path. Best/extra-label bookkeeping re-keys to `PhotoResult::registeredId` — an owned-import auto-rename
    gives the copy a new identity.
 3. **Videos in the group** (`importVideoGroup`): relocates source files if enabled
-   (`SourceRelocation::relocateIfNeeded`), then calls `addMediaItemsRequested` (`importVideoBatch`/`Import::importVideo`
-   — also where a file dropped on the main window ends up, since a drop just opens this dialog pre-staged),
+   (`SourceRelocation::relocateIfNeeded`), then calls
+   `ImportExecution::importVideosInteractive` → `Import::importVideo` — also where a file dropped on the main window
+   ends up, since a drop just opens this dialog pre-staged —
    passing each video's staging temp dir so import can reuse the already-extracted preview frames (see "Import:
    preview frames only" above). `isTrackedUnderLabel(id, labelId)` checks the item's tracked frame folder
-   against `<storageFolder>/<source base name>`, not just "tracked at all" — so both a declined/failed import
-   and a name+size collision with an item tracked elsewhere are correctly left staged rather than misread as
-   successes. The staged path is updated to the relocated location when the file was actually moved, so a
-   retry starts from where the file really is.
+   against that id's `Catalog::frameFolderName` under the selected storage folder, not just "tracked at all" — so
+   both a declined/failed import and a name+size collision with an item tracked elsewhere are correctly left staged
+   rather than misread as successes. The staged path is updated to the relocated location when the file was actually
+   moved, so a retry starts from where the file really is.
 4. Both group importers accumulate into one `ImportOutcome`. Once every group is processed, `runImport` flushes
    Best flags and extra-label picks to the Catalog — guarded by `Catalog::containsMediaItem` (a
    frame-folder-exists check wouldn't work for photos), wrapped in one `Catalog::BatchScope`
    (see [catalog-and-labels.md](catalog-and-labels.md)) so a multi-item Import session writes the store once.
-5. If anything succeeded, `viewChanged()` fires once (`MainWindow` wires it to `MediaBrowserWidget::refreshLibraryView()`):
-   `addMediaItemsRequested` → `importVideoBatch` already refreshes mid-Import as each group lands, but only with
-   folder labels — the Best/extra-label flush in step 4 runs *after* that, with no refresh of its own. Since
-   the dialog stays open after an Import, that gap would otherwise be visible until the dialog closes.
+5. If anything succeeded, `itemsImported` fires once after the Best/extra-label flush; MainWindow connects it
+   directly to `MediaBrowserWidget::refreshLibraryView()`. There is no partial mid-Import refresh: the browser observes
+   the complete result of the command while the dialog remains open.
 
 Nothing here is deferred past the click that triggers it, so there's no `QDialog::done(int)` override and no
 caller-visible close-time flush to get right — the dialog's destructor only deletes leftover temp preview

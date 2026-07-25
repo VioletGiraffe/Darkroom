@@ -24,8 +24,9 @@ and fully loads the requested root; `setRoot()` first flushes the current librar
 replacement. On success it synchronously destroys player windows, clears the persistent frame viewer, and asks the
 browser to clear its grid and library-specific label filter before returning to the event loop. The browser and sidebar
 borrow the stable `Library&`, so they need no replacement/rebinding. Library switching and Settings are refused while
-`_isProcessing`: import/re-export pumps
-events while holding a catalog batch, and settings changes partway through could give one batch mixed encoding behavior.
+`_isProcessing`: re-export pumps events while holding a catalog batch, and settings changes partway through could give
+one batch mixed encoding behavior. Import has its own application-modal workspace, which prevents interaction with
+these shell commands while `ImportExecution` pumps events.
 
 ## The Library menu and its recent list
 

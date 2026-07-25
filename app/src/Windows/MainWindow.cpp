@@ -2,7 +2,6 @@
 #include "Core/Catalog.h"
 #include "Core/Library.h"
 #include "Windows/PhotoCompareWindow.h"
-#include "Import.h"
 #include "Windows/FrameExtraction.h"
 #include "Windows/FrameViewerWindow.h"
 #include "Windows/IntegrityCheckDialog.h"
@@ -474,113 +473,6 @@ void MainWindow::updateEditActions()
 	_renameAction->setEnabled(selected.size() == 1);
 }
 
-void MainWindow::importVideoBatch(QStringList videoPaths, const QString& storageFolderPath, const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations)
-{
-	if (videoPaths.empty())
-		return;
-
-	if (_isProcessing)
-	{
-		QMessageBox::information(this, tr("Busy"), tr("Already extracting frames. Please wait for the current operation to finish."));
-		return;
-	}
-	_isProcessing = true;
-	const auto processingGuard = qScopeGuard([this] { _isProcessing = false; });
-
-	Catalog::BatchScope batch(libraryCatalog());
-
-	QMessageBox progressBox(this);
-	progressBox.setWindowTitle(tr("Processing"));
-	progressBox.setStandardButtons(QMessageBox::NoButton);
-	progressBox.setModal(true);
-	progressBox.show();
-
-	const auto partition = std::ranges::stable_partition(videoPaths, [&storageFolderPath](const QString& path) {
-		const QString outputFolder = storageFolderPath + "/" + QFileInfo(path).completeBaseName();
-		return !QDir{ outputFolder }.exists();
-	});
-
-	const auto processFilesRange = [&progressBox, this, &storageFolderPath, &stagedPreviewDirs, &stagedDurations, totalSize = videoPaths.size()](const auto& begin, const auto& end, qsizetype firstNumber, bool overwriteExisting = false) {
-		qsizetype displayNumber = firstNumber;
-		for (const QString& videoPath : std::ranges::subrange(begin, end))
-		{
-			progressBox.setText(tr("Adding video %1/%2...").arg(displayNumber++).arg(totalSize));
-			QApplication::processEvents();
-			const MediaId id = MediaId::fromFile(videoPath);
-			const QString stagedPreviewDir = stagedPreviewDirs.value(id);
-			const qint64 stagedDurationMs = stagedDurations.value(id, -1);
-			Import::Result result = Import::importVideo(libraryCatalog(), videoPath, storageFolderPath, stagedPreviewDir, overwriteExisting, stagedDurationMs);
-			if (result.status == Import::Status::FolderConflict)
-			{
-				const QString outputFolder = storageFolderPath + "/" + QFileInfo(videoPath).completeBaseName();
-				if (QMessageBox::question(this, tr("Folder Exists"),
-						tr("Folder already exists:\n%1\n\nOverwrite?").arg(outputFolder),
-						QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes)
-					continue;
-				result = Import::importVideo(libraryCatalog(), videoPath, storageFolderPath, stagedPreviewDir, /*overwriteExisting=*/true, stagedDurationMs);
-			}
-			if (result.status == Import::Status::Error)
-				QMessageBox::critical(this, tr("Error"), result.errorMessage);
-		}
-	};
-
-	processFilesRange(videoPaths.begin(), partition.begin(), 1);
-
-	if (partition.begin() != partition.end())
-	{
-		QMessageBox msgBox;
-		msgBox.setIcon(QMessageBox::Question);
-		msgBox.setWindowTitle(tr("Folder conflict"));
-		msgBox.setText(tr("One or more videos have existing output folders. Overwrite all, skip all, or decide one by one?"));
-		msgBox.setStandardButtons(QMessageBox::YesToAll | QMessageBox::Yes | QMessageBox::NoToAll);
-		msgBox.button(QMessageBox::YesToAll)->setText(tr("Overwrite all"));
-		msgBox.button(QMessageBox::Yes)->setText(tr("Decide one by one"));
-		msgBox.button(QMessageBox::NoToAll)->setText(tr("Skip all"));
-		msgBox.setDefaultButton(QMessageBox::YesToAll);
-
-		const auto choice = msgBox.exec();
-		if (choice != QMessageBox::NoToAll)
-		{
-			processFilesRange(partition.begin(), partition.end(), partition.begin() - videoPaths.begin() + 1, choice == QMessageBox::YesToAll);
-		}
-	}
-
-	_mediaBrowser->refreshLibraryView();
-}
-
-std::vector<Import::PhotoResult> MainWindow::importPhotoBatch(LabelId labelId, const QStringList& photoPaths, Import::PhotoImportMode mode)
-{
-	Catalog& catalog = libraryCatalog();
-	const Catalog::Label* label = catalog.labelById(labelId);
-	if (!label || label->isVirtual())
-		return {};
-	const QString photoFolder = catalog.photoFolderForLabel(labelId);
-	if (photoFolder.isEmpty())
-	{
-		QMessageBox::warning(this, tr("Import"),
-			tr("This label does not have a safe photo-storage path:\n%1").arg(label->displayName));
-		return {};
-	}
-
-	Catalog::BatchScope batch(catalog);
-
-	std::vector<Import::PhotoResult> results;
-	results.reserve(photoPaths.size());
-	for (const QString& path : photoPaths)
-	{
-		const Import::PhotoResult result = Import::importPhoto(catalog, photoFolder, path, mode);
-		if (result.status == Import::PhotoStatus::Error)
-			QMessageBox::critical(this, tr("Error"), result.errorMessage);
-		// Referenced photos have no storage folder from which to derive this label.
-		if (result.status == Import::PhotoStatus::Success && mode == Import::PhotoImportMode::Reference)
-			catalog.addLabel(result.registeredId, labelId);
-		results.push_back(result);
-	}
-
-	_mediaBrowser->refreshLibraryView();
-	return results;
-}
-
 void MainWindow::reExportAllVideos()
 {
 	if (_isProcessing)
@@ -599,32 +491,13 @@ void MainWindow::reExportAllVideos()
 
 void MainWindow::openImportDialog(const QStringList& initialStaging)
 {
-	ImportDialog::Callbacks callbacks{
-		.addMediaItemsRequested = [this](const QString& labelId, const QStringList& videoPaths,
-				const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations) {
-			const LabelId id = labelIdFromString(labelId);
-			const QString storageFolder = libraryCatalog().storageFolderForLabel(id);
-			if (storageFolder.isEmpty())
-			{
-				const Catalog::Label* label = libraryCatalog().labelById(id);
-				QMessageBox::warning(this, tr("Import"),
-					tr("This label does not have a safe storage path:\n%1").arg(label ? label->displayName : labelId));
-				return;
-			}
-			importVideoBatch(videoPaths, storageFolder, stagedPreviewDirs, stagedDurations);
-		},
-		.importPhotosRequested = [this](const QString& labelId, const QStringList& photoPaths, Import::PhotoImportMode mode) {
-			return importPhotoBatch(labelIdFromString(labelId), photoPaths, mode);
-		},
-		.viewChanged = [this] { _mediaBrowser->refreshLibraryView(); }
-	};
-
-	ImportDialog dialog(_library, std::move(callbacks), libraryCatalog().anySourceDir(), nullptr);
+	ImportDialog dialog(_library, libraryCatalog().anySourceDir(), nullptr);
+	connect(&dialog, &ImportDialog::itemsImported, _mediaBrowser, &MediaBrowserWidget::refreshLibraryView);
 	if (!initialStaging.isEmpty())
 		dialog.addToStaging(initialStaging);
 	dialog.exec();
 
-	// A label created without a subsequent import has not reached viewChanged.
+	// Label materialization may succeed even when every item import fails, so itemsImported was not emitted.
 	_mediaBrowser->refreshLibraryView();
 }
 

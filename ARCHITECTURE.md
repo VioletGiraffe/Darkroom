@@ -159,10 +159,10 @@ The `Settings.h`/`QSettings` key pattern, `SettingsDialog`, the `Theme` dark/lig
 app-wide `Accent`/`AccentBg` tokens), and the central `Style` stylesheet + custom-widget approach (e.g.
 `SegmentedToggle`) that gives the app its non-stock look.
 
-### [Import: the Import module, ffmpeg, Utils, ImportDialog](docs/architecture/import.md)
-`Import::importVideo` and `Import::importPhoto` — the per-item import workers (`MainWindow::importVideoBatch` /
-`importPhotoBatch` remain the batch coordinators over them; photos land in `<root>/Photos/<label>/` or are
-referenced in place, with collision auto-rename), full-frame replacement and repair (`FrameExtraction`), the `ffmpeg`
+### [Import: workers, interactive execution, ffmpeg, Utils, and ImportDialog](docs/architecture/import.md)
+`Import::importVideo` and `Import::importPhoto` — the UI-free per-item import workers; `ImportExecution` owns their
+interactive batch coordination, while photos land in `<root>/Photos/<label>/` or are referenced in place with
+collision auto-rename. Also covers full-frame replacement and repair (`FrameExtraction`), the `ffmpeg`
 invocation (`Ffmpeg::generatePreviewFrames` —
 a batch/concurrent preview extractor that `ImportDialog`'s staging runs across several videos at once,
 whose frames import then reuses by copy instead of re-extracting), `Utils.h`'s grab-bag of free functions,
@@ -175,8 +175,8 @@ card in one step.
 ## Improvement backlog
 
 **Open:**
-- *Batch ffmpeg failures*: `importVideoBatch` pops one modal `QMessageBox` per failure inside the loop, blocking
-  the batch. Collect failures, show one summary at the end.
+- *Batch ffmpeg failures*: `ImportExecution::importVideosInteractive` pops one modal `QMessageBox` per failure
+  inside the loop, blocking the batch. Collect failures, show one summary at the end.
 - *Label-reference validation*: `CatalogIntegrity::scan` checks catalog-vs-disk but not label integrity — an
   item whose stored `"labels"` id matches no registry label is neither flagged nor fixable. Add a "dangling
   label reference" verdict to the scan (resolution: drop the dead id). Low urgency — the mutation API already
