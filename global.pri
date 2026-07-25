@@ -1,9 +1,10 @@
 CONFIG += c++2b
 
 win*{
-	QMAKE_CXXFLAGS += /Zi
+	# Beyond -Zi in release, this makes qmake emit /Fd into OBJECTS_DIR - otherwise cl drops vc140.pdb next to the .pro
+	CONFIG += force_debug_info
 	Release:QMAKE_CXXFLAGS += /GL
-	Release:QMAKE_LFLAGS += /DEBUG:FULL /OPT:REF /OPT:ICF /TIME /LTCG /INCREMENTAL:NO
+	Release:QMAKE_LFLAGS += /OPT:REF /OPT:ICF /TIME /LTCG /INCREMENTAL:NO
 }
 
 mac*{

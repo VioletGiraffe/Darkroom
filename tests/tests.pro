@@ -58,7 +58,7 @@ LIBS += -L$${DESTDIR} -lqtutils -lcpputils
 include(../cpputils/dependencies.pri)
 
 win*{
-	QMAKE_CXXFLAGS += /MP /wd4251 /Zi
+	QMAKE_CXXFLAGS += /MP /wd4251
 	QMAKE_CXXFLAGS += /std:c++latest /permissive- /Zc:__cplusplus /FS
 	QMAKE_CXXFLAGS_WARN_ON = /W4
 	DEFINES += WIN32_LEAN_AND_MEAN NOMINMAX _SCL_SECURE_NO_WARNINGS

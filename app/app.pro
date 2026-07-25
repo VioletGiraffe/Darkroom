@@ -73,7 +73,7 @@ include(../cpputils/dependencies.pri)
 
 win*{
 	#LIBS += -lole32 -lShell32 -lUser32
-	QMAKE_CXXFLAGS += /MP /wd4251 /Zi
+	QMAKE_CXXFLAGS += /MP /wd4251
 	QMAKE_CXXFLAGS += /std:c++latest /permissive- /Zc:__cplusplus /FS
 	QMAKE_CXXFLAGS_WARN_ON = /W4
 	DEFINES += WIN32_LEAN_AND_MEAN NOMINMAX _SCL_SECURE_NO_WARNINGS
