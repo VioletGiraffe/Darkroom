@@ -77,6 +77,7 @@ QString formatLoopLabel(qint64 startMs, qint64 endMs, const QString& name, doubl
 
 constexpr int VolumeWheelStep = 5;
 
+// Together these keep worst-case cache memory acceptable; no separate byte cap is needed.
 constexpr qint64 MaxOscillationDurationMs = 30000;
 constexpr qreal MaxOscillationFrameRate = 60.0;
 constexpr QSize MaxOscillationFrameSize{ 1920, 1080 };
