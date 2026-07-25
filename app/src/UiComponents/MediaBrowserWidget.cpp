@@ -2,22 +2,32 @@
 #include "Core/Catalog.h"
 #include "Core/Library.h"
 #include "Settings.h"
+#include "Shortcuts.h"
 #include "Theme/Icons.h"
 #include "Theme/Style.h"
 #include "Theme/Theme.h"
+#include "UiComponents/LabelVisuals.h"
 #include "UiComponents/LabelSidebar.h"
 #include "UiComponents/MediaGrid.h"
 #include "UiComponents/MediaItemWidget.h"
 #include "UiComponents/SegmentedToggle.h"
 #include "UiComponents/SortControl.h"
 #include "Utils.h"
+#include "Windows/CompareWindow.h"
 #include "Windows/LabelManagement.h"
+#include "Windows/MediaItemManagement.h"
+#include "Windows/MediaRename.h"
+#include "Windows/PhotoCompareWindow.h"
+#include "Windows/VideoPlayerWindow.h"
 
 #include <QAbstractItemView>
 #include <QAction>
+#include <QApplication>
+#include <QClipboard>
 #include <QColor>
 #include <QComboBox>
 #include <QDateTime>
+#include <QDesktopServices>
 #include <QDir>
 #include <QFile>
 #include <QHBoxLayout>
@@ -26,6 +36,8 @@
 #include <QKeySequence>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QMenu>
+#include <QMessageBox>
 #include <QMetaObject>
 #include <QSettings>
 #include <QShortcut>
@@ -307,6 +319,202 @@ void MediaBrowserWidget::setupUi()
 	rootLayout->addWidget(splitter);
 }
 
+void MediaBrowserWidget::activateMediaItem(const MediaId& id)
+{
+	if (_library.catalog().mediaType(id) == Catalog::MediaType::Photo)
+		openSourceInSystemApp(id);
+	else
+		playVideo(id);
+}
+
+void MediaBrowserWidget::playVideo(const MediaId& id)
+{
+	const QString sourcePath = _library.catalog().sourcePathForMediaItem(id);
+	if (!QFile::exists(sourcePath))
+	{
+		reportMissingFile(window(), sourcePath);
+		return;
+	}
+
+	auto* playerWindow = new VideoPlayerWindow(_library, sourcePath, id, nullptr);
+	playerWindow->show();
+}
+
+void MediaBrowserWidget::openSourceInSystemApp(const MediaId& id)
+{
+	const QString sourcePath = _library.catalog().sourcePathForMediaItem(id);
+	if (!QFile::exists(sourcePath))
+	{
+		reportMissingFile(window(), sourcePath);
+		return;
+	}
+
+	QDesktopServices::openUrl(QUrl::fromLocalFile(sourcePath));
+}
+
+void MediaBrowserWidget::showMediaItemContextMenu(const MediaId& id, const QPoint& globalPos)
+{
+	Catalog& catalog = _library.catalog();
+	const std::vector<MediaId> selection = effectiveSelection(id);
+	const QString folderPath = catalog.folderForMediaItem(id);
+	const bool isPhoto = catalog.mediaType(id) == Catalog::MediaType::Photo;
+
+	QMenu menu(window());
+	const auto addActionWithShortcut = [&menu, this](
+			const QString& text, const QKeySequence& shortcut, auto&& slot) {
+		QAction* action = menu.addAction(text, this, std::forward<decltype(slot)>(slot));
+		action->setShortcut(shortcut);
+		action->setShortcutContext(Qt::WidgetShortcut);
+	};
+
+	size_t videoCount = 0;
+	for (const MediaId& selectedId : selection)
+		if (catalog.mediaType(selectedId) == Catalog::MediaType::Video)
+			++videoCount;
+	const bool selectionAllVideos = videoCount == selection.size();
+	const bool selectionAllPhotos = videoCount == 0;
+
+	if (selectionAllVideos)
+	{
+		menu.addAction(selection.size() > 1 ? tr("Compare selected") : tr("Inspect"), this, [this, selection] {
+			QStringList folders;
+			for (const MediaId& selectedId : selection)
+				folders << _library.catalog().folderForMediaItem(selectedId);
+			auto* compareWindow = new CompareWindow(folders, window());
+			compareWindow->setAttribute(Qt::WA_DeleteOnClose);
+			compareWindow->show();
+		});
+		menu.addSeparator();
+	}
+
+	if (selectionAllPhotos && selection.size() >= 2)
+	{
+		menu.addAction(tr("Compare photos"), this, [this, selection] {
+			QStringList paths;
+			for (const MediaId& selectedId : selection)
+				paths << _library.catalog().sourcePathForMediaItem(selectedId);
+			PhotoCompareWindow::showForFiles(paths, window());
+		});
+		menu.addSeparator();
+	}
+
+	if (!isPhoto)
+	{
+		menu.addAction(revealInFileManagerActionText(), this, [folderPath, this] {
+			if (!revealInFileManager(folderPath))
+				reportMissingFile(window(), folderPath);
+		});
+	}
+	menu.addAction(isPhoto ? tr("Open photo") : tr("Play source video"), this, [this, id] {
+		openSourceInSystemApp(id);
+	});
+	menu.addAction(tr("Locate source file"), this, [this, id] {
+		const QString sourcePath = _library.catalog().sourcePathForMediaItem(id);
+		if (sourcePath.isEmpty())
+			QMessageBox::warning(window(), tr("Error"), tr("No source file is recorded for this item."));
+		else if (!revealInFileManager(sourcePath))
+			reportMissingFile(window(), sourcePath);
+	});
+	menu.addAction(tr("Copy source path to clipboard"), this, [this, id] {
+		const QString sourcePath = _library.catalog().sourcePathForMediaItem(id);
+		if (!sourcePath.isEmpty())
+			QApplication::clipboard()->setText(QDir::toNativeSeparators(sourcePath));
+	});
+	addActionWithShortcut(isPhoto ? tr("Rename photo") : tr("Rename media file"), QKeySequence(Shortcuts::Rename),
+		[this, id] { renameMediaItemInteractive(id); });
+	menu.addSeparator();
+
+	const bool inBest = catalog.mediaItemHasLabel(id, Catalog::BestLabelId);
+	menu.addAction(inBest ? tr("Remove from Best") : tr("Add to Best"), this, [this, id] {
+		toggleBest(id);
+	});
+
+	std::vector<LabelVisuals::ChecklistRow> labelRows;
+	for (const Catalog::Label& label : catalog.allLabels())
+	{
+		if (label.isVirtual())
+			continue;
+		const LabelId labelId = label.id;
+
+		int haveCount = 0;
+		for (const MediaId& selectedId : selection)
+			if (catalog.mediaItemHasLabel(selectedId, labelId))
+				++haveCount;
+
+		labelRows.push_back({ label.displayName, QColor(label.color),
+			LabelVisuals::presenceForCount(haveCount, static_cast<int>(selection.size())),
+			[this, selection, labelId](bool addToAll) {
+				Catalog::BatchScope batch(_library.catalog());
+				for (const MediaId& selectedId : selection)
+				{
+					if (addToAll)
+						_library.catalog().addLabel(selectedId, labelId);
+					else
+						_library.catalog().removeLabel(selectedId, labelId);
+				}
+				refreshLibraryView();
+			} });
+	}
+	LabelVisuals::buildChecklistMenu(menu.addMenu(tr("Labels")), std::move(labelRows));
+	menu.addSeparator();
+
+	addActionWithShortcut(
+		selection.size() > 1
+			? tr("Remove %1 items from library (untrack)").arg(selection.size())
+			: tr("Remove from library (untrack)"),
+		QKeySequence(Shortcuts::RemoveFromList), [this, selection] { removeMediaItemsFromLibraryInteractive(selection); });
+	addActionWithShortcut(selection.size() > 1 ? tr("Delete (%1 items)").arg(selection.size()) : tr("Delete"),
+		QKeySequence(Shortcuts::DeleteFile), [this, selection] { deleteMediaItemsInteractive(selection); });
+
+	menu.exec(globalPos);
+}
+
+void MediaBrowserWidget::deleteMediaItemsInteractive(const std::vector<MediaId>& selection)
+{
+	const MediaItemManagement::DeleteResult result =
+		MediaItemManagement::deleteItemsInteractive(_library.catalog(), selection, window());
+	if (!result.refreshRequired)
+		return;
+
+	refreshLibraryView();
+	for (const QString& folderPath : result.affectedFrameFolders)
+		emit frameFolderPathChanged(folderPath, {}, {});
+}
+
+void MediaBrowserWidget::removeMediaItemsFromLibraryInteractive(const std::vector<MediaId>& selection)
+{
+	if (MediaItemManagement::removeItemsFromLibraryInteractive(_library.catalog(), selection, window()))
+		refreshLibraryView();
+}
+
+void MediaBrowserWidget::renameMediaItemInteractive(const MediaId& id)
+{
+	const MediaRename::Result result = MediaRename::renameItemInteractive(_library.catalog(), id, window());
+	if (!result.renamed)
+		return;
+
+	refreshLibraryView();
+	if (!result.oldFolderPath.isEmpty())
+		emit frameFolderPathChanged(result.oldFolderPath, result.newFolderPath, result.newName);
+}
+
+void MediaBrowserWidget::deleteSelectedMediaItemsInteractive()
+{
+	deleteMediaItemsInteractive(selectedMediaItems());
+}
+
+void MediaBrowserWidget::removeSelectedMediaItemsFromLibraryInteractive()
+{
+	removeMediaItemsFromLibraryInteractive(selectedMediaItems());
+}
+
+void MediaBrowserWidget::renameSelectedMediaItemInteractive()
+{
+	const std::vector<MediaId> selection = selectedMediaItems();
+	if (selection.size() == 1)
+		renameMediaItemInteractive(selection.front());
+}
+
 void MediaBrowserWidget::saveSettings()
 {
 	QVariantList activeIds;
@@ -436,18 +644,13 @@ MediaItemWidget* MediaBrowserWidget::buildMediaCard(
 		id,
 		isBest,
 		[this, id] { toggleBest(id); },
-		[this, id, isPhoto] {
-			if (isPhoto)
-				emit openSourceRequested(id);
-			else
-				emit playVideoRequested(id);
-		},
-		[this, id](QPoint globalPos) { emit mediaItemContextMenuRequested(id, globalPos); },
+		[this, id] { activateMediaItem(id); },
+		[this, id](QPoint globalPos) { showMediaItemContextMenu(id, globalPos); },
 		/* dynamic size hint */false,
 		/* film strip */ !isPhoto
 	);
 	if (!isPhoto)
-		card->setOnMiddleButtonClick([this, id] { emit frameViewerRequested(id); });
+		card->setOnMiddleButtonClick([this, id] { emit inspectVideoFramesRequested(id); });
 	card->setOnMouseWheelCallback([this](int steps) { zoomCards(steps); });
 	card->setFramesExtracted(!isPhoto && catalog.isSplitIntoFrames(id));
 	card->setDuration(catalog.durationMsForMediaItem(id));

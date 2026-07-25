@@ -3,6 +3,7 @@
 #include "Core/MediaId.h"
 
 #include <QList>
+#include <QString>
 #include <QUrl>
 #include <QWidget>
 
@@ -22,7 +23,7 @@ class QTimer;
 class SegmentedToggle;
 class SortControl;
 
-// Main-window media browser: sidebar, toolbar, grid, browser-local persistence, and lightweight catalog mutations.
+// Main-window media browser feature: sidebar, toolbar, grid, local media actions, and browser persistence.
 class MediaBrowserWidget final : public QWidget
 {
 	Q_OBJECT
@@ -39,24 +40,32 @@ public:
 
 	[[nodiscard]] int previewFrameCount() const;
 	[[nodiscard]] std::vector<MediaId> selectedMediaItems() const;
-	[[nodiscard]] std::vector<MediaId> effectiveSelection(std::optional<MediaId> target = std::nullopt) const;
 
 	void installGridAction(QAction* action);
 	[[nodiscard]] bool isGridDragSource(const QObject* source) const;
 
-	void toggleBest(const MediaId& id);
+	void deleteSelectedMediaItemsInteractive();
+	void removeSelectedMediaItemsFromLibraryInteractive();
+	void renameSelectedMediaItemInteractive();
 
 signals:
 	void selectionChanged();
-	void playVideoRequested(const MediaId& id);
-	void openSourceRequested(const MediaId& id);
-	void frameViewerRequested(const MediaId& id);
-	void mediaItemContextMenuRequested(const MediaId& id, const QPoint& globalPos);
+	void inspectVideoFramesRequested(const MediaId& id);
+	// An empty new path means the folder was deleted or may have been partially deleted.
+	void frameFolderPathChanged(const QString& oldFolderPath, const QString& newFolderPath, const QString& newDisplayName);
 
 private:
 	struct GridViewState;
 
 	void setupUi();
+	void activateMediaItem(const MediaId& id);
+	void playVideo(const MediaId& id);
+	void openSourceInSystemApp(const MediaId& id);
+	void showMediaItemContextMenu(const MediaId& id, const QPoint& globalPos);
+	void deleteMediaItemsInteractive(const std::vector<MediaId>& selection);
+	void removeMediaItemsFromLibraryInteractive(const std::vector<MediaId>& selection);
+	void renameMediaItemInteractive(const MediaId& id);
+	void toggleBest(const MediaId& id);
 	void zoomCards(int steps);
 	void resortMediaGrid();
 	void applyNameFilter();
@@ -66,6 +75,7 @@ private:
 	[[nodiscard]] GridViewState captureGridViewState() const;
 	void restoreGridViewState(const GridViewState& state);
 
+	[[nodiscard]] std::vector<MediaId> effectiveSelection(std::optional<MediaId> target = std::nullopt) const;
 	[[nodiscard]] std::vector<MediaId> mediaItemsMatchingFilters() const;
 	[[nodiscard]] MediaItemWidget* buildMediaCard(
 		const MediaId& id, bool isBest, const QSize& photoCanvas, const QSize& videoCanvas, int previewFrameCount);

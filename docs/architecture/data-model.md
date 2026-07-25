@@ -98,8 +98,8 @@ Stable identity for a **label** — a 64-bit value (`enum class LabelId : uint64
   `"labels"` array; a native **`quint64`** in `QSettings` (the saved filter); and its **decimal-string** form
   (`toString` / `labelIdFromString`) only at the string-based UI seam — `ImportDialog` carries ids as
   strings so it can namespace not-yet-created labels as `"new:<n>"` (see [import.md](import.md)), and the
-  `LabelSidebar`↔`MainWindow` drag payload is a string too. `MainWindow`'s dialog callbacks are where the two
-  forms convert.
+  `LabelSidebar`→card drag payload is a string too. `ImportDialog` and `MediaBrowserWidget` convert at those
+  UI seams.
 
 ## `MetadataStore` (`src/Core/MetadataStore.h/.cpp`)
 

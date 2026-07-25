@@ -1,17 +1,14 @@
 #include "Windows/MainWindow.h"
 #include "Core/Catalog.h"
 #include "Core/Library.h"
-#include "Windows/CompareWindow.h"
 #include "Windows/PhotoCompareWindow.h"
 #include "Ffmpeg.h"
 #include "Import.h"
 #include "Windows/FrameViewerWindow.h"
 #include "Windows/IntegrityCheckDialog.h"
-#include "UiComponents/LabelVisuals.h"
 #include "UiComponents/MediaBrowserWidget.h"
 #include "Windows/ImportDialog.h"
 #include "Windows/LogViewerDialog.h"
-#include "Windows/MediaRename.h"
 #include "Windows/SettingsDialog.h"
 #include "Core/MediaId.h"
 #include "Windows/VideoPlayerWindow.h"
@@ -26,10 +23,7 @@
 
 #include <QAbstractButton>
 #include <QApplication>
-#include <QClipboard>
 #include <QCloseEvent>
-#include <QColor>
-#include <QDesktopServices>
 #include <QDir>
 #include <QDragEnterEvent>
 #include <QFile>
@@ -42,7 +36,6 @@
 #include <QSet>
 #include <QSettings>
 #include <QStandardPaths>
-#include <QUrl>
 #include <QUuid>
 
 #include <QScopeGuard>
@@ -109,28 +102,6 @@ void recordCurrentLibrary(const QString& root)
 	if (recents.size() > MAX_RECENT_LIBRARIES)
 		recents.resize(MAX_RECENT_LIBRARIES);
 	settings.setValue(Settings::RecentLibraries, recents);
-}
-
-[[nodiscard]] bool deleteFileIfPresent(const QString& filePath)
-{
-	if (filePath.isEmpty())
-		return false;
-
-	const QFileInfo info(filePath);
-	return (!info.exists() && !info.isSymLink()) || QFile::remove(filePath);
-}
-
-[[nodiscard]] bool deleteFolderRecursivelyIfPresent(const QString& folderPath)
-{
-	if (folderPath.isEmpty())
-		return false;
-
-	const QFileInfo info(folderPath);
-	if (!info.exists() && !info.isSymLink())
-		return true;
-	if (!info.isDir())
-		return false;
-	return QDir(folderPath).removeRecursively();
 }
 
 } // namespace
@@ -215,13 +186,19 @@ void MainWindow::setupUI()
 	_mediaBrowser = new MediaBrowserWidget(_library, this);
 	setCentralWidget(_mediaBrowser);
 
-	connect(_mediaBrowser, &MediaBrowserWidget::playVideoRequested, this, &MainWindow::playVideo);
-	connect(_mediaBrowser, &MediaBrowserWidget::openSourceRequested, this, &MainWindow::openSourceInSystemApp);
-	connect(_mediaBrowser, &MediaBrowserWidget::frameViewerRequested, this, [this](const MediaId& id) {
+	connect(_mediaBrowser, &MediaBrowserWidget::inspectVideoFramesRequested, this, [this](const MediaId& id) {
 		if (ensureFramesSplit(id))
 			_frameViewer->showForFolder(libraryCatalog().folderForMediaItem(id), libraryCatalog().displayName(id));
 	});
-	connect(_mediaBrowser, &MediaBrowserWidget::mediaItemContextMenuRequested, this, &MainWindow::showMediaItemContextMenu);
+	connect(_mediaBrowser, &MediaBrowserWidget::frameFolderPathChanged, this,
+		[this](const QString& oldFolderPath, const QString& newFolderPath, const QString& newDisplayName) {
+			if (_frameViewer->currentFolder() != oldFolderPath)
+				return;
+			if (newFolderPath.isEmpty())
+				_frameViewer->showForFolder({});
+			else if (_frameViewer->isVisible())
+				_frameViewer->showForFolder(newFolderPath, newDisplayName);
+		});
 
 	setupMainMenu();
 }
@@ -243,9 +220,12 @@ void MainWindow::setupMainMenu()
 	connect(_libraryMenu, &QMenu::aboutToShow, this, &MainWindow::rebuildRecentLibraryActions);
 
 	QMenu* editMenu = new QMenu(tr("Edit"), menuBar);
-	_deleteAction = editMenu->addAction(tr("Delete"), QKeySequence(Shortcuts::DeleteFile), this, &MainWindow::deleteSelectedItems);
-	_removeFromLibraryAction = editMenu->addAction(tr("Remove from library"), QKeySequence(Shortcuts::RemoveFromList), this, &MainWindow::removeSelectedItemsFromLibrary);
-	_renameAction = editMenu->addAction(tr("Rename"), QKeySequence(Shortcuts::Rename), this, &MainWindow::renameSelectedItemInteractive);
+	_deleteAction = editMenu->addAction(
+		tr("Delete"), QKeySequence(Shortcuts::DeleteFile), _mediaBrowser, &MediaBrowserWidget::deleteSelectedMediaItemsInteractive);
+	_removeFromLibraryAction = editMenu->addAction(tr("Remove from library"), QKeySequence(Shortcuts::RemoveFromList),
+		_mediaBrowser, &MediaBrowserWidget::removeSelectedMediaItemsFromLibraryInteractive);
+	_renameAction = editMenu->addAction(
+		tr("Rename"), QKeySequence(Shortcuts::Rename), _mediaBrowser, &MediaBrowserWidget::renameSelectedMediaItemInteractive);
 	connect(_mediaBrowser, &MediaBrowserWidget::selectionChanged, this, &MainWindow::updateEditActions);
 	updateEditActions();
 
@@ -405,7 +385,6 @@ bool MainWindow::switchLibraryTo(const QString& root, QString* error)
 	VideoPlayerWindow::closeAll();
 	_frameViewer->showForFolder({});
 	_mediaBrowser->resetForLibrarySwitch();
-	_contextMenuTarget.reset();
 
 	recordCurrentLibrary(_library.rootFolder());
 	_mediaBrowser->refreshLibraryView();
@@ -538,165 +517,6 @@ bool MainWindow::regeneratePreviewFor(const MediaId& id)
 	return result.ok();
 }
 
-QString MainWindow::bulletedItemNameList(const std::vector<MediaId>& selection) const
-{
-	const Catalog& catalog = libraryCatalog();
-	QString list;
-	constexpr size_t maxListed = 15;
-	for (size_t i = 0; i < std::min(maxListed, selection.size()); ++i)
-	{
-		const MediaId& sel = selection[i];
-		list += "\n• " + (catalog.mediaType(sel) == Catalog::MediaType::Photo
-			? sel.name() : catalog.displayName(sel));
-	}
-	if (selection.size() > maxListed)
-		list += "\n" + tr("... and %1 more").arg(selection.size() - maxListed);
-	return list;
-}
-
-void MainWindow::deleteSelectedItems()
-{
-	const std::vector<MediaId> selection = _mediaBrowser->effectiveSelection(_contextMenuTarget);
-	if (selection.empty())
-		return;
-
-	Catalog& catalog = libraryCatalog();
-
-	QString message;
-	if (selection.size() == 1)
-	{
-		const MediaId& sel = selection.front();
-		const QString sourcePath = catalog.sourcePathForMediaItem(sel);
-		if (catalog.mediaType(sel) == Catalog::MediaType::Photo)
-		{
-			message = tr("This will permanently delete:\n\n• %1").arg(sourcePath);
-		}
-		else
-		{
-			message = tr("This will permanently delete:\n\n• %1").arg(catalog.folderForMediaItem(sel));
-			if (!sourcePath.isEmpty())
-				message += "\n• " + sourcePath;
-		}
-	}
-	else
-	{
-		bool anyVideo = false, anyPhoto = false;
-		for (const MediaId& sel : selection)
-		{
-			if (catalog.mediaType(sel) == Catalog::MediaType::Video)
-				anyVideo = true;
-			else
-				anyPhoto = true;
-		}
-
-		QStringList deletedKinds;
-		if (anyVideo)
-			deletedKinds << tr("each video's frame folder and source file");
-		if (anyPhoto)
-			deletedKinds << tr("each photo's file");
-		message = tr("This will permanently delete %1 items - %2:\n").arg(selection.size()).arg(deletedKinds.join(", "));
-
-		message += bulletedItemNameList(selection);
-	}
-	message += tr("\n\nThis cannot be undone. Continue?");
-
-	if (QMessageBox::warning(this, tr("Delete"), message,
-		QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
-		return;
-
-	QStringList failedItems;
-	{
-		// Photo folders are shared by siblings and must never be deleted here.
-		Catalog::BatchScope batch(catalog);
-		for (const MediaId& sel : selection)
-		{
-			const QString sourcePath = catalog.sourcePathForMediaItem(sel);
-			QStringList failedParts;
-			if (catalog.mediaType(sel) == Catalog::MediaType::Photo)
-			{
-				if (!deleteFileIfPresent(sourcePath))
-					failedParts << (sourcePath.isEmpty() ? tr("• Photo file path is missing.") : tr("• Photo file: %1").arg(sourcePath));
-			}
-			else
-			{
-				const QString folderPath = catalog.folderForMediaItem(sel);
-				const bool folderDeleted = deleteFolderRecursivelyIfPresent(folderPath);
-				if (!folderDeleted)
-				{
-					failedParts << (folderPath.isEmpty() ? tr("• Frame folder path is missing.") : tr("• Frame folder: %1").arg(folderPath));
-					if (!sourcePath.isEmpty())
-						failedParts << tr("• Source file not attempted: %1").arg(sourcePath);
-				}
-				else if (!sourcePath.isEmpty() && !deleteFileIfPresent(sourcePath))
-					failedParts << tr("• Source file: %1").arg(sourcePath);
-
-				// A failed recursive removal can still have partially changed the folder.
-				if (_frameViewer->currentFolder() == folderPath)
-					_frameViewer->showForFolder({});
-			}
-
-			if (failedParts.empty())
-				catalog.removeMediaItem(sel);
-			else
-				failedItems << tr("%1:\n%2").arg(sel.name(), failedParts.join("\n"));
-		}
-	}
-
-	_mediaBrowser->refreshLibraryView();
-
-	if (!failedItems.empty())
-	{
-		MessageBox::notice(this, tr("Delete incomplete"),
-			tr("Some items could not be fully deleted. Their catalog records were kept:"),
-			failedItems.join("\n\n"), QMessageBox::Critical);
-	}
-}
-
-void MainWindow::removeSelectedItemsFromLibrary()
-{
-	const std::vector<MediaId> selection = _mediaBrowser->effectiveSelection(_contextMenuTarget);
-	if (selection.empty())
-		return;
-
-	Catalog& catalog = libraryCatalog();
-
-	QString message;
-	if (selection.size() == 1)
-	{
-		const MediaId& sel = selection.front();
-		message = tr("This will remove the item from the library:\n");
-		if (catalog.mediaType(sel) == Catalog::MediaType::Video)
-			message += "\n• " + catalog.folderForMediaItem(sel);
-		const QString sourcePath = catalog.sourcePathForMediaItem(sel);
-		if (!sourcePath.isEmpty())
-			message += "\n• " + sourcePath;
-	}
-	else
-	{
-		message = tr("This will remove %1 items from the library:\n").arg(selection.size());
-		message += bulletedItemNameList(selection);
-	}
-	message += "\n\n" + tr("No files will be deleted, but labels and other catalog metadata will be discarded. Continue?");
-
-	if (QMessageBox::question(this, tr("Remove from library"), message,
-		QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
-		return;
-
-	Catalog::BatchScope batch(libraryCatalog());
-	for (const MediaId& sel : selection)
-		catalog.removeMediaItem(sel);
-
-	_mediaBrowser->refreshLibraryView();
-}
-
-void MainWindow::renameSelectedItemInteractive()
-{
-	const std::vector<MediaId> selected = _mediaBrowser->selectedMediaItems();
-	if (selected.size() != 1)
-		return;
-	renameItemInteractive(selected.front());
-}
-
 void MainWindow::updateEditActions()
 {
 	const std::vector<MediaId> selected = _mediaBrowser->selectedMediaItems();
@@ -705,147 +525,6 @@ void MainWindow::updateEditActions()
 	_removeFromLibraryAction->setEnabled(hasSelection);
 
 	_renameAction->setEnabled(selected.size() == 1);
-}
-
-void MainWindow::showMediaItemContextMenu(const MediaId& id, const QPoint& globalPos)
-{
-	_contextMenuTarget = id;
-	Catalog& catalog = libraryCatalog();
-	const std::vector<MediaId> selection = _mediaBrowser->effectiveSelection(id);
-	const QString folderPath = catalog.folderForMediaItem(id);
-	const bool isPhoto = catalog.mediaType(id) == Catalog::MediaType::Photo;
-
-	QMenu menu(this);
-
-	const auto addActionMirroringShortcut = [&menu, this](const QString& text, const QAction* shortcutSource, auto&& slot) {
-		QAction* a = menu.addAction(text, this, std::forward<decltype(slot)>(slot));
-		a->setShortcut(shortcutSource->shortcut());
-		a->setShortcutContext(Qt::WidgetShortcut);
-	};
-
-	size_t videoCount = 0;
-	for (const MediaId& sel : selection)
-		if (catalog.mediaType(sel) == Catalog::MediaType::Video)
-			++videoCount;
-	const bool selectionAllVideos = videoCount == selection.size();
-	const bool selectionAllPhotos = videoCount == 0;
-
-	if (selectionAllVideos)
-	{
-		menu.addAction(selection.size() > 1 ? tr("Compare selected") : tr("Inspect"), [this, selection] {
-			QStringList folders;
-			for (const MediaId& sel : selection)
-				folders << libraryCatalog().folderForMediaItem(sel);
-			auto* w = new CompareWindow(folders, this);
-			w->setAttribute(Qt::WA_DeleteOnClose);
-			w->show();
-		});
-		menu.addSeparator();
-	}
-
-	if (selectionAllPhotos && selection.size() >= 2)
-	{
-		menu.addAction(tr("Compare photos"), [this, selection] {
-			QStringList paths;
-			for (const MediaId& sel : selection)
-				paths << libraryCatalog().sourcePathForMediaItem(sel);
-			PhotoCompareWindow::showForFiles(paths, this);
-		});
-		menu.addSeparator();
-	}
-
-	if (!isPhoto)
-	{
-		menu.addAction(revealInFileManagerActionText(), [folderPath, this] {
-			if (!revealInFileManager(folderPath))
-				reportMissingFile(this, folderPath);
-		});
-	}
-	menu.addAction(isPhoto ? tr("Open photo") : tr("Play source video"), [this, id] {
-		openSourceInSystemApp(id);
-	});
-	menu.addAction(tr("Locate source file"), [this, id] {
-		const QString sourcePath = libraryCatalog().sourcePathForMediaItem(id);
-		if (sourcePath.isEmpty())
-			QMessageBox::warning(this, tr("Error"), tr("No source file is recorded for this item."));
-		else if (!revealInFileManager(sourcePath))
-			reportMissingFile(this, sourcePath);
-	});
-	menu.addAction(tr("Copy source path to clipboard"), [this, id] {
-		const QString sourcePath = libraryCatalog().sourcePathForMediaItem(id);
-		if (!sourcePath.isEmpty())
-			QApplication::clipboard()->setText(QDir::toNativeSeparators(sourcePath));
-	});
-	addActionMirroringShortcut(isPhoto ? tr("Rename photo") : tr("Rename media file"), _renameAction,
-		[this, id] { renameItemInteractive(id); });
-	menu.addSeparator();
-
-	const bool inBest = catalog.mediaItemHasLabel(id, Catalog::BestLabelId);
-	menu.addAction(inBest ? tr("Remove from Best") : tr("Add to Best"), [this, id] {
-		_mediaBrowser->toggleBest(id);
-	});
-
-	std::vector<LabelVisuals::ChecklistRow> labelRows;
-	for (const Catalog::Label& label : catalog.allLabels())
-	{
-		if (label.isVirtual())
-			continue;
-		const LabelId labelId = label.id;
-
-		int haveCount = 0;
-		for (const MediaId& sel : selection)
-			if (catalog.mediaItemHasLabel(sel, labelId))
-				++haveCount;
-
-		labelRows.push_back({ label.displayName, QColor(label.color),
-			LabelVisuals::presenceForCount(haveCount, static_cast<int>(selection.size())),
-			[this, selection, labelId](bool addToAll) {
-				Catalog::BatchScope batch(libraryCatalog());
-				for (const MediaId& target : selection)
-				{
-					if (addToAll)
-						libraryCatalog().addLabel(target, labelId);
-					else
-						libraryCatalog().removeLabel(target, labelId);
-				}
-				_mediaBrowser->refreshLibraryView();
-			} });
-	}
-	LabelVisuals::buildChecklistMenu(menu.addMenu(tr("Labels")), std::move(labelRows));
-	menu.addSeparator();
-
-	addActionMirroringShortcut(selection.size() > 1 ? tr("Remove %1 items from library (untrack)").arg(selection.size()) : tr("Remove from library (untrack)"),
-		_removeFromLibraryAction, &MainWindow::removeSelectedItemsFromLibrary);
-	addActionMirroringShortcut(selection.size() > 1 ? tr("Delete (%1 items)").arg(selection.size()) : tr("Delete"),
-		_deleteAction, &MainWindow::deleteSelectedItems);
-
-	menu.exec(globalPos);
-	_contextMenuTarget = std::nullopt;
-}
-
-void MainWindow::playVideo(const MediaId& id)
-{
-	const QString sourcePath = libraryCatalog().sourcePathForMediaItem(id);
-	if (!QFile::exists(sourcePath))
-	{
-		reportMissingFile(this, sourcePath);
-		return;
-	}
-
-	auto* playerWindow = new VideoPlayerWindow(_library, sourcePath, id, nullptr);
-	playerWindow->show();
-}
-
-void MainWindow::openSourceInSystemApp(const MediaId& id)
-{
-	const QString sourcePath = libraryCatalog().sourcePathForMediaItem(id);
-	if (!QFile::exists(sourcePath))
-	{
-		reportMissingFile(this, sourcePath);
-		return;
-	}
-
-	QDesktopServices::openUrl(QUrl::fromLocalFile(sourcePath));
 }
 
 bool MainWindow::resplitVideoIntoFrames(const MediaId& id, bool preserveExistingPreview)
@@ -1222,15 +901,4 @@ void MainWindow::checkCatalogIntegrity()
 
 	if (IntegrityCheckDialog::scanAndShowUi(libraryCatalog(), _library.rootFolder(), std::move(callbacks), this))
 		_mediaBrowser->refreshLibraryView();
-}
-
-void MainWindow::renameItemInteractive(const MediaId& id)
-{
-	const MediaRename::Result result = MediaRename::renameItemInteractive(libraryCatalog(), id, this);
-	if (!result.renamed)
-		return;
-
-	_mediaBrowser->refreshLibraryView();
-	if (!result.oldFolderPath.isEmpty() && _frameViewer->currentFolder() == result.oldFolderPath && _frameViewer->isVisible())
-		_frameViewer->showForFolder(result.newFolderPath, result.newName);
 }

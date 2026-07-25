@@ -5,8 +5,10 @@
 `MainWindow.h/.cpp` owns a stable `Library` member, a `MediaBrowserWidget`, and a persistent `FrameViewerWindow`
 (reused, not recreated). `MediaBrowserWidget` is the main-window content composite: it owns the `LabelSidebar`,
 browser toolbar, card grid (`MediaGrid`), browser-local settings, filtering/sorting, selection/view-state preservation,
-card construction, Best toggles, and label drops. It borrows the stable `Library&`; `MainWindow` handles the
-high-level intents it emits (open/play, inspect frames, and the context menu).
+card construction, activation, context menu, Best/label mutations, and item rename/remove/delete workflows. It borrows
+the stable `Library&`. Its remaining signals cross a real ownership boundary: `MainWindow` updates its Edit-menu state
+from browser selection, performs on-demand frame extraction into its persistent frame viewer, and keeps that viewer
+coherent when a browser operation renames or deletes its current folder.
 
 The **constructor** runs `loadInitialLibrary()` before building anything — loading first is not stylistic: `setupUI()`
 constructs the browser with a `Library&`, which its sidebar also keeps for life, so there is no window to build without
@@ -84,12 +86,19 @@ first"). It **owns its own persistence** and emits a single **`changed()`** sign
   [catalog-and-labels.md](catalog-and-labels.md#in-memory-model) for why. A rebuild preserves the scroll position and
   selection by re-anchoring on `MediaId` identity — not scroll offset or row index, which shift as items are
   inserted/removed. Scroll also persists across restarts; the selection is per-session.
-- `showMediaItemContextMenu()` — multi-select-aware right-click menu. **"Remove from library"** drops the selection from
+- `MediaBrowserWidget::showMediaItemContextMenu()` — multi-select-aware right-click menu. **"Remove from library"** drops the selection from
   the catalog only — since the catalog is never re-derived from a disk walk, an untracked video's frame folder stays on
   disk, surfaced again only by the integrity tool or a re-import.
-- `MediaBrowserWidget::effectiveSelection(id)` — **shared** by the context menu, the Edit menu actions, and the label-drop handler.
+- `MediaBrowserWidget::effectiveSelection(id)` — **shared** by the context menu and label-drop handler. The Edit-menu
+  actions call the browser's selected-item entry points directly, so right-click targeting needs no ambient MainWindow
+  state.
 - `MediaBrowserWidget::refreshLibraryView()` — `refreshMediaGrid()` plus the sidebar refresh: the entry point for **structural** changes
   (add/delete/rename an item, create a label), where plain `refreshMediaGrid()` covers filter/sort/zoom.
+
+Physical Delete and catalog-only Remove confirmations live in **`MediaItemManagement`**
+(`src/Windows/MediaItemManagement.h/.cpp`). The result tells the browser whether a refresh is required and which video
+frame folders may have changed, including a partially failed recursive deletion. The browser then emits only the
+folder-path effect needed to synchronize MainWindow's persistent frame viewer.
 
 ## Label assignment
 
@@ -165,9 +174,9 @@ the name filter hid them all; the paint checks live visibility, so it needs no h
 ## Renaming a media item
 
 **`MediaRename`** (`src/Windows/MediaRename.h/.cpp`) is the module — free functions with entry
-`MediaRename::renameItemInteractive(id, dialogParent)`, dispatching by media type. `MainWindow::renameItemInteractive`
-is a thin wrapper: on success it calls `MediaBrowserWidget::refreshLibraryView()` and repoints the frame viewer when needed. Both the
-Edit-menu **Rename** action and the card context menu go through that wrapper.
+`MediaRename::renameItemInteractive(id, dialogParent)`, dispatching by media type. `MediaBrowserWidget` calls it from
+both the Edit-menu entry point and the card context menu, refreshes itself on success, and emits the old/new frame
+folder paths when MainWindow's persistent frame viewer may need repointing.
 
 `renameVideo` is the **one place a video's frame folder moves on disk outside the label-mutation paths in `Catalog`**
 (see [catalog-and-labels.md](catalog-and-labels.md)). It renames the source file, then the frame folder, then calls

@@ -31,6 +31,9 @@ void clearStuckHoverIfCursorLeft(QWidget* w);
 // Byte-for-byte comparison with a size short-circuit.
 [[nodiscard]] bool filesAreIdentical(const QString& pathA, const QString& pathB);
 
+// An empty path fails; an already-absent path succeeds.
+[[nodiscard]] bool deleteFolderRecursivelyIfPresent(const QString& folderPath);
+
 // Lexical, case/separator-insensitive path key. Does not resolve symlinks or junctions.
 [[nodiscard]] QString pathComparisonKey(const QString& path);
 

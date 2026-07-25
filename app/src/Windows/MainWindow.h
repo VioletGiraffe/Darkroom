@@ -9,7 +9,6 @@
 #include <QMainWindow>
 #include <QStringList>
 
-#include <optional>
 #include <vector>
 
 class Catalog;
@@ -42,10 +41,6 @@ private:
 	void saveSettings();
 	void restoreSettings();
 
-	void playVideo(const MediaId& id);
-	void openSourceInSystemApp(const MediaId& id);
-	void showMediaItemContextMenu(const MediaId& id, const QPoint& globalPos);
-	[[nodiscard]] QString bulletedItemNameList(const std::vector<MediaId>& selection) const;
 	[[nodiscard]] bool splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder);
 	// A pre-commit failure restores the complete previous frame folder.
 	[[nodiscard]] bool resplitVideoIntoFrames(const MediaId& id, bool preserveExistingPreview);
@@ -59,9 +54,6 @@ private:
 	void scanForUntrackedFiles();
 	void checkCatalogIntegrity();
 
-	void deleteSelectedItems();
-	void removeSelectedItemsFromLibrary();
-	void renameSelectedItemInteractive();
 	void updateEditActions();
 
 	enum class LibraryPickerMode { Open, CreateNew };
@@ -74,7 +66,6 @@ private:
 	void rebuildRecentLibraryActions();
 	void schedulePersistenceFailureWarning();
 	void openSettings();
-	void renameItemInteractive(const MediaId& id);
 
 private:
 	[[nodiscard]] Catalog& libraryCatalog();
@@ -85,8 +76,6 @@ private:
 	Library _library;
 	MediaBrowserWidget* _mediaBrowser = nullptr;
 	FrameViewerWindow* _frameViewer = nullptr;
-
-	std::optional<MediaId> _contextMenuTarget;
 
 	QAction* _deleteAction = nullptr;
 	QAction* _removeFromLibraryAction = nullptr;

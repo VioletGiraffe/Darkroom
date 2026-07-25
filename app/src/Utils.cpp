@@ -149,6 +149,19 @@ bool filesAreIdentical(const QString& pathA, const QString& pathB)
 	return true;
 }
 
+bool deleteFolderRecursivelyIfPresent(const QString& folderPath)
+{
+	if (folderPath.isEmpty())
+		return false;
+
+	const QFileInfo info(folderPath);
+	if (!info.exists() && !info.isSymLink())
+		return true;
+	if (!info.isDir())
+		return false;
+	return QDir(folderPath).removeRecursively();
+}
+
 QString pathComparisonKey(const QString& path)
 {
 	// Callers that must see through aliases canonicalize their shared root before using this lexical key.

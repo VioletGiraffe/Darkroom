@@ -6,7 +6,7 @@
 
 Card used in the MainWindow grid. Takes a **`MediaId`** (see [data-model.md](data-model.md)) rather than a
 folder path — label ops are `MediaId`-anchored, and the one remaining drag interaction is a drop target, not
-a source (see below). `MainWindow` retains paths for thumbnails/playback; the card does not.
+a source (see below). `MediaBrowserWidget` retains paths for thumbnails/playback; the card does not.
 
 ### Card layout & frame
 
@@ -19,7 +19,7 @@ thumbnail above a footer row. The card keeps a **transparent** normal background
 ### Label drop target
 
 The card is a drop target for `LabelMimeType` (`src/UiComponents/LabelMimeType.h`) MIME carried by
-`LabelSidebar` row drags. A drop invokes a `setOnLabelDropped` handler in **MainWindow**, which adds the
+`LabelSidebar` row drags. A drop invokes a `setOnLabelDropped` handler in **`MediaBrowserWidget`**, which adds the
 label across `effectiveSelection` (drop on a selected card → whole selection; else just that card),
 mirroring the context-menu path. The handler **defers** the catalog mutation + view rebuild via a queued
 invoke — the rebuild deletes the card whose `dropEvent` is still on the stack.
@@ -29,10 +29,10 @@ invoke — the rebuild deletes the card whose `dropEvent` is still on the stack.
 `LabelDotStrip` in the footer paints one dot per label the item carries; **`Best` is a dot like any other
 label**, with the star toggle existing in parallel.
 
-> **Pattern: "MainWindow computes, card draws."** The card is display-only — **MainWindow** computes
+> **Pattern: "browser computes, card draws."** The card is display-only — **`MediaBrowserWidget`** computes
 > the colors from the `Catalog` (`labelById(id)->color`, unset → grey) and the tooltip, then hands the
 > card a plain list of colors and a tooltip string. The card never queries `Catalog` itself. Follow this
-> split for any future per-card decoration: business logic in `MainWindow`; pure rendering in the widget.
+> split for any future per-card decoration: feature logic in the browser; pure rendering in the card.
 
 v1 shows dots; named chips with drag-out removal are deferred polish.
 
@@ -40,7 +40,7 @@ v1 shows dots; named chips with drag-out removal are deferred polish.
 
 A green contact-sheet grid icon marks a video whose full frame set has been extracted. It is a *positive*
 marker of the ready state — a "frames-done" glyph reads immediately, where an abstract "not-done" one
-wouldn't. **MainWindow gates it to videos** —
+wouldn't. **`MediaBrowserWidget` gates it to videos** —
 a photo never shows it even though `isSplitIntoFrames()` returns `true` (photos have no frames; see
 [import.md](import.md)). Its position depends on the thumbnail width, so it is re-placed on every thumbnail
 resize — the self-correcting placement that handles the real widget size not being known at construction.
@@ -53,8 +53,8 @@ column grid. Per-frame height and frame count are both user-adjustable at runtim
 
 ### Duration badge
 
-A small play-triangle overlay marks a card as video at a glance. **MainWindow** supplies the duration from
-the `Catalog`, matching the "MainWindow computes, card draws" split; the card never queries the catalog
+A small play-triangle overlay marks a card as video at a glance. **`MediaBrowserWidget`** supplies the duration from
+the `Catalog`, matching the "browser computes, card draws" split; the card never queries the catalog
 itself.
 
 ### Film-strip treatment (video cards)
@@ -96,7 +96,7 @@ transient one: a video whose `preview/` and frame folder are both empty still ge
 [import.md](import.md)), as does a staged import card whose preview extraction failed.
 
 `sizeHint()` has two modes via `setDynamicSizeHint(bool)` (default **on**): dynamic returns the tight
-bounding box post-load; **fixed** always returns the max-bound. **MainWindow's grid uses fixed by design**
+bounding box post-load; **fixed** always returns the max-bound. **The main browser grid uses fixed by design**
 — every card of a given media type is one fixed size, so the grid computes the hint once per type and
 reuses it for every item of that type. Because the two types differ in width, `setUniformItemSizes(true)`
 **can't** be used; each item carries an explicit fixed hint instead. Tight per-card sizing is deliberately
