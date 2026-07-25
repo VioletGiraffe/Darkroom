@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784992130009,
+  "lastUpdate": 1784993400659,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -8732,6 +8732,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .reloc",
             "value": 10,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "daeb4e7658552ff3199456f347eab128c51c915f",
+          "message": "Windows build flags cleanup",
+          "timestamp": "2026-07-25T18:22:00+03:00",
+          "tree_id": "ec76c9dc5bbd0d446b5ea2150a0d71436c3ee5f8",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/daeb4e7658552ff3199456f347eab128c51c915f"
+        },
+        "date": 1784993398406,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 13318,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 8055,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1118.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 683,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 331.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 32.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 33,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9.5,
             "unit": "KB"
           }
         ]
