@@ -12,21 +12,23 @@ which needs the native multi-select `CFlowLayout` lacks (see
 
 ---
 
-## `VideoPlayerWindow` (`src/Windows/VideoPlayerWindow.h/.cpp`) + `MarkerSlider`
+## `VideoPlayerWindow`, `OscillatingPlayback`, `FrameCapture`, and `MarkerSlider`
 
 Built-in player (`QMediaPlayer` + `QVideoWidget` + `QAudioOutput`) for the double-click-to-play path. Keeps a
 static list of open instances (app-wide restart/close) and auto-tiles each window into screen thirds once the
 video size is known. Offers an A–B loop plus multiple saved loops per video. The player has one logical
 position/play-state seam so controls keep referring to the frame actually shown when the optional oscillating
-mode temporarily takes presentation over from `QMediaPlayer`.
+mode temporarily takes presentation over from `QMediaPlayer`. The window owns controls, saved-loop UI/persistence,
+and coordination; the process/cache state machine lives in `OscillatingPlayback`, and single-frame extraction/import
+lives in `FrameCapture`.
 
 ### Oscillating playback
 
-**Oscillate** prepares an in-memory JPEG cache of the target range and then presents it forward and backward
-without seeking at either turnaround. The range is the A–B interval, or the whole video when no valid A–B is
-set. Preparation is one asynchronous ffmpeg process owned by the
-player window; its constant-rate, at-most-60-fps MJPEG stream is parsed by multipart `Content-length` directly
-from stdout. There are no temporary files and no Darkroom worker thread. The coarse admission limits are 30
+`OscillatingPlayback` (`src/Windows/OscillatingPlayback.h/.cpp`) prepares an in-memory JPEG cache of the target
+range and then presents it forward and backward without seeking at either turnaround. The range is the A–B interval,
+or the whole video when no valid A–B is set. Preparation is one asynchronous ffmpeg process owned by the controller;
+its constant-rate, at-most-60-fps MJPEG stream is parsed by multipart `Content-length` directly from stdout. There are
+no temporary files and no Darkroom worker thread. The coarse admission limits are 30
 seconds and a 1920×1080 output envelope (smaller sources are not upscaled); the resulting frame-count cap is
 the runaway guard, deliberately without compressed-byte accounting.
 
@@ -48,8 +50,10 @@ toggle and cache are per-window/transient.
 
 ### Frame extraction
 
-Right-clicking the video (`Ffmpeg::extractFrame`) extracts the frame at the clicked moment (left click stays
-play/pause) to one of three destinations: the library, a picked folder, or a repeat of whichever ran last
+`FrameCapture` (`src/Windows/FrameCapture.h/.cpp`) owns the configured blocking `Ffmpeg::extractFrame` call,
+failure reporting, last-destination settings, and the optional library import. Right-clicking the video extracts
+the frame at the clicked moment (left click stays play/pause) to one of three destinations: the library, a picked
+folder, or a repeat of whichever ran last
 (persisted). The library path lands it as an **owned photo** under the configurable "Extracted" label via
 `Import::importPhoto(Move)`, reusing photo import's dedup/collision handling; extraction goes to a temp dir
 under the library root (not system temp) so that move is a same-drive rename. Frames deliberately never go
