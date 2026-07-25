@@ -26,6 +26,7 @@
 #include <QMediaMetaData>
 #include <QMediaPlayer>
 #include <QMenu>
+#include <QMessageBox>
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QSettings>
@@ -47,6 +48,7 @@
 #include <limits>
 #include <optional>
 #include <stdint.h>
+#include <utility>
 
 namespace Settings {
 	constexpr const char* PauseOnSeek  = "VideoPlayer/PauseOnSeek";
@@ -133,7 +135,6 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	_audioOutput = new QAudioOutput(this);
 	_player->setVideoOutput(_videoWidget);
 	_player->setAudioOutput(_audioOutput);
-	_player->setSource(QUrl::fromLocalFile(videoPath));
 	_oscillatingPlayback = std::make_unique<OscillatingPlayback>(*this);
 
 	_videoWidget->installEventFilter(this);
@@ -451,6 +452,26 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	setCentralWidget(centralWidget);
 
 	_player->setLoops(QMediaPlayer::Infinite);
+	connect(_player, &QMediaPlayer::errorOccurred, this, [this](QMediaPlayer::Error error, const QString& details) {
+		if (error == QMediaPlayer::NoError || _fatalPlaybackErrorReported)
+			return;
+		if (error == QMediaPlayer::FormatError)
+		{
+			if (_formatWarningReported)
+				return;
+			_pendingFormatError = details;
+			resolvePendingFormatError();
+			return;
+		}
+		reportFatalPlaybackError(details);
+	});
+	connect(_player, &QMediaPlayer::mediaStatusChanged, this, [this](QMediaPlayer::MediaStatus status) {
+		if (status == QMediaPlayer::InvalidMedia)
+			reportFatalPlaybackError(_pendingFormatError.value_or(_player->errorString()));
+		else
+			resolvePendingFormatError();
+	});
+	connect(_player, &QMediaPlayer::hasVideoChanged, this, [this] { resolvePendingFormatError(); });
 
 	connect(_player, &QMediaPlayer::durationChanged, this, [this](qint64 duration) {
 		_seekSlider->setRange(0, static_cast<int>(duration));
@@ -510,7 +531,9 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	connect(extractFrameShortcut, &QShortcut::activated, this, [this] { repeatLastExtraction(currentPlaybackPosition()); });
 
 	updateOscillationAvailability();
-	setPlaybackActive(true);
+	_player->setSource(QUrl::fromLocalFile(videoPath));
+	if (!_fatalPlaybackErrorReported)
+		setPlaybackActive(true);
 }
 
 VideoPlayerWindow::~VideoPlayerWindow()
@@ -839,6 +862,62 @@ void VideoPlayerWindow::onOscillationFailed(
 	updatePlaybackPositionUi(hasDisplayedPosition ? displayedPosition : _player->position());
 	updateOscillationAvailability();
 	MessageBox::notice(this, tr("Oscillating playback"), error, diagnostics);
+}
+
+void VideoPlayerWindow::resolvePendingFormatError()
+{
+	if (!_pendingFormatError || _formatWarningReported || _fatalPlaybackErrorReported)
+		return;
+
+	if (_player->mediaStatus() == QMediaPlayer::InvalidMedia)
+	{
+		const QString details = std::exchange(_pendingFormatError, std::nullopt).value();
+		reportFatalPlaybackError(details);
+		return;
+	}
+	if (_player->hasVideo())
+	{
+		const QString details = std::exchange(_pendingFormatError, std::nullopt).value();
+		reportRecoverableFormatError(details);
+		return;
+	}
+
+	const QMediaPlayer::MediaStatus status = _player->mediaStatus();
+	if (status == QMediaPlayer::LoadedMedia || status == QMediaPlayer::BufferedMedia || status == QMediaPlayer::EndOfMedia)
+	{
+		const QString details = std::exchange(_pendingFormatError, std::nullopt).value();
+		reportFatalPlaybackError(details);
+	}
+}
+
+void VideoPlayerWindow::reportFatalPlaybackError(const QString& details)
+{
+	if (_fatalPlaybackErrorReported)
+		return;
+
+	_fatalPlaybackErrorReported = true;
+	_pendingFormatError.reset();
+	exitOscillatingPlayback(false);
+	_player->stop();
+	_timeLabel->setText(tr("Playback failed"));
+	QTimer::singleShot(0, this, [this, details] {
+		MessageBox::notice(this, tr("Video playback"),
+			tr("Could not play \"%1\".").arg(QFileInfo{ _videoPath }.fileName()), details, QMessageBox::Critical);
+		close();
+	});
+}
+
+void VideoPlayerWindow::reportRecoverableFormatError(const QString& details)
+{
+	if (_formatWarningReported || _fatalPlaybackErrorReported)
+		return;
+
+	_formatWarningReported = true;
+	QTimer::singleShot(0, this, [this, details] {
+		if (!_fatalPlaybackErrorReported)
+			MessageBox::notice(this, tr("Limited video playback"),
+				tr("Some media content is unsupported, but the video can still be played."), details);
+	});
 }
 
 void VideoPlayerWindow::togglePlayPause()

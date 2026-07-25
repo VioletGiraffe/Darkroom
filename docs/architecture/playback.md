@@ -22,6 +22,11 @@ mode temporarily takes presentation over from `QMediaPlayer`. The window owns co
 and coordination; the process/cache state machine lives in `OscillatingPlayback`, and single-frame extraction/import
 lives in `FrameCapture`.
 
+`QMediaPlayer` error observation is installed before assigning the source. Resource, access, network, invalid-media,
+and format failures that leave no playable video are reported once with the backend detail and close the unusable
+window. A format error that still leaves a video track playable is reported once as a nonfatal limitation; playback
+continues, since Qt may use `FormatError` for an unsupported secondary stream such as audio.
+
 ### Oscillating playback
 
 `OscillatingPlayback` (`src/Windows/OscillatingPlayback.h/.cpp`) prepares an in-memory JPEG cache of the target

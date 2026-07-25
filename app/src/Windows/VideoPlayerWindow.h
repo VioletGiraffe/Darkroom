@@ -5,6 +5,7 @@
 #include <QMainWindow>
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 class QMediaPlayer;
@@ -53,6 +54,9 @@ private:
 	// diagnostics is raw ffmpeg output for a bounded detail pane; error is the summary.
 	void onOscillationFailed(const QString& error, const QString& diagnostics, qint64 displayedPosition,
 		bool hasDisplayedPosition, bool shouldResumePlayback);
+	void resolvePendingFormatError();
+	void reportFatalPlaybackError(const QString& details);
+	void reportRecoverableFormatError(const QString& details);
 
 	void showContextMenu(const QPoint& globalPos);
 	void extractFrameToLibrary(qint64 timestampMs);
@@ -82,6 +86,9 @@ private:
 	bool _pauseOnSeek = true;
 	bool _wasPlayingBeforeSeek = false;
 	bool _userMuted = false;
+	std::optional<QString> _pendingFormatError;
+	bool _formatWarningReported = false;
+	bool _fatalPlaybackErrorReported = false;
 
 	qint64 _loopStart = -1;
 	qint64 _loopEnd = -1;
