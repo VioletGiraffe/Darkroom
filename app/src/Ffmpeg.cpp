@@ -3,7 +3,6 @@
 #include "assert/advanced_assert.h"
 
 #include <QDir>
-#include <QFile>
 #include <QFileInfo>
 #include <QProcess>
 #include <QRegularExpression>
@@ -331,7 +330,7 @@ SplitResult splitVideoIntoFrames(const QString& videoFilePath, const QString& ou
 	return result;
 }
 
-SplitResult extractFrame(const QString& videoFilePath, qint64 timestampMs, const QString& outputFilePath, int jpegQuality)
+SplitResult extractSingleFrame(const QString& videoFilePath, qint64 timestampMs, const QString& outputFilePath, int jpegQuality)
 {
 	SplitResult result;
 
@@ -347,14 +346,8 @@ SplitResult extractFrame(const QString& videoFilePath, qint64 timestampMs, const
 		return result;
 	}
 
-	// The parent may contain user files; clean up only this output when it exists.
-	const auto cleanupAfterFailure = [&outputFilePath] {
-		if (QFile::exists(outputFilePath))
-			assert_r(QFile::remove(outputFilePath));
-	};
-
 	QStringList arguments;
-	arguments << "-y"
+	arguments << "-n"
 		// -ss before -i seeks by keyframe, then decodes forward to the exact timestamp.
 		<< "-ss" << QString::number(timestampMs / 1000.0, 'f', 3)
 		<< "-i" << QDir::toNativeSeparators(videoFilePath)
@@ -381,7 +374,6 @@ SplitResult extractFrame(const QString& videoFilePath, qint64 timestampMs, const
 	{
 		process.kill();
 		process.waitForFinished();  // reap the killed process rather than leaving it orphaned
-		cleanupAfterFailure();
 		result.status = SplitResult::Status::TimedOut;
 		return result;
 	}
@@ -390,7 +382,6 @@ SplitResult extractFrame(const QString& videoFilePath, qint64 timestampMs, const
 	{
 		result.exitCode    = process.exitCode();
 		result.errorOutput = process.readAllStandardError() + "\n" + process.readAllStandardOutput();
-		cleanupAfterFailure();
 		result.status = SplitResult::Status::ExtractionFailed;
 		return result;
 	}

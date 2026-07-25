@@ -55,15 +55,16 @@ toggle and cache are per-window/transient.
 
 ### Frame extraction
 
-`FrameCapture` (`src/Windows/FrameCapture.h/.cpp`) owns the configured blocking `Ffmpeg::extractFrame` call,
+`FrameCapture` (`src/Windows/FrameCapture.h/.cpp`) owns the configured blocking `Ffmpeg::extractSingleFrame` call,
 failure reporting, last-destination settings, and the optional library import. Right-clicking the video extracts
 the frame at the clicked moment (left click stays play/pause) to one of three destinations: the library, a picked
 folder, or a repeat of whichever ran last
 (persisted). The library path lands it as an **owned photo** under the configurable "Extracted" label via
 `Import::importPhoto(Move)`, reusing photo import's dedup/collision handling; extraction goes to a temp dir
 under the library root (not system temp) so that move is a same-drive rename. Frames deliberately never go
-into the video's frame folder — a regenerable artifact a re-split wipes wholesale. Untracked (staging-preview)
-videos work too; the main window does not yet refresh when a frame lands.
+into the video's frame folder — a regenerable artifact a re-split wipes wholesale. Folder extraction selects
+the first free `name`, `name (1)`, ... path and ffmpeg refuses overwrites; a failed extraction may leave its new
+partial file. Untracked (staging-preview) videos work too; the main window does not yet refresh when a frame lands.
 
 ### Saved loops
 

@@ -27,18 +27,30 @@ namespace {
 constexpr const char* ExtractToLibraryMode = "library";
 constexpr const char* ExtractToFolderMode  = "folder";
 
-[[nodiscard]] QString extractFrameInto(const QString& videoPath, qint64 timestampMs, const QString& destinationFolder,
+[[nodiscard]] QString firstAvailableFramePath(
+	const QString& videoPath, qint64 timestampMs, const QString& destinationFolder, bool tiff)
+{
+	// Windows filenames cannot use colon-separated timestamps.
+	const QString timestampText = QTime::fromMSecsSinceStartOfDay(static_cast<int>(timestampMs)).toString("h.mm.ss.zzz");
+	const QString stem = QFileInfo{ videoPath }.completeBaseName() + ' ' + timestampText;
+	const QString extension = tiff ? ".tif" : ".jpg";
+	for (int copyIndex = 0; ; ++copyIndex)
+	{
+		const QString numberedSuffix = copyIndex == 0 ? QString{} : QString(" (%1)").arg(copyIndex);
+		const QString candidatePath = QDir{ destinationFolder }.filePath(stem + numberedSuffix + extension);
+		if (!QFileInfo::exists(candidatePath))
+			return candidatePath;
+	}
+}
+
+[[nodiscard]] QString extractSingleFrameInto(const QString& videoPath, qint64 timestampMs, const QString& destinationFolder,
 	const std::function<void()>& extractionFinished, QWidget* dialogParent)
 {
 	const bool tiff       = QSettings{}.value(Settings::UseTiff, Defaults::UseTiff).toBool();
 	const int jpegQuality = QSettings{}.value(Settings::JpegQuality, Defaults::JpegQuality).toInt();
+	const QString filePath = firstAvailableFramePath(videoPath, timestampMs, destinationFolder, tiff);
 
-	// Windows filenames cannot use colon-separated timestamps.
-	const QString timestampText = QTime::fromMSecsSinceStartOfDay(static_cast<int>(timestampMs)).toString("h.mm.ss.zzz");
-	const QString filePath = destinationFolder + '/' + QFileInfo{ videoPath }.completeBaseName() + ' ' + timestampText
-		+ (tiff ? ".tif" : ".jpg");
-
-	const Ffmpeg::SplitResult result = Ffmpeg::extractFrame(videoPath, timestampMs, filePath, jpegQuality);
+	const Ffmpeg::SplitResult result = Ffmpeg::extractSingleFrame(videoPath, timestampMs, filePath, jpegQuality);
 	if (extractionFinished)
 		extractionFinished();
 	if (!result.ok())
@@ -69,7 +81,7 @@ QString FrameCapture::lastFolder()
 void FrameCapture::extractToFolderInteractive(const QString& videoPath, qint64 timestampMs, const QString& folder,
 	const std::function<void()>& extractionFinished, QWidget* dialogParent)
 {
-	const QString filePath = extractFrameInto(videoPath, timestampMs, folder, extractionFinished, dialogParent);
+	const QString filePath = extractSingleFrameInto(videoPath, timestampMs, folder, extractionFinished, dialogParent);
 	if (filePath.isEmpty())
 		return;
 
@@ -111,7 +123,7 @@ void FrameCapture::extractToLibraryInteractive(Library& library, const QString& 
 		return;
 	}
 
-	const QString extractedPath = extractFrameInto(videoPath, timestampMs, tempDir.path(), extractionFinished, dialogParent);
+	const QString extractedPath = extractSingleFrameInto(videoPath, timestampMs, tempDir.path(), extractionFinished, dialogParent);
 	if (extractedPath.isEmpty())
 		return;
 

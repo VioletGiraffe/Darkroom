@@ -78,8 +78,8 @@ struct SplitResult
 // Blocking full-resolution extraction. Failure removes the entire partial output folder.
 [[nodiscard]] SplitResult splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder, const SplitOptions& options);
 
-// Blocking single-frame extraction. ".tif" selects TIFF; other extensions select JPEG. Failure removes only
-// the partial output file, never its parent folder.
-[[nodiscard]] SplitResult extractFrame(const QString& videoFilePath, qint64 timestampMs, const QString& outputFilePath, int jpegQuality);
+// Blocking single-frame extraction. ".tif" selects TIFF; other extensions select JPEG. The destination must
+// not exist; ffmpeg refuses to overwrite it. Failure may leave a partial output file.
+[[nodiscard]] SplitResult extractSingleFrame(const QString& videoFilePath, qint64 timestampMs, const QString& outputFilePath, int jpegQuality);
 
 } // namespace Ffmpeg
