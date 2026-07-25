@@ -6,7 +6,7 @@
 (reused, not recreated). `MediaBrowserWidget` is the main-window content composite: it owns the `LabelSidebar`,
 browser toolbar, card grid (`MediaGrid`), browser-local settings, filtering/sorting, selection/view-state preservation,
 card construction, Best toggles, and label drops. It borrows the stable `Library&`; `MainWindow` handles the
-high-level intents it emits (open/play, inspect frames, context menu, and label-management dialogs).
+high-level intents it emits (open/play, inspect frames, context menu, and label-management requests).
 
 The **constructor** runs `loadInitialLibrary()` before building anything — loading first is not stylistic: `setupUI()`
 constructs the browser with a `Library&`, which its sidebar also keeps for life, so there is no window to build without
@@ -115,11 +115,11 @@ row via the delegate.
 ## Sidebar label management
 
 Right-clicking an ordinary label row opens a **Rename / Set color / Delete** menu; `LabelSidebar` emits the
-corresponding signal carrying the label id, `MediaBrowserWidget` forwards it, and `MainWindow` handles each.
-`MainWindow` does not duplicate name/path
-rules or create the backing folder itself — those live in the `Catalog` API (see
-[catalog-and-labels.md](catalog-and-labels.md)). Import callbacks likewise resolve the destination through the Catalog's
-verified path accessors.
+corresponding signal carrying the label id and `MediaBrowserWidget` forwards it. `MainWindow` routes these requests to
+**`LabelManagement`** (`src/Windows/LabelManagement.h/.cpp`) and refreshes the browser when it reports a possible
+catalog change. The module owns the create/rename/color/delete prompts, confirmations, and error reporting; the
+`Catalog` API owns all name/path rules, backing-folder creation, relocation, and persistence (see
+[catalog-and-labels.md](catalog-and-labels.md)). Import's non-interactive create-label callback uses the same module.
 
 ## Card interactions
 

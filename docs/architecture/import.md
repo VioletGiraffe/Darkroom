@@ -140,7 +140,8 @@ options, photo-content duplicates, the
 id-tracking check, random label colors) and calls back into its host (`MainWindow`) only for host-owned
 actions it can't do itself. The `Callbacks` struct is four members:
 `addMediaItemsRequested` / `importPhotosRequested` (the import workers, which own the app-wide busy lock and
-the progress modal), `createLabelRequested` (shared with the sidebar's create-label flow), and
+the progress modal), `createLabelRequested` (routed through `LabelManagement::createLabelOrReport`, shared with the
+sidebar's create-label flow), and
 `viewChanged` (the host repaint). The Best/extra-label flush and the tracked-under-label check are done
 in-dialog, not through callbacks (below). Source-file relocation lives in its own **`SourceRelocation`** module
 (`src/Windows/SourceRelocation.h/.cpp`),

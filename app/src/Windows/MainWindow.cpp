@@ -10,6 +10,7 @@
 #include "UiComponents/LabelVisuals.h"
 #include "UiComponents/MediaBrowserWidget.h"
 #include "Windows/ImportDialog.h"
+#include "Windows/LabelManagement.h"
 #include "Windows/LogViewerDialog.h"
 #include "Windows/MediaRename.h"
 #include "Windows/SettingsDialog.h"
@@ -29,15 +30,12 @@
 #include <QClipboard>
 #include <QCloseEvent>
 #include <QColor>
-#include <QColorDialog>
 #include <QDesktopServices>
 #include <QDir>
 #include <QDragEnterEvent>
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
-#include <QInputDialog>
-#include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -225,10 +223,22 @@ void MainWindow::setupUI()
 			_frameViewer->showForFolder(libraryCatalog().folderForMediaItem(id), libraryCatalog().displayName(id));
 	});
 	connect(_mediaBrowser, &MediaBrowserWidget::mediaItemContextMenuRequested, this, &MainWindow::showMediaItemContextMenu);
-	connect(_mediaBrowser, &MediaBrowserWidget::addLabelRequested, this, &MainWindow::createLabelInteractive);
-	connect(_mediaBrowser, &MediaBrowserWidget::renameLabelRequested, this, &MainWindow::renameLabelInteractive);
-	connect(_mediaBrowser, &MediaBrowserWidget::setLabelColorRequested, this, &MainWindow::setLabelColorInteractive);
-	connect(_mediaBrowser, &MediaBrowserWidget::deleteLabelRequested, this, &MainWindow::deleteLabelInteractive);
+	connect(_mediaBrowser, &MediaBrowserWidget::addLabelRequested, this, [this] {
+		if (LabelManagement::createLabelInteractive(libraryCatalog(), this) != LabelId::None)
+			_mediaBrowser->refreshLibraryView();
+	});
+	connect(_mediaBrowser, &MediaBrowserWidget::renameLabelRequested, this, [this](LabelId labelId) {
+		if (LabelManagement::renameLabelInteractive(libraryCatalog(), labelId, this))
+			_mediaBrowser->refreshLibraryView();
+	});
+	connect(_mediaBrowser, &MediaBrowserWidget::setLabelColorRequested, this, [this](LabelId labelId) {
+		if (LabelManagement::setLabelColorInteractive(libraryCatalog(), labelId, this))
+			_mediaBrowser->refreshLibraryView();
+	});
+	connect(_mediaBrowser, &MediaBrowserWidget::deleteLabelRequested, this, [this](LabelId labelId) {
+		if (LabelManagement::deleteLabelInteractive(libraryCatalog(), labelId, this))
+			_mediaBrowser->refreshLibraryView();
+	});
 
 	setupMainMenu();
 }
@@ -1107,96 +1117,6 @@ void MainWindow::reExportAllVideos()
 	_mediaBrowser->refreshMediaGrid();
 }
 
-LabelId MainWindow::createFolderLabel(const QString& name, const QString& color, bool refreshList)
-{
-	QString error;
-	const LabelId labelId = libraryCatalog().createLabel(name, color, &error);
-	if (labelId == LabelId::None)
-	{
-		QMessageBox::warning(this, tr("Create label"), error);
-		return {};
-	}
-
-	if (refreshList)
-		_mediaBrowser->refreshLibraryView();
-	return labelId;
-}
-
-void MainWindow::createLabelInteractive()
-{
-	bool ok = false;
-	const QString name = QInputDialog::getText(this, tr("New label"), tr("Label name:"), QLineEdit::Normal, QString{}, &ok);
-	if (ok)
-		createFolderLabel(name);
-}
-
-void MainWindow::renameLabelInteractive(LabelId labelId)
-{
-	const Catalog::Label* label = libraryCatalog().labelById(labelId);
-	if (!label)
-		return;
-
-	bool ok = false;
-	const QString newName = QInputDialog::getText(this, tr("Rename label"), tr("New name:"), QLineEdit::Normal, label->displayName, &ok);
-	if (!ok || newName == label->displayName)
-		return;
-
-	QString error;
-	if (!libraryCatalog().renameLabel(labelId, newName, &error))
-	{
-		QMessageBox::warning(this, tr("Rename label"), error);
-		return;
-	}
-	_mediaBrowser->refreshLibraryView();
-}
-
-void MainWindow::setLabelColorInteractive(LabelId labelId)
-{
-	const Catalog::Label* label = libraryCatalog().labelById(labelId);
-	if (!label)
-		return;
-
-	const QColor initial = label->color.isEmpty() ? QColor(Qt::white) : QColor(label->color);
-	const QColor chosen = QColorDialog::getColor(initial, this, tr("Label color"));
-	if (!chosen.isValid())
-		return;
-
-	libraryCatalog().setColor(labelId, chosen.name());
-	_mediaBrowser->refreshLibraryView();
-}
-
-void MainWindow::deleteLabelInteractive(LabelId labelId)
-{
-	Catalog& catalog = libraryCatalog();
-	const Catalog::Label* label = catalog.labelById(labelId);
-	if (!label)
-		return;
-	const QString name = label->displayName;
-
-	const Catalog::DeleteImpact impact = catalog.deleteLabelImpact(labelId);
-	if (impact.wouldOrphan)
-	{
-		QMessageBox::warning(this, tr("Delete label"),
-			tr("Cannot delete \"%1\": some items are stored only under this label, with no other label to "
-			   "fall back on. Give those items another label first, then delete this one.").arg(name));
-		return;
-	}
-
-	QString message = tr("Delete the label \"%1\"?").arg(name);
-	if (impact.relocateCount > 0)
-		message += tr("\n\n%1 item(s) stored under it will be moved to another of their labels.").arg(impact.relocateCount);
-	if (impact.untagCount > 0)
-		message += tr("\n%1 item(s) tagged with it will lose the tag.").arg(impact.untagCount);
-	message += tr("\n\nThis cannot be undone. Continue?");
-
-	if (QMessageBox::warning(this, tr("Delete label"), message, QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
-		return;
-
-	if (!catalog.deleteLabel(labelId))
-		QMessageBox::warning(this, tr("Delete label"), tr("Could not fully delete \"%1\" - some items may not have been moved.").arg(name));
-	_mediaBrowser->refreshLibraryView();
-}
-
 void MainWindow::openImportDialog(const QStringList& initialStaging)
 {
 	ImportDialog::Callbacks callbacks{
@@ -1217,7 +1137,7 @@ void MainWindow::openImportDialog(const QStringList& initialStaging)
 			return importPhotoBatch(labelIdFromString(labelId), photoPaths, mode);
 		},
 		.createLabelRequested = [this](const QString& name, const QString& color) -> QString {
-			const LabelId id = createFolderLabel(name, color, /*refreshList*/ false);
+			const LabelId id = LabelManagement::createLabelOrReport(libraryCatalog(), name, color, this);
 			return id == LabelId::None ? QString{} : toString(id);
 		},
 		.viewChanged = [this] { _mediaBrowser->refreshLibraryView(); }

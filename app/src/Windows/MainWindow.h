@@ -55,11 +55,6 @@ private:
 	void reExportAllVideos();
 	void importVideoBatch(QStringList videoPaths, const QString& storageFolderPath, const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations);
 	std::vector<Import::PhotoResult> importPhotoBatch(LabelId labelId, const QStringList& photoPaths, Import::PhotoImportMode mode);
-	LabelId createFolderLabel(const QString& name, const QString& color = {}, bool refreshList = true);
-	void createLabelInteractive();
-	void renameLabelInteractive(LabelId labelId);
-	void setLabelColorInteractive(LabelId labelId);
-	void deleteLabelInteractive(LabelId labelId);
 	void openImportDialog(const QStringList& initialStaging = {});
 	void scanForUntrackedFiles();
 	void checkCatalogIntegrity();
