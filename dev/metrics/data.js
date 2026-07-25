@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784985838523,
+  "lastUpdate": 1784986623659,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -8480,6 +8480,75 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/VioletGiraffe/Darkroom/commit/f3d56c841a543345671ef9d3c5b4df0e7da7e571"
         },
         "date": 1784985831140,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 13190,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 8055,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1114,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 683,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 326,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 32.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 34,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "7d240d7627b69cb596b5776f6f526eaeeb53c460",
+          "message": "CI: no Qt cache",
+          "timestamp": "2026-07-25T16:33:08+03:00",
+          "tree_id": "0e0a111fe2b735980bdff570a1c60749abaf4dc9",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/7d240d7627b69cb596b5776f6f526eaeeb53c460"
+        },
+        "date": 1784986621557,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
