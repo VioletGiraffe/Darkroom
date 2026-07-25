@@ -11,6 +11,7 @@
 #include "UiComponents/SegmentedToggle.h"
 #include "UiComponents/SortControl.h"
 #include "Utils.h"
+#include "Windows/LabelManagement.h"
 
 #include <QAbstractItemView>
 #include <QAction>
@@ -192,10 +193,22 @@ void MediaBrowserWidget::setupUi()
 
 	_labelSidebar = new LabelSidebar(_library);
 	connect(_labelSidebar, &LabelSidebar::filterChanged, this, &MediaBrowserWidget::refreshMediaGrid);
-	connect(_labelSidebar, &LabelSidebar::addLabelRequested, this, &MediaBrowserWidget::addLabelRequested);
-	connect(_labelSidebar, &LabelSidebar::renameLabelRequested, this, &MediaBrowserWidget::renameLabelRequested);
-	connect(_labelSidebar, &LabelSidebar::setLabelColorRequested, this, &MediaBrowserWidget::setLabelColorRequested);
-	connect(_labelSidebar, &LabelSidebar::deleteLabelRequested, this, &MediaBrowserWidget::deleteLabelRequested);
+	connect(_labelSidebar, &LabelSidebar::addLabelRequested, this, [this] {
+		if (LabelManagement::createLabelInteractive(_library.catalog(), window()) != LabelId::None)
+			refreshLibraryView();
+	});
+	connect(_labelSidebar, &LabelSidebar::renameLabelRequested, this, [this](LabelId labelId) {
+		if (LabelManagement::renameLabelInteractive(_library.catalog(), labelId, window()))
+			refreshLibraryView();
+	});
+	connect(_labelSidebar, &LabelSidebar::setLabelColorRequested, this, [this](LabelId labelId) {
+		if (LabelManagement::setLabelColorInteractive(_library.catalog(), labelId, window()))
+			refreshLibraryView();
+	});
+	connect(_labelSidebar, &LabelSidebar::deleteLabelRequested, this, [this](LabelId labelId) {
+		if (LabelManagement::deleteLabelInteractive(_library.catalog(), labelId, window()))
+			refreshLibraryView();
+	});
 
 	auto* rightPanel = new QWidget();
 	auto* mainLayout = new QVBoxLayout(rightPanel);

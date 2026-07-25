@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Core/LabelId.h"
 #include "Core/MediaId.h"
 
 #include <QList>
@@ -53,10 +52,6 @@ signals:
 	void openSourceRequested(const MediaId& id);
 	void frameViewerRequested(const MediaId& id);
 	void mediaItemContextMenuRequested(const MediaId& id, const QPoint& globalPos);
-	void addLabelRequested();
-	void renameLabelRequested(LabelId labelId);
-	void setLabelColorRequested(LabelId labelId);
-	void deleteLabelRequested(LabelId labelId);
 
 private:
 	struct GridViewState;

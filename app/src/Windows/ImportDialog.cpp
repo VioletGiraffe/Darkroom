@@ -10,6 +10,7 @@
 #include "UiComponents/LabelVisuals.h"
 #include "Settings.h"
 #include "Shortcuts.h"
+#include "Windows/LabelManagement.h"
 #include "Windows/SourceRelocation.h"
 #include "Theme/Icons.h"
 #include "Theme/Theme.h"
@@ -1001,8 +1002,10 @@ void ImportDialog::materializeUsedProvisionalLabels()
 			if (isProvisionalId(labelId) && !provisionalToReal.contains(labelId))
 			{
 				const LabelOption* option = findLabelOption(labelId);
-				provisionalToReal.insert(labelId,
-					option ? _callbacks.createLabelRequested(option->displayName, option->color) : QString());
+				const LabelId createdId = option
+					? LabelManagement::createLabelOrReport(_library.catalog(), option->displayName, option->color, this)
+					: LabelId::None;
+				provisionalToReal.insert(labelId, createdId == LabelId::None ? QString{} : toString(createdId));
 			}
 		}
 	}

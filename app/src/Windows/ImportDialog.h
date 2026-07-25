@@ -44,8 +44,6 @@ public:
 		// Returns results in path order; registeredId must key post-import Best/label updates.
 		std::function<std::vector<Import::PhotoResult>(const QString& labelId, const QStringList& photoPaths,
 			Import::PhotoImportMode mode)> importPhotosRequested;
-		// Materializes a provisional label; empty means refusal and drops affected picks.
-		std::function<QString(const QString& name, const QString& color)> createLabelRequested;
 		// Called after Best/extra-label flushing when at least one item imported.
 		std::function<void()> viewChanged;
 	};

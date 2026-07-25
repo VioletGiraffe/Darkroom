@@ -138,11 +138,11 @@ Import dialog: copy/move source files under a label.
 `ImportDialog` borrows its modal lifetime's `Library&` and reads its `Catalog` directly for lookups (label
 options, photo-content duplicates, the
 id-tracking check, random label colors) and calls back into its host (`MainWindow`) only for host-owned
-actions it can't do itself. The `Callbacks` struct is four members:
+actions it can't do itself. The `Callbacks` struct is three members:
 `addMediaItemsRequested` / `importPhotosRequested` (the import workers, which own the app-wide busy lock and
-the progress modal), `createLabelRequested` (routed through `LabelManagement::createLabelOrReport`, shared with the
-sidebar's create-label flow), and
-`viewChanged` (the host repaint). The Best/extra-label flush and the tracked-under-label check are done
+the progress modal), and `viewChanged` (the host repaint). Provisional-label materialization calls
+`LabelManagement::createLabelOrReport` directly, sharing the sidebar's creation workflow without routing through the
+host. The Best/extra-label flush and the tracked-under-label check are done
 in-dialog, not through callbacks (below). Source-file relocation lives in its own **`SourceRelocation`** module
 (`src/Windows/SourceRelocation.h/.cpp`),
 entry point `SourceRelocation::relocateIfNeeded`.

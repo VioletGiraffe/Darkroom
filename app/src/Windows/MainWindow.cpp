@@ -10,7 +10,6 @@
 #include "UiComponents/LabelVisuals.h"
 #include "UiComponents/MediaBrowserWidget.h"
 #include "Windows/ImportDialog.h"
-#include "Windows/LabelManagement.h"
 #include "Windows/LogViewerDialog.h"
 #include "Windows/MediaRename.h"
 #include "Windows/SettingsDialog.h"
@@ -223,22 +222,6 @@ void MainWindow::setupUI()
 			_frameViewer->showForFolder(libraryCatalog().folderForMediaItem(id), libraryCatalog().displayName(id));
 	});
 	connect(_mediaBrowser, &MediaBrowserWidget::mediaItemContextMenuRequested, this, &MainWindow::showMediaItemContextMenu);
-	connect(_mediaBrowser, &MediaBrowserWidget::addLabelRequested, this, [this] {
-		if (LabelManagement::createLabelInteractive(libraryCatalog(), this) != LabelId::None)
-			_mediaBrowser->refreshLibraryView();
-	});
-	connect(_mediaBrowser, &MediaBrowserWidget::renameLabelRequested, this, [this](LabelId labelId) {
-		if (LabelManagement::renameLabelInteractive(libraryCatalog(), labelId, this))
-			_mediaBrowser->refreshLibraryView();
-	});
-	connect(_mediaBrowser, &MediaBrowserWidget::setLabelColorRequested, this, [this](LabelId labelId) {
-		if (LabelManagement::setLabelColorInteractive(libraryCatalog(), labelId, this))
-			_mediaBrowser->refreshLibraryView();
-	});
-	connect(_mediaBrowser, &MediaBrowserWidget::deleteLabelRequested, this, [this](LabelId labelId) {
-		if (LabelManagement::deleteLabelInteractive(libraryCatalog(), labelId, this))
-			_mediaBrowser->refreshLibraryView();
-	});
 
 	setupMainMenu();
 }
@@ -1135,10 +1118,6 @@ void MainWindow::openImportDialog(const QStringList& initialStaging)
 		},
 		.importPhotosRequested = [this](const QString& labelId, const QStringList& photoPaths, Import::PhotoImportMode mode) {
 			return importPhotoBatch(labelIdFromString(labelId), photoPaths, mode);
-		},
-		.createLabelRequested = [this](const QString& name, const QString& color) -> QString {
-			const LabelId id = LabelManagement::createLabelOrReport(libraryCatalog(), name, color, this);
-			return id == LabelId::None ? QString{} : toString(id);
 		},
 		.viewChanged = [this] { _mediaBrowser->refreshLibraryView(); }
 	};
