@@ -13,28 +13,26 @@
 
 namespace {
 
-// Fixed, independent of the user's full-split jpegQuality() setting - preview frames are small permanent
-// thumbnails, not archival output, so there's no need to tie them to the full-split quality.
+// Fixed, independent of the user's full-split jpegQuality() setting: preview frames are small thumbnails, not
+// archival output.
 constexpr int kPreviewFrameJpegQuality = 5;
 
-// Preview frames are downscaled to this height (width auto-computed by ffmpeg to preserve the source's
-// aspect ratio - see the -vf scale argument below); upscaling a smaller source is fine, these are thumbnails.
+// Preview frames are scaled to this height; the width follows the source's aspect ratio (the -vf scale argument
+// below). Upscaling a smaller source is fine, these are thumbnails.
 constexpr int kPreviewFrameHeight = 360;
 
-// In a batch, a source larger than this has its preview frames extracted in an ffmpeg process of its own, never
-// sharing a window with another job: a big file's extraction is a long sequential read and a long decode at once,
-// and running two of those together thrashes disk and CPU, whereas small clips only gain from packing. The batch
-// is usually fed small clips, so this rarely trips - it just keeps the occasional large source from dragging the
-// others down. Tuned by eye; easy to revisit.
+// In a batch, a source larger than this extracts in an ffmpeg process of its own, never sharing a window: a big
+// file's extraction is a long sequential read and a long decode at once, and running two of those together
+// thrashes disk and CPU, whereas small clips only gain from packing. The batch is usually fed small clips, so
+// this rarely trips. Tuned by eye.
 constexpr qint64 kSoloExtractionAboveBytes = 500LL * 1024 * 1024;
 
 // Waits for a process to finish, killing it if it overruns or if cancellation is requested, so a stuck ffmpeg
-// (e.g. on a corrupt file) never lingers past the QProcess it was spawned from - important here since a batch
-// can spawn many at once.
+// (e.g. on a corrupt file) never outlives the QProcess it was spawned from.
 void waitForFinishedOrKill(QProcess& process, int timeoutMs, const std::atomic<bool>& cancelled)
 {
-	// Waited in slices rather than one blocking call so that a cancellation is acted on within a slice, instead
-	// of after however long this process still had to run.
+	// Sliced rather than one blocking wait, so a cancellation is acted on within a slice instead of after
+	// however long this process still had to run.
 	constexpr int sliceMs = 100;
 	for (int remainingMs = timeoutMs; remainingMs > 0 && !cancelled; remainingMs -= sliceMs)
 		if (process.waitForFinished(qMin(sliceMs, remainingMs)))
@@ -45,11 +43,10 @@ void waitForFinishedOrKill(QProcess& process, int timeoutMs, const std::atomic<b
 }
 
 // Runs `windowSizes.size()` windows of concurrent QProcess, all on the calling thread - the parallelism is the OS
-// running the ffmpeg processes at once, not threads. Operations are numbered 0.. in window order; for each,
-// start(index, process) launches it without waiting, then once the whole window is started, finish(index,
-// process) is called per operation (in start order) to wait on and consume its result. Cancellation stops
-// further windows from starting; the current window is still finished through, because that is what kills and
-// reaps its processes (see waitForFinishedOrKill) rather than leaving them running.
+// running the ffmpeg processes at once, not threads. Operations are numbered 0.. in window order; start(index,
+// process) launches one without waiting, and once the whole window is started, finish(index, process) waits on
+// and consumes each result in start order. Cancellation stops further windows from starting; the current window
+// is still finished through, since that is what kills and reaps its processes (see waitForFinishedOrKill).
 template <typename StartFn, typename FinishFn>
 void runInProcessWindows(const std::vector<int>& windowSizes, const std::atomic<bool>& cancelled, StartFn&& start, FinishFn&& finish)
 {
@@ -59,8 +56,8 @@ void runInProcessWindows(const std::vector<int>& windowSizes, const std::atomic<
 		if (cancelled)
 			break;
 
-		// The sizing constructor default-constructs each QProcess in place; QProcess is a QObject (neither
-		// copyable nor movable), so a vector of them can only be built this way, not grown via push_back.
+		// QProcess is a QObject - neither copyable nor movable - so the vector can only be sized up front by the
+		// constructor that default-constructs each element in place, never grown with push_back.
 		std::vector<QProcess> processes(windowCount);
 		for (int i = 0; i < windowCount; ++i)
 			start(windowStart + i, processes[i]);
@@ -73,9 +70,9 @@ void runInProcessWindows(const std::vector<int>& windowSizes, const std::atomic<
 }
 
 // Starts (without waiting) an ffmpeg invocation that only opens the input, so its stderr banner carries the
-// Duration line parsed by parseProbedDurationMs. No ffprobe binary ships with this app, hence probing via
-// ffmpeg itself; the missing output file makes ffmpeg exit non-zero, which is why the duration is read from
-// stderr rather than gated on the exit code.
+// Duration line parseProbedDurationMs reads. No ffprobe binary ships with this app, hence probing via ffmpeg
+// itself; the missing output file makes it exit non-zero, which is why the duration is read from stderr rather
+// than gated on the exit code.
 void startDurationProbe(QProcess& probe, const QString& videoFilePath)
 {
 	probe.start(ffmpegPath(), { "-i", QDir::toNativeSeparators(videoFilePath) });
@@ -156,23 +153,22 @@ std::vector<PreviewResult> generatePreviewFrames(const std::vector<PreviewJob>& 
 
 	const int maxProcesses = qMax(1, maxConcurrentProcesses);
 
-	// Reaching a terminal state is tracked per job, not just counted: whatever the cancellation cut short is
-	// exactly what never got here, and is marked Cancelled once both passes are done.
+	// Terminal state is tracked per job, not just counted: whatever the cancellation cut short is exactly what
+	// never got here, and is marked Cancelled once both passes are done.
 	int completed = 0;
 	std::vector<bool> reachedTerminalState(total, false);
 	const auto markTerminal    = [&](int i) { reachedTerminalState[i] = true; ++completed; };
 	const auto reportCompleted = [&](int i) { markTerminal(i); if (onProgress) onProgress(completed, total, Phase::Extracting); };
 
-	// Pass 1 reports a count of its own: a successfully probed job is not terminal yet, so counting only terminal
-	// states would leave progress frozen through the whole probe pass and move it only when a job failed there.
+	// Pass 1 reports a count of its own: a successfully probed job isn't terminal yet, so counting only terminal
+	// states would leave progress frozen through the probe pass and move it only when a job failed there.
 	int probed = 0;
 	const auto reportProbed = [&] { ++probed; if (onProgress) onProgress(probed, total, Phase::Probing); };
 
 	// Pass 1: probe each job's duration and build its extraction arguments, up to maxProcesses probes at once
 	// (probing is size-independent, so the solo rule below doesn't apply - every window is packed full). A job
-	// whose destination folder can't be created (FolderCreateFailed) or whose duration can't be probed
-	// (ProbeFailed - a corrupt file typically fails here first) gets no arguments and is counted done now, so it
-	// never enters pass 2 and the extraction windows there stay packed with only good jobs.
+	// that fails here - FolderCreateFailed, or ProbeFailed as a corrupt file typically does first - gets no
+	// arguments and is counted done now, so pass 2's windows stay packed with only good jobs.
 	std::vector<int> probeWindows;
 	for (int remaining = total; remaining > 0; remaining -= maxProcesses)
 		probeWindows.push_back(qMin(maxProcesses, remaining));
@@ -212,9 +208,8 @@ std::vector<PreviewResult> generatePreviewFrames(const std::vector<PreviewJob>& 
 		});
 
 	// Pass 2: run the extractions for the jobs that probed successfully. Windows pack maxProcesses at a time,
-	// except a source over kSoloExtractionAboveBytes gets a window of its own so its long read and decode don't
-	// run beside another's. A non-zero exit (or a kill on timeout) marks the job ExtractionFailed but leaves its
-	// probed duration intact.
+	// except that a source over kSoloExtractionAboveBytes gets one of its own. A non-zero exit (or a kill on
+	// timeout) marks the job ExtractionFailed but leaves its probed duration intact.
 	std::vector<int> jobsToExtract;
 	jobsToExtract.reserve(total);
 	for (int i = 0; i < total; ++i)
@@ -292,9 +287,8 @@ SplitResult splitVideoIntoFrames(const QString& videoFilePath, const QString& ou
 		return result;
 	}
 
-	// Removes outputFolder on any failure path below, so a failed extraction leaves no debris - this undoes the
-	// mkpath above plus whatever ffmpeg partially wrote (callers always wipe the folder before calling anyway).
-	// The folder exists and no ffmpeg process is left running by the time any call site gets here, so a failure is unexpected.
+	// Undoes the mkpath above plus whatever ffmpeg partially wrote, so a failed extraction leaves no debris. The
+	// folder exists and no ffmpeg process is still running by the time any failure path gets here, so it can't fail.
 	const auto cleanupAfterFailure = [&outputFolder] { assert_r(QDir(outputFolder).removeRecursively()); };
 
 	const QString baseName      = QFileInfo(videoFilePath).completeBaseName();
@@ -382,9 +376,9 @@ SplitResult extractFrame(const QString& videoFilePath, qint64 timestampMs, const
 		return result;
 	}
 
-	// Unlike splitVideoIntoFrames' folder wipe, only the (possibly partial) output file is removed on failure -
-	// the folder may be a user-chosen destination holding other files. ffmpeg can also fail before creating the
-	// file at all, hence the existence check: only removing a file that is there must succeed.
+	// Unlike splitVideoIntoFrames' folder wipe, only the (possibly partial) output file is removed - the folder
+	// may be a user-chosen destination holding other files. ffmpeg can also fail before creating the file at all,
+	// hence the existence check: only removing a file that is there must succeed.
 	const auto cleanupAfterFailure = [&outputFilePath] {
 		if (QFile::exists(outputFilePath))
 			assert_r(QFile::remove(outputFilePath));

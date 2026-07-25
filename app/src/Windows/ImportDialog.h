@@ -29,16 +29,16 @@ class Library;
 // Dragging a label from the list onto a staged card tags it, exactly like dragging a label onto an item
 // card in the main window; the star button toggles Best the same way too.
 //
-// The label list holds the Catalog's real labels plus this session's *provisional* labels: dropping a folder
-// auto-creates one per folder (named for the folder's relative path, e.g. "Root-cars-2026") and pre-assigns
-// its files, and "Create label" makes one too. Provisional labels live only in this dialog - right-click to
-// rename/recolor/delete them - and are created in the Catalog for real only when "Import" materializes the ones
-// actually used (see runImport); a real label can't be edited from here. Nothing is written to the
-// Catalog until "Import" runs: every staged item that's been labeled gets imported and removed from
-// staging on success, or stays staged (with its labels intact) on failure or a deferred (Cancel) relocation
-// collision; a collision resolved as Skip / "Skip and Delete" also clears the entry - the destination copy
-// stands in for it. Unlabeled items are left alone either way. Files or folders can also be dropped straight
-// onto the dialog to stage them (a folder is scanned recursively for the supported files under it).
+// The label list holds the Catalog's real labels plus this session's *provisional* ones: dropping a folder mints
+// one per folder (named for the folder's relative path, e.g. "Root-cars-2026") and pre-assigns its files, and
+// "Create label" mints one too. Provisional labels live only in this dialog - right-click to rename/recolor/delete
+// them - while a real label can't be edited from here.
+//
+// Nothing is written to the Catalog until "Import" runs: it materializes the provisional labels actually used
+// (see runImport), then imports every labeled staged item, clearing it from staging on success. An item stays
+// staged with its labels intact on failure or a deferred (Cancel) relocation collision; a collision resolved as
+// Skip / "Skip and Delete" clears it too - the destination copy stands in for it. Unlabeled items are left
+// alone. Files or folders can also be dropped straight onto the dialog (a folder is scanned recursively).
 // ============================================================================
 
 class ImportDialog final : public QDialog
@@ -58,11 +58,11 @@ public:
 	// Catalog reads and writes are done directly - the dialog makes no attempt to be Catalog-agnostic.
 	struct Callbacks
 	{
-		// Adds the given video files to the identified label. stagedPreviewDirs maps each staged video's MediaId
-		// to the temp dir whose preview/ holds the frames already extracted for its staging card, so import
-		// can reuse them by copy instead of re-running ffmpeg (see Import::importVideo); a video absent
-		// from the map, or whose staged frames are gone, is extracted fresh. stagedDurations likewise carries
-		// the duration already probed for each video during staging, so import records it without re-probing.
+		// Adds the given video files to the identified label. stagedPreviewDirs maps each staged video's MediaId to
+		// the temp dir whose preview/ holds the frames already extracted for its card, so import can copy them
+		// instead of re-running ffmpeg (see Import::importVideo); a video absent from the map, or whose staged
+		// frames are gone, is extracted fresh. stagedDurations likewise carries each video's already-probed
+		// duration, so import records it without re-probing.
 		std::function<void(const QString& labelId, const QStringList& videoPaths,
 			const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations)> addMediaItemsRequested;
 		// Imports the given photos under the label (owned modes copy/move each file into the label's photo
@@ -74,16 +74,16 @@ public:
 		std::function<std::vector<Import::PhotoResult>(const QString& labelId, const QStringList& photoPaths,
 			Import::PhotoImportMode mode)> importPhotosRequested;
 		// Materializes one provisional label at Import time (called per used provisional from runImport): ensures a
-		// label with this name exists in the catalog and returns its id - which is what the dialog then rewrites
-		// the staged items' pending picks to, replacing the provisional stand-in id. The color applies only when
-		// the label is genuinely new; an existing same-name label keeps its own. Empty return = creation refused
-		// (reserved/invalid name), and the affected picks are dropped rather than remapped.
+		// label with this name exists in the catalog and returns its id, which the dialog then rewrites the staged
+		// picks to in place of the provisional stand-in. The color applies only when the label is genuinely new; an
+		// existing same-name label keeps its own. Empty return = creation refused (reserved/invalid name), and the
+		// affected picks are dropped rather than remapped.
 		std::function<QString(const QString& name, const QString& color)> createLabelRequested;
 		// Called once at the end of an Import that imported at least one item, after the dialog's own
-		// Best/extra-label flush. addMediaItemsRequested may refresh the host view mid-Import (it imports
-		// folder-by-folder), but that refresh predates the flush - so without this, the host shows each item's
-		// folder label but not its extra labels/Best until the dialog is closed. The dialog stays open after
-		// an Import, so that gap is visible. Lets the host repaint once with the fully-applied state.
+		// Best/extra-label flush, to repaint the host with the fully-applied state. addMediaItemsRequested may
+		// refresh the host view mid-Import (it imports folder-by-folder), but that refresh predates the flush -
+		// and since the dialog stays open afterwards, the host would visibly show each item's folder label
+		// without its extra labels or Best.
 		std::function<void()> viewChanged;
 	};
 
@@ -92,9 +92,9 @@ public:
 	ImportDialog(Library& library, Callbacks callbacks, const QString& suggestedRelocateFolder, QWidget* parent = nullptr);
 	~ImportDialog() override;
 
-	// Pre-populates the staging area with the given files and/or folders (a folder is scanned recursively for
-	// the supported media under it). Used when handing paths over from the main window's drop or the "Scan for
-	// untracked files" tool. Deferred until the dialog is shown so it paints before the blocking thumbnail extraction.
+	// Pre-populates the staging area with the given files and/or folders (a folder is scanned recursively for the
+	// supported media under it). Used when handing paths over from the main window's drop or the "Scan for
+	// untracked files" tool. The staging itself is deferred to the event loop - see the .cpp.
 	void addToStaging(const QStringList& paths);
 
 protected:
@@ -109,8 +109,8 @@ private:
 	// Extracts temp preview frames for each path and adds it to the staged grid.
 	void stageMediaItems(const QStringList& paths);
 	// Builds and wires one staged card for the given identity/file (the caller inserts it into the grid). Per-type
-	// differences (canvas size, preview images) are derived from the path here; durationMs is passed in since it
-	// isn't derivable from the path (it's probed during staging). Shared by stageMediaItems and renameStagedItem.
+	// differences (canvas size, preview images) are derived from the path here; durationMs is passed in because it
+	// isn't. Shared by stageMediaItems and renameStagedItem.
 	[[nodiscard]] MediaItemWidget* buildStagedCard(const MediaId& id, const QString& path, const QString& tempPreviewDir, qint64 durationMs);
 	// Deletes a staged entry's temp preview dir and removes its card; used by "Remove from staging" and
 	// once an entry has been successfully imported by runImport().
@@ -190,10 +190,10 @@ private:
 	void materializeUsedProvisionalLabels();
 
 private:
-	// Per-staged-item state, accumulated by dragging labels from _labelList onto the card in _stagedGrid
-	// and toggling its Best star; applied (and removed from here) only once "Import" runs successfully. The
-	// first id in pendingLabelIds resolves the item's destination folder at Import time (see runImport) -
-	// that's the only place this ordering matters; there's no other state or UI for it.
+	// Per-staged-item state, accumulated by dragging labels from _labelList onto the card in _stagedGrid and
+	// toggling its Best star; applied (and removed from here) only once "Import" runs successfully. The first id
+	// in pendingLabelIds resolves the item's destination folder at Import time (see runImport) - the one place
+	// this ordering matters, and the only "destination" state there is.
 	struct StagedEntry
 	{
 		QString path;

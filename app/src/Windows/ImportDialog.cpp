@@ -82,8 +82,8 @@ QString uniqueTempPreviewDir()
 }
 
 // Discards a scratch dir handed out by uniqueTempPreviewDir. Both guards are load-bearing: a staged photo has no
-// temp dir at all and QDir("") would address the working directory, while a video whose extraction never got as
-// far as creating the dir leaves a path that names nothing. Removing one that is there must succeed.
+// temp dir at all and QDir("") would address the working directory, while a video whose extraction never created
+// the dir leaves a path naming nothing. Removing one that is there must succeed.
 void removeTempPreviewDir(const QString& path)
 {
 	if (path.isEmpty())
@@ -107,8 +107,7 @@ struct StagedFile
 // Expands a dropped path list to the media files to stage, each paired with its folder-derived label name (see
 // StagedFile): a supported video/photo file passes through unlabeled; a directory is scanned recursively and each
 // supported file under it carries the "-"-joined relative path of its containing folder; anything else
-// (unsupported file, dead path) is dropped. Folder handling lives here so it's uniform across every staging entry
-// point - the dialog's own drop, addToStaging (the main window's drop), and the untracked scan.
+// (unsupported file, dead path) is dropped. Folder handling lives here so every staging entry point shares it.
 QList<StagedFile> flattenToSupportedMediaFiles(const QStringList& paths)
 {
 	QList<StagedFile> files;
@@ -133,9 +132,9 @@ using RelocateMode = SourceRelocation::Mode;
 
 // True iff the item is tracked by the Catalog at the exact frame folder this import derives for it
 // (Import::importVideo's outputFolder). Checked right after a video batch import to tell a successfully-added
-// entry (clear from staging) from a declined/failed one (leave staged). Deliberately not "tracked under *some*
-// folder": on a name+size collision the id is already tracked elsewhere and the staged copy was refused - a
-// plain "is tracked" check would misreport that as imported, silently dropping the entry's pending labels.
+// entry (clear from staging) from a declined/failed one (leave staged). Not "tracked under *some* folder": on a
+// name+size collision the id is already tracked elsewhere and the staged copy was refused, which a plain "is
+// tracked" check would misreport as imported, silently dropping the entry's pending labels.
 [[nodiscard]] bool isTrackedUnderLabel(const Catalog& catalog, const MediaId& id, const QString& labelId)
 {
 	const QString storageFolder = catalog.storageFolderForLabel(labelIdFromString(labelId));
@@ -214,13 +213,10 @@ ImportDialog::ImportDialog(Library& library, Callbacks callbacks, const QString&
 	_labelList = new ContentWidthListWidget();  // hugs its content so the pane auto-fits the label names
 	_labelList->setSelectionMode(QAbstractItemView::NoSelection);  // rows are dragged, never selected
 	_labelList->setFrameShape(QFrame::NoFrame);
-	// Cap the content-hugging width so a pathologically long label name can't blow the pane up; the row elides
-	// instead (horizontal scrolling off). No explicit minimum width, so the minimum tracks content up to the cap.
-	_labelList->setMaximumWidth(LABEL_LIST_MAX_WIDTH);
+	_labelList->setMaximumWidth(LABEL_LIST_MAX_WIDTH);   // no explicit minimum, so the width tracks content up to the cap
 	_labelList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-	// LabelRowDelegate paints the rows just like the main window's sidebar: squircle swatch, name, dashed
-	// hover outline (mouse tracking on so hover repaints). The active pill/spine states simply never engage
-	// here - no row is ever marked active.
+	// LabelRowDelegate paints the rows just like the main window's sidebar: squircle swatch, name, dashed hover
+	// outline (mouse tracking on so hover repaints). Its active pill/spine states never engage - no row is active here.
 	_labelList->setItemDelegate(new LabelRowDelegate(_labelList));
 	_labelList->setMouseTracking(true);
 	// A press-and-drag on a label row drags the label out, to be dropped onto a staged card.
@@ -236,8 +232,8 @@ ImportDialog::ImportDialog(Library& library, Callbacks callbacks, const QString&
 	QPushButton* addLabelButton = new QPushButton(tr("Create label"));
 	addLabelButton->setObjectName("addLabelButton");
 	addLabelButton->setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_plus.svg"), &Theme::ThemeColors::TextPrimary));
-	// Ctrl+L mirrors LabelSidebar's Create-label button; keep the two in sync. The tooltip surfaces the shortcut
-	// (derived from it, so there's a single source of truth) since a button doesn't advertise one otherwise.
+	// Ctrl+L mirrors LabelSidebar's Create-label button; keep the two in sync. The tooltip is derived from the
+	// shortcut (one source of truth) since a button doesn't advertise one otherwise.
 	addLabelButton->setShortcut(QKeySequence(Shortcuts::CreateLabel));
 	addLabelButton->setToolTip(tr("Create a new label (%1)").arg(addLabelButton->shortcut().toString(QKeySequence::NativeText)));
 	connect(addLabelButton, &QPushButton::clicked, this, [this] {
@@ -276,16 +272,16 @@ ImportDialog::ImportDialog(Library& library, Callbacks callbacks, const QString&
 	// item behind them - same rule the main grid uses.
 	_stagedGrid->setStyleSheet(QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().AccentBg));
 
-	// Keyboard accelerators on the staged grid, mirroring MainWindow's edit actions: F2 renames, Del removes from
-	// staging, Shift+Del deletes the source file(s). WidgetWithChildrenShortcut scopes them to the grid so they don't
-	// fire while typing elsewhere in the dialog; the context menu shows the same shortcuts (see showStagedCardContextMenu).
+	// Keyboard accelerators on the staged grid, mirroring MainWindow's edit actions. WidgetWithChildrenShortcut
+	// scopes them to the grid so they don't fire while typing elsewhere in the dialog; the context menu displays
+	// the same ones (see showStagedCardContextMenu).
 	auto* renameStagedAction = new QAction(tr("Rename..."), this);
 	renameStagedAction->setShortcut(QKeySequence(Shortcuts::Rename));
 	renameStagedAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
 	connect(renameStagedAction, &QAction::triggered, this, [this] {
 		const std::vector<MediaId> ids = selectedStagedIds();
 		if (ids.size() == 1)
-			renameStagedItem(ids.front());   // F2 renames only when exactly one item is selected
+			renameStagedItem(ids.front());   // deliberately a no-op for a multi-selection
 	});
 	_stagedGrid->addAction(renameStagedAction);
 
@@ -326,8 +322,7 @@ ImportDialog::ImportDialog(Library& library, Callbacks callbacks, const QString&
 
 	refreshLabelList();
 
-	// Restore persisted window geometry; with nothing stored yet (first run) open maximized - this is a full
-	// workspace - letting the saved geometry rule on every run thereafter.
+	// With nothing persisted yet (first run) open maximized - this is a full workspace.
 	if (!restoreWindowGeometry(this, "importDialog"))
 	{
 		resize(1200, 800);  // the size the dialog falls back to when un-maximized
@@ -378,8 +373,7 @@ void ImportDialog::refreshLabelList()
 	_labelOptions.clear();
 	for (const LabelOption& provisional : _provisionalLabels)
 		_labelOptions.push_back(provisional);
-	// Every ordinary Catalog label is a candidate destination - read from the Catalog model (which also
-	// carries each label's color), not from a disk listing.
+	// Every ordinary Catalog label is a candidate destination; the model carries each label's color too.
 	for (const Catalog::Label& label : _library.catalog().allLabels())
 		if (!label.isVirtual())
 			_labelOptions.push_back(LabelOption{ toString(label.id), label.displayName, label.color });
@@ -442,8 +436,8 @@ QString ImportDialog::ensureLabelForFolderName(const QString& name)
 {
 	if (name.isEmpty())
 		return {};
-	// A folder whose name already matches a label (real, or an earlier provisional from this same drop) reuses it -
-	// "existing labels need no action", and two files from one folder share a single label.
+	// A name that already matches a label - real, or a provisional from earlier in this same drop - reuses it, so
+	// two files from one folder share a single label.
 	const QString existing = findLabelIdByName(name, {});
 	return existing.isEmpty() ? addProvisionalLabel(name) : existing;
 }
@@ -558,8 +552,8 @@ void ImportDialog::deleteProvisionalLabel(const QString& provisionalId)
 
 void ImportDialog::mergeProvisionalInto(const QString& provisionalId, const QString& targetId)
 {
-	// Point every staged pick at the target and drop the now-merged provisional. Pre-import this is purely local -
-	// nothing in the Catalog changes; it's a rewrite of the staged cards' pending assignments.
+	// Point every staged pick at the target and drop the now-merged provisional. Purely local: pre-import, nothing
+	// in the Catalog changes.
 	remapStagedLabelIds({ { provisionalId, targetId } });
 
 	_provisionalLabels.erase(std::remove_if(_provisionalLabels.begin(), _provisionalLabels.end(),
@@ -633,8 +627,7 @@ MediaItemWidget* ImportDialog::buildStagedCard(const MediaId& id, const QString&
 void ImportDialog::stageMediaItems(const QStringList& paths)
 {
 	// A dropped folder contributes every supported file under it (recursive, flattened), each tagged with the
-	// label its origin folder implies; plain files pass through unlabeled. Doing it here means folder-drop and its
-	// auto-labeling work from every entry point that reaches staging.
+	// label its origin folder implies; plain files pass through unlabeled.
 	const QList<StagedFile> mediaFiles = flattenToSupportedMediaFiles(paths);
 	if (mediaFiles.isEmpty())
 		return;
@@ -644,12 +637,12 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 		if (!file.labelName.isEmpty())
 			labelNameByPath.insert(file.path, file.labelName);
 
-	// Dedup by MediaId, both against already-staged entries and within this batch (_staged is keyed by id,
-	// so accepting a second same-id file would silently overwrite the first entry, orphaning its card and
-	// leaking its temp dir). The id match (name+size) is the cheap gate; a byte comparison then classifies
-	// it, mirroring SourceRelocation's gate-then-verify shape: identical content is a plain duplicate,
-	// skipped silently, while different content is a genuine collision the user must know about - the
-	// catalog tracks at most one item per id, so the file can't be staged alongside its twin.
+	// Dedup by MediaId, both against already-staged entries and within this batch (_staged is keyed by id, so a
+	// second same-id file would silently overwrite the first entry, orphaning its card and leaking its temp dir).
+	// The id match (name+size) is the cheap gate and a byte comparison then classifies it, mirroring
+	// SourceRelocation's gate-then-verify shape: identical content is a plain duplicate, skipped silently, while
+	// different content is a collision the user must know about - the catalog tracks at most one item per id, so
+	// the file can't be staged alongside its twin.
 	QHash<MediaId, QString> stagedPathById;
 	for (auto it = _staged.constBegin(); it != _staged.constEnd(); ++it)
 		stagedPathById.insert(it.key(), it->path);
@@ -935,10 +928,9 @@ void ImportDialog::showStagedCardContextMenu(const MediaId& id, const QPoint& gl
 	LabelVisuals::buildChecklistMenu(menu.addMenu(tr("Labels")), std::move(labelRows));
 	menu.addSeparator();
 
-	// Remove from staging (no disk change) and Delete (removes the source from disk). Both act on the effective staged
-	// selection and display the same accelerators as the grid actions set up in the constructor. Deferred via a queued
-	// call: this menu was opened from the card's own context-menu handler, still on the stack, and both actions delete
-	// that very card - the mutation must wait until this unwinds (same reason MainWindow defers a card's own mutation).
+	// Both act on the effective staged selection. Deferred via a queued call: this menu was opened from the card's
+	// own context-menu handler, still on the stack, and both actions delete that very card - the mutation has to
+	// wait until that unwinds (same reason MainWindow defers a card's own mutation).
 	QAction* removeItem = menu.addAction(tr("Remove from staging"), this, [this, selection] {
 		QMetaObject::invokeMethod(this, [this, selection] { removeStagedItems(selection); }, Qt::QueuedConnection);
 	});
@@ -1109,9 +1101,9 @@ void ImportDialog::renameStagedItem(const MediaId& id)
 
 void ImportDialog::materializeUsedProvisionalLabels()
 {
-	// Provisional labels reach the Catalog only here, at Import: create each one a staged item actually carries and
-	// map its provisional id to the real one. A provisional whose name already matched a real label was reused
-	// directly (never minted), so it doesn't appear here; a genuinely new one is created with the swatch it showed.
+	// Provisional labels reach the Catalog only here: create each one a staged item actually carries, with the
+	// swatch it has been showing, and map its provisional id to the real one. A name that already matched a real
+	// label reused that label at staging time, so it never became a provisional and doesn't appear here.
 	QHash<QString, QString> provisionalToReal;  // provisional id -> real id ("" = creation failed)
 	for (auto it = _staged.constBegin(); it != _staged.constEnd(); ++it)
 	{
@@ -1248,9 +1240,9 @@ void ImportDialog::runImport()
 {
 	const RelocateMode relocateMode = static_cast<RelocateMode>(_relocateModeCombo->currentData().toInt());
 
-	// Move/Copy relocate the source files (Move deletes the originals), and the mode is easy to leave set from a
-	// previous run - so confirm before committing to it. Only prompt when there's actually something to import; an
-	// unlabeled run just reports "nothing labeled" below without a spurious confirmation first.
+	// Move/Copy relocate the source files (Move deletes the originals) and the mode is easy to leave set from a
+	// previous run, so confirm first - but only when there's something to import, or an unlabeled run would ask
+	// before reporting "nothing labeled" below.
 	if (relocateMode != RelocateMode::LeaveInPlace
 		&& std::any_of(_staged.constBegin(), _staged.constEnd(), [](const StagedEntry& entry) { return !entry.pendingLabelIds.isEmpty(); }))
 	{
@@ -1332,8 +1324,8 @@ void ImportDialog::runImport()
 	for (const MediaId& id : outcome.skippedIds)
 		unstage(id);
 
-	// Repaint the host once with the fully-applied state - the dialog stays open, so the mid-Import refresh
-	// that addMediaItemsRequested may have done only shows folder labels, not the Best/extra labels flushed just above.
+	// Repaint the host once with the fully-applied state - any mid-Import refresh from addMediaItemsRequested
+	// predates the flush above (see Callbacks::viewChanged).
 	if (!outcome.succeededIds.empty() && _callbacks.viewChanged)
 		_callbacks.viewChanged();
 }

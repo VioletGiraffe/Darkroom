@@ -6,25 +6,21 @@
 #include <functional>
 #include <vector>
 
-// Thin wrapper over invoking the ffmpeg binary (see Utils.h's ffmpegPath()). Three operations, all pure - they
-// run ffmpeg and report the outcome, leaving all UI and catalog updates to the caller: pulling a handful of
-// evenly-spaced still frames for a card preview (generatePreviewFrames), extracting every frame of a video
-// into a folder (splitVideoIntoFrames), and extracting the single frame at a timestamp (extractFrame).
+// Thin wrapper over invoking the ffmpeg binary (see Utils.h's ffmpegPath()). Every operation is pure: it runs
+// ffmpeg and reports the outcome, leaving all UI and catalog updates to the caller.
 namespace Ffmpeg {
 
-// One video's preview-extraction request: pull evenly-spaced frames from videoFilePath into
-// destinationFolder. The "preview" subfolder convention lives with the caller (see Catalog::previewDirFor);
-// this module writes frames into exactly the folder it's handed and knows nothing about where that sits.
+// One video's preview-extraction request. The "preview" subfolder convention lives with the caller (see
+// Catalog::previewDirFor); frames go into exactly the folder handed over here.
 struct PreviewJob
 {
 	QString videoFilePath;
 	QString destinationFolder;
 };
 
-// Per-job outcome. durationMs is the source video's duration in ms, read from the probe that precedes
-// extraction (see generatePreviewFrames) - so it is valid (> 0) whenever the probe succeeded, which includes
-// the ExtractionFailed case: a caller can still record the duration even when no frames were written. It stays
-// -1 (unknown) only when the probe never ran or found no duration (FolderCreateFailed / ProbeFailed / Cancelled).
+// Per-job outcome. durationMs (the source's length in ms) is valid whenever the probe succeeded - including
+// under ExtractionFailed, so a caller can record the duration even when no frames were written. It stays -1 for
+// FolderCreateFailed / ProbeFailed / Cancelled.
 struct PreviewResult
 {
 	enum class Status
@@ -42,42 +38,39 @@ struct PreviewResult
 };
 
 // Which of generatePreviewFrames' two passes an onProgress report comes from. Probing counts jobs leaving the
-// probe pass, whether they probed or failed there; Extracting counts jobs reaching their terminal state, so it
-// also carries over the jobs that failed in pass 1. Both count against jobs.size().
+// probe pass, probed or failed; Extracting counts jobs reaching their terminal state, so it carries the pass-1
+// failures too. Both count against jobs.size().
 enum class Phase
 {
 	Probing,
 	Extracting,
 };
 
-// Generates frameCount evenly-spaced preview frames for each job into its destinationFolder (created if
-// needed), running up to maxConcurrentProcesses ffmpeg processes at once. Each ffmpeg is its own OS process, so
-// this parallelizes without any worker threads: it starts a window of processes and then waits on that window,
-// all on the calling thread. Work happens in two passes - first all duration probes, then all frame extractions
-// - each windowed at maxConcurrentProcesses, except that an extraction of a large source runs in a window of its
-// own so its long read and decode don't contend with another's. A job whose folder can't be created or whose
-// duration can't be probed (the first thing to fail on a corrupt file) is skipped, leaving its destinationFolder
-// empty and never entering the extraction pass.
+// Generates frameCount evenly-spaced preview frames for each job into its destinationFolder (created if needed).
+// Parallel without worker threads - each ffmpeg is its own OS process, so this starts a window of up to
+// maxConcurrentProcesses of them and then waits on that window, all on the calling thread. Two passes: all
+// duration probes, then all extractions, except that a large source extracts in a window of its own so its long
+// read and decode don't contend with another's. A job whose folder can't be created or whose duration can't be
+// probed (the first thing to fail on a corrupt file) never enters the extraction pass, leaving its
+// destinationFolder empty.
 //
-// Returns one PreviewResult per job, in jobs order (result[i] describes jobs[i]). Best-effort in that a failed
-// job never aborts the batch: its status/duration are reported for the caller to act on or ignore, not enforced.
+// Returns one PreviewResult per job, in jobs order. Best-effort: a failed job never aborts the batch, its status
+// and duration are reported for the caller to act on or ignore.
 //
-// Setting `cancelled` (from another thread - the call blocks its own for the whole batch) stops the batch: the
-// running ffmpeg processes are killed instead of waited out, no further ones are started, and every job that
-// didn't already finish cleanly comes back Cancelled. A job that did finish keeps its Ok result, so the caller
-// can keep the work already paid for. Cancelled jobs leave whatever partial frames ffmpeg had written in their
-// destinationFolder - the caller owns that cleanup.
+// Setting `cancelled` (from another thread - the call blocks its own for the whole batch) kills the running
+// ffmpeg processes instead of waiting them out, starts no further ones, and returns Cancelled for every job that
+// hadn't already finished cleanly - the ones that had keep their Ok result. Partial frames from a killed
+// extraction stay in destinationFolder for the caller to remove.
 //
-// onProgress, if set, is invoked as each job leaves the probe pass and again as each reaches its terminal state
-// (extracted or skipped), with (completedJobs, totalJobs, phase) where totalJobs == jobs.size(); use it to drive
-// UI. Each phase counts up to totalJobs of its own, so the two are not one continuous run of numbers. It runs on
-// the calling thread, which is not the GUI thread if the caller followed the cancellation contract above - so a
-// UI callback must marshal to the GUI thread rather than touching widgets directly.
+// onProgress, if set, is invoked as each job leaves the probe pass and again as each reaches its terminal state,
+// with (completedJobs, totalJobs, phase) where totalJobs == jobs.size(). Each phase counts to totalJobs of its
+// own, so the two are not one continuous run of numbers. It runs on the calling thread, which is not the GUI
+// thread if the caller followed the cancellation contract above - so a UI callback must marshal to it.
 [[nodiscard]] std::vector<PreviewResult> generatePreviewFrames(const std::vector<PreviewJob>& jobs, int frameCount, int maxConcurrentProcesses,
 	const std::atomic<bool>& cancelled, const std::function<void(int completedJobs, int totalJobs, Phase phase)>& onProgress = {});
 
-// Single-video convenience: the batch form with one job run one process at a time, returning its lone
-// PreviewResult. Used by the import and re-split paths, which handle a single video.
+// Single-video convenience: the batch form with one job, returning its lone PreviewResult. Used by the import
+// and re-split paths.
 [[nodiscard]] PreviewResult generatePreviewFrames(const QString& videoFilePath, const QString& destinationFolder, int frameCount);
 
 // Output-format and sampling knobs for splitVideoIntoFrames - the choices the caller pulls from settings.
@@ -111,17 +104,16 @@ struct SplitResult
 };
 
 // Extracts frames from videoFilePath into outputFolder (created if needed) at full resolution - every frame, or
-// every frameStep-th - with one ffmpeg process, blocking until it finishes. This is the raw material behind a
-// video's frame folder, as opposed to the small seeked previews above. On any failure the partial output folder
-// is removed, so a failed split leaves no debris. Returns the outcome; touches neither UI nor catalog - the
-// caller renders the result and registers the video.
+// every frameStep-th - with one blocking ffmpeg process. This is the raw material behind a video's frame folder,
+// as opposed to the small seeked previews above. On any failure the partial output folder is removed, so a
+// failed split leaves no debris.
 [[nodiscard]] SplitResult splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder, const SplitOptions& options);
 
 // Extracts the single frame at timestampMs into outputFilePath (parent folder created if needed), with one
 // blocking ffmpeg process. The format follows the file's extension - ".tif" = TIFF, anything else JPEG at
-// jpegQuality - with the same encoder options as splitVideoIntoFrames, so an extracted frame matches split
-// output. On failure any partial output file is removed; the folder is left alone (it may be a user-chosen
-// destination holding other files). Reuses SplitResult; frameCount is 1 on success.
+// jpegQuality - using splitVideoIntoFrames' encoder options, so an extracted frame matches split output. On
+// failure any partial output file is removed; the folder is left alone (it may be a user-chosen destination
+// holding other files). Reuses SplitResult; frameCount is 1 on success.
 [[nodiscard]] SplitResult extractFrame(const QString& videoFilePath, qint64 timestampMs, const QString& outputFilePath, int jpegQuality);
 
 } // namespace Ffmpeg
