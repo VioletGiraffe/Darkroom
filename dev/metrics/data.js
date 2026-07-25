@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784985112399,
+  "lastUpdate": 1784985838523,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -8411,6 +8411,75 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/VioletGiraffe/Darkroom/commit/df073bb456058379bbfee383415738c79e90f06d"
         },
         "date": 1784985109645,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 13190,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 8055,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1114,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 683,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 326,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 32.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 34,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 9.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "f3d56c841a543345671ef9d3c5b4df0e7da7e571",
+          "message": "ImportDialog got a taskbar button (nullptr parent)",
+          "timestamp": "2026-07-25T16:19:32+03:00",
+          "tree_id": "69f431928960baa39ab737480943c32d2bf86935",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/f3d56c841a543345671ef9d3c5b4df0e7da7e571"
+        },
+        "date": 1784985831140,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
