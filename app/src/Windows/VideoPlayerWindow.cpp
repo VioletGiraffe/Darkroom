@@ -5,6 +5,7 @@
 #include "Core/Library.h"
 #include "Core/MetadataStore.h"
 #include "Theme/Icons.h"
+#include "Utils.h"
 #include "assert/advanced_assert.h"
 #include "dialogs/messagebox.h"
 
@@ -985,6 +986,10 @@ void VideoPlayerWindow::showContextMenu(const QPoint& globalPos)
 	repeatAction->setEnabled(!repeatText.isEmpty());
 
 	menu.addSeparator();
+	menu.addAction(revealInFileManagerActionText(), this, [this] {
+		if (!revealInFileManager(_videoPath))
+			reportMissingFile(this, _videoPath);
+	});
 	menu.addAction((isFullScreen() ? tr("Exit fullscreen") : tr("Fullscreen")) + "\tF", this, &VideoPlayerWindow::toggleFullScreen);
 
 	menu.exec(globalPos);
