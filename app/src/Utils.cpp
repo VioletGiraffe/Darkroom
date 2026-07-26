@@ -8,6 +8,7 @@
 #include <QCoreApplication>
 #include <QCursor>
 #include <QDateTime>
+#include <QDesktopServices>
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
@@ -28,7 +29,6 @@
 #include <QDBusMessage>
 #include <QDBusPendingCall>
 #include <QDBusPendingCallWatcher>
-#include <QDesktopServices>
 #endif
 
 #include <functional>
@@ -277,6 +277,15 @@ QString revealInFileManagerActionText()
 #else
 	return QObject::tr("Show in file manager");
 #endif
+}
+
+bool openFolderInFileManager(const QString& folderPath)
+{
+	if (!QFileInfo(folderPath).isDir())
+		return false;
+
+	QDesktopServices::openUrl(QUrl::fromLocalFile(folderPath));
+	return true;
 }
 
 void reportMissingFile(QWidget* parent, const QString& path)

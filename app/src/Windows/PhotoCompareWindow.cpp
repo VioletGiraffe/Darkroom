@@ -335,7 +335,7 @@ void PhotoComparePane::contextMenuEvent(QContextMenuEvent* event)
 		return;
 	const int index = photoIndex();
 	QMenu menu;
-	menu.addAction(tr("Open containing folder"), [this, index] {
+	menu.addAction(revealInFileManagerActionText(), [this, index] {
 		if (const QString path = _owner._photos[index].filePath; !revealInFileManager(path))
 			reportMissingFile(this, path);
 	});

@@ -402,8 +402,8 @@ void MediaBrowserWidget::showMediaItemContextMenu(const MediaId& id, const QPoin
 
 	if (!isPhoto)
 	{
-		menu.addAction(revealInFileManagerActionText(), this, [folderPath, this] {
-			if (!revealInFileManager(folderPath))
+		menu.addAction(tr("Open frame folder"), this, [folderPath, this] {
+			if (!openFolderInFileManager(folderPath))
 				reportMissingFile(window(), folderPath);
 		});
 	}

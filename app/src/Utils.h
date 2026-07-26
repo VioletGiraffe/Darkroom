@@ -75,6 +75,10 @@ void forEachFolder(const QString& root, F&& callback)
 // Platform-native menu wording for revealInFileManager.
 [[nodiscard]] QString revealInFileManagerActionText();
 
+// Opens the folder's contents, unlike revealInFileManager, which selects it in its parent.
+// False means only that folderPath is not an existing directory; the handoff itself is best-effort.
+[[nodiscard]] bool openFolderInFileManager(const QString& folderPath);
+
 void reportMissingFile(QWidget* parent, const QString& path);
 
 namespace Ffmpeg { struct SplitResult; }
