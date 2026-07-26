@@ -78,8 +78,8 @@ that case stays clean.
 
 - **Queries**: standard per-item and per-label lookups; `mediaItems` exposes the full `MediaId`→`Entry` map as a const
   ref — prefer it over per-field re-queries when scanning the whole set.
-- **Mutations**: `addLabel`/`removeLabel`. `addLabel` only writes the stored id list (no-op on an invalid id —
-  a missing-source item can't be labeled). `removeLabel` is metadata-only too, **except** when the label
+- **Mutations**: `addLabel`/`removeLabel`. `addLabel` only writes the stored id list (no-op on an invalid media id
+  or an id absent from the label registry). `removeLabel` is metadata-only too, **except** when the label
   names the item's storage location: then it relocates that storage (a video's frame folder into the
   destination's storage folder; an owned photo's file into the destination's `Photos/<label>` dir, updating its
   source path too) to the item's alphabetically-first remaining ordinary label. The **≥1-ordinary-label
@@ -258,9 +258,11 @@ photo's owned/referenced × source presence) and the verdicts it yields — is d
 banner comment atop `CatalogIntegrity::scan`, kept next to the code so the two can't drift.** This section
 stays conceptual and does not restate it.
 
-The scan reports four kinds of drift: **untracked folder** (frame folder on disk unclaimed by any entry), **untracked
+The scan reports five kinds of drift: **untracked folder** (frame folder on disk unclaimed by any entry), **untracked
 photo** (image under `<root>/Photos/<label>` unclaimed by any entry), **broken video entry** (tracked video whose
-on-disk product no longer matches the catalog record), and **missing photo** (tracked photo whose source file is gone).
+on-disk product no longer matches the catalog record), **missing photo** (tracked photo whose source file is gone),
+and **invalid label references** (stored label ids absent from the registry). Invalid references can be dropped per
+item or in one batch; `Catalog::addLabel` rejects unknown ids so normal mutations cannot create new ones.
 Full verdict→resolution mapping is in the banner comment atop `CatalogIntegrity::scan`.
 
 `IntegrityCheckDialog::scanAndShowUi` is the one static entry point. `MainWindow` supplies the resolution callbacks that

@@ -2,11 +2,13 @@
 #include "Core/Catalog.h"
 #include "Core/Library.h"
 #include "Core/MediaId.h"
+#include "Core/MetadataStore.h"
 #include "Utils.h"
 #include "TestHelpers.h"
 
 #include <QDir>
 #include <QFileInfo>
+#include <QJsonArray>
 #include <QTemporaryDir>
 
 namespace
@@ -215,4 +217,43 @@ TEST_CASE("scan: untracked frame folders and loose photos surface; claimed and f
 	REQUIRE(report.untrackedPhotos.size() == 1u);
 	REQUIRE(pathComparisonKey(report.untrackedPhotos.front().filePath) == pathComparisonKey(loose));
 	REQUIRE(report.untrackedPhotos.front().labelName == "Alpha");
+}
+
+TEST_CASE("scan: dangling label references are reported, repairable, and rejected by normal mutation", "[integrity]")
+{
+	IntegrityFixture f;
+	Catalog& catalog = f.catalog();
+
+	const MediaId video = f.addVideo("labeled.mp4", 1, "Storage", true, true);
+	f.putFrame(f.frameFolder("labeled.mp4", "Storage"));
+	f.putFrame(Catalog::previewDirFor(f.frameFolder("labeled.mp4", "Storage")));
+	const LabelId validExtra = catalog.createLabel("Extra");
+	REQUIRE(validExtra != LabelId::None);
+
+	const LabelId missing = labelIdFromUInt64(999999);
+	QJsonArray storedLabels;
+	storedLabels.append(static_cast<qint64>(toUInt64(validExtra)));
+	storedLabels.append(static_cast<qint64>(toUInt64(missing)));
+	{
+		MetadataStore::Writer writer = f.library.metadataStore().beginBatch();
+		writer.set(video, u"labels", storedLabels);
+	}
+	catalog.rebuildIndex();
+
+	CatalogIntegrity::IntegrityReport report = CatalogIntegrity::scan(catalog, f.root);
+	REQUIRE(report.danglingLabelIssues.size() == 1u);
+	REQUIRE(report.danglingLabelIssues.front().id == video);
+	REQUIRE(report.danglingLabelIssues.front().missingLabelIds == std::vector<LabelId>{ missing });
+	REQUIRE(catalog.mediaItemHasLabel(video, validExtra));
+	REQUIRE(catalog.mediaItemHasLabel(video, missing));
+
+	REQUIRE(catalog.removeInvalidLabelReferences(video));
+	REQUIRE(catalog.mediaItemHasLabel(video, validExtra));
+	REQUIRE_FALSE(catalog.mediaItemHasLabel(video, missing));
+	REQUIRE_FALSE(catalog.removeInvalidLabelReferences(video));
+	requireRebuildStable(catalog);
+	REQUIRE(CatalogIntegrity::scan(catalog, f.root).isEmpty());
+
+	catalog.addLabel(video, missing);
+	REQUIRE_FALSE(catalog.mediaItemHasLabel(video, missing));
 }

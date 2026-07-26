@@ -9,16 +9,22 @@
 #include <QSet>
 
 #include <algorithm>
+#include <utility>
 
 // Video verdicts are independent: a completed split needs real frames, every video needs a preview, and real
 // frames behind a preview-only flag make that flag stale. Source absence overlays any combination. A photo has
-// only its source file. The final disk walk reports frame folders and owned photos no entry claims.
+// only its source file. Every item is also checked for label ids absent from the registry. The final disk walk
+// reports frame folders and owned photos no entry claims.
 
 namespace CatalogIntegrity {
 
 IntegrityReport scan(const Catalog& catalog, const QString& rootFolder)
 {
 	IntegrityReport report;
+
+	QSet<LabelId> knownLabelIds;
+	for (const Catalog::Label& label : catalog.allLabels())
+		knownLabelIds.insert(label.id);
 
 	// Collect issues and the case-insensitive claimed paths needed by the untracked walk in one model pass.
 	QSet<QString> knownFolders;
@@ -28,6 +34,13 @@ IntegrityReport scan(const Catalog& catalog, const QString& rootFolder)
 		knownFolders.insert(pathComparisonKey(entry.folder));
 		if (!entry.sourcePath.isEmpty())
 			trackedSources.insert(pathComparisonKey(entry.sourcePath));
+
+		DanglingLabelIssue labelIssue{ .id = id };
+		for (const LabelId labelId : entry.labelIds)
+			if (!knownLabelIds.contains(labelId))
+				labelIssue.missingLabelIds.push_back(labelId);
+		if (!labelIssue.missingLabelIds.empty())
+			report.danglingLabelIssues.push_back(std::move(labelIssue));
 
 		if (entry.type == Catalog::MediaType::Photo)
 		{

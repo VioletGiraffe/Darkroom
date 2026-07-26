@@ -18,7 +18,8 @@ bool IntegrityCheckDialog::scanAndShowUi(const Catalog& catalog, const QString& 
 	const CatalogIntegrity::IntegrityReport report = CatalogIntegrity::scan(catalog, rootFolder);
 	if (report.isEmpty())
 	{
-		QMessageBox::information(parent, tr("Catalog integrity check"), tr("No issues found - the catalog matches what's on disk."));
+		QMessageBox::information(parent, tr("Catalog integrity check"),
+			tr("No issues found - catalog entries, label references, and on-disk content are consistent."));
 		return false;
 	}
 
@@ -35,7 +36,7 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog& catalog, const Catalog
 	QVBoxLayout* outer = new QVBoxLayout(this);
 
 	QLabel* instructions = new QLabel(
-		tr("Differences between the catalog and what's actually on disk. Resolve each row on its own, or use a "
+		tr("Catalog inconsistencies and differences from what's actually on disk. Resolve each row on its own, or use a "
 		   "section's blanket action - nothing here is applied automatically."), this);
 	instructions->setWordWrap(true);
 	instructions->setStyleSheet(QStringLiteral("color: %1;").arg(Theme::current().InstructionText));

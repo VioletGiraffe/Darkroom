@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Core/LabelId.h"
 #include "Core/MediaId.h"
 
 #include <QString>
@@ -8,7 +9,7 @@
 
 class Catalog;
 
-// Read-only catalog-vs-disk scan. Resolution belongs to Catalog/MainWindow.
+// Read-only catalog consistency and disk reconciliation scan. Resolution belongs to Catalog/MainWindow.
 namespace CatalogIntegrity {
 
 struct UntrackedFolder
@@ -49,13 +50,24 @@ struct PhotoIssue
 	bool    referenced = false;
 };
 
+// An item whose persisted extra-label list refers to ids absent from the label registry.
+struct DanglingLabelIssue
+{
+	MediaId id;
+	std::vector<LabelId> missingLabelIds;
+};
+
 struct IntegrityReport
 {
-	std::vector<UntrackedFolder> untracked;
-	std::vector<UntrackedPhoto>  untrackedPhotos;
-	std::vector<MediaIssue>      issues;
-	std::vector<PhotoIssue>      photoIssues;
-	[[nodiscard]] bool isEmpty() const { return untracked.empty() && untrackedPhotos.empty() && issues.empty() && photoIssues.empty(); }
+	std::vector<UntrackedFolder>    untracked;
+	std::vector<UntrackedPhoto>     untrackedPhotos;
+	std::vector<MediaIssue>         issues;
+	std::vector<PhotoIssue>         photoIssues;
+	std::vector<DanglingLabelIssue> danglingLabelIssues;
+	[[nodiscard]] bool isEmpty() const
+	{
+		return untracked.empty() && untrackedPhotos.empty() && issues.empty() && photoIssues.empty() && danglingLabelIssues.empty();
+	}
 };
 
 // Explicit, read-only scan; never part of normal refresh.

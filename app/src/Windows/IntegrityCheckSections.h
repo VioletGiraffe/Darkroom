@@ -46,11 +46,13 @@ private:
 	struct AdoptRow        { ResolvableRow* row; QString filePath; };
 	struct VideoRow        { ResolvableRow* row; MediaId id; bool canReimport; bool canRegenerate; bool sourceMissing; };
 	struct MissingPhotoRow { ResolvableRow* row; MediaId id; bool referenced; };
+	struct DanglingLabelRow { ResolvableRow* row; MediaId id; };
 
 	void buildUntrackedFolders(const CatalogIntegrity::IntegrityReport& report);
 	void buildUntrackedPhotos(const CatalogIntegrity::IntegrityReport& report);
 	void buildVideoIssues(const CatalogIntegrity::IntegrityReport& report);
 	void buildMissingPhotos(const CatalogIntegrity::IntegrityReport& report);
+	void buildDanglingLabelIssues(const CatalogIntegrity::IntegrityReport& report);
 
 	std::pair<QHBoxLayout*, ResolvableRow*> addRow(const QString& statusText);
 	static QPushButton* addRowButton(QHBoxLayout* rowLayout, ResolvableRow* row, const QString& text);
@@ -88,10 +90,11 @@ private:
 	QVBoxLayout* _currentRowsLayout = nullptr;
 	const QString _rowStyle;
 
-	std::deque<ResolvableRow>    _rows;  // Handlers retain row pointers; deque preserves their addresses.
-	std::vector<AdoptRow>        _untrackedPhotoRows;
-	std::vector<VideoRow>        _videoRows;
-	std::vector<MissingPhotoRow> _missingPhotoRows;
+	std::deque<ResolvableRow>     _rows;  // Handlers retain row pointers; deque preserves their addresses.
+	std::vector<AdoptRow>         _untrackedPhotoRows;
+	std::vector<VideoRow>         _videoRows;
+	std::vector<MissingPhotoRow>  _missingPhotoRows;
+	std::vector<DanglingLabelRow> _danglingLabelRows;
 };
 
 inline void ResolvableRow::close(const QString& status, bool resolved)
@@ -126,6 +129,7 @@ inline IntegrityCheckSections::IntegrityCheckSections(const Catalog& catalog, co
 	buildUntrackedPhotos(report);
 	buildVideoIssues(report);
 	buildMissingPhotos(report);
+	buildDanglingLabelIssues(report);
 }
 
 inline void IntegrityCheckSections::buildUntrackedFolders(const CatalogIntegrity::IntegrityReport& report)
@@ -409,6 +413,49 @@ inline void IntegrityCheckSections::buildMissingPhotos(const CatalogIntegrity::I
 		confirmAndRemoveAll(_missingPhotoRows, QObject::tr("Remove all"),
 			QObject::tr("Remove all %1 missing-photo entries from the catalog? Any files still on disk are not touched."),
 			QObject::tr("Removed %1 photo(s) from the catalog."));
+	});
+
+	refreshBlanket();
+}
+
+inline void IntegrityCheckSections::buildDanglingLabelIssues(const CatalogIntegrity::IntegrityReport& report)
+{
+	if (report.danglingLabelIssues.empty())
+		return;
+
+	QHBoxLayout* header = addSectionHeader(QObject::tr("<b>Invalid label references</b> - items refer to labels no longer in the registry"));
+	QPushButton* dropAllButton = new QPushButton(QObject::tr("Drop all invalid references"), _content);
+	header->addWidget(dropAllButton);
+
+	const auto refreshBlanket = [this, dropAllButton] {
+		dropAllButton->setEnabled(std::any_of(_danglingLabelRows.cbegin(), _danglingLabelRows.cend(),
+			[](const DanglingLabelRow& r) { return !r.row->closed; }));
+	};
+
+	for (const CatalogIntegrity::DanglingLabelIssue& issue : report.danglingLabelIssues)
+	{
+		QStringList missingIds;
+		for (const LabelId labelId : issue.missingLabelIds)
+			missingIds << QString::number(toUInt64(labelId));
+
+		const auto [rowLayout, row] = addRow(issue.id.name() + "<br>" + QObject::tr("missing label ID(s): %1").arg(missingIds.join(", ")));
+		QPushButton* dropButton = addRowButton(rowLayout, row, QObject::tr("Drop invalid references"));
+		QPushButton* skipButton = addRowButton(rowLayout, row, QObject::tr("Skip"));
+		row->onClosed = refreshBlanket;
+
+		const MediaId id = issue.id;
+		wireAction(dropButton, row, QObject::tr("Invalid label references dropped."), QObject::tr("Could not update the entry."),
+			[this, id] { return _callbacks.removeInvalidLabelReferencesRequested(id); });
+		wireSkip(skipButton, row);
+		_danglingLabelRows.push_back({ row, id });
+	}
+
+	QObject::connect(dropAllButton, &QPushButton::clicked, dropAllButton, [this] {
+		const auto [done, failed] = runBlanket(_danglingLabelRows, [](const DanglingLabelRow&) { return true; },
+			[this](DanglingLabelRow& r) { return _callbacks.removeInvalidLabelReferencesRequested(r.id); },
+			QObject::tr("Invalid label references dropped."));
+		showBlanketTally(QObject::tr("Drop invalid label references"), QObject::tr("Cleaned %1 item(s)."), done,
+			QObject::tr("%1 item(s) could not be updated."), failed);
 	});
 
 	refreshBlanket();

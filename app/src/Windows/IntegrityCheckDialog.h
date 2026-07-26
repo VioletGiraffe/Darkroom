@@ -28,6 +28,7 @@ public:
 		std::function<bool(const MediaId& id, const QString& newSourcePath)> locateSourceRequested;
 		std::function<bool(const MediaId& id)> removeEntryRequested;
 		std::function<bool(const MediaId& id, const QString& newSourcePath)> locatePhotoRequested;
+		std::function<bool(const MediaId& id)> removeInvalidLabelReferencesRequested;
 	};
 
 	// Returns whether findings existed; a clean scan shows only an information box.

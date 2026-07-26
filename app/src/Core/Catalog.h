@@ -95,6 +95,8 @@ public:
 	// first remaining ordinary label. Removing any item's last ordinary label is refused.
 	void addLabel(const MediaId& id, LabelId labelId);
 	void removeLabel(const MediaId& id, LabelId labelId);
+	// Drops stored label ids that no longer exist in the registry. Returns whether anything changed.
+	bool removeInvalidLabelReferences(const MediaId& id);
 
 	// Coalesces catalog-change notification without extending a persistence batch. Use around compound,
 	// event-pumping workflows whose intermediate model states should not reach observers.

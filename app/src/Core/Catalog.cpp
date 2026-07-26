@@ -452,6 +452,11 @@ void Catalog::addLabel(const MediaId& id, LabelId labelId)
 		qWarning() << "Catalog: cannot add label" << toUInt64(labelId) << "- invalid media id (source file missing?)";
 		return;
 	}
+	if (!labelById(labelId))
+	{
+		qWarning() << "Catalog: cannot add unknown label" << toUInt64(labelId) << "to" << id.key();
+		return;
+	}
 	QList<LabelId> ids = readStoredLabelIds(id);
 	if (!ids.contains(labelId))
 	{
@@ -498,6 +503,22 @@ void Catalog::removeLabel(const MediaId& id, LabelId labelId)
 		refreshMediaItemLabels(id);
 		notifyCatalogChanged();
 	}
+}
+
+bool Catalog::removeInvalidLabelReferences(const MediaId& id)
+{
+	if (!_mediaItems.contains(id))
+		return false;
+
+	QList<LabelId> labelIds = readStoredLabelIds(id);
+	const qsizetype removed = labelIds.removeIf([this](LabelId labelId) { return !labelById(labelId); });
+	if (removed == 0)
+		return false;
+
+	writeStoredLabelIds(id, labelIds);
+	refreshMediaItemLabels(id);
+	notifyCatalogChanged();
+	return true;
 }
 
 bool Catalog::addMediaItem(const MediaId& id, const QString& sourcePath, const QString& folderAbs, bool splitIntoFrames, qint64 durationMs)

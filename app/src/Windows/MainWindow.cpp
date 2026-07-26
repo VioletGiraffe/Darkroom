@@ -584,10 +584,14 @@ void MainWindow::checkCatalogIntegrity()
 		.locatePhotoRequested = [this](const MediaId& id, const QString& newSourcePath) {
 			return libraryCatalog().applyRename(id, MediaId::fromFile(newSourcePath), newSourcePath, /*newFolderAbs=*/QString{});
 		},
+		.removeInvalidLabelReferencesRequested = [this](const MediaId& id) {
+			return libraryCatalog().removeInvalidLabelReferences(id);
+		},
 	};
 
 	bool catalogOrStorageChanged = false;
 	{
+		// This spans dialog.exec()'s nested event loop; a BatchScope would retain a persistence writer across re-entrant UI processing.
 		Catalog::ChangeBatchScope catalogChanges(libraryCatalog());
 		catalogOrStorageChanged = IntegrityCheckDialog::scanAndShowUi(libraryCatalog(), _library.rootFolder(), std::move(callbacks), this);
 	}
