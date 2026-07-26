@@ -178,8 +178,6 @@ card in one step.
 ## Improvement backlog
 
 **Open:**
-- *Batch ffmpeg failures*: `ImportExecution::importVideosInteractive` pops one modal `QMessageBox` per failure
-  inside the loop, blocking the batch. Collect failures, show one summary at the end.
 - *Label-reference validation*: `CatalogIntegrity::scan` checks catalog-vs-disk but not label integrity — an
   item whose stored `"labels"` id matches no registry label is neither flagged nor fixable. Add a "dangling
   label reference" verdict to the scan (resolution: drop the dead id). Low urgency — the mutation API already

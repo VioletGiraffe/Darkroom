@@ -3,6 +3,7 @@
 #include "Core/Catalog.h"
 
 #include "assert/advanced_assert.h"
+#include "dialogs/messagebox.h"
 
 #include <QAbstractButton>
 #include <QApplication>
@@ -21,6 +22,14 @@ namespace {
 	const QFileInfo videoInfo(videoPath);
 	const MediaId id = MediaId::fromFile(videoPath);
 	return storageFolderPath + "/" + Catalog::frameFolderName(videoInfo.completeBaseName(), id);
+}
+
+void showImportFailures(QWidget* dialogParent, const QString& summary, const QStringList& failures)
+{
+	if (failures.empty())
+		return;
+
+	MessageBox::notice(dialogParent, QObject::tr("Import incomplete"), summary, failures.join("\n\n"), QMessageBox::Critical);
 }
 
 } // namespace
@@ -44,8 +53,9 @@ void ImportExecution::importVideosInteractive(Catalog& catalog, QStringList vide
 		return !QDir{ videoOutputFolder(storageFolderPath, path) }.exists();
 	});
 
+	QStringList failures;
 	const auto processFilesRange = [&catalog, &progressBox, &storageFolderPath, &stagedPreviewDirs, &stagedDurations, dialogParent,
-			totalSize = videoPaths.size()](auto begin, auto end, qsizetype firstNumber, bool overwriteExisting = false) {
+			&failures, totalSize = videoPaths.size()](auto begin, auto end, qsizetype firstNumber, bool overwriteExisting = false) {
 		qsizetype displayNumber = firstNumber;
 		for (const QString& videoPath : std::ranges::subrange(begin, end))
 		{
@@ -68,28 +78,31 @@ void ImportExecution::importVideosInteractive(Catalog& catalog, QStringList vide
 					catalog, videoPath, storageFolderPath, stagedPreviewDir, /*overwriteExisting=*/true, stagedDurationMs);
 			}
 			if (result.status == Import::Status::Error)
-				QMessageBox::critical(dialogParent, QObject::tr("Error"), result.errorMessage);
+				failures << QObject::tr("%1:\n%2").arg(QDir::toNativeSeparators(videoPath), result.errorMessage);
 		}
 	};
 
 	processFilesRange(videoPaths.begin(), partition.begin(), 1);
 
-	if (partition.begin() == partition.end())
-		return;
+	if (partition.begin() != partition.end())
+	{
+		QMessageBox conflictChoice(dialogParent);
+		conflictChoice.setIcon(QMessageBox::Question);
+		conflictChoice.setWindowTitle(QObject::tr("Folder conflict"));
+		conflictChoice.setText(QObject::tr("One or more videos have existing output folders. Overwrite all, skip all, or decide one by one?"));
+		conflictChoice.setStandardButtons(QMessageBox::YesToAll | QMessageBox::Yes | QMessageBox::NoToAll);
+		conflictChoice.button(QMessageBox::YesToAll)->setText(QObject::tr("Overwrite all"));
+		conflictChoice.button(QMessageBox::Yes)->setText(QObject::tr("Decide one by one"));
+		conflictChoice.button(QMessageBox::NoToAll)->setText(QObject::tr("Skip all"));
+		conflictChoice.setDefaultButton(QMessageBox::YesToAll);
 
-	QMessageBox conflictChoice(dialogParent);
-	conflictChoice.setIcon(QMessageBox::Question);
-	conflictChoice.setWindowTitle(QObject::tr("Folder conflict"));
-	conflictChoice.setText(QObject::tr("One or more videos have existing output folders. Overwrite all, skip all, or decide one by one?"));
-	conflictChoice.setStandardButtons(QMessageBox::YesToAll | QMessageBox::Yes | QMessageBox::NoToAll);
-	conflictChoice.button(QMessageBox::YesToAll)->setText(QObject::tr("Overwrite all"));
-	conflictChoice.button(QMessageBox::Yes)->setText(QObject::tr("Decide one by one"));
-	conflictChoice.button(QMessageBox::NoToAll)->setText(QObject::tr("Skip all"));
-	conflictChoice.setDefaultButton(QMessageBox::YesToAll);
+		const int choice = conflictChoice.exec();
+		if (choice != QMessageBox::NoToAll)
+			processFilesRange(partition.begin(), partition.end(), partition.begin() - videoPaths.begin() + 1, choice == QMessageBox::YesToAll);
+	}
 
-	const int choice = conflictChoice.exec();
-	if (choice != QMessageBox::NoToAll)
-		processFilesRange(partition.begin(), partition.end(), partition.begin() - videoPaths.begin() + 1, choice == QMessageBox::YesToAll);
+	progressBox.hide();
+	showImportFailures(dialogParent, QObject::tr("The following videos could not be imported:"), failures);
 }
 
 std::vector<Import::PhotoResult> ImportExecution::importPhotosInteractive(
@@ -111,15 +124,17 @@ std::vector<Import::PhotoResult> ImportExecution::importPhotosInteractive(
 
 	std::vector<Import::PhotoResult> results;
 	results.reserve(photoPaths.size());
+	QStringList failures;
 	for (const QString& path : photoPaths)
 	{
 		const Import::PhotoResult result = Import::importPhoto(catalog, photoFolder, path, mode);
 		if (result.status == Import::PhotoStatus::Error)
-			QMessageBox::critical(dialogParent, QObject::tr("Error"), result.errorMessage);
+			failures << QObject::tr("%1:\n%2").arg(QDir::toNativeSeparators(path), result.errorMessage);
 		// Referenced photos have no storage folder from which to derive this label.
 		if (result.status == Import::PhotoStatus::Success && mode == Import::PhotoImportMode::Reference)
 			catalog.addLabel(result.registeredId, labelId);
 		results.push_back(result);
 	}
+	showImportFailures(dialogParent, QObject::tr("The following photos could not be imported:"), failures);
 	return results;
 }

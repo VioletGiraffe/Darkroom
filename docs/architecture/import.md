@@ -43,7 +43,9 @@ regenerating-in-place there; it just goes through the normal import flow from sc
 per-item import worker. It is deliberately UI-free — it never prompts or pops a message box; every outcome
 comes back as an `Import::Result` (`Success` / `FolderConflict` / `Error` with a user-presentable message).
 `ImportExecution::importVideosInteractive` is the batch coordinator on top of it and owns the progress modal,
-folder-conflict decisions, per-item error boxes, and `Catalog::BatchScope`. The application-modal Import dialog
+folder-conflict decisions, one post-batch summary of terminal import errors, and `Catalog::BatchScope`. Folder
+conflicts remain interactive because each can require an overwrite decision; ordinary failures do not interrupt the
+remaining batch. The application-modal Import dialog
 prevents interaction with library-switch and Settings commands while this event-pumping operation runs, so import
 does not route through MainWindow or share its re-export busy flag.
 
@@ -69,7 +71,7 @@ other import failure.
 UI-free, taking the verified destination produced by `Catalog::photoFolderForLabel` and returning an
 `Import::PhotoResult` (`Success` / `IdCollision` / `Error` + message + the
 **`registeredId`** actually registered). `ImportExecution::importPhotosInteractive` is its coordinator
-(destination validation, batch scope, and error boxes), called directly by the Import dialog.
+(destination validation, batch scope, and one post-batch failure summary), called directly by the Import dialog.
 **Copy/Move** land the file in `<root>/Photos/<label>/` (created lazily); **"leave in place" means Reference** —
 the file is tracked where it is and the catalog entry is marked referenced (`Catalog::addPhoto`,
 see [catalog-and-labels.md](catalog-and-labels.md)).
