@@ -78,6 +78,9 @@ QString formatLoopLabel(qint64 startMs, qint64 endMs, const QString& name, doubl
 
 constexpr int VolumeWheelStep = 5;
 
+// QVideoWidget has no minimum size hint of its own, so without this the video area can be squeezed to nothing.
+constexpr QSize MinVideoAreaSize{ 300, 200 };
+
 // Together these keep worst-case cache memory acceptable; no separate byte cap is needed.
 constexpr qint64 MaxOscillationDurationMs = 30000;
 constexpr qreal MaxOscillationFrameRate = 60.0;
@@ -140,6 +143,7 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	_oscillatingPlayback = std::make_unique<OscillatingPlayback>(*this);
 
 	_videoWidget->installEventFilter(this);
+	_videoWidget->setMinimumSize(MinVideoAreaSize);
 
 	QWidget* centralWidget = new QWidget(this);
 	QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
@@ -593,7 +597,7 @@ void VideoPlayerWindow::resizeAndMoveWindow()
 	QSize targetVideoSize = sourceVideoSize;
 	if (targetVideoSize.width() > 1280 || targetVideoSize.height() > 720)
 		targetVideoSize.scale(QSize(1280, 720), Qt::KeepAspectRatio);
-	targetVideoSize = targetVideoSize.expandedTo(QSize(300, 200));
+	targetVideoSize = targetVideoSize.expandedTo(MinVideoAreaSize);
 
 	_videoWidget->setMinimumSize(targetVideoSize);
 	adjustSize();
@@ -608,7 +612,8 @@ void VideoPlayerWindow::resizeAndMoveWindow()
 		_videoWidget->setMinimumSize(targetVideoSize);
 		adjustSize();
 	}
-	_videoWidget->setMinimumSize(0, 0);
+	// The target size was only a lever for adjustSize.
+	_videoWidget->setMinimumSize(MinVideoAreaSize);
 
 	if (frameSize().width() > available.width() || frameSize().height() > available.height())
 	{
