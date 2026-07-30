@@ -339,6 +339,7 @@ void MediaBrowserWidget::playVideo(const MediaId& id)
 	}
 
 	auto* playerWindow = new VideoPlayerWindow(_library, sourcePath, id, nullptr);
+	playerWindow->setNavigationOrder(visibleVideosInViewOrder());
 	playerWindow->show();
 }
 
@@ -839,6 +840,23 @@ std::vector<MediaId> MediaBrowserWidget::selectedMediaItems() const
 	for (const QListWidgetItem* item : selectedItems)
 		selected.push_back(static_cast<const GridItem*>(item)->mediaId);
 	return selected;
+}
+
+std::vector<MediaId> MediaBrowserWidget::visibleVideosInViewOrder() const
+{
+	const Catalog& catalog = _library.catalog();
+	const int count = _mediaGrid->count();
+
+	std::vector<MediaId> videos;
+	videos.reserve(count);
+	for (int row = 0; row < count; ++row)
+	{
+		const auto* item = static_cast<const GridItem*>(_mediaGrid->item(row));
+		if (item->isHidden() || catalog.mediaType(item->mediaId) != Catalog::MediaType::Video)
+			continue;
+		videos.push_back(item->mediaId);
+	}
+	return videos;
 }
 
 std::vector<MediaId> MediaBrowserWidget::effectiveSelection(std::optional<MediaId> target) const

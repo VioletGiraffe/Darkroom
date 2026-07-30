@@ -28,6 +28,9 @@ public:
 	VideoPlayerWindow(Library& library, const QString& videoPath, const MediaId& mediaId, QWidget* parent);
 	~VideoPlayerWindow() override;
 
+	// Browsing order for previous/next navigation; empty (the default) leaves navigation inert.
+	void setNavigationOrder(std::vector<MediaId> order);
+
 	static void restartAll();
 	static void closeAll();
 
@@ -39,6 +42,9 @@ private:
 
 	// Everything per-file lives here; the constructor is the first caller.
 	void loadFile(const QString& videoPath, const MediaId& mediaId);
+	// step is +1 or -1. Skips items no longer in the catalog and stops at the ends.
+	[[nodiscard]] std::optional<MediaId> adjacentMediaItem(int step) const;
+	void loadAdjacentFile(int step);
 	void resizeAndMoveWindow();
 	void togglePlayPause();
 	void toggleFullScreen();
@@ -80,6 +86,8 @@ private:
 	Library& _library;
 	MediaId _mediaId;
 	QString _videoPath;
+	// The current position is looked up by _mediaId rather than tracked.
+	std::vector<MediaId> _navigationOrder;
 
 	QMediaPlayer* _player = nullptr;
 	QAudioOutput* _audioOutput = nullptr;

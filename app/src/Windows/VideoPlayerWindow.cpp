@@ -2,6 +2,7 @@
 #include "Windows/SingleFrameExtraction.h"
 #include "Windows/OscillatingPlayback.h"
 #include "UiComponents/MarkerSlider.h"
+#include "Core/Catalog.h"
 #include "Core/Library.h"
 #include "Core/MetadataStore.h"
 #include "Theme/Icons.h"
@@ -468,6 +469,11 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	QShortcut* seekForwardShortcut = new QShortcut(QKeySequence(Qt::Key_Right), this);
 	connect(seekForwardShortcut, &QShortcut::activated, this, [this] { _seekSlider->triggerAction(QAbstractSlider::SliderSingleStepAdd); });
 
+	QShortcut* previousFileShortcut = new QShortcut(QKeySequence(Qt::Key_PageUp), this);
+	connect(previousFileShortcut, &QShortcut::activated, this, [this] { loadAdjacentFile(-1); });
+	QShortcut* nextFileShortcut = new QShortcut(QKeySequence(Qt::Key_PageDown), this);
+	connect(nextFileShortcut, &QShortcut::activated, this, [this] { loadAdjacentFile(1); });
+
 	QShortcut* closeWindowShortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
 	connect(closeWindowShortcut, &QShortcut::activated, this, [this] {
 		if (isFullScreen())
@@ -529,6 +535,47 @@ void VideoPlayerWindow::loadFile(const QString& videoPath, const MediaId& mediaI
 	_player->setSource(QUrl::fromLocalFile(videoPath));
 	if (!_fatalPlaybackErrorReported)
 		setPlaybackActive(true);
+}
+
+void VideoPlayerWindow::setNavigationOrder(std::vector<MediaId> order)
+{
+	_navigationOrder = std::move(order);
+}
+
+std::optional<MediaId> VideoPlayerWindow::adjacentMediaItem(int step) const
+{
+	assert_and_return_r(step == 1 || step == -1, std::nullopt);
+
+	const auto current = std::find(_navigationOrder.cbegin(), _navigationOrder.cend(), _mediaId);
+	if (current == _navigationOrder.cend())
+		return std::nullopt;
+
+	const Catalog& catalog = _library.catalog();
+	for (int index = static_cast<int>(current - _navigationOrder.cbegin()) + step;
+	     index >= 0 && index < static_cast<int>(_navigationOrder.size()); index += step)
+	{
+		// The order is a snapshot taken when the player opened; the library may have lost items since.
+		const MediaId& candidate = _navigationOrder[static_cast<size_t>(index)];
+		if (catalog.containsMediaItem(candidate))
+			return candidate;
+	}
+	return std::nullopt;
+}
+
+void VideoPlayerWindow::loadAdjacentFile(int step)
+{
+	const std::optional<MediaId> mediaId = adjacentMediaItem(step);
+	if (!mediaId)
+		return;
+
+	const QString sourcePath = _library.catalog().sourcePathForMediaItem(*mediaId);
+	if (!QFileInfo::exists(sourcePath))
+	{
+		reportMissingFile(this, sourcePath);
+		return;
+	}
+
+	loadFile(sourcePath, *mediaId);
 }
 
 VideoPlayerWindow::~VideoPlayerWindow()
@@ -1031,6 +1078,15 @@ void VideoPlayerWindow::showContextMenu(const QPoint& globalPos)
 	repeatAction->setEnabled(!repeatText.isEmpty());
 
 	menu.addSeparator();
+	if (!_navigationOrder.empty())
+	{
+		QAction* previousFileAction = menu.addAction(tr("Previous video") + "\tPgUp", this, [this] { loadAdjacentFile(-1); });
+		previousFileAction->setEnabled(adjacentMediaItem(-1).has_value());
+		QAction* nextFileAction = menu.addAction(tr("Next video") + "\tPgDown", this, [this] { loadAdjacentFile(1); });
+		nextFileAction->setEnabled(adjacentMediaItem(1).has_value());
+		menu.addSeparator();
+	}
+
 	menu.addAction(revealInFileManagerActionText(), this, [this] {
 		if (!revealInFileManager(_videoPath))
 			reportMissingFile(this, _videoPath);

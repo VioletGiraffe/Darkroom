@@ -40,6 +40,8 @@ public:
 
 	[[nodiscard]] int previewFrameCount() const;
 	[[nodiscard]] std::vector<MediaId> selectedMediaItems() const;
+	// Grid order, without the rows the name filter hides and without photos: what a player can browse through.
+	[[nodiscard]] std::vector<MediaId> visibleVideosInViewOrder() const;
 
 	void installGridAction(QAction* action);
 	[[nodiscard]] bool isGridDragSource(const QObject* source) const;
