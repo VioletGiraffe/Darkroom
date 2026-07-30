@@ -15,6 +15,7 @@ class QSlider;
 class QLabel;
 class QCheckBox;
 class QComboBox;
+class QPushButton;
 class MarkerSlider;
 class Library;
 class OscillatingPlayback;
@@ -36,13 +37,21 @@ public:
 private:
 	friend class OscillatingPlayback;
 
+	// Everything per-file lives here; the constructor is the first caller.
+	void loadFile(const QString& videoPath, const MediaId& mediaId);
 	void resizeAndMoveWindow();
 	void togglePlayPause();
 	void toggleFullScreen();
 	[[nodiscard]] qint64 currentPlaybackPosition() const;
 	[[nodiscard]] bool isPlaybackActive() const;
 	void setPlaybackActive(bool active);
+	void applyPlaybackSpeed(double speed);
+	// Snaps to the nearest offered speed.
+	void selectPlaybackSpeed(double speed);
 	[[nodiscard]] bool hasAbInterval() const { return _loopStart >= 0 && _loopEnd > _loopStart; }
+	void clearAbInterval();
+	// Returns the new item's index in the saved-loop combo.
+	int addSavedLoopItem(qint64 startMs, qint64 endMs, const QString& name, double speed);
 	void exitOscillatingPlayback(bool restorePlaybackState = true);
 	void updatePlaybackPositionUi(qint64 position);
 	void applyEffectiveMute();
@@ -70,7 +79,7 @@ private:
 
 	Library& _library;
 	MediaId _mediaId;
-	const QString _videoPath;
+	QString _videoPath;
 
 	QMediaPlayer* _player = nullptr;
 	QAudioOutput* _audioOutput = nullptr;
@@ -78,8 +87,12 @@ private:
 	MarkerSlider* _seekSlider = nullptr;
 	QLabel* _timeLabel = nullptr;
 	QSlider* _volumeSlider = nullptr;
+	QComboBox* _speedCombo = nullptr;
+	QPushButton* _loopStartButton = nullptr;
+	QPushButton* _loopEndButton = nullptr;
 	QCheckBox* _oscillationCheck = nullptr;
 	QComboBox* _oscillationCurveCombo = nullptr;
+	QComboBox* _savedLoopCombo = nullptr;
 	// Borrows this window and its video sink; the destructor resets it before QObject child teardown begins.
 	std::unique_ptr<OscillatingPlayback> _oscillatingPlayback;
 	bool _windowPlacementDone = false;
