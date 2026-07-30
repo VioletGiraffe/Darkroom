@@ -77,6 +77,7 @@ QString formatLoopLabel(qint64 startMs, qint64 endMs, const QString& name, doubl
 }
 
 constexpr int VolumeWheelStep = 5;
+constexpr qint64 MaxSeekStepMs = 15000;
 
 // QVideoWidget has no minimum size hint of its own, so without this the video area can be squeezed to nothing.
 constexpr QSize MinVideoAreaSize{ 300, 200 };
@@ -482,6 +483,7 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 
 	connect(_player, &QMediaPlayer::durationChanged, this, [this](qint64 duration) {
 		_seekSlider->setRange(0, static_cast<int>(duration));
+		_seekSlider->setSingleStep(static_cast<int>(qMin(duration / 100, MaxSeekStepMs)));
 		updateOscillationAvailability();
 	});
 
@@ -519,6 +521,12 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 
 	QShortcut* spaceShortcut = new QShortcut(QKeySequence(Qt::Key_Space), this);
 	connect(spaceShortcut, &QShortcut::activated, this, &VideoPlayerWindow::togglePlayPause);
+
+	// Stepping the slider reuses its seek handling: oscillation exit and pause-on-seek.
+	QShortcut* seekBackShortcut = new QShortcut(QKeySequence(Qt::Key_Left), this);
+	connect(seekBackShortcut, &QShortcut::activated, this, [this] { _seekSlider->triggerAction(QAbstractSlider::SliderSingleStepSub); });
+	QShortcut* seekForwardShortcut = new QShortcut(QKeySequence(Qt::Key_Right), this);
+	connect(seekForwardShortcut, &QShortcut::activated, this, [this] { _seekSlider->triggerAction(QAbstractSlider::SliderSingleStepAdd); });
 
 	QShortcut* closeWindowShortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
 	connect(closeWindowShortcut, &QShortcut::activated, this, [this] {
