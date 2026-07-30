@@ -80,7 +80,7 @@ constexpr int VolumeWheelStep = 5;
 constexpr qint64 MaxSeekStepMs = 15000;
 
 // QVideoWidget has no minimum size hint of its own, so without this the video area can be squeezed to nothing.
-constexpr QSize MinVideoAreaSize{ 300, 200 };
+constexpr QSize MinVideoAreaSize{ 640, 400 };
 
 // Together these keep worst-case cache memory acceptable; no separate byte cap is needed.
 constexpr qint64 MaxOscillationDurationMs = 30000;
