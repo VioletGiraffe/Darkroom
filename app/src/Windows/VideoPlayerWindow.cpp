@@ -470,9 +470,9 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	connect(seekForwardShortcut, &QShortcut::activated, this, [this] { _seekSlider->triggerAction(QAbstractSlider::SliderSingleStepAdd); });
 
 	QShortcut* previousFileShortcut = new QShortcut(QKeySequence(Qt::Key_PageUp), this);
-	connect(previousFileShortcut, &QShortcut::activated, this, [this] { loadAdjacentFile(-1); });
+	connect(previousFileShortcut, &QShortcut::activated, this, [this] { loadAdjacentFile(Direction::Previous); });
 	QShortcut* nextFileShortcut = new QShortcut(QKeySequence(Qt::Key_PageDown), this);
-	connect(nextFileShortcut, &QShortcut::activated, this, [this] { loadAdjacentFile(1); });
+	connect(nextFileShortcut, &QShortcut::activated, this, [this] { loadAdjacentFile(Direction::Next); });
 
 	QShortcut* closeWindowShortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
 	connect(closeWindowShortcut, &QShortcut::activated, this, [this] {
@@ -542,14 +542,13 @@ void VideoPlayerWindow::setNavigationOrder(std::vector<MediaId> order)
 	_navigationOrder = std::move(order);
 }
 
-std::optional<MediaId> VideoPlayerWindow::adjacentMediaItem(int step) const
+std::optional<MediaId> VideoPlayerWindow::adjacentMediaItem(Direction direction) const
 {
-	assert_and_return_r(step == 1 || step == -1, std::nullopt);
-
 	const auto current = std::find(_navigationOrder.cbegin(), _navigationOrder.cend(), _mediaId);
 	if (current == _navigationOrder.cend())
 		return std::nullopt;
 
+	const int step = static_cast<int>(direction);
 	const Catalog& catalog = _library.catalog();
 	for (int index = static_cast<int>(current - _navigationOrder.cbegin()) + step;
 	     index >= 0 && index < static_cast<int>(_navigationOrder.size()); index += step)
@@ -562,9 +561,9 @@ std::optional<MediaId> VideoPlayerWindow::adjacentMediaItem(int step) const
 	return std::nullopt;
 }
 
-void VideoPlayerWindow::loadAdjacentFile(int step)
+void VideoPlayerWindow::loadAdjacentFile(Direction direction)
 {
-	const std::optional<MediaId> mediaId = adjacentMediaItem(step);
+	const std::optional<MediaId> mediaId = adjacentMediaItem(direction);
 	if (!mediaId)
 		return;
 
@@ -1073,10 +1072,12 @@ void VideoPlayerWindow::showContextMenu(const QPoint& globalPos)
 	menu.addSeparator();
 	if (!_navigationOrder.empty())
 	{
-		QAction* previousFileAction = menu.addAction(tr("Previous video") + "\tPgUp", this, [this] { loadAdjacentFile(-1); });
-		previousFileAction->setEnabled(adjacentMediaItem(-1).has_value());
-		QAction* nextFileAction = menu.addAction(tr("Next video") + "\tPgDown", this, [this] { loadAdjacentFile(1); });
-		nextFileAction->setEnabled(adjacentMediaItem(1).has_value());
+		const auto addNavigationAction = [this, &menu](const QString& text, Direction direction) {
+			QAction* action = menu.addAction(text, this, [this, direction] { loadAdjacentFile(direction); });
+			action->setEnabled(adjacentMediaItem(direction).has_value());
+		};
+		addNavigationAction(tr("Previous video") + "\tPgUp", Direction::Previous);
+		addNavigationAction(tr("Next video") + "\tPgDown", Direction::Next);
 		menu.addSeparator();
 	}
 

@@ -40,11 +40,14 @@ public:
 private:
 	friend class OscillatingPlayback;
 
+	// The values are the step through _navigationOrder.
+	enum class Direction { Previous = -1, Next = 1 };
+
 	// Everything per-file lives here; the constructor is the first caller.
 	void loadFile(const QString& videoPath, const MediaId& mediaId);
-	// step is +1 or -1. Skips items that have left the library or the disk, and stops at the ends.
-	[[nodiscard]] std::optional<MediaId> adjacentMediaItem(int step) const;
-	void loadAdjacentFile(int step);
+	// Skips items that have left the library or the disk, and stops at the ends.
+	[[nodiscard]] std::optional<MediaId> adjacentMediaItem(Direction direction) const;
+	void loadAdjacentFile(Direction direction);
 	void resizeAndMoveWindow();
 	void togglePlayPause();
 	void toggleFullScreen();
