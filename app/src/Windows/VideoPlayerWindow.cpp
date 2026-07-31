@@ -554,9 +554,9 @@ std::optional<MediaId> VideoPlayerWindow::adjacentMediaItem(int step) const
 	for (int index = static_cast<int>(current - _navigationOrder.cbegin()) + step;
 	     index >= 0 && index < static_cast<int>(_navigationOrder.size()); index += step)
 	{
-		// The order is a snapshot taken when the player opened; the library may have lost items since.
+		// The order is a snapshot from when the player opened; a since-deleted item must not block navigation past it.
 		const MediaId& candidate = _navigationOrder[static_cast<size_t>(index)];
-		if (catalog.containsMediaItem(candidate))
+		if (catalog.containsMediaItem(candidate) && QFileInfo::exists(catalog.sourcePathForMediaItem(candidate)))
 			return candidate;
 	}
 	return std::nullopt;
@@ -568,14 +568,7 @@ void VideoPlayerWindow::loadAdjacentFile(int step)
 	if (!mediaId)
 		return;
 
-	const QString sourcePath = _library.catalog().sourcePathForMediaItem(*mediaId);
-	if (!QFileInfo::exists(sourcePath))
-	{
-		reportMissingFile(this, sourcePath);
-		return;
-	}
-
-	loadFile(sourcePath, *mediaId);
+	loadFile(_library.catalog().sourcePathForMediaItem(*mediaId), *mediaId);
 }
 
 VideoPlayerWindow::~VideoPlayerWindow()

@@ -42,7 +42,7 @@ private:
 
 	// Everything per-file lives here; the constructor is the first caller.
 	void loadFile(const QString& videoPath, const MediaId& mediaId);
-	// step is +1 or -1. Skips items no longer in the catalog and stops at the ends.
+	// step is +1 or -1. Skips items that have left the library or the disk, and stops at the ends.
 	[[nodiscard]] std::optional<MediaId> adjacentMediaItem(int step) const;
 	void loadAdjacentFile(int step);
 	void resizeAndMoveWindow();
