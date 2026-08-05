@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785939754318,
+  "lastUpdate": 1785968675688,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -10033,6 +10033,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 33,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 10,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "78729c1a0c978ab75e77c5d208455351c6d71317",
+          "message": "Storage type detection improved and optimized",
+          "timestamp": "2026-08-06T01:18:53+03:00",
+          "tree_id": "a7cc1ee96cb97f7ad98103816136c21a0f0ee7ca",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/78729c1a0c978ab75e77c5d208455351c6d71317"
+        },
+        "date": 1785968673052,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 14006,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 8345,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1147,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 704.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 338,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 34.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 33.5,
             "unit": "KB"
           },
           {
