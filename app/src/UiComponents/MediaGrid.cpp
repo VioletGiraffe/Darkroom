@@ -59,15 +59,23 @@ void MediaGrid::ensureVisibleCardsExist()
 
 	// A screen of slack on either side, so scrolling arrives at cards that already exist.
 	const int slack = viewport()->height();
-	const QRect materializeArea = viewport()->rect().adjusted(0, -slack, 0, slack);
+	const QRect visibleArea = viewport()->rect();
+	const QRect materializeArea = visibleArea.adjusted(0, -slack, 0, slack);
+	const int rows = count();
 
-	for (int row = 0, rows = count(); row < rows; ++row)
-	{
-		QListWidgetItem* rowItem = item(row);
-		if (rowItem->isHidden() || !materializeArea.intersects(visualItemRect(rowItem)) || itemWidget(rowItem))
-			continue;
-		setItemWidget(rowItem, _cardFactory(rowItem));
-	}
+	const auto materializeCardsIn = [this, rows](const QRect& area) {
+		for (int row = 0; row < rows; ++row)
+		{
+			QListWidgetItem* rowItem = item(row);
+			if (rowItem->isHidden() || !area.intersects(visualItemRect(rowItem)) || itemWidget(rowItem))
+				continue;
+			setItemWidget(rowItem, _cardFactory(rowItem));
+		}
+	};
+
+	// Start the useful work in view order before filling the off-screen preload margin.
+	materializeCardsIn(visibleArea);
+	materializeCardsIn(materializeArea);
 }
 
 void MediaGrid::discardAllCards()

@@ -101,6 +101,10 @@ materializes every card. The grid owns *when* materialization happens; the brows
 and remains the sole owner of catalog semantics. An attached row widget is the only materialization record —
 there is no parallel card registry to synchronize.
 
+Each materialization batch builds cards intersecting the viewport first, in sorted view order, then fills a
+one-screen preload margin on either side. The margin keeps ordinary scrolling ahead of card construction
+without delaying the cards that can contribute to the current paint.
+
 The split has three load-bearing invariants:
 
 1. Every row needs its fixed, media-type-specific size before insertion, because layout must work before a
