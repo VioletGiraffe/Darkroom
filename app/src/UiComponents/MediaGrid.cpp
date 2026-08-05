@@ -8,6 +8,7 @@
 #include <QMimeData>
 #include <QPainter>
 #include <QPixmap>
+#include <QResizeEvent>
 #include <QScrollBar>
 #include <QUrl>
 #include <QWheelEvent>
@@ -41,6 +42,39 @@ void paintDragCountBadge(QPixmap& pixmap, int count)
 void MediaGrid::setDragUrlsProvider(std::function<QList<QUrl>(const QList<QListWidgetItem*>&)> provider)
 {
 	_dragUrlsProvider = std::move(provider);
+}
+
+void MediaGrid::setCardFactory(std::function<QWidget*(QListWidgetItem*)> factory)
+{
+	_cardFactory = std::move(factory);
+}
+
+void MediaGrid::ensureVisibleCardsExist()
+{
+	if (!_cardFactory)
+		return;
+
+	// visualItemRect() reads the item layout, which QListView otherwise defers to the next event loop pass.
+	executeDelayedItemsLayout();
+
+	// A screen of slack on either side, so scrolling arrives at cards that already exist.
+	const int slack = viewport()->height();
+	const QRect materializeArea = viewport()->rect().adjusted(0, -slack, 0, slack);
+
+	for (int row = 0, rows = count(); row < rows; ++row)
+	{
+		QListWidgetItem* rowItem = item(row);
+		if (rowItem->isHidden() || !materializeArea.intersects(visualItemRect(rowItem)) || itemWidget(rowItem))
+			continue;
+		setItemWidget(rowItem, _cardFactory(rowItem));
+	}
+}
+
+void MediaGrid::discardAllCards()
+{
+	// setItemWidget deletes the widget it replaces, so a null one clears the row.
+	for (int row = 0, rows = count(); row < rows; ++row)
+		setItemWidget(item(row), nullptr);
 }
 
 void MediaGrid::setEmptyMessage(const QString& message)
@@ -80,6 +114,18 @@ void MediaGrid::wheelEvent(QWheelEvent* event)
 		return;
 	}
 	QListWidget::wheelEvent(event);
+}
+
+void MediaGrid::resizeEvent(QResizeEvent* event)
+{
+	QListWidget::resizeEvent(event);
+	ensureVisibleCardsExist();
+}
+
+void MediaGrid::scrollContentsBy(int dx, int dy)
+{
+	QListWidget::scrollContentsBy(dx, dy);
+	ensureVisibleCardsExist();
 }
 
 void MediaGrid::startDrag(Qt::DropActions /*supportedActions*/)

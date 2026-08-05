@@ -3,6 +3,7 @@
 #include "Core/MediaId.h"
 
 #include <QList>
+#include <QSize>
 #include <QString>
 #include <QUrl>
 #include <QWidget>
@@ -34,7 +35,6 @@ public:
 	// Restores filters and performs the initial grid build.
 	void restoreSettings();
 
-	void refreshMediaGrid();
 	void refreshLibraryView();
 	void resetForLibrarySwitch();
 
@@ -69,8 +69,18 @@ private:
 	void renameMediaItemInteractive(const MediaId& id);
 	void toggleBest(const MediaId& id);
 	void zoomCards(int steps);
+
+	// Grid operations, split by what changed: which rows exist, how cards look, their order, which are hidden.
+	void rebuildGridItems();
+	void rebuildAllCards();
 	void resortMediaGrid();
 	void applyNameFilter();
+	// applyNameFilter() without materializing cards, for callers that materialize later.
+	void applyNameFilterToRows();
+
+	void updateCardCanvasSizes();
+	void applyCardSizeHints();
+	[[nodiscard]] QSize cardSizeHintFor(bool isPhoto) const;
 
 	[[nodiscard]] QString topAnchorKey() const;
 	void scrollGridToAnchorKey(const QString& anchorKey);
@@ -79,8 +89,7 @@ private:
 
 	[[nodiscard]] std::vector<MediaId> effectiveSelection(std::optional<MediaId> target = std::nullopt) const;
 	[[nodiscard]] std::vector<MediaId> mediaItemsMatchingFilters() const;
-	[[nodiscard]] MediaItemWidget* buildMediaCard(
-		const MediaId& id, bool isBest, const QSize& photoCanvas, const QSize& videoCanvas, int previewFrameCount);
+	[[nodiscard]] MediaItemWidget* buildMediaCard(QListWidgetItem* item);
 	[[nodiscard]] QList<QUrl> dragUrlsForItems(const QList<QListWidgetItem*>& items) const;
 
 private:
@@ -94,4 +103,7 @@ private:
 	MediaGrid*       _mediaGrid = nullptr;
 	QTimer*          _catalogRefreshTimer = nullptr;
 	QTimer*          _gridZoomDebounce = nullptr;
+
+	// Cards are built long after zoom and preview frame count are read, so their canvas sizes are cached here.
+	QSize _photoCanvas, _videoCanvas;
 };

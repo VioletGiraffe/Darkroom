@@ -57,48 +57,77 @@ choice before closing with unsaved changes.
 
 ## Media-type switch
 
-`MediaBrowserWidget::_mediaTypeFilter` (a `SegmentedToggle`): **All / Videos / Photos**, ANDed with the other filters.
-A *structural* filter — changing it rebuilds the grid (`refreshMediaGrid`), unlike the name filter's cheap hide/show.
+The **All / Videos / Photos** switch is ANDed with the other filters. It is a *structural* filter: changing it
+changes which grid rows exist, unlike the name filter's cheap hide/show.
 
 **Photo cards** use the decoded photo file directly as the image strip — no preview cache; an unloadable path (e.g. a
 referenced photo on an unmounted drive) renders a blank card. Videos read `preview/`, falling back to the real frame
-folder and then to a "No preview" placeholder (see [import.md](import.md)). **Every catalog item gets a card**, whatever
-shape its backing is in: an item with no card would be unreachable, since every action on it is reached through its card.
+folder and then to a "No preview" placeholder (see [import.md](import.md)). **Every catalog item admitted by the
+structural filters gets a row**, whatever shape its backing is in; its card is built only once the row nears the viewport
+(see *Grid population* below). Actions reached through a card need it on screen anyway; selection-based actions read
+rows, so off-screen items stay reachable.
 Per-type gates: double-click opens the system image viewer instead of the built-in player; middle-click (frame viewer)
 is not wired; the green "frames extracted" badge is gated to videos; the context menu adapts per type.
 
 ## Name filter
 
-`MediaBrowserWidget::_nameFilter` (toolbar `QLineEdit`): an item-name substring filter ANDed with the sidebar's label filter. It's a
-**view-level hide/show**, not a rebuild: `textChanged` runs `applyNameFilter`, which only toggles each card's
-`setHidden` — no grid rebuild and no thumbnail re-decode. (The label filter, by contrast, *does* drive which cards get
-built, in `refreshMediaGrid`.)
+The toolbar's item-name substring filter is ANDed with the sidebar's label filter. It is a **view-level
+hide/show**, not a structural rebuild: it hides existing rows and renumbers the visible captions without
+recreating cards or decoding thumbnails again. The label filter, by contrast, changes which rows exist.
 
-## Sort control (`src/UiComponents/SortControl.h/.cpp`)
+## Sort control
 
 A single **`SortControl`** chip widget bundles the three ordering options (sort field, ascending/descending, "Favorites
-first"). It **owns its own persistence** and emits a single **`changed()`** signal whenever the user adjusts any option;
-`MediaBrowserWidget` connects that to `resortMediaGrid()` and reads the state back through the control's getters.
+first"). It owns its persistence and reports one aggregate change notification; the browser then reorders the existing
+rows together with any cards already attached to them.
 
-## Key methods
+## Grid population
 
-- `MediaBrowserWidget::refreshMediaGrid()` — clears and rebuilds the grid from `Catalog::mediaItems()` filtered by the label filter, ending
-  with `applyNameFilter()`. Deliberately does **not** call `Catalog::rebuildIndex()` — see
-  [catalog-and-labels.md](catalog-and-labels.md#in-memory-model) for why. A rebuild preserves the scroll position and
-  selection by re-anchoring on `MediaId` identity — not scroll offset or row index, which shift as items are
-  inserted/removed. Scroll also persists across restarts; the selection is per-session.
-- `MediaBrowserWidget::showMediaItemContextMenu()` — multi-select-aware right-click menu. **"Remove from library"** drops the selection from
-  the catalog only — since the catalog is never re-derived from a disk walk, an untracked video's frame folder stays on
-  disk, surfaced again only by the integrity tool or a re-import.
-- `MediaBrowserWidget::effectiveSelection(id)` — **shared** by the context menu and label-drop handler. The Edit-menu
-  actions call the browser's selected-item entry points directly, so right-click targeting needs no ambient MainWindow
-  state.
-- `MediaBrowserWidget::refreshLibraryView()` — `refreshMediaGrid()` plus the sidebar refresh. Browser-visible Catalog
-  mutations and library replacement reach it through the stable `Library::catalogChanged` signal; delivery is
-  zero-delay queued and coalesced so mutation call stacks never synchronously destroy cards and compound operations
-  rebuild only once. Plain `refreshMediaGrid()` remains for view-only filter/sort/zoom changes. Direct library-view
-  refreshes remain only where files can change without a corresponding Catalog mutation, such as an incomplete
-  physical deletion or preview regeneration.
+The grid separates **lightweight rows** from rich `MediaItemWidget` cards. Every item admitted by the
+structural filters has a row, preserving native selection, keyboard navigation, sort order, and scroll
+geometry without constructing the entire library's widget tree. A card is created only when its row
+approaches the viewport.
+
+Changes stop at the narrowest layer that can represent them:
+
+1. A library, label-filter, or media-type change replaces the affected row set and its cards.
+2. Card geometry or preview-frame-count changes keep the rows but recreate the cards.
+3. Sorting reorders rows together with any cards already attached to them.
+4. Name filtering only hides or reveals rows; existing cards remain attached.
+
+Cards are retained once created and are not evicted by scrolling. This avoids reloading thumbnails when the
+user revisits an area, at the deliberate cost that a session which traverses the entire library eventually
+materializes every card. The grid owns *when* materialization happens; the browser supplies *what* to build
+and remains the sole owner of catalog semantics. An attached row widget is the only materialization record —
+there is no parallel card registry to synchronize.
+
+The split has three load-bearing invariants:
+
+1. Every row needs its fixed, media-type-specific size before insertion, because layout must work before a
+   card exists. Photo and video cards differ in width, so the view cannot assume one uniform item size.
+2. A card may be created at any later scroll position. Everything it displays must therefore be derivable
+   from the current `Catalog` plus row state; even the visible caption number belongs to the row first.
+3. Qt defers icon-view layout, and the persisted startup anchor becomes reliable only after the post-show
+   resize turn. Keep startup row construction and first card materialization as two phases: materializing
+   earlier constructs cards for the temporary top-of-grid position.
+
+Grid rebuilding queries the already-current in-memory `Catalog`; it never re-derives the model from
+persistence or disk. View state is preserved by `MediaId` identity rather than row index or raw scroll
+offset, both of which can change as rows are inserted, removed, filtered, or sorted. Scroll position also
+persists across restarts; selection is per-session.
+
+## Browser refresh and item-management boundaries
+
+Browser-visible catalog mutations and library replacement arrive through the stable
+`Library::catalogChanged` signal. The browser queues and coalesces them into one structural refresh, so a
+mutation stack never synchronously destroys its own cards and a compound operation rebuilds only once.
+View-only changes use the narrower paths described above. Direct refreshes remain only where files can
+change without a corresponding catalog mutation, such as incomplete physical deletion or preview
+regeneration.
+
+The context menu and label-drop path share the same multi-selection-aware target calculation. **Remove from
+library** drops those records from the catalog only; because the catalog is never recreated from a disk
+walk, leftover frame folders remain untracked until an integrity scan or re-import finds them.
 
 Physical Delete and catalog-only Remove confirmations live in **`MediaItemManagement`**
 (`src/Windows/MediaItemManagement.h/.cpp`). Catalog record removal reaches the browser through `catalogChanged`; the
@@ -108,13 +137,12 @@ the latter to synchronize MainWindow's persistent frame viewer.
 
 ## Label assignment
 
-Two paths, both routed through `effectiveSelection`:
-- **Context-menu Labels checklist** — see `showMediaItemContextMenu` above.
-- **Dragging a label row from `LabelSidebar` onto a card.** The sidebar drags ordinary label rows only (not "All" or
-  `Best`), carrying the label id as `LabelMimeType`; the card is the drop target (see
-  [media-widgets.md](media-widgets.md)). The drop handler is **deferred via a queued `invokeMethod`** — the grid rebuild
-  must not delete the card mid-drop (the rebuild happens inside the handler, which runs from the card's own
-  `dropEvent`).
+Two paths share the same multi-selection-aware target calculation:
+
+1. The context menu exposes a label checklist.
+2. An ordinary label row (never "All" or `Best`) can be dragged from the sidebar onto a card. The card is the
+   drop target; the label id is the payload (see [media-widgets.md](media-widgets.md)). Applying the drop is
+   deferred until the drop event unwinds, because the resulting structural refresh may delete that card.
 
 ## LabelSidebar structure (`src/UiComponents/LabelSidebar.h/.cpp`)
 

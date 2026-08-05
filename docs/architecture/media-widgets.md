@@ -112,9 +112,15 @@ cards). The rest of the render/paint path is shared.
 
 ### Loading
 
-The render is **not** started at construction. Loading defers until a `paintEvent` fires with the card
-still visible — so a grid never loads off-screen cards, and a fast scroll loads nothing it doesn't come to
-rest on.
+The render is **not** started at construction. Loading begins only after the thumbnail has remained visible
+for a short post-paint dwell, so off-screen cards and cards merely passed during a fast scroll read nothing.
+
+For a browser video card, choosing the preview inputs is an earlier, separate step: card materialization
+enumerates `preview/`, then falls back to the full frame folder. That directory discovery is currently
+**synchronous on the GUI thread**; only the subsequent image reads and decoding are asynchronous. Deferring
+cards bounds this cost to rows near the viewport, but a slow, unavailable, or network-backed library can
+still delay card appearance. Do not treat the complete thumbnail path as background work when investigating
+UI latency.
 
 A load runs in two stages: the **file read** through `Core/IoThreadPool`, which routes by storage medium —
 a fast random-access volume gets a small parallel pool; a slow, external, network, or unclassifiable one
@@ -148,10 +154,10 @@ their label-assign drags — neither hand-rolls the gesture (see [main-window.md
 
 ## Card preview sizing & zoom (Ctrl+wheel)
 
-`ThumbnailWidget` detects Ctrl+wheel and fires a zoom callback (consuming the event); plain wheel falls
-through so the view scrolls. **Owners apply the same shape**: bound, persist to `QSettings`, and
-debounce-rebuild — `MediaBrowserWidget::zoomCards` (card height) → `refreshMediaGrid()`,
-`FrameViewerWindow::zoomThumbnails` (frame-viewer thumbnail size).
+`ThumbnailWidget` consumes Ctrl+wheel as a zoom request; plain wheel input continues to the surrounding
+view. Both owners bound and persist the new size, then debounce the visual rebuild. The main browser keeps
+its rows and recreates only cards because zoom changes presentation, not item membership; the frame viewer
+rebuilds its thumbnail view.
 
 The two owners' bound/persist/debounce logic is intentionally **not** de-duplicated yet (each is a few
 lines) — revisit at a 4th consumer. See [backlog](../../ARCHITECTURE.md#improvement-backlog).
