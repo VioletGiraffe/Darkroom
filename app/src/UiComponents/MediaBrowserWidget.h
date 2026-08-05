@@ -32,7 +32,7 @@ public:
 	explicit MediaBrowserWidget(Library& library, QWidget* parent = nullptr);
 
 	void saveSettings();
-	// Restores filters and performs the initial grid build.
+	// Restores filters, then schedules the initial grid build after post-show layout settles.
 	void restoreSettings();
 
 	void refreshLibraryView();
@@ -72,6 +72,7 @@ private:
 
 	// Grid operations, split by what changed: which rows exist, how cards look, their order, which are hidden.
 	void rebuildGridItems();
+	void rebuildGridRows();
 	void rebuildAllCards();
 	void resortMediaGrid();
 	void applyNameFilter();

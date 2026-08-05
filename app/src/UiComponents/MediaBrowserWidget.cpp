@@ -547,12 +547,15 @@ void MediaBrowserWidget::restoreSettings()
 		activeIds.push_back(labelIdFromUInt64(v.toULongLong()));
 	const bool andMode = QSettings{}.value("mainWindow/labelsAndMode", false).toBool();
 	_labelSidebar->setActiveFilter(activeIds, andMode);
-	rebuildGridItems();
 
-	// The wrapped grid's final row layout is available only after post-show resize events.
 	const QString scrollAnchorKey = QSettings{}.value("mainWindow/scrollAnchor").toString();
-	if (!scrollAnchorKey.isEmpty())
-		QMetaObject::invokeMethod(this, [this, scrollAnchorKey] { scrollGridToAnchorKey(scrollAnchorKey); }, Qt::QueuedConnection);
+	// The wrapped grid's final geometry is available only after post-show resize events. Build rows then, restore
+	// the persisted position against that layout, and only afterward materialize the cards around it.
+	QMetaObject::invokeMethod(this, [this, scrollAnchorKey] {
+		rebuildGridRows();
+		scrollGridToAnchorKey(scrollAnchorKey);
+		_mediaGrid->ensureVisibleCardsExist();
+	}, Qt::QueuedConnection);
 }
 
 void MediaBrowserWidget::resetForLibrarySwitch()
@@ -727,6 +730,15 @@ void MediaBrowserWidget::applyCardSizeHints()
 void MediaBrowserWidget::rebuildGridItems()
 {
 	const GridViewState viewState = captureGridViewState();
+	rebuildGridRows();
+
+	// Restore against the final post-filter layout; materialize only then, so no cards are built at the pre-restore scroll position.
+	restoreGridViewState(viewState);
+	_mediaGrid->ensureVisibleCardsExist();
+}
+
+void MediaBrowserWidget::rebuildGridRows()
+{
 	_mediaGrid->clear();
 
 	updateCardCanvasSizes();
@@ -756,10 +768,6 @@ void MediaBrowserWidget::rebuildGridItems()
 
 	_mediaGrid->sortItems(Qt::AscendingOrder);
 	applyNameFilterToRows();
-
-	// Restore against the final post-filter layout; materialize only then, so no cards are built at the pre-restore scroll position.
-	restoreGridViewState(viewState);
-	_mediaGrid->ensureVisibleCardsExist();
 }
 
 void MediaBrowserWidget::rebuildAllCards()

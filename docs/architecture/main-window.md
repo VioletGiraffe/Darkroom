@@ -108,8 +108,9 @@ The split has three load-bearing invariants:
 2. A card may be created at any later scroll position. Everything it displays must therefore be derivable
    from the current `Catalog` plus row state; even the visible caption number belongs to the row first.
 3. Qt defers icon-view layout, and the persisted startup anchor becomes reliable only after the post-show
-   resize turn. Keep startup row construction and first card materialization as two phases: materializing
-   earlier constructs cards for the temporary top-of-grid position.
+   resize turn. Startup therefore restores filters immediately but defers row construction until that turn;
+   it then applies the persisted anchor before materializing the first cards. Ordinary in-session rebuilds
+   already have stable geometry and preserve the current view state around the row replacement.
 
 Grid rebuilding queries the already-current in-memory `Catalog`; it never re-derives the model from
 persistence or disk. View state is preserved by `MediaId` identity rather than row index or raw scroll
