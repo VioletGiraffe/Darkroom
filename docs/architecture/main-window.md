@@ -101,9 +101,10 @@ materializes every card. The grid owns *when* materialization happens; the brows
 and remains the sole owner of catalog semantics. An attached row widget is the only materialization record —
 there is no parallel card registry to synchronize.
 
-Each materialization batch builds cards intersecting the viewport first, in sorted view order, then fills a
-one-screen preload margin on either side. The margin keeps ordinary scrolling ahead of card construction
-without delaying the cards that can contribute to the current paint.
+Each materialization batch builds cards intersecting the viewport first, in sorted view order, then fills up
+to one screen on either side, capped at the three nearest visual rows per side. The bounded margin keeps
+ordinary scrolling ahead of card construction without letting tiny cards turn speculative work into hundreds
+of widgets or delaying the cards that can contribute to the current paint.
 
 The split has three load-bearing invariants:
 

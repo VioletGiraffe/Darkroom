@@ -13,9 +13,12 @@
 #include <QUrl>
 #include <QWheelEvent>
 
+#include <algorithm>
+
 namespace {
 
 static constexpr int MAX_DRAG_IMAGE_EDGE = 180;
+static constexpr int PRELOAD_VISUAL_ROWS_PER_SIDE = 3;
 
 void paintDragCountBadge(QPixmap& pixmap, int count)
 {
@@ -57,11 +60,12 @@ void MediaGrid::ensureVisibleCardsExist()
 	// visualItemRect() reads the item layout, which QListView otherwise defers to the next event loop pass.
 	executeDelayedItemsLayout();
 
-	// A screen of slack on either side, so scrolling arrives at cards that already exist.
-	const int slack = viewport()->height();
+	const int rows = count();
+	// Browser cards share one fixed height, so a pixel margin of three row pitches cannot reach a fourth off-screen row.
+	const int rowPitch = rows == 0 ? 0 : item(0)->sizeHint().height() + spacing();
+	const int slack = std::min(viewport()->height(), PRELOAD_VISUAL_ROWS_PER_SIDE * rowPitch);
 	const QRect visibleArea = viewport()->rect();
 	const QRect materializeArea = visibleArea.adjusted(0, -slack, 0, slack);
-	const int rows = count();
 
 	const auto materializeCardsIn = [this, rows](const QRect& area) {
 		for (int row = 0; row < rows; ++row)
@@ -73,7 +77,7 @@ void MediaGrid::ensureVisibleCardsExist()
 		}
 	};
 
-	// Start the useful work in view order before filling the off-screen preload margin.
+	// Start the useful work in view order before filling the bounded off-screen preload margin.
 	materializeCardsIn(visibleArea);
 	materializeCardsIn(materializeArea);
 }
