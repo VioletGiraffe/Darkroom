@@ -241,7 +241,7 @@ ThumbnailWidget::ThumbnailWidget(const QString& filePath, const QString& label, 
 }
 
 ThumbnailWidget::ThumbnailWidget(const QStringList& compositePaths, const QString& label, QWidget* parent, QSize canvasSize, bool dynamicSizeHint,
-	bool framed, bool filmStrip, ThumbnailLoadTiming initialLoadTiming)
+	bool framed, bool filmStrip)
 	: QWidget(parent)
 	, _caption{ label }
 	, _bDynamicSizeHint{ dynamicSizeHint }
@@ -253,8 +253,6 @@ ThumbnailWidget::ThumbnailWidget(const QStringList& compositePaths, const QStrin
 
 	_sourcePaths = compositePaths;
 	_maxSize = canvasSize;
-	if (initialLoadTiming == ThumbnailLoadTiming::Immediate && !_sourcePaths.empty())
-		scheduleRender();
 }
 
 ThumbnailWidget::~ThumbnailWidget()

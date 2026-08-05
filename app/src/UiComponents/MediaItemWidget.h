@@ -27,7 +27,6 @@ public:
 		std::function<void(QPoint globalPos)> onContextMenu = {},
 		bool dynamicSizeHint = true,
 		bool filmStrip = false,
-		ThumbnailLoadTiming initialThumbnailLoadTiming = ThumbnailLoadTiming::AfterVisibilityDwell,
 		QWidget* parent = nullptr
 	);
 

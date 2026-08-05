@@ -112,10 +112,10 @@ cards). The rest of the render/paint path is shared.
 
 ### Loading
 
-Cards created for the restored initial browser viewport start rendering during construction. Later cards wait
-for a short post-paint dwell, so off-screen cards and cards merely passed during a fast scroll read nothing.
-Startup selects this timing explicitly for its first materialization batch — individual thumbnails do not
-infer process-wide "first load" state.
+Newly constructed composite thumbnails follow one loading rule at startup and during later scrolling: their
+first paint arms a short dwell, and rendering starts only if they remain visible when it expires. Construction
+alone therefore performs no image I/O; off-screen cards and cards merely passed during a fast scroll read
+nothing.
 
 For a browser video card, choosing the preview inputs is an earlier, separate step: card materialization
 enumerates `preview/`, then falls back to the full frame folder. That directory discovery is currently
@@ -134,8 +134,8 @@ decode for JPEG), far cheaper than a full decode plus downscale and free of the 
 large downscale caused; it also applies EXIF orientation.
 
 Cards are built parentless and reparented later, so the device-pixel-ratio isn't reliable until the widget
-is on its real screen. The default delayed path captures DPR after first paint; an immediate startup load may
-capture a provisional value, so first paint rechecks it and reschedules the render if needed.
+is on its real screen. Render scheduling captures the current DPR, and painting rechecks it after realization
+and reschedules when necessary.
 
 ### Drag
 
