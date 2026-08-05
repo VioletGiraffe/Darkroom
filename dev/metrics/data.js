@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785799789862,
+  "lastUpdate": 1785930788190,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -9747,6 +9747,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 336,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 34.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 33,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 10,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "2cf437eefaa742e9f44755e413c7a55d7766a2ec",
+          "message": "Media browser redesign: lazy widget creation",
+          "timestamp": "2026-08-05T14:48:04+03:00",
+          "tree_id": "45a8adc248acbe274cfe92bfa3bbcf6d9ceec915",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/2cf437eefaa742e9f44755e413c7a55d7766a2ec"
+        },
+        "date": 1785930786028,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 13979,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 8230,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1135.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 694.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 337,
             "unit": "KB"
           },
           {
