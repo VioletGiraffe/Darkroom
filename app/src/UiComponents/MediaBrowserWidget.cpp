@@ -19,6 +19,7 @@
 #include "Windows/MediaRename.h"
 #include "Windows/PhotoCompareWindow.h"
 #include "Windows/VideoPlayerWindow.h"
+#include "utility/on_scope_exit.hpp"
 
 #include <QAbstractItemView>
 #include <QAction>
@@ -209,6 +210,7 @@ struct MediaBrowserWidget::GridViewState
 MediaBrowserWidget::MediaBrowserWidget(Library& library, QWidget* parent)
 	: QWidget(parent)
 	, _library(library)
+	, _newCardLoadTiming{ ThumbnailLoadTiming::AfterVisibilityDwell }
 {
 	setupUi();
 }
@@ -552,6 +554,11 @@ void MediaBrowserWidget::restoreSettings()
 	// The wrapped grid's final geometry is available only after post-show resize events. Build rows then, restore
 	// the persisted position against that layout, and only afterward materialize the cards around it.
 	QMetaObject::invokeMethod(this, [this, scrollAnchorKey] {
+		EXEC_ON_SCOPE_EXIT([this, previousTiming = _newCardLoadTiming] {
+			_newCardLoadTiming = previousTiming;
+		});
+		_newCardLoadTiming = ThumbnailLoadTiming::Immediate;
+
 		rebuildGridRows();
 		scrollGridToAnchorKey(scrollAnchorKey);
 		_mediaGrid->ensureVisibleCardsExist();
@@ -668,7 +675,8 @@ MediaItemWidget* MediaBrowserWidget::buildMediaCard(QListWidgetItem* item)
 		[this, id] { activateMediaItem(id); },
 		[this, id](QPoint globalPos) { showMediaItemContextMenu(id, globalPos); },
 		/* dynamic size hint */false,
-		/* film strip */ !isPhoto
+		/* film strip */ !isPhoto,
+		_newCardLoadTiming
 	);
 	if (!isPhoto)
 		card->setOnMiddleButtonClick([this, id] { emit inspectVideoFramesRequested(id); });

@@ -240,7 +240,8 @@ ThumbnailWidget::ThumbnailWidget(const QString& filePath, const QString& label, 
 	};
 }
 
-ThumbnailWidget::ThumbnailWidget(const QStringList& compositePaths, const QString& label, QWidget* parent, QSize canvasSize, bool dynamicSizeHint, bool framed, bool filmStrip)
+ThumbnailWidget::ThumbnailWidget(const QStringList& compositePaths, const QString& label, QWidget* parent, QSize canvasSize, bool dynamicSizeHint,
+	bool framed, bool filmStrip, ThumbnailLoadTiming initialLoadTiming)
 	: QWidget(parent)
 	, _caption{ label }
 	, _bDynamicSizeHint{ dynamicSizeHint }
@@ -252,6 +253,8 @@ ThumbnailWidget::ThumbnailWidget(const QStringList& compositePaths, const QStrin
 
 	_sourcePaths = compositePaths;
 	_maxSize = canvasSize;
+	if (initialLoadTiming == ThumbnailLoadTiming::Immediate && !_sourcePaths.empty())
+		scheduleRender();
 }
 
 ThumbnailWidget::~ThumbnailWidget()
@@ -390,18 +393,15 @@ void ThumbnailWidget::wheelEvent(QWheelEvent* event)
 
 void ThumbnailWidget::paintEvent(QPaintEvent*)
 {
-	// First paint arms one dwell timer. Only a still-visible card reads disk; empty sources remain placeholders.
-	if (!_job && !_sourcePaths.isEmpty())
+	// Default loads must remain visible long enough to avoid disk reads during fast scrolling.
+	if (!_job && !_sourcePaths.empty() && !_loadArmed)
 	{
-		if (!_loadArmed)
-		{
-			_loadArmed = true;
-			QTimer::singleShot(LOAD_DWELL_MS, this, [this] {
-				_loadArmed = false;
-				if (!_job && !visibleRegion().isEmpty())
-					scheduleRender();
-			});
-		}
+		_loadArmed = true;
+		QTimer::singleShot(LOAD_DWELL_MS, this, [this] {
+			_loadArmed = false;
+			if (!_job && !visibleRegion().isEmpty())
+				scheduleRender();
+		});
 	}
 	// Correct a stale pre-realization DPR immediately; this shown widget now reports the authoritative value.
 	else if (_job && !qFuzzyCompare(_renderDpr, devicePixelRatioF()))

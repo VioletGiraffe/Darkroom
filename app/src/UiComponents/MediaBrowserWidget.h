@@ -23,6 +23,7 @@ class QObject;
 class QTimer;
 class SegmentedToggle;
 class SortControl;
+enum class ThumbnailLoadTiming;
 
 // Main-window media browser feature: sidebar, toolbar, grid, local media actions, and browser persistence.
 class MediaBrowserWidget final : public QWidget
@@ -104,6 +105,7 @@ private:
 	MediaGrid*       _mediaGrid = nullptr;
 	QTimer*          _catalogRefreshTimer = nullptr;
 	QTimer*          _gridZoomDebounce = nullptr;
+	ThumbnailLoadTiming _newCardLoadTiming;
 
 	// Cards are built long after zoom and preview frame count are read, so their canvas sizes are cached here.
 	QSize _photoCanvas, _videoCanvas;

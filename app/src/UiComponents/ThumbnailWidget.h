@@ -11,6 +11,8 @@
 
 class QMimeData;
 
+enum class ThumbnailLoadTiming { AfterVisibilityDwell, Immediate };
+
 class ThumbnailWidget final : public QWidget {
 public:
 	struct LoadJob;
@@ -18,7 +20,8 @@ public:
 	ThumbnailWidget(const QString& filePath, const QString& caption, int thumbnailSize, QWidget* parent);
 	// Tiles one best-fit frame per slot in canvasSize. Empty paths render a final "No preview" state.
 	// framed=false leaves only the matte; filmStrip reserves perforated bands around a black frame strip.
-	ThumbnailWidget(const QStringList& compositePaths, const QString& label, QWidget* parent, QSize canvasSize, bool dynamicSizeHint = true, bool framed = true, bool filmStrip = false);
+	ThumbnailWidget(const QStringList& compositePaths, const QString& label, QWidget* parent, QSize canvasSize, bool dynamicSizeHint = true,
+		bool framed = true, bool filmStrip = false, ThumbnailLoadTiming initialLoadTiming = ThumbnailLoadTiming::AfterVisibilityDwell);
 
 	~ThumbnailWidget() override;
 

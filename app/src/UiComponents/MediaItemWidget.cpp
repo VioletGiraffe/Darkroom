@@ -220,6 +220,7 @@ MediaItemWidget::MediaItemWidget(
 	std::function<void(QPoint)> onContextMenu,
 	bool dynamicSizeHint,
 	bool filmStrip,
+	ThumbnailLoadTiming initialThumbnailLoadTiming,
 	QWidget* parent
 )
 	: QWidget{ parent }
@@ -239,7 +240,8 @@ MediaItemWidget::MediaItemWidget(
 	layout->setContentsMargins(0, 0, 0, 0);
 	layout->setSpacing(CARD_FOOTER_SPACING);
 
-	_thumb = new ThumbnailWidget(previewPaths, QString(), this, maxImageSize, dynamicSizeHint, /*framed*/ false, /*filmStrip*/ _filmStrip);
+	_thumb = new ThumbnailWidget(
+		previewPaths, QString(), this, maxImageSize, dynamicSizeHint, /*framed*/ false, /*filmStrip*/ _filmStrip, initialThumbnailLoadTiming);
 	_thumb->installEventFilter(this);
 
 	_framesReadyBadge = new FramesReadyBadge(_thumb);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/MediaId.h"
+#include "UiComponents/ThumbnailWidget.h"
 
 #include <QColor>
 #include <QSize>
@@ -15,7 +16,6 @@ class QDragMoveEvent;
 class QDropEvent;
 class QLabel;
 class QPushButton;
-class ThumbnailWidget;
 
 class MediaItemWidget final : public QWidget {
 public:
@@ -27,6 +27,7 @@ public:
 		std::function<void(QPoint globalPos)> onContextMenu = {},
 		bool dynamicSizeHint = true,
 		bool filmStrip = false,
+		ThumbnailLoadTiming initialThumbnailLoadTiming = ThumbnailLoadTiming::AfterVisibilityDwell,
 		QWidget* parent = nullptr
 	);
 
