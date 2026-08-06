@@ -181,5 +181,5 @@ card in one step.
 
 **Decided against / deferred (don't re-litigate without new info):**
 - *Async ffmpeg* — synchronous `waitForFinished` blocking the GUI was judged a non-issue, not worth doing.
-- *Dedup the 2× zoom bound/persist/debounce shape* — deferred; 2 short obvious methods beat the indirection.
+- *Dedup the 3× zoom bound/persist/debounce shape* — deferred; 3 short obvious methods beat the indirection.
   Revisit at a 4th consumer or if the shape grows.

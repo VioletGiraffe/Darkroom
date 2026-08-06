@@ -157,9 +157,9 @@ their label-assign drags — neither hand-rolls the gesture (see [main-window.md
 ## Card preview sizing & zoom (Ctrl+wheel)
 
 `ThumbnailWidget` consumes Ctrl+wheel as a zoom request; plain wheel input continues to the surrounding
-view. Both owners bound and persist the new size, then debounce the visual rebuild. The main browser keeps
-its rows and recreates only cards because zoom changes presentation, not item membership; the frame viewer
-rebuilds its thumbnail view.
+view. All three owners bound and persist the new size, then debounce the visual rebuild. The main browser keeps
+its rows and recreates only cards because zoom changes presentation, not item membership; the Import dialog does
+the same for its staged cards while preserving their pending state, and the frame viewer rebuilds its thumbnail view.
 
-The two owners' bound/persist/debounce logic is intentionally **not** de-duplicated yet (each is a few
+The three owners' bound/persist/debounce logic is intentionally **not** de-duplicated yet (each is a few
 lines) — revisit at a 4th consumer. See [backlog](../../ARCHITECTURE.md#improvement-backlog).

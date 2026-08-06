@@ -15,6 +15,7 @@ class QLineEdit;
 class QListWidget;
 class QListWidgetItem;
 class QSplitter;
+class QTimer;
 class QWidget;
 class MediaItemWidget;
 class Library;
@@ -52,6 +53,8 @@ private:
 	// Removes the card and its temporary preview directory.
 	void unstage(const MediaId& id);
 	void updateCardLabelDots(const MediaId& id);
+	void zoomStagedCards(int steps);
+	void rebuildAllStagedCards();
 	// Whole selection when id is selected; otherwise id alone.
 	[[nodiscard]] std::vector<MediaId> effectiveStagedSelection(const MediaId& id) const;
 	void showStagedCardContextMenu(const MediaId& id, const QPoint& globalPos);
@@ -125,4 +128,5 @@ private:
 	QComboBox* _relocateModeCombo = nullptr;
 	QLineEdit* _relocateFolderEdit = nullptr;
 	QSplitter* _splitter = nullptr;
+	QTimer* _stagedCardZoomDebounce = nullptr;
 };

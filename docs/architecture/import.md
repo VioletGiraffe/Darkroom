@@ -190,7 +190,9 @@ stages instantly. Each staged item is tracked by a `StagedEntry` (its path, temp
 Best/labels, grid item), keyed by `MediaId` computed once at stage time while the source file still exists (see
 "Why `MediaId`, not path" below). The temp dir is deleted once the entry is unstaged or the dialog closes — but
 its frames aren't wasted: a successful Import copies them into the permanent `outputFolder/preview/` rather than
-re-running ffmpeg (the import-side reuse in "Import: preview frames only" above).
+re-running ffmpeg (the import-side reuse in "Import: preview frames only" above). The staging grid shares the main
+media grid's per-pixel wheel scrolling behavior. Ctrl+wheel over a card adjusts the Import workspace's independently
+persisted card size; the dialog debounces rebuilding its staged cards, retaining their pending Best and label state.
 
 ### Label assignment: drag-from-list or per-card checklist, no "destination" UI
 

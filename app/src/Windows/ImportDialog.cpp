@@ -8,6 +8,7 @@
 #include "UiComponents/LabelMimeType.h"
 #include "UiComponents/LabelRowDelegate.h"
 #include "UiComponents/LabelVisuals.h"
+#include "UiComponents/MediaGrid.h"
 #include "Settings.h"
 #include "Shortcuts.h"
 #include "Windows/ImportExecution.h"
@@ -54,6 +55,7 @@
 #include <QPushButton>
 #include <QSettings>
 #include <QSplitter>
+#include <QTimer>
 #include <QUrl>
 #include <QUuid>
 #include <QVBoxLayout>
@@ -65,12 +67,21 @@ namespace {
 
 constexpr int kLabelIdRole = Qt::UserRole;
 
-constexpr int STAGED_CARD_IMAGE_HEIGHT = 120;
+const QString STAGED_CARD_IMAGE_HEIGHT_KEY = QStringLiteral("importDialog/cardImageHeight");
+constexpr int DEFAULT_STAGED_CARD_IMAGE_HEIGHT = 120;
+constexpr int MIN_STAGED_CARD_IMAGE_HEIGHT = 60;
+constexpr int MAX_STAGED_CARD_IMAGE_HEIGHT = 360;
+constexpr int STAGED_CARD_IMAGE_HEIGHT_STEP = 20;
 
 constexpr int LABEL_LIST_MAX_WIDTH = 300;
 
 // Each ffmpeg process is internally threaded; keep concurrent processes low.
 constexpr int PREVIEW_EXTRACTION_CONCURRENCY = 2;
+
+int stagedCardImageHeight()
+{
+	return QSettings{}.value(STAGED_CARD_IMAGE_HEIGHT_KEY, DEFAULT_STAGED_CARD_IMAGE_HEIGHT).toInt();
+}
 
 QString uniqueTempPreviewDir()
 {
@@ -225,15 +236,21 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 
 	_splitter->addWidget(labelPane);
 
-	_stagedGrid = new QListWidget();
+	_stagedGrid = new MediaGrid();
 	_stagedGrid->setViewMode(QListView::IconMode);
 	_stagedGrid->setFlow(QListView::LeftToRight);
 	_stagedGrid->setWrapping(true);
 	_stagedGrid->setResizeMode(QListView::Adjust);
 	_stagedGrid->setMovement(QListView::Static);
+	_stagedGrid->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
 	_stagedGrid->setSelectionMode(QAbstractItemView::ExtendedSelection);
 	_stagedGrid->setSpacing(10);
 	_stagedGrid->setStyleSheet(QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().AccentBg));
+
+	_stagedCardZoomDebounce = new QTimer(this);
+	_stagedCardZoomDebounce->setSingleShot(true);
+	_stagedCardZoomDebounce->setInterval(80);
+	connect(_stagedCardZoomDebounce, &QTimer::timeout, this, &ImportDialog::rebuildAllStagedCards);
 
 	auto* renameStagedAction = new QAction(tr("Rename..."), this);
 	renameStagedAction->setShortcut(QKeySequence(Shortcuts::Rename));
@@ -519,12 +536,13 @@ void ImportDialog::addToStaging(const QStringList& paths)
 
 MediaItemWidget* ImportDialog::buildStagedCard(const MediaId& id, const QString& path, const QString& tempPreviewDir, qint64 durationMs)
 {
-	QSize canvasSize{ STAGED_CARD_IMAGE_HEIGHT, STAGED_CARD_IMAGE_HEIGHT };
+	const int imageHeight = stagedCardImageHeight();
+	QSize canvasSize{ imageHeight, imageHeight };
 	QStringList previewPaths{ path };
 	if (!isSupportedImageFile(path))
 	{
 		const int frameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
-		canvasSize.setWidth(MediaItemWidget::videoCanvasWidthForTiling(STAGED_CARD_IMAGE_HEIGHT, frameCount, _stagedGrid->spacing()));
+		canvasSize.setWidth(MediaItemWidget::videoCanvasWidthForTiling(imageHeight, frameCount, _stagedGrid->spacing()));
 		previewPaths.clear();
 		const QDir previewDir(tempPreviewDir);
 		for (const QString& file : listFrameImageFiles(previewDir))
@@ -558,6 +576,7 @@ MediaItemWidget* ImportDialog::buildStagedCard(const MediaId& id, const QString&
 	});
 
 	card->setDuration(durationMs);
+	card->setOnMouseWheelCallback([this](int steps) { zoomStagedCards(steps); });
 
 	return card;
 }
@@ -745,6 +764,29 @@ void ImportDialog::updateCardLabelDots(const MediaId& id)
 
 	auto* card = static_cast<MediaItemWidget*>(_stagedGrid->itemWidget(it->item));
 	card->setLabelDots(colors, names.join(", "));
+}
+
+void ImportDialog::zoomStagedCards(int steps)
+{
+	const int current = stagedCardImageHeight();
+	const int next = qBound(MIN_STAGED_CARD_IMAGE_HEIGHT, current + steps * STAGED_CARD_IMAGE_HEIGHT_STEP, MAX_STAGED_CARD_IMAGE_HEIGHT);
+	if (next == current)
+		return;
+
+	QSettings{}.setValue(STAGED_CARD_IMAGE_HEIGHT_KEY, next);
+	_stagedCardZoomDebounce->start();
+}
+
+void ImportDialog::rebuildAllStagedCards()
+{
+	for (auto it = _staged.begin(); it != _staged.end(); ++it)
+	{
+		MediaItemWidget* card = buildStagedCard(it.key(), it->path, it->tempPreviewDir, it->durationMs);
+		card->setInBest(it->pendingBest);
+		it->item->setSizeHint(card->sizeHint());
+		_stagedGrid->setItemWidget(it->item, card);
+		updateCardLabelDots(it.key());
+	}
 }
 
 std::vector<MediaId> ImportDialog::effectiveStagedSelection(const MediaId& id) const
