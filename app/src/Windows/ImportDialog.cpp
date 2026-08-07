@@ -275,6 +275,10 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 	connect(_labelList, &QListWidget::customContextMenuRequested, this, &ImportDialog::showLabelListContextMenu);
 	labelPaneLayout->addWidget(_labelList, 1);
 
+	QPushButton* suggestLabelsButton = new QPushButton(tr("Suggest labels"));
+	connect(suggestLabelsButton, &QPushButton::clicked, this, &ImportDialog::suggestLabels);
+	labelPaneLayout->addWidget(suggestLabelsButton);
+
 	QPushButton* addLabelButton = new QPushButton(tr("Create label"));
 	addLabelButton->setObjectName("addLabelButton");
 	addLabelButton->setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_plus.svg"), &Theme::ThemeColors::TextPrimary));
@@ -357,7 +361,7 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 	_splitter->setCollapsible(0, false);
 
 	QLabel* instructions = new QLabel(
-		tr("Drop video or image files here to stage them, then drag labels from the list onto a card to tag it. "
+		tr("Drop video or image files here to stage them. Assign labels by dragging them from the list onto a card or through the card's right-click menu. "
 		   "Dropping a folder stages the media under it; click \"Suggest labels\" to apply labels derived from folder names. Right-click a "
 		   "label to rename, recolor, or remove it before importing. "
 		   "Double-click a card to preview; right-click for more options. \"Import\" imports every labeled card "
@@ -368,9 +372,6 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 
 	QHBoxLayout* footer = new QHBoxLayout;
 	footer->addStretch(1);
-	QPushButton* suggestLabelsButton = new QPushButton(tr("Suggest labels"), this);
-	connect(suggestLabelsButton, &QPushButton::clicked, this, &ImportDialog::suggestLabels);
-	footer->addWidget(suggestLabelsButton);
 	QPushButton* importButton = new QPushButton(tr("Import"), this);
 	connect(importButton, &QPushButton::clicked, this, &ImportDialog::runImport);
 	footer->addWidget(importButton);
