@@ -50,6 +50,7 @@ protected:
 private:
 	void refreshLabelList();
 	void stageMediaItems(const QStringList& paths);
+	void suggestLabels();
 	[[nodiscard]] MediaItemWidget* buildStagedCard(const MediaId& id, const QString& path, const QString& tempPreviewDir, qint64 durationMs);
 	// Removes the card and its temporary preview directory.
 	void unstage(const MediaId& id);
@@ -114,6 +115,7 @@ private:
 	{
 		QString path;
 		QString tempPreviewDir;
+		QString suggestedLabelName;
 		qint64 durationMs = -1;
 		bool pendingBest = false;
 		QStringList pendingLabelIds;

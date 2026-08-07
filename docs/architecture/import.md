@@ -179,8 +179,11 @@ Four independent layers, at different points and catching different things:
 ### Staging area: mirrors the main window's own label model
 
 Dropping a file or folder onto the dialog, or `addToStaging()` (used by `MainWindow`'s own drop and to
-pre-fill staging from the untracked-file scan via `openImportDialog`), calls `stageMediaItems()`. It then
-extracts a temporary preview per new video path (deduplicated by `MediaId` first — see "Duplicate detection" above)
+pre-fill staging from the untracked-file scan via `openImportDialog`), calls `stageMediaItems()`. A folder drop
+retains each photo or video's hierarchy-derived label name as a pending suggestion; **Suggest labels** in the dialog
+footer applies and consumes those suggestions on demand, creating session-provisional labels where needed without
+displacing labels already assigned manually. Staging then extracts a temporary preview per new video path
+(deduplicated by `MediaId` first — see "Duplicate detection" above)
 into a per-video temp dir via the batch `Ffmpeg::generatePreviewFrames`, so several videos are processed at once. That
 batch runs on a
 `CInterruptableThread` while a modal `QProgressDialog` holds the GUI thread's event loop, which is what makes

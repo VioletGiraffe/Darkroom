@@ -162,11 +162,11 @@ std::vector<Ffmpeg::PreviewResult> generatePreviewFramesInteractively(
 	return results;
 }
 
-// labelName preserves the dropped folder hierarchy as hyphen-joined components.
+// suggestedLabelName preserves the dropped folder hierarchy as hyphen-joined components.
 struct StagedFile
 {
 	QString path;
-	QString labelName;
+	QString suggestedLabelName;
 };
 
 QList<StagedFile> flattenToSupportedMediaFiles(const QStringList& paths)
@@ -349,7 +349,7 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 
 	QLabel* instructions = new QLabel(
 		tr("Drop video or image files here to stage them, then drag labels from the list onto a card to tag it. "
-		   "Dropping a folder stages the media under it and makes a label from the folder's name; right-click a "
+		   "Dropping a folder stages the media under it; click \"Suggest labels\" to apply labels derived from folder names. Right-click a "
 		   "label to rename, recolor, or remove it before importing. "
 		   "Double-click a card to preview; right-click for more options. \"Import\" imports every labeled card "
 		   "and clears it from staging."), this);
@@ -359,6 +359,9 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 
 	QHBoxLayout* footer = new QHBoxLayout;
 	footer->addStretch(1);
+	QPushButton* suggestLabelsButton = new QPushButton(tr("Suggest labels"), this);
+	connect(suggestLabelsButton, &QPushButton::clicked, this, &ImportDialog::suggestLabels);
+	footer->addWidget(suggestLabelsButton);
 	QPushButton* importButton = new QPushButton(tr("Import"), this);
 	connect(importButton, &QPushButton::clicked, this, &ImportDialog::runImport);
 	footer->addWidget(importButton);
@@ -653,10 +656,10 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 	if (mediaFiles.isEmpty())
 		return;
 
-	QHash<QString, QString> labelNameByPath;
+	QHash<QString, QString> suggestedLabelNameByPath;
 	for (const StagedFile& file : mediaFiles)
-		if (!file.labelName.isEmpty())
-			labelNameByPath.insert(file.path, file.labelName);
+		if (!file.suggestedLabelName.isEmpty())
+			suggestedLabelNameByPath.insert(file.path, file.suggestedLabelName);
 
 	// MediaId is only a name/size gate; byte-compare matches before treating one as a duplicate.
 	QHash<MediaId, QString> stagedPathById;
@@ -708,20 +711,10 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 		MessageBox::notice(this, tr("Already imported"), tr("Not staged - already in the library:"),
 			duplicateLines.join("\n\n"), QMessageBox::Information);
 
-	QHash<QString, QString> labelIdByPath;
-	for (const QString& path : videoPaths + photoPaths)
-	{
-		if (const QString name = labelNameByPath.value(path); !name.isEmpty())
-			labelIdByPath.insert(path, ensureLabelForFolderName(name));
-	}
-
-	if (!labelIdByPath.isEmpty())
-		refreshLabelList();
-
 	const int mainWindowFrameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
 	const int extractionFrameCount = std::max(stagedPreviewFrameCount(), mainWindowFrameCount);
 
-	const auto stageCard = [this, &labelIdByPath](const QString& path, const QString& tempPreviewDir, qint64 durationMs = -1) {
+	const auto stageCard = [this, &suggestedLabelNameByPath](const QString& path, const QString& tempPreviewDir, qint64 durationMs = -1) {
 		const MediaId id = MediaId::fromFile(path);
 		auto* card = buildStagedCard(id, path, tempPreviewDir, durationMs);
 
@@ -730,13 +723,8 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 		_stagedGrid->addItem(item);
 		_stagedGrid->setItemWidget(item, card);
 
-		_staged.insert(id, StagedEntry{ path, tempPreviewDir, durationMs, /*pendingBest*/ false, /*pendingLabelIds*/ {}, item });
-
-		if (const QString labelId = labelIdByPath.value(path); !labelId.isEmpty())
-		{
-			_staged[id].pendingLabelIds << labelId;
-			updateCardLabelDots(id);
-		}
+		_staged.insert(id, StagedEntry{
+			path, tempPreviewDir, suggestedLabelNameByPath.value(path), durationMs, /*pendingBest*/ false, /*pendingLabelIds*/ {}, item });
 	};
 
 	for (const QString& path : photoPaths)
@@ -760,6 +748,28 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 		else
 			stageCard(jobs[i].videoFilePath, jobs[i].destinationFolder, results[i].durationMs);
 	}
+}
+
+void ImportDialog::suggestLabels()
+{
+	bool hadSuggestions = false;
+	for (auto it = _staged.begin(); it != _staged.end(); ++it)
+	{
+		if (it->suggestedLabelName.isEmpty())
+			continue;
+
+		hadSuggestions = true;
+		const QString labelId = ensureLabelForFolderName(it->suggestedLabelName);
+		it->suggestedLabelName.clear();
+		if (!labelId.isEmpty() && !it->pendingLabelIds.contains(labelId))
+			it->pendingLabelIds << labelId;
+	}
+
+	if (!hadSuggestions)
+		return;
+
+	refreshLabelList();
+	updateAllCardLabelDots();
 }
 
 void ImportDialog::unstage(const MediaId& id)
