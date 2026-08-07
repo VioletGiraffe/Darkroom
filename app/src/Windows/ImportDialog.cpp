@@ -955,7 +955,21 @@ void ImportDialog::showStagedCardContextMenu(const MediaId& id, const QPoint& gl
 				}
 			} });
 	}
-	LabelVisuals::buildChecklistMenu(menu.addMenu(tr("Labels")), std::move(labelRows));
+	QMenu* labelsMenu = menu.addMenu(tr("Labels"));
+	QAction* removeAllLabelsAction = labelsMenu->addAction(tr("Remove all labels"), this, [this, selection] {
+		for (const MediaId& target : selection)
+		{
+			auto it = _staged.find(target);
+			if (it == _staged.end())
+				continue;
+			it->pendingLabelIds.clear();
+			updateCardLabelDots(target);
+		}
+	});
+	removeAllLabelsAction->setEnabled(std::any_of(selection.cbegin(), selection.cend(),
+		[this](const MediaId& target) { return !_staged.value(target).pendingLabelIds.empty(); }));
+	labelsMenu->addSeparator();
+	LabelVisuals::buildChecklistMenu(labelsMenu, std::move(labelRows));
 	menu.addSeparator();
 
 	QAction* removeItem = menu.addAction(tr("Remove from staging"), this, [this, selection] {
