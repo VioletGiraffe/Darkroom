@@ -8,6 +8,8 @@ win*{
 }
 
 mac*{
+	QMAKE_MACOSX_DEPLOYMENT_TARGET = 13.3
+
 	# Qt 6.10's qyieldcpu.h calls the ACLE intrinsic __yield() on Apple Silicon without including <arm_acle.h>,
 	# so clang rejects it as an implicit declaration. Force-include the header so the intrinsic is declared.
 	QMAKE_CXXFLAGS += -include arm_acle.h
