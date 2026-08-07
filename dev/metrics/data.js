@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785968680073,
+  "lastUpdate": 1786101506636,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -10166,6 +10166,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .data",
             "value": 34.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 33.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 10,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "c18caecac3296686d4e1cdd84f4ad7a13e32d18e",
+          "message": "ImportDialog moved to the MediaGrid widget; Ctrl+wheel size control supported",
+          "timestamp": "2026-08-07T00:39:16+03:00",
+          "tree_id": "5e413199623a16d2ddc050721debec10e128e69f",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/c18caecac3296686d4e1cdd84f4ad7a13e32d18e"
+        },
+        "date": 1786101504343,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 14041,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 8345,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1150,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 706.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 338.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 35,
             "unit": "KB"
           },
           {
