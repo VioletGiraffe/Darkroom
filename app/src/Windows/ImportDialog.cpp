@@ -9,6 +9,7 @@
 #include "UiComponents/LabelRowDelegate.h"
 #include "UiComponents/LabelVisuals.h"
 #include "UiComponents/MediaGrid.h"
+#include "UiComponents/PreviewFrameCountCombo.h"
 #include "Settings.h"
 #include "Shortcuts.h"
 #include "Windows/ImportExecution.h"
@@ -36,6 +37,7 @@
 #include <QDir>
 #include <QDragEnterEvent>
 #include <QDropEvent>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -56,6 +58,7 @@
 #include <QSettings>
 #include <QSplitter>
 #include <QTimer>
+#include <QThread>
 #include <QUrl>
 #include <QUuid>
 #include <QVBoxLayout>
@@ -68,6 +71,7 @@ namespace {
 constexpr int kLabelIdRole = Qt::UserRole;
 
 const QString STAGED_CARD_IMAGE_HEIGHT_KEY = QStringLiteral("importDialog/cardImageHeight");
+const QString STAGED_PREVIEW_FRAME_COUNT_KEY = QStringLiteral("importDialog/previewFrameCount");
 constexpr int DEFAULT_STAGED_CARD_IMAGE_HEIGHT = 120;
 constexpr int MIN_STAGED_CARD_IMAGE_HEIGHT = 60;
 constexpr int MAX_STAGED_CARD_IMAGE_HEIGHT = 360;
@@ -77,6 +81,8 @@ constexpr int LABEL_LIST_MAX_WIDTH = 300;
 
 // Each ffmpeg process is internally threaded; keep concurrent processes low.
 constexpr int PREVIEW_EXTRACTION_CONCURRENCY = 2;
+constexpr int TEMP_PREVIEW_DELETE_TIMEOUT_MS = 1000;
+constexpr int TEMP_PREVIEW_DELETE_RETRY_MS = 20;
 
 int stagedCardImageHeight()
 {
@@ -88,15 +94,72 @@ QString uniqueTempPreviewDir()
 	return QDir::tempPath() + "/darkroom_import/" + QUuid::createUuid().toString(QUuid::Id128);
 }
 
-void removeTempPreviewDir(const QString& path)
+bool removeTempPreviewDirWithRetry(const QString& path)
 {
 	// QDir("") addresses the working directory; photos have no temporary directory.
 	if (path.isEmpty())
-		return;
+		return true;
 
-	QDir dir{ path };
-	if (dir.exists())
-		assert_r(dir.removeRecursively());
+	QElapsedTimer timeout;
+	timeout.start();
+	for (;;)
+	{
+		if (deleteFolderRecursivelyIfPresent(path))
+			return true;
+		if (timeout.elapsed() >= TEMP_PREVIEW_DELETE_TIMEOUT_MS)
+			return false;
+		QThread::msleep(TEMP_PREVIEW_DELETE_RETRY_MS);
+	}
+}
+
+std::vector<Ffmpeg::PreviewResult> generatePreviewFramesInteractively(
+	const std::vector<Ffmpeg::PreviewJob>& jobs, int frameCount, QWidget* parent)
+{
+	if (jobs.empty())
+		return {};
+
+	QProgressDialog progress(QObject::tr("Examining video %1/%2...").arg(0).arg(jobs.size()), QObject::tr("Cancel"),
+		0, static_cast<int>(jobs.size()), parent);
+	progress.setWindowTitle(QObject::tr("Staging"));
+	progress.setModal(true);
+	progress.setMinimumDuration(0);
+	// Keep the dialog open until cancelled ffmpeg processes have been reaped.
+	progress.setAutoClose(false);
+	progress.setAutoReset(false);
+
+	// results is written by this worker and read only after join().
+	std::vector<Ffmpeg::PreviewResult> results;
+	CInterruptableThread previewThread{ "preview-extraction" };
+
+	QObject::connect(&progress, &QProgressDialog::canceled, parent, [&] {
+		previewThread.requestCancellation();
+		progress.setLabelText(QObject::tr("Cancelling..."));
+	});
+
+	previewThread.start([&](const std::atomic<bool>& cancelled) {
+		results = Ffmpeg::generatePreviewFrames(jobs, frameCount, PREVIEW_EXTRACTION_CONCURRENCY, cancelled,
+			[&](int done, int total, Ffmpeg::Phase phase) {
+				QMetaObject::invokeMethod(&progress, [&progress, &previewThread, done, total, phase] {
+					if (previewThread.cancellationRequested())
+						return;
+					if (phase == Ffmpeg::Phase::Probing)
+					{
+						progress.setLabelText(QObject::tr("Examining video %1/%2...").arg(done).arg(total));
+						return;
+					}
+					progress.setValue(done);
+					progress.setLabelText(QObject::tr("Generating preview %1/%2...").arg(done).arg(total));
+				}, Qt::QueuedConnection);
+			});
+		QMetaObject::invokeMethod(&progress, [&progress] { progress.accept(); }, Qt::QueuedConnection);
+	});
+
+	progress.exec();
+
+	// Cover completion, Cancel, Esc, and window close before joining the worker.
+	previewThread.requestCancellation();
+	previewThread.join();
+	return results;
 }
 
 // labelName preserves the dropped folder hierarchy as hyphen-joined components.
@@ -236,21 +299,25 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 
 	_splitter->addWidget(labelPane);
 
+	QWidget* stagedPane = new QWidget();
+	QVBoxLayout* stagedPaneLayout = new QVBoxLayout(stagedPane);
+	stagedPaneLayout->setContentsMargins(0, 0, 0, 0);
+
+	const int mainWindowFrameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
+	const int savedStagedFrameCount = QSettings{}.value(STAGED_PREVIEW_FRAME_COUNT_KEY, mainWindowFrameCount).toInt();
+	_previewFrameCountCombo = new PreviewFrameCountCombo(savedStagedFrameCount);
+	QSettings{}.setValue(STAGED_PREVIEW_FRAME_COUNT_KEY, _previewFrameCountCombo->frameCount());
+	connect(_previewFrameCountCombo, &QComboBox::currentIndexChanged, this, &ImportDialog::stagedPreviewFrameCountChanged);
+	stagedPaneLayout->addWidget(_previewFrameCountCombo, 0, Qt::AlignRight | Qt::AlignVCenter);
+
 	_stagedGrid = new MediaGrid();
-	_stagedGrid->setViewMode(QListView::IconMode);
-	_stagedGrid->setFlow(QListView::LeftToRight);
-	_stagedGrid->setWrapping(true);
-	_stagedGrid->setResizeMode(QListView::Adjust);
-	_stagedGrid->setMovement(QListView::Static);
-	_stagedGrid->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-	_stagedGrid->setSelectionMode(QAbstractItemView::ExtendedSelection);
-	_stagedGrid->setSpacing(10);
 	_stagedGrid->setStyleSheet(QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().AccentBg));
 
 	_stagedCardZoomDebounce = new QTimer(this);
 	_stagedCardZoomDebounce->setSingleShot(true);
 	_stagedCardZoomDebounce->setInterval(80);
 	connect(_stagedCardZoomDebounce, &QTimer::timeout, this, &ImportDialog::rebuildAllStagedCards);
+	stagedPaneLayout->addWidget(_stagedGrid, 1);
 
 	auto* renameStagedAction = new QAction(tr("Rename..."), this);
 	renameStagedAction->setShortcut(QKeySequence(Shortcuts::Rename));
@@ -274,7 +341,7 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 	connect(deleteStagedAction, &QAction::triggered, this, [this] { deleteStagedSourceFiles(selectedStagedIds()); });
 	_stagedGrid->addAction(deleteStagedAction);
 
-	_splitter->addWidget(_stagedGrid);
+	_splitter->addWidget(stagedPane);
 
 	_splitter->setStretchFactor(0, 0);
 	_splitter->setStretchFactor(1, 1);
@@ -317,7 +384,7 @@ ImportDialog::~ImportDialog()
 	QSettings{}.setValue("importDialog/relocateFolder", _relocateFolderEdit->text());
 
 	for (const StagedEntry& entry : std::as_const(_staged))
-		removeTempPreviewDir(entry.tempPreviewDir);
+		assert_r(removeTempPreviewDirWithRetry(entry.tempPreviewDir));
 }
 
 void ImportDialog::dragEnterEvent(QDragEnterEvent* event)
@@ -538,15 +605,14 @@ MediaItemWidget* ImportDialog::buildStagedCard(const MediaId& id, const QString&
 {
 	const int imageHeight = stagedCardImageHeight();
 	QSize canvasSize{ imageHeight, imageHeight };
+	const bool isPhoto = isSupportedImageFile(path);
 	QStringList previewPaths{ path };
-	if (!isSupportedImageFile(path))
+	if (!isPhoto)
 	{
-		const int frameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
+		const int frameCount = stagedPreviewFrameCount();
 		canvasSize.setWidth(MediaItemWidget::videoCanvasWidthForTiling(imageHeight, frameCount, _stagedGrid->spacing()));
-		previewPaths.clear();
 		const QDir previewDir(tempPreviewDir);
-		for (const QString& file : listFrameImageFiles(previewDir))
-			previewPaths << previewDir.filePath(file);
+		previewPaths = pickEvenlySpacedFrames(previewDir, listFrameImageFiles(previewDir), frameCount);
 	}
 
 	auto* card = new MediaItemWidget(
@@ -562,7 +628,7 @@ MediaItemWidget* ImportDialog::buildStagedCard(const MediaId& id, const QString&
 		[this, id] { previewStagedItem(id); },
 		[this, id](QPoint globalPos) { showStagedCardContextMenu(id, globalPos); },
 		/* dynamicSizeHint */ false,
-		/* film strip */ !isSupportedImageFile(path)
+		/* film strip */ !isPhoto
 	);
 
 	card->setOnLabelDropped([this, id](const QString& labelId) {
@@ -652,7 +718,8 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 	if (!labelIdByPath.isEmpty())
 		refreshLabelList();
 
-	const int frameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
+	const int mainWindowFrameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
+	const int extractionFrameCount = std::max(stagedPreviewFrameCount(), mainWindowFrameCount);
 
 	const auto stageCard = [this, &labelIdByPath](const QString& path, const QString& tempPreviewDir, qint64 durationMs = -1) {
 		const MediaId id = MediaId::fromFile(path);
@@ -683,52 +750,13 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 	for (const QString& path : videoPaths)
 		jobs.push_back({ path, uniqueTempPreviewDir() });
 
-	QProgressDialog progress(tr("Examining video %1/%2...").arg(0).arg(jobs.size()), tr("Cancel"), 0, static_cast<int>(jobs.size()), this);
-	progress.setWindowTitle(tr("Staging"));
-	progress.setModal(true);
-	progress.setMinimumDuration(0);
-	// Keep the dialog open until cancelled ffmpeg processes have been reaped.
-	progress.setAutoClose(false);
-	progress.setAutoReset(false);
-
-	// results is written by this worker and read only after join().
-	std::vector<Ffmpeg::PreviewResult> results;
-	CInterruptableThread previewThread{ "preview-extraction" };
-
-	connect(&progress, &QProgressDialog::canceled, this, [&] {
-		previewThread.requestCancellation();
-		progress.setLabelText(tr("Cancelling..."));
-	});
-
-	previewThread.start([&](const std::atomic<bool>& cancelled) {
-		results = Ffmpeg::generatePreviewFrames(jobs, frameCount, PREVIEW_EXTRACTION_CONCURRENCY, cancelled,
-			[&](int done, int total, Ffmpeg::Phase phase) {
-				QMetaObject::invokeMethod(&progress, [&progress, &previewThread, done, total, phase] {
-					if (previewThread.cancellationRequested())
-						return;
-					if (phase == Ffmpeg::Phase::Probing)
-					{
-						progress.setLabelText(tr("Examining video %1/%2...").arg(done).arg(total));
-						return;
-					}
-					progress.setValue(done);
-					progress.setLabelText(tr("Generating preview %1/%2...").arg(done).arg(total));
-				}, Qt::QueuedConnection);
-			});
-		QMetaObject::invokeMethod(&progress, [&progress] { progress.accept(); }, Qt::QueuedConnection);
-	});
-
-	progress.exec();
-
-	// Cover completion, Cancel, Esc, and window close before joining the worker.
-	previewThread.requestCancellation();
-	previewThread.join();
+	const std::vector<Ffmpeg::PreviewResult> results = generatePreviewFramesInteractively(jobs, extractionFrameCount, this);
 
 	for (size_t i = 0; i < jobs.size(); ++i)
 	{
 		// Cancelled jobs never become staged entries that could own their scratch directory.
 		if (results[i].status == Ffmpeg::PreviewResult::Status::Cancelled)
-			removeTempPreviewDir(jobs[i].destinationFolder);
+			assert_r(removeTempPreviewDirWithRetry(jobs[i].destinationFolder));
 		else
 			stageCard(jobs[i].videoFilePath, jobs[i].destinationFolder, results[i].durationMs);
 	}
@@ -740,7 +768,7 @@ void ImportDialog::unstage(const MediaId& id)
 	if (it == _staged.end())
 		return;
 
-	removeTempPreviewDir(it->tempPreviewDir);
+	assert_r(removeTempPreviewDirWithRetry(it->tempPreviewDir));
 	delete it->item;
 	_staged.erase(it);
 }
@@ -764,6 +792,58 @@ void ImportDialog::updateCardLabelDots(const MediaId& id)
 
 	auto* card = static_cast<MediaItemWidget*>(_stagedGrid->itemWidget(it->item));
 	card->setLabelDots(colors, names.join(", "));
+}
+
+int ImportDialog::stagedPreviewFrameCount() const
+{
+	return _previewFrameCountCombo->frameCount();
+}
+
+void ImportDialog::stagedPreviewFrameCountChanged()
+{
+	QSettings settings;
+	const int mainWindowFrameCount = settings.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
+	const int previousFrameCount = settings.value(STAGED_PREVIEW_FRAME_COUNT_KEY, mainWindowFrameCount).toInt();
+	const int currentFrameCount = stagedPreviewFrameCount();
+	settings.setValue(STAGED_PREVIEW_FRAME_COUNT_KEY, currentFrameCount);
+
+	if (currentFrameCount > previousFrameCount)
+		regenerateInsufficientStagedVideoPreviews(std::max(currentFrameCount, mainWindowFrameCount));
+	rebuildAllStagedCards();
+}
+
+void ImportDialog::regenerateInsufficientStagedVideoPreviews(int frameCount)
+{
+	std::vector<Ffmpeg::PreviewJob> jobs;
+	std::vector<MediaId> jobIds;
+	QStringList cleanupFailures;
+	for (auto it = _staged.constBegin(); it != _staged.constEnd(); ++it)
+	{
+		if (it->tempPreviewDir.isEmpty())
+			continue;
+		if (listFrameImageFiles(QDir{ it->tempPreviewDir }).size() >= frameCount)
+			continue;
+		if (!removeTempPreviewDirWithRetry(it->tempPreviewDir))
+		{
+			cleanupFailures << QDir::toNativeSeparators(it->path);
+			continue;
+		}
+		jobs.push_back({ it->path, it->tempPreviewDir });
+		jobIds.push_back(it.key());
+	}
+
+	const std::vector<Ffmpeg::PreviewResult> results = generatePreviewFramesInteractively(jobs, frameCount, this);
+	for (size_t i = 0; i < results.size(); ++i)
+	{
+		auto staged = _staged.find(jobIds[i]);
+		if (results[i].ok())
+			staged->durationMs = results[i].durationMs;
+		else
+			assert_r(removeTempPreviewDirWithRetry(staged->tempPreviewDir));
+	}
+
+	if (!cleanupFailures.isEmpty())
+		MessageBox::notice(this, tr("Preview refresh"), tr("Could not clear preview files for:"), cleanupFailures.join("\n"), QMessageBox::Warning);
 }
 
 void ImportDialog::zoomStagedCards(int steps)

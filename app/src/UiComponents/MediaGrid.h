@@ -11,7 +11,7 @@ class QUrl;
 // no item is visible. MediaBrowserWidget supplies the data sources; the view contains no catalog logic.
 class MediaGrid final : public QListWidget {
 public:
-	using QListWidget::QListWidget;
+	explicit MediaGrid(QWidget* parent = nullptr);
 
 	// Called with the current selection; an empty result cancels the drag.
 	void setDragUrlsProvider(std::function<QList<QUrl>(const QList<QListWidgetItem*>&)> provider);

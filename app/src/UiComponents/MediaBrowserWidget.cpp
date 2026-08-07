@@ -10,6 +10,7 @@
 #include "UiComponents/LabelSidebar.h"
 #include "UiComponents/MediaGrid.h"
 #include "UiComponents/MediaItemWidget.h"
+#include "UiComponents/PreviewFrameCountCombo.h"
 #include "UiComponents/SegmentedToggle.h"
 #include "UiComponents/SortControl.h"
 #include "Utils.h"
@@ -33,7 +34,6 @@
 #include <QElapsedTimer>
 #include <QFile>
 #include <QHBoxLayout>
-#include <QIcon>
 #include <QItemSelectionModel>
 #include <QKeySequence>
 #include <QLineEdit>
@@ -46,8 +46,6 @@
 #include <QSignalBlocker>
 #include <QSet>
 #include <QSplitter>
-#include <QStyleOptionViewItem>
-#include <QStyledItemDelegate>
 #include <QTimer>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -58,18 +56,6 @@
 
 namespace {
 
-// QComboBox paints the current item's icon itself; popup rows should remain undecorated.
-class ClosedControlIconDelegate final : public QStyledItemDelegate {
-public:
-	using QStyledItemDelegate::QStyledItemDelegate;
-	void initStyleOption(QStyleOptionViewItem* option, const QModelIndex& index) const override
-	{
-		QStyledItemDelegate::initStyleOption(option, index);
-		option->features &= ~QStyleOptionViewItem::HasDecoration;
-		option->icon = QIcon();
-	}
-};
-
 // Card width scales with this per-frame height.
 const QString CARD_IMAGE_HEIGHT_KEY = QStringLiteral("mainWindow/cardImageHeight");
 const QString MEDIA_TYPE_FILTER_KEY = QStringLiteral("mainWindow/mediaTypeFilter");
@@ -77,9 +63,6 @@ constexpr int DEFAULT_CARD_IMAGE_HEIGHT = 120;
 constexpr int MIN_CARD_IMAGE_HEIGHT = 60;
 constexpr int MAX_CARD_IMAGE_HEIGHT = 360;
 constexpr int CARD_IMAGE_HEIGHT_STEP = 20;
-
-constexpr int MIN_PREVIEW_FRAME_COUNT = 1;
-constexpr int MAX_PREVIEW_FRAME_COUNT = 10;
 
 int cardImageHeight()
 {
@@ -280,17 +263,8 @@ void MediaBrowserWidget::setupUi()
 
 	headerLayout->addStretch(1);
 
-	_previewFrameCountCombo = new QComboBox();
-	_previewFrameCountCombo->setToolTip(tr("Number of preview frames shown on each video card"));
-	const QIcon previewCountIcon = Theme::tintedIcon(QStringLiteral(":/UI/icon_columns.svg"), &Theme::ThemeColors::InstructionText);
-	for (int n = MIN_PREVIEW_FRAME_COUNT; n <= MAX_PREVIEW_FRAME_COUNT; ++n)
-		_previewFrameCountCombo->addItem(previewCountIcon, (n == 1 ? tr("%1 frame per preview") : tr("%1 frames per preview")).arg(n), n);
-	_previewFrameCountCombo->view()->setItemDelegate(new ClosedControlIconDelegate(_previewFrameCountCombo));
-
 	const int savedFrameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
-	const int savedFrameIdx = _previewFrameCountCombo->findData(savedFrameCount);
-	_previewFrameCountCombo->setCurrentIndex(savedFrameIdx >= 0 ? savedFrameIdx
-		: _previewFrameCountCombo->findData(Defaults::PreviewFrameCount));
+	_previewFrameCountCombo = new PreviewFrameCountCombo(savedFrameCount);
 
 	connect(_previewFrameCountCombo, &QComboBox::currentIndexChanged, this, [this] {
 		QSettings{}.setValue(Settings::PreviewFrameCount, previewFrameCount());
@@ -305,19 +279,11 @@ void MediaBrowserWidget::setupUi()
 	mainLayout->addWidget(headerWidget);
 
 	_mediaGrid = new MediaGrid();
-	_mediaGrid->setViewMode(QListView::IconMode);
-	_mediaGrid->setFlow(QListView::LeftToRight);
-	_mediaGrid->setWrapping(true);
-	_mediaGrid->setResizeMode(QListView::Adjust);
 	// Video and photo cards have different fixed sizes.
 	_mediaGrid->setUniformItemSizes(false);
-	_mediaGrid->setMovement(QListView::Static);
-	_mediaGrid->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-	_mediaGrid->setSelectionMode(QAbstractItemView::ExtendedSelection);
 	_mediaGrid->setDragEnabled(true);
 	_mediaGrid->setDragUrlsProvider([this](const QList<QListWidgetItem*>& items) { return dragUrlsForItems(items); });
 	_mediaGrid->setCardFactory([this](QListWidgetItem* item) { return buildMediaCard(item); });
-	_mediaGrid->setSpacing(10);
 	Style::applyThemedSheet(_mediaGrid, [] {
 		return QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().AccentBg);
 	});
@@ -580,7 +546,7 @@ void MediaBrowserWidget::refreshLibraryView()
 
 int MediaBrowserWidget::previewFrameCount() const
 {
-	return _previewFrameCountCombo->currentData().toInt();
+	return _previewFrameCountCombo->frameCount();
 }
 
 void MediaBrowserWidget::installGridAction(QAction* action)

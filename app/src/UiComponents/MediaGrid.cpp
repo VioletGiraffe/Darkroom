@@ -42,6 +42,19 @@ void paintDragCountBadge(QPixmap& pixmap, int count)
 
 }  // namespace
 
+MediaGrid::MediaGrid(QWidget* parent)
+	: QListWidget(parent)
+{
+	setViewMode(QListView::IconMode);
+	setFlow(QListView::LeftToRight);
+	setWrapping(true);
+	setResizeMode(QListView::Adjust);
+	setMovement(QListView::Static);
+	setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+	setSelectionMode(QAbstractItemView::ExtendedSelection);
+	setSpacing(10);
+}
+
 void MediaGrid::setDragUrlsProvider(std::function<QList<QUrl>(const QList<QListWidgetItem*>&)> provider)
 {
 	_dragUrlsProvider = std::move(provider);

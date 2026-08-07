@@ -194,6 +194,14 @@ re-running ffmpeg (the import-side reuse in "Import: preview frames only" above)
 media grid's per-pixel wheel scrolling behavior. Ctrl+wheel over a card adjusts the Import workspace's independently
 persisted card size; the dialog debounces rebuilding its staged cards, retaining their pending Best and label state.
 
+The staging grid has its own persisted preview-frame-count selector, independent from the main browser's display
+count. Cards show the local count, while a newly-staged video extracts the larger of the local and main-browser counts
+so the preview copied into the library remains sufficient for the main view. Raising the local count re-extracts only
+staged videos whose scratch directory contains fewer frames than the new local/main maximum; it first clears that same
+directory with bounded retry for transient open-file failures. Lowering the count retains all extracted files and only
+rebuilds cards from an evenly sampled subset, so raising it again can reuse them. Failed or cancelled refreshes clear
+partial output.
+
 ### Label assignment: drag-from-list or per-card checklist, no "destination" UI
 
 Provisional labels exist **only in the dialog** until Import — minted in-dialog (folder-derived or via

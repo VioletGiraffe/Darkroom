@@ -41,7 +41,7 @@ orient, then follow the link for the subsystem you're touching.
   are authoritative.
 - **Source layout** (under `app/src/`): reusable UI widgets and feature-level composites in `UiComponents/`
   (`ThumbnailWidget`, `MediaItemWidget`, `MediaBrowserWidget`, `MarkerSlider`, `SortControl`, `SegmentedToggle`,
-  `LabelSidebar`) plus their close UI
+  `PreviewFrameCountCombo`, `LabelSidebar`) plus their close UI
   helpers (`LabelVisuals`, `DragGestureHelper`, `LabelMimeType`); top-level windows + dialogs in `Windows/`
   (`MainWindow`, `CompareWindow`, `PhotoCompareWindow`, `FrameViewerWindow`, `VideoPlayerWindow`, the `*Dialog`s); the non-UI core
   model in `Core/` (`Library`, `Catalog`, `MetadataStore`, `MediaId`); and the visual theming in `Theme/` (`Theme`,

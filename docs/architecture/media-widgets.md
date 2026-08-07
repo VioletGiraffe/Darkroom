@@ -51,6 +51,9 @@ Card sizes are type-specific but share one **height** (the user's per-frame heig
 column grid. Per-frame height and frame count are both user-adjustable at runtime (see
 [Card preview sizing & zoom](#card-preview-sizing--zoom-ctrlwheel) below).
 
+`PreviewFrameCountCombo` supplies the identical 1-10-frame selector used by the main browser and Import staging;
+each owner persists and applies its own selected count.
+
 ### Duration badge
 
 A small play-triangle overlay marks a card as video at a glance. **`MediaBrowserWidget`** supplies the duration from

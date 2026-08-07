@@ -19,6 +19,7 @@ class QTimer;
 class QWidget;
 class MediaItemWidget;
 class Library;
+class PreviewFrameCountCombo;
 
 // Stages dropped videos/photos as media cards, assigns real or session-provisional labels, then imports every
 // labeled item in one pass. Provisional labels reach Catalog only when used by Import. Failed, cancelled, and
@@ -53,6 +54,9 @@ private:
 	// Removes the card and its temporary preview directory.
 	void unstage(const MediaId& id);
 	void updateCardLabelDots(const MediaId& id);
+	[[nodiscard]] int stagedPreviewFrameCount() const;
+	void stagedPreviewFrameCountChanged();
+	void regenerateInsufficientStagedVideoPreviews(int frameCount);
 	void zoomStagedCards(int steps);
 	void rebuildAllStagedCards();
 	// Whole selection when id is selected; otherwise id alone.
@@ -126,6 +130,7 @@ private:
 	QListWidget* _stagedGrid = nullptr;
 
 	QComboBox* _relocateModeCombo = nullptr;
+	PreviewFrameCountCombo* _previewFrameCountCombo = nullptr;
 	QLineEdit* _relocateFolderEdit = nullptr;
 	QSplitter* _splitter = nullptr;
 	QTimer* _stagedCardZoomDebounce = nullptr;

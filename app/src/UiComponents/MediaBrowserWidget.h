@@ -16,7 +16,7 @@ class LabelSidebar;
 class Library;
 class MediaGrid;
 class MediaItemWidget;
-class QComboBox;
+class PreviewFrameCountCombo;
 class QLineEdit;
 class QListWidgetItem;
 class QObject;
@@ -99,7 +99,7 @@ private:
 	LabelSidebar*    _labelSidebar = nullptr;
 	QLineEdit*       _nameFilter = nullptr;
 	SegmentedToggle* _mediaTypeFilter = nullptr;
-	QComboBox*       _previewFrameCountCombo = nullptr;
+	PreviewFrameCountCombo* _previewFrameCountCombo = nullptr;
 	SortControl*     _sortControl = nullptr;
 	MediaGrid*       _mediaGrid = nullptr;
 	QTimer*          _catalogRefreshTimer = nullptr;
