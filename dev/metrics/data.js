@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786128491528,
+  "lastUpdate": 1786131978135,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -10481,6 +10481,75 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/VioletGiraffe/Darkroom/commit/1d45013ab8d5365cf0cde78e7335b94771b838d1"
         },
         "date": 1786128489211,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 14316,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 8345,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1165.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 718,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 341.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 35.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 34,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 10,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "7203b4ff3826f662fe816f8a905316a5a88bf72e",
+          "message": "MacOS build fixed",
+          "timestamp": "2026-08-07T22:41:38+03:00",
+          "tree_id": "275c620ebed7f11f8831c41fa06cbdd98121a78f",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/7203b4ff3826f662fe816f8a905316a5a88bf72e"
+        },
+        "date": 1786131975909,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
