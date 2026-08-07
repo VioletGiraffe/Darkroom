@@ -219,8 +219,8 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 	_relocateModeCombo->addItem(tr("Leave source file in place (photos: reference, never touched)"), int(RelocateMode::LeaveInPlace));
 	_relocateModeCombo->addItem(tr("Copy source file to:"), int(RelocateMode::Copy));
 	_relocateModeCombo->addItem(tr("Move source file to:"), int(RelocateMode::Move));
-	const int savedRelocateMode = relocateSettings.value("importDialog/relocateMode", int(RelocateMode::LeaveInPlace)).toInt();
-	_relocateModeCombo->setCurrentIndex(qMax(0, _relocateModeCombo->findData(savedRelocateMode)));
+	_relocateModeCombo->setPlaceholderText(tr("Choose how to handle source files..."));
+	_relocateModeCombo->setCurrentIndex(-1);
 
 	QString relocateFolder = relocateSettings.value("importDialog/relocateFolder").toString();
 	if (relocateFolder.isEmpty())
@@ -229,7 +229,8 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 	QPushButton* relocateBrowseButton = new QPushButton(tr("Browse..."), this);
 
 	const auto updateRelocateRowEnabled = [this, relocateBrowseButton] {
-		const bool enabled = _relocateModeCombo->currentData().toInt() != int(RelocateMode::LeaveInPlace);
+		const auto modeData = _relocateModeCombo->currentData();
+		const bool enabled = modeData.isValid() && modeData.toInt() != int(RelocateMode::LeaveInPlace);
 		_relocateFolderEdit->setEnabled(enabled);
 		relocateBrowseButton->setEnabled(enabled);
 	};
@@ -384,7 +385,6 @@ ImportDialog::~ImportDialog()
 {
 	saveWindowGeometry(this, "importDialog");
 	QSettings{}.setValue("importDialog/splitter", _splitter->saveState());
-	QSettings{}.setValue("importDialog/relocateMode", _relocateModeCombo->currentData().toInt());
 	QSettings{}.setValue("importDialog/relocateFolder", _relocateFolderEdit->text());
 
 	for (const StagedEntry& entry : std::as_const(_staged))
@@ -1276,10 +1276,24 @@ void ImportDialog::importVideoGroup(const QString& labelId, const std::vector<Me
 
 void ImportDialog::runImport()
 {
+	const bool hasLabeledItems = std::any_of(
+		_staged.constBegin(), _staged.constEnd(), [](const StagedEntry& entry) { return !entry.pendingLabelIds.empty(); });
+	if (!hasLabeledItems)
+	{
+		QMessageBox::information(this, tr("Import"), tr("No staged item has been labeled yet."));
+		return;
+	}
+
+	if (_relocateModeCombo->currentIndex() < 0)
+	{
+		_relocateModeCombo->setFocus(Qt::OtherFocusReason);
+		_relocateModeCombo->showPopup();
+		return;
+	}
+
 	const RelocateMode relocateMode = static_cast<RelocateMode>(_relocateModeCombo->currentData().toInt());
 
-	if (relocateMode != RelocateMode::LeaveInPlace
-		&& std::any_of(_staged.constBegin(), _staged.constEnd(), [](const StagedEntry& entry) { return !entry.pendingLabelIds.isEmpty(); }))
+	if (relocateMode != RelocateMode::LeaveInPlace)
 	{
 		const bool move = relocateMode == RelocateMode::Move;
 		const QString text = move
