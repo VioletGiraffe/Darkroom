@@ -21,6 +21,8 @@
 #include "Windows/PhotoCompareWindow.h"
 #include "Windows/VideoPlayerWindow.h"
 
+#include "utils/naturalsorting/cnaturalsorterqcollator.h"
+
 #include <QAbstractItemView>
 #include <QAction>
 #include <QApplication>
@@ -110,8 +112,9 @@ public:
 		if (sortBy == SortBy::Date)
 			return descending ? b.date < info.date : info.date < b.date;
 
-		const int cmp = QString::compare(info.name, b.name, Qt::CaseInsensitive);
-		return descending ? cmp > 0 : cmp < 0;
+		return descending
+			? NaturalSort::lessCaseInsensitive(b.name, info.name)
+			: NaturalSort::lessCaseInsensitive(info.name, b.name);
 	}
 };
 

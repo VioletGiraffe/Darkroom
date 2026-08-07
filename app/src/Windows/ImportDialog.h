@@ -13,7 +13,6 @@
 class QComboBox;
 class QLineEdit;
 class QListWidget;
-class QListWidgetItem;
 class QSplitter;
 class QTimer;
 class QWidget;
@@ -50,12 +49,15 @@ protected:
 	void dropEvent(QDropEvent* event) override;
 
 private:
+	class StagedGridItem;
+
 	void refreshLabelList();
 	void stageMediaItems(const QStringList& paths);
 	[[nodiscard]] bool stagedItemMatchesMediaTypeFilter(const QString& path) const;
 	void applyStagedMediaTypeFilter();
+	void resortStagedItems();
 	void suggestLabels();
-	[[nodiscard]] MediaItemWidget* buildStagedCard(const MediaId& id, const QString& path, const QString& tempPreviewDir, qint64 durationMs);
+	[[nodiscard]] MediaItemWidget* buildStagedCard(StagedGridItem* item, const QString& path, const QString& tempPreviewDir, qint64 durationMs);
 	// Removes the card and its temporary preview directory.
 	void unstage(const MediaId& id);
 	void updateCardLabelDots(const MediaId& id);
@@ -64,9 +66,9 @@ private:
 	void regenerateInsufficientStagedVideoPreviews(int frameCount);
 	void zoomStagedCards(int steps);
 	void rebuildAllStagedCards();
-	// Whole selection when id is selected; otherwise id alone.
-	[[nodiscard]] std::vector<MediaId> effectiveStagedSelection(const MediaId& id) const;
-	void showStagedCardContextMenu(const MediaId& id, const QPoint& globalPos);
+	// Whole selection when item is selected; otherwise that item alone.
+	[[nodiscard]] std::vector<MediaId> effectiveStagedSelection(const StagedGridItem* item) const;
+	void showStagedCardContextMenu(StagedGridItem* item, const QPoint& globalPos);
 	void previewStagedItem(const MediaId& id);
 	void locateStagedSourceFile(const MediaId& id);
 	void copyStagedSourcePath(const MediaId& id);
@@ -75,7 +77,7 @@ private:
 	void removeStagedItems(const std::vector<MediaId>& ids);
 	void deleteStagedSourceFiles(const std::vector<MediaId>& ids);
 	[[nodiscard]] std::vector<MediaId> selectedStagedIds() const;
-	// Renames and re-keys in place, preserving "staged key == current file id"; extension remains fixed.
+	// Renames and re-keys in place, preserving "staged key == row id == current file id"; extension remains fixed.
 	void renameStagedItem(const MediaId& id);
 
 	// Keyed by registered id because owned-photo import may auto-rename.
@@ -123,7 +125,7 @@ private:
 		qint64 durationMs = -1;
 		bool pendingBest = false;
 		QStringList pendingLabelIds;
-		QListWidgetItem* item = nullptr;
+		StagedGridItem* item = nullptr;
 	};
 
 	Library& _library;
@@ -138,6 +140,7 @@ private:
 	QComboBox* _relocateModeCombo = nullptr;
 	SegmentedToggle* _mediaTypeFilter = nullptr;
 	PreviewFrameCountCombo* _previewFrameCountCombo = nullptr;
+	SegmentedToggle* _sortDirectionToggle = nullptr;
 	QLineEdit* _relocateFolderEdit = nullptr;
 	QSplitter* _splitter = nullptr;
 	QTimer* _stagedCardZoomDebounce = nullptr;
