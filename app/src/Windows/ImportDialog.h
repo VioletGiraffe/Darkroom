@@ -20,6 +20,7 @@ class QWidget;
 class MediaItemWidget;
 class Library;
 class PreviewFrameCountCombo;
+class SegmentedToggle;
 
 // Stages dropped videos/photos as media cards, assigns real or session-provisional labels, then imports every
 // labeled item in one pass. Provisional labels reach Catalog only when used by Import. Failed, cancelled, and
@@ -44,12 +45,15 @@ public:
 	void addToStaging(const QStringList& paths);
 
 protected:
+	void reject() override;
 	void dragEnterEvent(QDragEnterEvent* event) override;
 	void dropEvent(QDropEvent* event) override;
 
 private:
 	void refreshLabelList();
 	void stageMediaItems(const QStringList& paths);
+	[[nodiscard]] bool stagedItemMatchesMediaTypeFilter(const QString& path) const;
+	void applyStagedMediaTypeFilter();
 	void suggestLabels();
 	[[nodiscard]] MediaItemWidget* buildStagedCard(const MediaId& id, const QString& path, const QString& tempPreviewDir, qint64 durationMs);
 	// Removes the card and its temporary preview directory.
@@ -132,6 +136,7 @@ private:
 	QListWidget* _stagedGrid = nullptr;
 
 	QComboBox* _relocateModeCombo = nullptr;
+	SegmentedToggle* _mediaTypeFilter = nullptr;
 	PreviewFrameCountCombo* _previewFrameCountCombo = nullptr;
 	QLineEdit* _relocateFolderEdit = nullptr;
 	QSplitter* _splitter = nullptr;

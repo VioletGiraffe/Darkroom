@@ -10,6 +10,7 @@
 #include "UiComponents/LabelVisuals.h"
 #include "UiComponents/MediaGrid.h"
 #include "UiComponents/PreviewFrameCountCombo.h"
+#include "UiComponents/SegmentedToggle.h"
 #include "Settings.h"
 #include "Shortcuts.h"
 #include "Windows/ImportExecution.h"
@@ -307,10 +308,16 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 
 	const int mainWindowFrameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
 	const int savedStagedFrameCount = QSettings{}.value(STAGED_PREVIEW_FRAME_COUNT_KEY, mainWindowFrameCount).toInt();
+	_mediaTypeFilter = new SegmentedToggle({ tr("All"), tr("Videos"), tr("Photos") });
+	connect(_mediaTypeFilter, &SegmentedToggle::currentChanged, this, &ImportDialog::applyStagedMediaTypeFilter);
 	_previewFrameCountCombo = new PreviewFrameCountCombo(savedStagedFrameCount);
 	QSettings{}.setValue(STAGED_PREVIEW_FRAME_COUNT_KEY, _previewFrameCountCombo->frameCount());
 	connect(_previewFrameCountCombo, &QComboBox::currentIndexChanged, this, &ImportDialog::stagedPreviewFrameCountChanged);
-	stagedPaneLayout->addWidget(_previewFrameCountCombo, 0, Qt::AlignRight | Qt::AlignVCenter);
+	QHBoxLayout* stagedToolbar = new QHBoxLayout;
+	stagedToolbar->addWidget(_mediaTypeFilter, 0, Qt::AlignVCenter);
+	stagedToolbar->addStretch(1);
+	stagedToolbar->addWidget(_previewFrameCountCombo, 0, Qt::AlignVCenter);
+	stagedPaneLayout->addLayout(stagedToolbar);
 
 	_stagedGrid = new MediaGrid();
 	_stagedGrid->setStyleSheet(QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().AccentBg));
@@ -389,6 +396,20 @@ ImportDialog::~ImportDialog()
 
 	for (const StagedEntry& entry : std::as_const(_staged))
 		assert_r(removeTempPreviewDirWithRetry(entry.tempPreviewDir));
+}
+
+void ImportDialog::reject()
+{
+	const bool anyHiddenItems = std::any_of(_staged.constBegin(), _staged.constEnd(),
+		[](const StagedEntry& entry) { return entry.item->isHidden(); });
+	if (anyHiddenItems)
+	{
+		_mediaTypeFilter->setCurrentIndex(0);
+		applyStagedMediaTypeFilter();
+		return;
+	}
+
+	QDialog::reject();
 }
 
 void ImportDialog::dragEnterEvent(QDragEnterEvent* event)
@@ -651,6 +672,27 @@ MediaItemWidget* ImportDialog::buildStagedCard(const MediaId& id, const QString&
 	return card;
 }
 
+bool ImportDialog::stagedItemMatchesMediaTypeFilter(const QString& path) const
+{
+	const int filterIndex = _mediaTypeFilter->currentIndex();
+	if (filterIndex == 1)
+		return !isSupportedImageFile(path);
+	if (filterIndex == 2)
+		return isSupportedImageFile(path);
+	return true;
+}
+
+void ImportDialog::applyStagedMediaTypeFilter()
+{
+	for (StagedEntry& entry : _staged)
+	{
+		const bool hidden = !stagedItemMatchesMediaTypeFilter(entry.path);
+		entry.item->setHidden(hidden);
+		if (hidden)
+			entry.item->setSelected(false);
+	}
+}
+
 void ImportDialog::stageMediaItems(const QStringList& paths)
 {
 	const QList<StagedFile> mediaFiles = flattenToSupportedMediaFiles(paths);
@@ -726,6 +768,7 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 
 		_staged.insert(id, StagedEntry{
 			path, tempPreviewDir, suggestedLabelNameByPath.value(path), durationMs, /*pendingBest*/ false, /*pendingLabelIds*/ {}, item });
+		item->setHidden(!stagedItemMatchesMediaTypeFilter(path));
 	};
 
 	for (const QString& path : photoPaths)

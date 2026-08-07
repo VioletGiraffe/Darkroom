@@ -99,6 +99,8 @@ their order.
 
 Staged videos receive cancellable scratch previews; photos stage directly from their source image. Completed scratch
 previews and probed durations are reused by video import, while unstaging or closing the dialog removes leftovers.
+The All/Videos/Photos selector only hides staged cards; Import and Suggest labels still process all of them. Closing
+while any are hidden first restores All and keeps the dialog open.
 Explicit staged-source deletion uses the shared Trash-first workflow and unstages only the successfully removed
 items. Photo comparison reports successful deletion back to the dialog for the same reason. Internal scratch and
 transaction cleanup remains permanent so regenerable files do not accumulate in Trash.
