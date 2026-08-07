@@ -8,6 +8,7 @@
 #include <QStringList>
 #include <QWidget>
 
+#include <functional>
 #include <memory>
 #include <stdint.h>
 #include <vector>
@@ -18,6 +19,7 @@ class QSlider;
 class QStackedLayout;
 class PhotoComparePane;
 class SegmentedToggle;
+class Library;
 struct AlignmentTransform;
 
 // N-way aligned comparison. Pan/zoom is shared across panes; each photo has a similarity transform into the
@@ -26,12 +28,16 @@ struct AlignmentTransform;
 class PhotoCompareWindow final : public QWidget
 {
 public:
+	using PhotoRemovedHandler = std::function<void(const QString& filePath)>;
+
 	// Empty paths open the drop-target state. Loading omits unreadable files and caps the set at 50.
-	explicit PhotoCompareWindow(const QStringList& photoPaths, QWidget* parent = nullptr);
+	explicit PhotoCompareWindow(Library& library, const QStringList& photoPaths, QWidget* parent = nullptr,
+		PhotoRemovedHandler photoRemovedHandler = {});
 	~PhotoCompareWindow() override;
 
 	// Opens a self-deleting window, or warns when fewer than two existing candidates remain.
-	static void showForFiles(const QStringList& candidatePaths, QWidget* parent);
+	static void showForFiles(Library& library, const QStringList& candidatePaths, QWidget* parent,
+		PhotoRemovedHandler photoRemovedHandler = {});
 
 protected:
 	void keyPressEvent(QKeyEvent* event) override;
@@ -88,6 +94,8 @@ private:
 	void addPhotosFromFiles(const QStringList& photoPaths);
 	void applyLoadedPhotoBatch(PhotoLoadBatch& batch);
 	void rebuildPaneGrid();
+	void deletePhotoInteractive(int index);
+	void removePhotoFromComparison(int index);
 
 	[[nodiscard]] QRectF referenceSubjectRect() const;
 	// Converts the align region to/from persisted reference-frame fractions.
@@ -128,6 +136,8 @@ private:
 	void updateHintText();
 
 private:
+	Library& _library;
+	PhotoRemovedHandler _photoRemovedHandler;
 	std::vector<Photo> _photos;
 	std::vector<PhotoComparePane*> _paneWidgets;
 	QWidget* _gridPage = nullptr;

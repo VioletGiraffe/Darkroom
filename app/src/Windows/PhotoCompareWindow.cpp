@@ -1,9 +1,12 @@
 #include "Windows/PhotoCompareWindow.h"
+#include "Core/Catalog.h"
 #include "Core/IoThreadPool.h"
+#include "Core/Library.h"
 #include "MagicAlignment.h"
 #include "Theme/Theme.h"
 #include "UiComponents/SegmentedToggle.h"
 #include "Utils.h"
+#include "Windows/MediaItemManagement.h"
 
 #include "assert/advanced_assert.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
@@ -13,6 +16,7 @@
 #include <QCheckBox>
 #include <QContextMenuEvent>
 #include <QDebug>
+#include <QDir>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QElapsedTimer>
@@ -32,6 +36,7 @@
 #include <QPolygonF>
 #include <QSettings>
 #include <QSlider>
+#include <QSignalBlocker>
 #include <QStackedLayout>
 #include <QtMath>
 #include <QUrl>
@@ -43,7 +48,9 @@
 #include <cmath>
 #include <memory>
 #include <numbers>
+#include <optional>
 #include <thread>
+#include <utility>
 
 namespace Settings {
 	constexpr const char* PhotoCompareIgnoreRotation = "photoCompare/ignoreRotation";
@@ -344,10 +351,13 @@ void PhotoComparePane::contextMenuEvent(QContextMenuEvent* event)
 		_owner.updateAllPanes();
 	});
 	makeReference->setEnabled(index != _owner._refIndex);
+	menu.addSeparator();
+	menu.addAction(tr("Delete this photo from disk"), [this, index] { _owner.deletePhotoInteractive(index); });
 	menu.exec(event->globalPos());
 }
 
-void PhotoCompareWindow::showForFiles(const QStringList& candidatePaths, QWidget* parent)
+void PhotoCompareWindow::showForFiles(Library& library, const QStringList& candidatePaths, QWidget* parent,
+	PhotoRemovedHandler photoRemovedHandler)
 {
 	QStringList paths;
 	for (const QString& path : candidatePaths)
@@ -366,12 +376,15 @@ void PhotoCompareWindow::showForFiles(const QStringList& candidatePaths, QWidget
 		return;
 	}
 
-	auto* w = new PhotoCompareWindow(paths, parent);
+	auto* w = new PhotoCompareWindow(library, paths, parent, std::move(photoRemovedHandler));
 	w->setAttribute(Qt::WA_DeleteOnClose);
 	w->show();
 }
 
-PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* parent) : QWidget(parent, Qt::Window),
+PhotoCompareWindow::PhotoCompareWindow(Library& library, const QStringList& photoPaths, QWidget* parent,
+	PhotoRemovedHandler photoRemovedHandler) : QWidget(parent, Qt::Window),
+	_library(library),
+	_photoRemovedHandler(std::move(photoRemovedHandler)),
 	_workerPool(std::max(std::thread::hardware_concurrency(), 2u) - 1, "photo-compare")
 {
 	setWindowTitle(tr("Compare Photos"));
@@ -603,6 +616,8 @@ void PhotoCompareWindow::rebuildPaneGrid()
 	grid->setSpacing(4);
 
 	const int photoCount = static_cast<int>(_photos.size());
+	for (PhotoComparePane* pane : _paneWidgets)
+		pane->hide();
 	_dropHintLabel->setVisible(photoCount == 0);
 	if (photoCount == 0)
 	{
@@ -617,12 +632,92 @@ void PhotoCompareWindow::rebuildPaneGrid()
 	const int columns = static_cast<int>(std::ceil(std::sqrt(photoCount)));
 	const int rows = (photoCount + columns - 1) / columns;
 	for (int i = 0; i < photoCount; ++i)
+	{
 		grid->addWidget(_paneWidgets[i], i / columns, i % columns);
+		_paneWidgets[i]->show();
+	}
 	// Shared widget-space pan requires equally sized panes.
 	for (int c = 0; c < columns; ++c)
 		grid->setColumnStretch(c, 1);
 	for (int r = 0; r < rows; ++r)
 		grid->setRowStretch(r, 1);
+}
+
+void PhotoCompareWindow::deletePhotoInteractive(int index)
+{
+	if (index < 0 || index >= static_cast<int>(_photos.size()))
+	{
+		assert_unconditional_r("Invalid photo-comparison index");
+		return;
+	}
+
+	const QString filePath = _photos[index].filePath;
+	const QString pathKey = pathComparisonKey(filePath);
+	std::optional<MediaId> trackedId;
+	Catalog& catalog = _library.catalog();
+	for (auto it = catalog.mediaItems().cbegin(); it != catalog.mediaItems().cend(); ++it)
+	{
+		if (it->type == Catalog::MediaType::Photo && pathComparisonKey(it->sourcePath) == pathKey)
+		{
+			trackedId = it.key();
+			break;
+		}
+	}
+
+	if (trackedId)
+	{
+		MediaItemManagement::deleteItemsInteractive(catalog, { *trackedId }, this);
+		if (!catalog.containsMediaItem(*trackedId))
+			removePhotoFromComparison(index);
+		return;
+	}
+
+	const QString question = tr("Move this photo to Trash?\n\n%1").arg(QDir::toNativeSeparators(filePath));
+	if (QMessageBox::warning(this, tr("Delete photo"), question,
+			QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+		return;
+
+	if (MediaItemManagement::removePathTrashFirstInteractive(filePath, this))
+		removePhotoFromComparison(index);
+}
+
+void PhotoCompareWindow::removePhotoFromComparison(int index)
+{
+	const QString removedPath = _photos[index].filePath;
+	const bool removedReference = index == _refIndex;
+	exitFullView();
+	_flickerIndex = -1;
+	_photos.erase(_photos.begin() + index);
+	if (_photos.empty())
+	{
+		_refIndex = 0;
+		_alignAoi = QRectF();
+		_viewTouched = false;
+	}
+	else if (removedReference)
+		_refIndex = std::min(index, static_cast<int>(_photos.size()) - 1);
+	else if (index < _refIndex)
+		--_refIndex;
+
+	rebuildPaneGrid();
+	{
+		const QSignalBlocker blocker(_slider);
+		_slider->setRange(0, std::max(0, static_cast<int>(_photos.size()) - 1));
+		_slider->setValue(std::min(_slider->value(), _slider->maximum()));
+	}
+	_slider->setEnabled(!_photos.empty() && !_calibrating);
+	if (removedReference && !_photos.empty())
+		resetToInitialState();
+	else
+	{
+		if (!_viewTouched)
+			fitView();
+		updateHintText();
+		updateAllPanes();
+	}
+
+	if (_photoRemovedHandler)
+		_photoRemovedHandler(removedPath);
 }
 
 void PhotoCompareWindow::dragEnterEvent(QDragEnterEvent* event)

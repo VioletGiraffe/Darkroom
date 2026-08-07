@@ -13,6 +13,10 @@ class QWidget;
 // filesystem deletion, and failure reporting.
 namespace MediaItemManagement
 {
+	// The caller owns the initial deletion confirmation. An absent path succeeds. A Trash failure reports QFile's
+	// available diagnostic and offers an explicit, default-cancelled permanent-deletion fallback.
+	[[nodiscard]] bool removePathTrashFirstInteractive(const QString& path, QWidget* dialogParent);
+
 	struct DeleteResult
 	{
 		// A failed deletion can partially alter storage without changing the Catalog.

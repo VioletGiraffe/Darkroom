@@ -14,6 +14,7 @@
 #include "Shortcuts.h"
 #include "Windows/ImportExecution.h"
 #include "Windows/LabelManagement.h"
+#include "Windows/MediaItemManagement.h"
 #include "Windows/SourceRelocation.h"
 #include "Theme/Icons.h"
 #include "Theme/Theme.h"
@@ -1030,7 +1031,18 @@ void ImportDialog::compareStagedPhotos(const std::vector<MediaId>& photoIds)
 	QStringList paths;
 	for (const MediaId& id : photoIds)
 		paths << _staged.value(id).path;
-	PhotoCompareWindow::showForFiles(paths, this);
+	PhotoCompareWindow::showForFiles(_library, paths, this, [this](const QString& removedPath) {
+		const QString removedKey = pathComparisonKey(removedPath);
+		for (auto it = _staged.constBegin(); it != _staged.constEnd(); ++it)
+		{
+			if (pathComparisonKey(it->path) == removedKey)
+			{
+				const MediaId id = it.key();
+				unstage(id);
+				return;
+			}
+		}
+	});
 }
 
 void ImportDialog::setBestForStagedSelection(const std::vector<MediaId>& ids, bool inBest)
@@ -1057,27 +1069,18 @@ void ImportDialog::deleteStagedSourceFiles(const std::vector<MediaId>& ids)
 		return;
 
 	const QString question = ids.size() == 1
-		? tr("Permanently delete this source file from disk?\n\n%1").arg(QDir::toNativeSeparators(_staged.value(ids.front()).path))
-		: tr("Permanently delete %1 source files from disk? This cannot be undone.").arg(ids.size());
+		? tr("Move this source file to Trash?\n\n%1").arg(QDir::toNativeSeparators(_staged.value(ids.front()).path))
+		: tr("Move %1 source files to Trash?").arg(ids.size());
 	if (QMessageBox::warning(this, tr("Delete source file(s)"), question,
 			QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
 		return;
 
-	QStringList failed;
 	for (const MediaId& id : ids)
 	{
 		const auto it = _staged.constFind(id);
-		if (it == _staged.constEnd())
-			continue;
-		const QString path = it->path;
-		if (QFile::remove(path))
+		if (it != _staged.constEnd() && MediaItemManagement::removePathTrashFirstInteractive(it->path, this))
 			unstage(id);
-		else
-			failed << QDir::toNativeSeparators(path);
 	}
-
-	if (!failed.isEmpty())
-		MessageBox::notice(this, tr("Delete source file(s)"), tr("These files could not be deleted:"), failed.join("\n"));
 }
 
 void ImportDialog::renameStagedItem(const MediaId& id)

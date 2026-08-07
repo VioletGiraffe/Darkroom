@@ -381,7 +381,7 @@ void MediaBrowserWidget::showMediaItemContextMenu(const MediaId& id, const QPoin
 			QStringList paths;
 			for (const MediaId& selectedId : selection)
 				paths << _library.catalog().sourcePathForMediaItem(selectedId);
-			PhotoCompareWindow::showForFiles(paths, window());
+			PhotoCompareWindow::showForFiles(_library, paths, window());
 		});
 		menu.addSeparator();
 	}

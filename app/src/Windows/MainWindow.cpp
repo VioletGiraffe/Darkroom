@@ -228,7 +228,7 @@ void MainWindow::setupMainMenu()
 	toolsMenu->addAction(tr("Check catalog integrity..."), this, &MainWindow::checkCatalogIntegrity);
 	toolsMenu->addSeparator();
 	toolsMenu->addAction(tr("Compare photos..."), QKeySequence("Shift+C"), this, [this] {
-		auto* w = new PhotoCompareWindow({}, this);
+		auto* w = new PhotoCompareWindow(_library, {}, this);
 		w->setAttribute(Qt::WA_DeleteOnClose);
 		w->show();
 	});

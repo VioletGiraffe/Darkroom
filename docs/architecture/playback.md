@@ -92,6 +92,12 @@ ways:
 Flicker, difference, and single-photo full-view modes all consume the same aligned image set and shared view; they do
 not maintain independent transforms.
 
+Each pane's context menu can delete its photo from disk through the shared Trash-first workflow. The window borrows
+the stable `Library` so a path currently owned by Catalog is deleted through `MediaItemManagement` and its record is
+removed only after the filesystem operation succeeds. Untracked files use the same filesystem workflow directly.
+Successful deletion removes the pane; deleting the reference resets alignment around a surviving reference. A
+caller-provided notification lets ImportDialog unstage a successfully deleted source.
+
 ### Image loading and worker ownership
 
 Photo loading follows the app-wide two-stage rule: tagged reads run on `Core::IoThreadPool`, then a window-local

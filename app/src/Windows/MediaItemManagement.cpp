@@ -1,25 +1,46 @@
 #include "Windows/MediaItemManagement.h"
 #include "Core/Catalog.h"
-#include "Utils.h"
 
 #include "dialogs/messagebox.h"
 
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QMessageBox>
 #include <QObject>
+#include <QPushButton>
 
 #include <algorithm>
 
 namespace {
 
-[[nodiscard]] bool deleteFileIfPresent(const QString& filePath)
+[[nodiscard]] bool pathExistsOrIsSymlink(const QString& path)
 {
-	if (filePath.isEmpty())
-		return false;
+	const QFileInfo info(path);
+	return info.exists() || info.isSymLink();
+}
 
-	const QFileInfo info(filePath);
-	return (!info.exists() && !info.isSymLink()) || QFile::remove(filePath);
+bool permanentlyRemovePath(const QString& path, QString* error)
+{
+	const QFileInfo info(path);
+	if (!info.exists() && !info.isSymLink())
+		return true;
+
+	if (info.isDir() && !info.isSymLink())
+	{
+		if (QDir(path).removeRecursively())
+			return true;
+		if (error)
+			*error = QObject::tr("The folder could not be removed.");
+		return false;
+	}
+
+	QFile file(path);
+	if (file.remove())
+		return true;
+	if (error)
+		*error = file.errorString().trimmed();
+	return false;
 }
 
 QString bulletedItemNameList(const Catalog& catalog, const std::vector<MediaId>& selection)
@@ -38,6 +59,42 @@ QString bulletedItemNameList(const Catalog& catalog, const std::vector<MediaId>&
 
 } // namespace
 
+bool MediaItemManagement::removePathTrashFirstInteractive(const QString& path, QWidget* dialogParent)
+{
+	if (path.isEmpty())
+		return false;
+	if (!pathExistsOrIsSymlink(path))
+		return true;
+
+	QFile file(path);
+	if (file.moveToTrash())
+		return true;
+
+	QString text = QObject::tr("This item could not be moved to Trash:\n\n%1\n\nPermanently delete it instead? This cannot be undone.")
+		.arg(QDir::toNativeSeparators(path));
+	const QString trashError = file.errorString().trimmed();
+	if (!trashError.isEmpty())
+		text += "\n\n" + trashError;
+
+	QMessageBox fallback(QMessageBox::Warning, QObject::tr("Move to Trash failed"), text, QMessageBox::NoButton, dialogParent);
+	QPushButton* permanentlyDelete = fallback.addButton(QObject::tr("Delete Permanently"), QMessageBox::DestructiveRole);
+	QPushButton* cancel = fallback.addButton(QMessageBox::Cancel);
+	fallback.setDefaultButton(cancel);
+	fallback.setEscapeButton(cancel);
+	fallback.exec();
+	if (fallback.clickedButton() != permanentlyDelete)
+		return false;
+
+	QString permanentError;
+	if (permanentlyRemovePath(path, &permanentError))
+		return true;
+
+	MessageBox::notice(dialogParent, QObject::tr("Permanent deletion failed"),
+		QObject::tr("The item could not be permanently deleted:"),
+		QDir::toNativeSeparators(path) + (permanentError.isEmpty() ? QString() : "\n" + permanentError), QMessageBox::Critical);
+	return false;
+}
+
 MediaItemManagement::DeleteResult MediaItemManagement::deleteItemsInteractive(
 	Catalog& catalog, const std::vector<MediaId>& selection, QWidget* dialogParent)
 {
@@ -51,11 +108,11 @@ MediaItemManagement::DeleteResult MediaItemManagement::deleteItemsInteractive(
 		const QString sourcePath = catalog.sourcePathForMediaItem(id);
 		if (catalog.mediaType(id) == Catalog::MediaType::Photo)
 		{
-			message = QObject::tr("This will permanently delete:\n\n• %1").arg(sourcePath);
+			message = QObject::tr("Move this photo to Trash?\n\n• %1").arg(sourcePath);
 		}
 		else
 		{
-			message = QObject::tr("This will permanently delete:\n\n• %1").arg(catalog.folderForMediaItem(id));
+			message = QObject::tr("Move this video's frame folder and source file to Trash?\n\n• %1").arg(catalog.folderForMediaItem(id));
 			if (!sourcePath.isEmpty())
 				message += "\n• " + sourcePath;
 		}
@@ -77,11 +134,10 @@ MediaItemManagement::DeleteResult MediaItemManagement::deleteItemsInteractive(
 			deletedKinds << QObject::tr("each video's frame folder and source file");
 		if (anyPhoto)
 			deletedKinds << QObject::tr("each photo's file");
-		message = QObject::tr("This will permanently delete %1 items - %2:\n")
+		message = QObject::tr("Move %1 items to Trash - %2:\n")
 			.arg(selection.size()).arg(deletedKinds.join(", "));
 		message += bulletedItemNameList(catalog, selection);
 	}
-	message += QObject::tr("\n\nThis cannot be undone. Continue?");
 
 	if (QMessageBox::warning(dialogParent, QObject::tr("Delete"), message,
 			QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
@@ -99,7 +155,7 @@ MediaItemManagement::DeleteResult MediaItemManagement::deleteItemsInteractive(
 			QStringList failedParts;
 			if (catalog.mediaType(id) == Catalog::MediaType::Photo)
 			{
-				if (!deleteFileIfPresent(sourcePath))
+				if (!removePathTrashFirstInteractive(sourcePath, dialogParent))
 				{
 					failedParts << (sourcePath.isEmpty()
 						? QObject::tr("• Photo file path is missing.")
@@ -112,8 +168,7 @@ MediaItemManagement::DeleteResult MediaItemManagement::deleteItemsInteractive(
 				if (!folderPath.isEmpty())
 					result.affectedFrameFolders << folderPath;
 
-				const bool folderDeleted = deleteFolderRecursivelyIfPresent(folderPath);
-				if (!folderDeleted)
+				if (!removePathTrashFirstInteractive(folderPath, dialogParent))
 				{
 					failedParts << (folderPath.isEmpty()
 						? QObject::tr("• Frame folder path is missing.")
@@ -121,7 +176,7 @@ MediaItemManagement::DeleteResult MediaItemManagement::deleteItemsInteractive(
 					if (!sourcePath.isEmpty())
 						failedParts << QObject::tr("• Source file not attempted: %1").arg(sourcePath);
 				}
-				else if (!sourcePath.isEmpty() && !deleteFileIfPresent(sourcePath))
+				else if (!sourcePath.isEmpty() && !removePathTrashFirstInteractive(sourcePath, dialogParent))
 				{
 					failedParts << QObject::tr("• Source file: %1").arg(sourcePath);
 				}

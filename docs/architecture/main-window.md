@@ -98,10 +98,13 @@ delete the receiving card.
 delete interaction. Catalog owns validation, backing paths, relocation, persistence, and change publication. The
 Import dialog reuses the same label-creation workflow when materializing provisionals.
 
-`MediaItemManagement` owns confirmation and execution for physical Delete and catalog-only Remove. Catalog removal
-refreshes the browser through `catalogChanged`; workflow results carry only effects that blanket invalidation cannot
-express, notably frame-folder changes needed to synchronize MainWindow's persistent viewer. Remove from library
-leaves disk content untracked by design.
+`MediaItemManagement` owns confirmation and execution for physical Delete and catalog-only Remove. User-requested
+physical deletion moves files and frame folders to the platform Trash first. A Trash failure reports Qt's available
+system diagnostic and offers an explicit, default-cancelled permanent-deletion fallback for that path.
+For videos, the source is attempted only after the frame folder is gone. Catalog records are removed only after all
+of an item's required paths are gone. Catalog removal refreshes the browser through `catalogChanged`; workflow
+results carry only effects that blanket invalidation cannot express, notably frame-folder changes needed to
+synchronize MainWindow's persistent viewer. Remove from library leaves disk content untracked by design.
 
 ## Renaming media
 
