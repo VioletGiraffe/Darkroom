@@ -162,16 +162,10 @@ The `Settings.h`/`QSettings` key pattern, `SettingsDialog`, the `Theme` dark/lig
 app-wide `Accent`/`AccentBg` tokens), and the central `Style` stylesheet + custom-widget approach (e.g.
 `SegmentedToggle`) that gives the app its non-stock look.
 
-### [Import: workers, interactive execution, ffmpeg, Utils, and ImportDialog](docs/architecture/import.md)
-`Import::importVideo` and `Import::importPhoto` — the UI-free per-item import workers; `ImportExecution` owns their
-interactive batch coordination, while photos land in `<root>/Photos/<label>/` or are referenced in place with
-collision auto-rename. Also covers full-frame replacement and repair (`FrameExtraction`), the `ffmpeg`
-invocation (`Ffmpeg::generatePreviewFrames` —
-a batch/concurrent preview extractor that `ImportDialog`'s staging runs across several videos at once,
-whose frames import then reuses by copy instead of re-extracting), `Utils.h`'s grab-bag of free functions,
-and `ImportDialog` itself: a staging grid + label-list panel mirroring the main window's own label
-model, duplicate detection at staging and relocation, and the "Import" command that imports every labeled
-card in one step.
+### [Import and frame extraction](docs/architecture/import.md)
+The UI-free video/photo workers and their interactive batch coordinators; transactional on-demand full-frame
+extraction; preview generation, reuse, and storage; and `ImportDialog`'s staging, duplicate boundaries,
+provisional-label lifecycle, source relocation, and batched catalog publication.
 
 ---
 

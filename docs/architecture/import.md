@@ -1,273 +1,122 @@
-# Import: workers, interactive execution, ffmpeg, Utils, and ImportDialog
+# Import and frame extraction
 
 [← Back to architecture index](../../ARCHITECTURE.md)
 
-## Full frame extraction — on-demand, not at import
+## On-demand full-frame extraction
 
-**`FrameExtraction`** (`src/Windows/FrameExtraction.h/.cpp`) owns configured full-frame extraction, transactional
-frame-folder replacement, preview repair, and the Re-export all workflow. Its raw process call is
-`Ffmpeg::splitVideoIntoFrames`; extraction remains synchronous and freezes the UI, which was decided not worth making
-async (see [backlog](../../ARCHITECTURE.md#improvement-backlog)).
+`FrameExtraction` owns first-time full-frame extraction, transactional frame-folder replacement, preview repair,
+and the video-only Re-export all workflow. Import deliberately creates only a permanent preview and registers the
+video as not yet split; an explicit frame-viewing action pays for the full extraction later.
 
-`FrameExtraction::ensureFramesExtracted(id, previewFrameCount, parent)` is the only path that pays for the first full
-split. If `Catalog::isSplitIntoFrames(id)` is false, it calls `reextractVideoFrames` with
-`PreviewHandling::PreserveExisting`. MainWindow invokes it for the grid's middle-click intent before showing its
-persistent frame viewer. It remains deliberately absent from `CompareWindow`: triggering a synchronous multi-second
-extraction as a side effect of multi-select compare was judged too easy to hit by accident.
+`FrameExtraction::reextractVideoFrames` builds a replacement beside the current frame set and publishes
+`Catalog::markSplitComplete` only after the candidate is ready to commit. Failure rolls back to the previous
+folder. Old and new frame sets therefore coexist during extraction; minimizing peak disk usage is not a design goal.
 
-`FrameExtraction::reextractVideoFrames` transactionally replaces an existing frame folder with rollback on failure.
-Old and new frame sets coexist during extraction; low peak disk usage is not a design goal. It publishes its completed
-split via `Catalog::markSplitComplete` only after the new folder and its preview policy have reached the transaction's
-commit point. Integrity repair's `regeneratePreview` prefers already-present real frames and repairs the split flag
-when it finds them; only with no real frames does it fall back to extracting a preview from the source video.
+`PreviewHandling` defines what the replacement transaction does with the permanent preview:
 
-`PreviewHandling` controls the candidate's preview before commit:
-- **`PreserveExisting`** (first on-demand split) — `preview/` is still fresh from import, so the module moves it from
-  the preserved old folder into the successful candidate.
-- **`Regenerate`** (Re-export all and integrity re-import) — the caller explicitly wants a clean start (re-export may
-  follow a settings change; the frames disappeared for an unknown reason), so a fresh preview is generated through
-  `Ffmpeg::generatePreviewFrames`. A requested preserved preview that does not exist takes this same fallback.
+- **`PreserveExisting`** moves the imported preview into the successful first full split.
+- **`Regenerate`** creates a fresh preview for explicit re-export and integrity repair. Preservation also falls
+  back to regeneration if no existing preview is available.
 
-`FrameExtraction::reExportAllVideosInteractive` skips photos when collecting its worklist — a photo has no frames,
-and its "folder" is the shared `Photos/<label>` dir, which frame-folder replacement would destroy. It owns confirmation,
-progress, the catalog batch, and per-video replacement. MainWindow's thin wrapper owns only the app-wide
-`_isProcessing` lock that protects the shell while re-export pumps events, and refreshes the browser afterward.
+Re-export applies only to videos: a photo has no frame set, and its storage directory may be shared by every photo
+under a label. Import's overwrite-conflict path does not use frame replacement because the existing directory may
+belong to an unrelated stale item; it prepares a fresh import instead.
 
-Neither path is used by `Import::importVideo`'s own overwrite-existing-folder path, which can be replacing a stale
-folder left behind by a completely different prior video — there's no related `preview/` worth preserving or
-regenerating-in-place there; it just goes through the normal import flow from scratch.
+## Import workers and interactive coordination
 
-## Import: preview frames only, full split deferred
+`Import::importVideo` and `Import::importPhoto` are UI-free per-item workers. They return structured outcomes
+rather than prompting. `ImportExecution` owns the interactive batch layer above them: progress, conflict decisions,
+continuing past ordinary item failures, failure summaries, and catalog write batching.
 
-`Import::importVideo` (`src/Import.h/.cpp`, a free-function module in the same style as `Ffmpeg`) is the
-per-item import worker. It is deliberately UI-free — it never prompts or pops a message box; every outcome
-comes back as an `Import::Result` (`Success` / `FolderConflict` / `Error` with a user-presentable message).
-`ImportExecution::importVideosInteractive` is the batch coordinator on top of it and owns the progress modal,
-folder-conflict decisions, one post-batch summary of terminal import errors, and `Catalog::BatchScope`. Folder
-conflicts remain interactive because each can require an overwrite decision; ordinary failures do not interrupt the
-remaining batch. The application-modal Import dialog
-prevents interaction with library-switch and Settings commands while this event-pumping operation runs, so import
-does not route through MainWindow or share its re-export busy flag.
+The Import dialog is application-modal while an interactive import pumps events, preventing library switching or
+settings changes from invalidating the operation. It invokes `ImportExecution` directly rather than routing through
+`MainWindow`.
 
-It does not extract the full frame set. It creates the output folder, puts a few
-permanent preview frames into `outputFolder/preview/`, then registers the video via `Catalog::addMediaItem(...,
-/*splitIntoFrames=*/false)` immediately — the video appears in the grid right away (see
-[media-widgets.md](media-widgets.md)), and the expensive full
-extraction only happens later via `FrameExtraction::ensureFramesExtracted`.
+### Video import
 
-Those preview frames are normally *reused, not re-extracted*: `ImportDialog` already ran ffmpeg to build
-each staged card's preview (see "Staging area" below), so import is handed each video's staging temp dir —
-keyed by the stable `MediaId` so it survives relocation moving the file — and copies those frames into
-`outputFolder/preview/`. A fresh extraction runs only as a fallback, when nothing staged is available. The **duration**
-the Import dialog
-probed while staging rides along the same handoff — passed to `importVideo` and stored on the item, so it isn't
-probed a second time. On a registration collision the whole output folder (previews included) is deleted, the same as
-any
-other import failure.
+A video import prepares its output directory and permanent `preview/`, then registers the item with
+`splitIntoFrames == false`. The dialog normally supplies the scratch preview and duration already produced during
+staging, so import copies the frames and avoids probing the video twice. Missing scratch output falls back to fresh
+preview generation. A registration failure removes the newly prepared output directory.
 
-## Photo import: `Import::importPhoto`
+### Photo import
 
-`Import::importPhoto(labelPhotoFolder, photoPath, mode)` is the photo counterpart to `importVideo` — equally
-UI-free, taking the verified destination produced by `Catalog::photoFolderForLabel` and returning an
-`Import::PhotoResult` (`Success` / `IdCollision` / `Error` + message + the
-**`registeredId`** actually registered). `ImportExecution::importPhotosInteractive` is its coordinator
-(destination validation, batch scope, and one post-batch failure summary), called directly by the Import dialog.
-**Copy/Move** land the file in `<root>/Photos/<label>/` (created lazily); **"leave in place" means Reference** —
-the file is tracked where it is and the catalog entry is marked referenced (`Catalog::addPhoto`,
-see [catalog-and-labels.md](catalog-and-labels.md)).
+Photo import uses the label's verified `Photos/<label>/` directory for owned files:
 
-- **Owned import auto-rename**: the destination name is chosen so that both the file path and the name+size
-  `MediaId` are free — one rename (`name_2.ext`, `name_3.ext`, ...) resolves a disk collision and a catalog
-  id collision alike, since a copy/move preserves the byte size. A byte-identical file already at the
-  destination (including the file itself on a re-import) is *adopted* — registered as-is, not copied again.
-  Because the registered identity can differ from the staged file's, all of the Import dialog's post-import
-  bookkeeping (Best, extra labels) re-keys to `PhotoResult::registeredId`.
-- **Reference import collision**: a referenced photo has no owned copy to rename, so an id already tracked
-  as a different item is refused with `IdCollision`; the Import dialog then offers the escape hatch — "import an
-  owned copy instead?" — which routes the file through the Copy path where the auto-rename works.
-- **A referenced photo's first label** is applied by `ImportExecution::importPhotosInteractive` via
-  `Catalog::addLabel` right after
-  registration (it has no storage folder to derive a label from); an owned photo's first label derives from
-  the `Photos/<label>` dir it landed in, exactly like a video's storage folder.
+- **Copy/Move** creates or adopts an owned file there. Destination selection avoids both path collisions and
+  name-and-size `MediaId` collisions, auto-renaming when necessary. A byte-identical file already at the destination
+  is adopted rather than copied again.
+- **Reference** tracks the source in place. Because it cannot rename an external file, an identity collision is
+  refused; the interactive layer can retry as an owned copy.
 
-`Ffmpeg::generatePreviewFrames` (`src/Ffmpeg.h/.cpp`, free functions) is that extraction engine, used whenever
-a fresh preview is needed — the fallback above, the re-split paths, and the Import dialog's staging. Thumbnail
-height and JPEG quality are fixed constants, independent of the user's full-split quality. Callers pass the exact
-destination folder — a frame folder's
-`preview/` subdir (via `Catalog::previewDirFor`) or a staging scratch dir — so the engine itself knows nothing
-of the `preview/` convention. Each call returns a per-job **`PreviewResult`** — a status plus the video's
-**duration**, which the probe had to read anyway to place the timestamps, handed back so the caller can persist
-it (`Catalog::durationMsForMediaItem`, see [data-model.md](data-model.md)) instead of re-probing for the number
-alone. Best-effort throughout: a failed job never aborts the batch and import never gates on it succeeding —
-the status just separates a probe failure (corrupt input, nothing extracted) from an extraction failure
-(duration known, frames didn't write), for the caller to act on or ignore.
+The worker returns the identity actually registered because an owned import may have been renamed. Best and
+additional-label bookkeeping must use that returned identity. A referenced photo receives its first label explicitly;
+an owned photo derives it from its storage directory.
 
-It also has a batch form that extracts several videos' previews at once, used by the Import dialog's staging. The
-concurrency is deliberately thread-free — each ffmpeg is its own OS process, so a bounded number run together
-and are waited on, all on the calling thread.
+## Preview generation and storage
 
-The batch is **interruptible**: it takes a `const std::atomic<bool>&` the caller sets from another thread, polled
-between the slices its process waits are broken into (so a cancel lands in ~100 ms rather than after the running
-ffmpeg). Cancelling kills the in-flight processes, starts no further ones, and returns `Cancelled` for every job
-that hadn't already finished cleanly — the ones that *had* keep their `Ok` result, so cancelling never throws away
-work already paid for. `Cancelled` is deliberately distinct from the failure statuses: it says "you stopped this",
-not "this file is broken". Partial frames from a killed extraction are left in the destination folder for the
-caller to remove — the engine still owns no cleanup policy.
+`Ffmpeg::generatePreviewFrames` is the shared fresh-preview engine used by staging, import fallback, full-split
+replacement, and repair. The caller supplies the destination, so the ffmpeg layer owns neither the permanent
+`preview/` convention nor scratch-directory cleanup. Each result includes extraction status and the duration already
+obtained while choosing frame timestamps.
 
-`preview/` is a permanent, separate store once created: a later real `splitVideoIntoFrames` run never deletes
-or rewrites it (it only ever lists/writes files directly in `outputFolder`, never recursing into `preview/`),
-and `CatalogIntegrity::scan`'s `extractedFramesMissing` verdict is guarded by `splitIntoFrames` specifically so a
-video that's legitimately still preview-only (zero real frames yet, by design) is never misreported.
+Batch generation runs a bounded number of ffmpeg subprocesses concurrently and is cancellable. Cancellation stops
+in-flight work, starts no new jobs, preserves completed results, and reports unfinished jobs as cancelled. The caller
+removes partial output.
 
-`MediaBrowserWidget::buildMediaCard` builds a card's thumbnail set from `<folder>/preview/` — this is what lets a
-not-yet-split video still show a real thumbnail, and means the grid never has to branch on split status for
-*where* to read images from. Only when `preview/` is empty does it fall back to the real frame folder, and
-with neither the card renders a "No preview" placeholder. Every catalog item gets a card either way: hiding
-one would strand it, since every action on an item is reached through its card.
+Once imported, `preview/` is a permanent store separate from real extracted frames. Full extraction does not rewrite
+it. Integrity scanning reports missing real frames only for items marked as fully split, so a preview-only video is a
+valid catalog state. Media cards prefer the permanent preview and fall back to real frames when it is absent; see
+[media-widgets.md](media-widgets.md).
 
-## Other utilities
+## ImportDialog
 
-`Utils.h` (mostly inline free functions). `ffmpegPath()` / `autoDetectedFfmpegPath()` are split because the
-Settings placeholder needs the detected path *without* the setting shadowing it.
-`collectFilesInDirectory(dir, recursive, predicate)` is
-the shared folder-to-files expansion behind the compare/import drops and the untracked/locate scans.
-`forEachFolder(root, cb)` visits every `(storageFolder, folderPath)` pair — used by the integrity scan and
-untracked-file discovery, not by per-card lookups.
+`ImportDialog` borrows `Library&` for its modal lifetime and owns interactive staging plus pending import state.
+It reads the current catalog for identity and label lookups, delegates source relocation to `SourceRelocation`, and
+delegates per-type batch execution to `ImportExecution`. Catalog mutations are wrapped in one
+`Catalog::ChangeBatchScope`, so the browser observes only the completed import result through
+`Library::catalogChanged`.
 
----
+### Duplicate boundaries
 
-## `ImportDialog` (`src/Windows/ImportDialog.h/.cpp`)
+Duplicate handling has four distinct boundaries:
 
-Import dialog: copy/move source files under a label.
+1. **Current library at staging:** photos use byte content identity, independent of name; videos use their
+   name-and-size `MediaId`.
+2. **Current staging set:** matching `MediaId` values are byte-compared. Identical content is a repeated drop;
+   different content is refused because both items cannot occupy the same staged/catalog identity.
+3. **Source-relocation destination:** a same-name destination is considered a duplicate only when identity and full
+   byte content both match.
+4. **Catalog registration:** the catalog remains the authoritative backstop and refuses a video identity already
+   registered under a different tracked folder.
 
-`ImportDialog` borrows its modal lifetime's `Library&` and reads its `Catalog` directly for lookups (label
-options, photo-content duplicates, the
-id-tracking check, random label colors). It invokes the interactive `ImportExecution` batch workflows directly;
-it has no outward refresh signal. Catalog mutations reach the browser through `Library::catalogChanged`, with the
-whole Import command wrapped in `Catalog::ChangeBatchScope` so the browser observes only the completed result.
-Provisional-label materialization calls
-`LabelManagement::createLabelOrReport` directly, sharing the sidebar's creation workflow without routing through the
-host. The Best/extra-label flush and the tracked-under-label check are done
-in-dialog, not through callbacks (below). Source-file relocation lives in its own **`SourceRelocation`** module
-(`src/Windows/SourceRelocation.h/.cpp`),
-entry point `SourceRelocation::relocateIfNeeded`.
+### Staging and pending labels
 
-### Duplicate detection
+A drop expands supported files recursively. Folder drops retain each photo or video's hierarchy-derived label name as
+a pending suggestion. **Suggest labels** consumes those suggestions on demand, reusing existing labels by
+case-insensitive name and creating session-provisional labels when needed. Labels already assigned manually keep
+their order.
 
-Four independent layers, at different points and catching different things:
-- **Already-in-library at staging** (`stageMediaItems`, direct Catalog calls): every dropped file is tested
-  against the current library before it can be staged or labeled, each media type by its own identity — a photo by
-  content (`Catalog::findPhotoBySameContent` byte-compares it against every imported photo of the same byte size,
-  *regardless of name*, so it catches renamed duplicates), a video by its name+size `MediaId`
-  (`Catalog::sourcePathForMediaItem` returns the tracked source path, empty when untracked — videos carry no content
-  hash, so this is the same name+size identity `addMediaItem` enforces below). The registration refusal below stays the
-  authoritative backstop for anything that reaches import anyway.
-- **Same-identity file at staging** (`stageMediaItems()`): a dropped file whose `MediaId` matches an
-  already-staged entry (or another file in the same drop) is byte-compared against it — identical content is
-  a re-drop of the same file, skipped silently; different content is refused with a warning naming both
-  paths. Accepting both is not an option: `_staged` is keyed by id, and the catalog tracks at most one
-  item per id anyway, so the second file would have silently overwritten the first's staging entry.
-- **File-content duplicate at the relocation destination** (the `SourceRelocation` module, above): on a same-name
-  destination collision, `performRelocation` treats it as a duplicate when the `MediaId`s match (name+size,
-  see [data-model.md](data-model.md)) **and** a full byte comparison (`Utils.h::filesAreIdentical`) confirms
-  identical content — so the rare same-name/same-size/different-content case is still classified as "files
-  differ".
-- **Catalog-identity collision at registration** (`Catalog::addMediaItem`, see
-  [catalog-and-labels.md](catalog-and-labels.md#import-lifecycle)): refuses to register a video whose id
-  already names a *different* tracked folder.
+Staged videos receive cancellable scratch previews; photos stage directly from their source image. Completed scratch
+previews and probed durations are reused by video import, while unstaging or closing the dialog removes leftovers.
 
-### Staging area: mirrors the main window's own label model
+Provisional labels exist only in the dialog until Import. Folder suggestions and **Create label** use the same pending
+model; only provisionals assigned to an item are materialized. The first pending label is the item's storage
+destination, while later labels are ordinary additional tags. Destination is deliberately represented by label order
+rather than separate UI or state.
 
-Dropping a file or folder onto the dialog, or `addToStaging()` (used by `MainWindow`'s own drop and to
-pre-fill staging from the untracked-file scan via `openImportDialog`), calls `stageMediaItems()`. A folder drop
-retains each photo or video's hierarchy-derived label name as a pending suggestion; **Suggest labels** in the dialog
-footer applies and consumes those suggestions on demand, creating session-provisional labels where needed without
-displacing labels already assigned manually. Staging then extracts a temporary preview per new video path
-(deduplicated by `MediaId` first — see "Duplicate detection" above)
-into a per-video temp dir via the batch `Ffmpeg::generatePreviewFrames`, so several videos are processed at once. That
-batch runs on a
-`CInterruptableThread` while a modal `QProgressDialog` holds the GUI thread's event loop, which is what makes
-staging **cancellable** — the Cancel button sets the thread's flag, and videos whose previews did finish are
-still staged. A staged *photo* skips preview extraction (`StagedEntry::tempPreviewDir` stays empty) and
-stages instantly. Each staged item is tracked by a `StagedEntry` (its path, temp preview dir, probed duration, pending
-Best/labels, grid item), keyed by `MediaId` computed once at stage time while the source file still exists (see
-"Why `MediaId`, not path" below). The temp dir is deleted once the entry is unstaged or the dialog closes — but
-its frames aren't wasted: a successful Import copies them into the permanent `outputFolder/preview/` rather than
-re-running ffmpeg (the import-side reuse in "Import: preview frames only" above). The staging grid shares the main
-media grid's per-pixel wheel scrolling behavior. Ctrl+wheel over a card adjusts the Import workspace's independently
-persisted card size; the dialog debounces rebuilding its staged cards, retaining their pending Best and label state.
+Each staged entry is keyed by a `MediaId` captured while the source exists. Renaming a staged file re-keys the entry;
+moving a source during import keeps the captured identity instead of deriving it again from the now-absent old path.
+Every post-relocation catalog lookup and metadata assignment follows that invariant.
 
-The staging grid has its own persisted preview-frame-count selector, independent from the main browser's display
-count. Cards show the local count, while a newly-staged video extracts the larger of the local and main-browser counts
-so the preview copied into the library remains sufficient for the main view. Raising the local count re-extracts only
-staged videos whose scratch directory contains fewer frames than the new local/main maximum; it first clears that same
-directory with bounded retry for transient open-file failures. Lowering the count retains all extracted files and only
-rebuilds cards from an evenly sampled subset, so raising it again can reuse them. Failed or cancelled refreshes clear
-partial output.
+### Import transaction
 
-### Label assignment: drag-from-list or per-card checklist, no "destination" UI
+Import first materializes used provisional labels and rewrites pending ids to their catalog ids. It then groups
+labeled entries by their first label and runs the photo and video coordinators. Unlabeled entries and ordinary
+failures remain staged for correction or retry.
 
-Provisional labels exist **only in the dialog** until Import — minted in-dialog (folder-derived or via
-**Create label**) and never touching the Catalog. Folder-derived provisionals are revalidated when
-materialized, before any backing path is created. Name matching is case-insensitive throughout, matching the
-Catalog/filesystem rule. Nothing reaches the Catalog until Import — the Best star and every label toggle
-mutate `pendingBest` / `pendingLabelIds` only. **Rename** renames the file on disk and re-keys the
-`StagedEntry` to the new name+size `MediaId`, preserving the `staged key == the file's MediaId` invariant
-`runImport` relies on (below).
-
-A staged video needs exactly one frame folder, and that folder's name is implied by whichever label landed
-on it *first* — `pendingLabelIds.constFirst()`, used only inside `runImport()` below. This is deliberately
-never surfaced: no "destination" badge, no separate menu entry, no field with that name — it's purely the
-order labels happen to sit in inside the `QStringList`. A label dropped (or checked) after the first is
-just an ordinary additional tag, applied the same way Best is.
-
-### `runImport()` (the "Import" button)
-
-0. **`materializeUsedProvisionalLabels()`** runs first — the *only* point provisional labels reach the Catalog.
-   Rewrites every staged entry's `pendingLabelIds` from provisional stand-in to real id; a failed creation
-   leaves that item staged but unlabeled. Successfully-created provisionals are removed from `_provisionalLabels`
-   so a partial Import that leaves items staged won't recreate them on a second run.
-1. Groups staged entries by first label id; entries with no label are left staged. It never reconstructs a
-   destination from the display name — always asks `Catalog::storageFolderForLabel` / `photoFolderForLabel`
-   for a verified path.
-2. **Photos in the group** (`importPhotoGroup`) go through `ImportExecution::importPhotosInteractive` →
-   `Import::importPhoto` (see "Photo import" above). An `IdCollision` result (Reference mode's unresolvable
-   name+size clash) triggers the "import an owned copy instead?" escape hatch, retrying through the Copy
-   path. Best/extra-label bookkeeping re-keys to `PhotoResult::registeredId` — an owned-import auto-rename
-   gives the copy a new identity.
-3. **Videos in the group** (`importVideoGroup`): relocates source files if enabled
-   (`SourceRelocation::relocateIfNeeded`), then calls
-   `ImportExecution::importVideosInteractive` → `Import::importVideo` — also where a file dropped on the main window
-   ends up, since a drop just opens this dialog pre-staged —
-   passing each video's staging temp dir so import can reuse the already-extracted preview frames (see "Import:
-   preview frames only" above). `isTrackedUnderLabel(id, labelId)` checks the item's tracked frame folder
-   against that id's `Catalog::frameFolderName` under the selected storage folder, not just "tracked at all" — so
-   both a declined/failed import and a name+size collision with an item tracked elsewhere are correctly left staged
-   rather than misread as successes. The staged path is updated to the relocated location when the file was actually
-   moved, so a retry starts from where the file really is.
-4. Both group importers accumulate into one `ImportOutcome`. Once every group is processed, `runImport` flushes
-   Best flags and extra-label picks to the Catalog — guarded by `Catalog::containsMediaItem` (a
-   frame-folder-exists check wouldn't work for photos), wrapped in one `Catalog::BatchScope`
-   (see [catalog-and-labels.md](catalog-and-labels.md)) so a multi-item Import session writes the store once.
-5. `runImport`'s outer `Catalog::ChangeBatchScope` releases after the Best/extra-label flush and staging cleanup.
-   Any actual catalog mutations then produce one `Library::catalogChanged`; there is no partial mid-Import refresh,
-   and label materialization is visible even if every item import subsequently fails.
-
-Nothing here is deferred past the click that triggers it, so there's no `QDialog::done(int)` override and no
-caller-visible close-time flush to get right — the dialog's destructor only deletes leftover temp preview
-dirs, a purely local resource the caller never depends on seeing.
-
-### Why `MediaId`, not path, addresses an item once it's mid-Import
-
-`isTrackedUnderLabel`, the accumulated `bestItems`, and `ExtraLabelAssignment` all take a `MediaId`, captured once at
-stage time, rather than the staged path. `MediaId::fromFile(path)` stats the file for its size — if
-relocation mode is **Move**, the source has already been deleted from that path by the time step 3/4 above
-run, so re-deriving the id from the path there would return an invalid id matching nothing. `MediaId::name()`
-still gives the original filename for string-only needs (e.g. deriving
-`<storageFolder>/<baseName>` without touching disk) — see [data-model.md](data-model.md).
-
----
-
-`CompareWindow` — side-by-side compare of the multi-selected items' frames.
-
-`crashhandler/` — crash reporting.
+Photo results re-key pending metadata to the identity actually registered. Video relocation updates the staged source
+path so a retry follows a moved file, and a video counts as successful only when the catalog tracks it under the
+expected destination label. After all groups finish, the dialog applies Best and additional labels to successfully
+registered items, removes completed or explicitly skipped entries from staging, and releases the catalog-change batch
+as one notification.
