@@ -1,127 +1,84 @@
-# Qt styling system quirks
+# Qt styling-system quirks
 
-Hard-won gotchas about Qt Style Sheets (QSS) and `QStyle`, collected so we don't rediscover them the slow
-way. Most came out of styling the `QComboBox` arrow and rounding its drop-down popup (see
-`ComboPopupRounder` and the `QComboBox` rules in [`app/src/Theme/Style.cpp`](../../app/src/Theme/Style.cpp)).
+Known QSS and `QStyle` traps with established remedies. The central implementations live in
+[`Theme/Style.cpp`](../../app/src/Theme/Style.cpp).
 
-## QSS can't draw shapes - it fills boxes
+## QSS shape and image limits
 
-- **The CSS "border triangle" hack does not work in Qt.** A zero-size box with thick one-side borders makes
-  a triangle in a browser (mitred corners); Qt's QSS renderer fills each border edge as a flat rectangular
-  band, so you get a rectangle, not an arrow. Any arrow/chevron/checkmark glyph must come from an `image:`,
-  or be hand-painted.
-- **Anti-aliased rounded rectangles, borders, dashes:** when QSS can't express it cleanly, paint it yourself
-  with `QPainter` (see the custom widgets `SegmentedToggle`, `SortControl`, and `ComboPopupRounder`). Inset
-  the rect by half a pixel (`adjusted(0.5, 0.5, -0.5, -0.5)`) so a 1px stroke stays crisp.
-- **`dashed`/`dotted` borders read as dots at 1px** - the dash period scales with border width. Use >= 2px
-  for a visible dash.
+- The browser CSS border-triangle trick does not work: Qt paints border edges as rectangular bands. Supply an image
+  or paint the glyph.
+- Paint anti-aliased shapes with `QPainter` when QSS cannot express them. Inset a 1 px outline by half a pixel for a
+  crisp stroke.
+- One-pixel dashed/dotted borders read as dots because the dash period follows border width; use at least 2 px when
+  the dash must remain visible.
+- QSS `image:` and `url()` accept files or Qt resources, not data URIs, `QByteArray`, or `QPixmap`. Runtime
+  resources must be registered `.rcc` data rather than a raw image blob.
+- SVG QSS images require the qsvg plugin through `QT += svg`; missing support fails silently.
+- Truly in-memory pixmaps require painting or a style API. A proxy style cannot override a subcontrol already owned
+  by QSS.
 
-## QSS images
+## QComboBox
 
-- **`image:` / `url()` load only from a file path or the Qt resource system (`:/...`).** No `data:` URIs, no
-  `QByteArray`/`QPixmap` injection. Resources are in-memory but must be in `.rcc` format
-  (`QResource::registerResource`), not a raw PNG blob.
-- **Rendering an SVG via QSS needs the `qsvg` image plugin** - add `QT += svg` (otherwise `url(:/x.svg)`
-  silently loads nothing and you get no image). PNG needs no plugin.
-- **Truly in-memory image data => bypass QSS and paint via `QStyle`/`QProxyStyle`** (takes a `QPixmap`
-  directly). But see the `QProxyStyle` caveat below.
+- Styling `QComboBox::drop-down` suppresses the native arrow. Also provide a `::down-arrow` image.
+- The arrow image scales to the subcontrol dimensions. A larger source scaled down remains crisper on high-DPI
+  screens.
+- Hover subcontrol rules do not inherit base geometry. Repeat width, height, and position or omit the hover variant;
+  otherwise Qt may paint a second natural-size arrow in the default position.
+- `QProxyStyle::drawPrimitive(PE_IndicatorArrowDown)` is not reached once `QStyleSheetStyle` owns the styled
+  subcontrol.
+- Styling the popup item view removes native row margins and changes behavior between Qt versions. Set explicit
+  `QComboBox QAbstractItemView::item` padding.
+- A QSS-styled item view does not take selected-row colors from `QPalette::Highlight` and
+  `HighlightedText`. Style `::item:selected` explicitly.
+- A fully styled combo receives no reliable style-drawn focus ring. Add an explicit `QComboBox:focus` rule.
 
-## QComboBox specifics
+## Combo popup window
 
-- **Styling `QComboBox::drop-down` suppresses the native arrow.** Once that subcontrol is styled, Qt draws no
-  arrow there unless you also give `::down-arrow { image: url(...) }`.
-- **`QComboBox::down-arrow` scales the image** to its `width`/`height`. Drawing the source ~2x and scaling
-  down keeps it crisp on high-DPI without `@2x` asset variants.
-- **Hover subcontrol rules do NOT inherit geometry from the base rule.** `QComboBox:hover::down-arrow { image:
-  ... }` with no `width`/`height`/position renders the image at its natural size at a default (centred)
-  position - a second, wrongly-placed arrow on top of the idle one. Repeat the geometry, or drop the hover
-  variant.
-- **`QProxyStyle::drawPrimitive(PE_IndicatorArrowDown)` is never reached when the subcontrol is styled in
-  QSS** - `QStyleSheetStyle` owns the subcontrol and doesn't delegate. A proxy style can't customise the
-  arrow while a stylesheet touches the combo.
-- **Styling the drop-down view collapses its row height - pin `QComboBox QAbstractItemView::item` padding.**
-  Once the view is styled (the `QComboBox QAbstractItemView { ... }` rule plus `ComboPopupRounder`'s
-  `setStyleSheet` on the view), `QStyleSheetStyle` takes over item sizing and drops the native per-item margins,
-  so rows collapse to about the text height. That bare default is also not stable across Qt versions - 6.9 and
-  6.10 render it differently. Set an explicit `::item { padding: ... }` (`Style.cpp` uses `5px 8px`, echoing the
-  `QMenu::item` vertical rhythm) so row height is both roomy and identical on every Qt version. Applies to any
-  styled `QAbstractItemView`, not just combos.
-- **A styled item view's selection color does NOT come from `QPalette::Highlight` - style `::item:selected`.**
-  An unstyled item view fills the selected row with `QPalette::Highlight`. Once the view is QSS-styled (the combo
-  popup is, via `QComboBox QAbstractItemView` + `ComboPopupRounder`), `QStyleSheetStyle` draws the selection from
-  its own defaults and ignores `Highlight`/`HighlightedText`, so setting those in the app palette has no effect on
-  it - you must add `QComboBox QAbstractItemView::item:selected { background: ...; color: ...; }`. (This is why the
-  app's combo-popup selection neither tracks the theme's selection colors nor matches the `QMenu` `AccentBg` pill,
-  and why repointing the palette's selection roles left it unchanged.)
-- **A fully QSS-styled `QComboBox` gets no style-drawn focus ring - add `:focus` yourself.** Styling the combo's
-  frame and subcontrols makes `QStyleSheetStyle` own it, and (unlike `QPushButton`, which keeps a style-drawn
-  focus frame) it draws no focus indication - so keyboard focus is invisible unless the sheet adds an explicit
-  `QComboBox:focus` rule. `Style.cpp` gives `:focus` the same accent border as `:hover`.
+The popup is a private top-level `QFrame` containing a list view. Its window, view, and viewport are separate paint
+layers:
 
-## The drop-down popup is a separate top-level window
+- Rounding the view does not hide the square popup window behind it.
+- Type selectors are unreliable on the private container; an unscoped stylesheet applies, but cascades to children.
+- A child stylesheet outranks that cascade and can restore view-specific styling.
+- A translucent top-level does not paint its own QSS background.
+- `QAbstractScrollArea` radius does not clip its opaque viewport, and its QSS background is routed to that viewport.
 
-The popup is a private top-level container (`QComboBoxPrivateContainer`, a `QFrame`) hosting the list view.
-Rounding it is genuinely awkward:
+`ComboPopupRounder` is the working recipe. An application event filter recognizes the private popup:
 
-- **`border-radius` on the view (`QComboBox QAbstractItemView`) does not round the popup** - the square,
-  opaque container window shows behind it.
-- **Type selectors don't reliably match that private container.** `QComboBoxPrivateContainer { ... }` and even
-  `QFrame { ... }` had no effect when set on it; only an **unscoped** stylesheet (`background: ...; border:
-  ...;` with no selector) applied.
-- **An unscoped stylesheet on a parent cascades to its children** (it wiped the inner view's background). A
-  child's own stylesheet outranks the parent cascade, so re-assert child styling on the child directly.
-- **A `WA_TranslucentBackground` top-level won't paint a QSS background** - it stays invisible. (A child
-  widget paints its QSS background fine; the translucent top-level doesn't.)
-- **`QAbstractItemView` (any `QAbstractScrollArea`) won't visually round via `border-radius`** - its opaque
-  **viewport** child paints a square over the rounded frame. QSS `background` on a scroll area routes to the
-  viewport, so the corners stay square (the "flat rectangle").
+1. On Show, make the container translucent and the view plus viewport transparent.
+2. On Paint, draw the rounded surface and border with `QPainter`, then consume the container paint.
+3. Let item painting proceed normally above that surface.
 
-**What actually works (the `ComboPopupRounder` recipe):** an app-wide event filter that, on the container's
-`Show`, sets `WA_TranslucentBackground` and makes the view + `viewport()` transparent; and on the container's
-`Paint`, draws the surface itself - an anti-aliased rounded rect (`palette().base()` fill + hairline border)
-with `QPainter` - returning `true` to suppress the container's own paint. The items paint on top afterward.
-Painting from an event filter on `QEvent::Paint` works and produces no warnings. Gate the global filter
-cheaply (bail on non-`Show`/`Paint`, require `isWindow()` before the `inherits()` check) since it sees every
-event in the app.
+Gate the global filter before private-type inspection: reject unrelated event types and non-window objects first.
 
-## `:hover` is driven by the `WA_UnderMouse` attribute, not by Enter/Leave events
+## Hover state
 
-QSS `:hover` matches on `QStyle::State_MouseOver`, which `QStyleOption::initFrom()` derives from
-`QWidget::underMouse()` - i.e. the `Qt::WA_UnderMouse` **attribute**. Crucially, that attribute is *not* toggled
-by the `QEvent::Enter`/`QEvent::Leave` events. Qt's internal enter/leave dispatch
-(`QApplicationPrivate::dispatchEnterLeave`) sets the attribute and *then* sends the event as a bare notification -
-two separate steps. Two consequences:
+QSS `:hover` follows `QStyle::State_MouseOver`, derived from `QWidget::underMouse()` and
+`Qt::WA_UnderMouse`. Enter/Leave events merely notify widgets; Qt's internal dispatch updates the attribute
+separately.
 
-- **Anything that bypasses that dispatch leaves the attribute stale, so the highlight sticks.** A popup menu's
-  `exec()` runs a mouse grab: the widget that spawned the menu never gets a leave dispatched when the cursor
-  slides onto the menu, so it keeps `WA_UnderMouse` set and stays highlighted after the menu closes - it reads as
-  a stuck "selection". The same failure mode hits a widget deleted and recreated under a stationary cursor (e.g. a
-  grid rebuild on Ctrl+wheel zoom): the fresh widget never receives an enter.
-- **Fix it by clearing the attribute, not by faking an event.** Sending a synthetic `QEvent::Leave` does nothing
-  to the highlight - the (usually absent) `leaveEvent` handler runs, but `WA_UnderMouse` is untouched, so the next
-  repaint still sees `underMouse() == true`. Clear it directly and repaint:
-  `w->setAttribute(Qt::WA_UnderMouse, false); w->update();`
+Mouse grabs and widget replacement can leave the attribute stale. A context menu may prevent the spawning widget from
+receiving a real leave, while a new widget created beneath a stationary cursor may never receive enter.
 
-The shared `clearStuckHoverIfCursorLeft()` in [`app/src/Utils.h`](../../app/src/Utils.h) does exactly that after a
-context menu's `exec()` - guarded so a right-click then Esc without moving the mouse keeps a legitimate hover - and
-is used by both the frame-viewer thumbnails (`#framedThumbnail`) and the grid cards (`#mediaItemCard`). Both set
-`WA_Hover`, which is what makes a plain styled `QWidget` repaint on real hover changes in the first place; the
-stuck-state fix is separate from that. When the menu action can delete the spawning widget mid-`exec()` (grid
-cards get rebuilt by their own menu actions), guard the widget with a `QPointer` before the post-`exec()` re-sync.
+Sending a synthetic Leave does not repair the state. Clear the attribute and repaint:
 
-- **`QSplitter::handle:hover` never matches out of the box** - `QSplitterHandle` doesn't set `WA_Hover` on
-  itself (long-standing QTBUG-13768), so the handle neither repaints on enter/leave nor reports
-  `State_MouseOver`, and the QSS hover rule is dead. The handles are created internally by `QSplitter` with
-  no per-instance hook, so `Style.cpp`'s `SplitterHandleHoverEnabler` (an app-wide event filter, same pattern
-  as `ComboPopupRounder`) sets the attribute on each handle as it gets polished.
+```cpp
+widget->setAttribute(Qt::WA_UnderMouse, false);
+widget->update();
+```
 
-## General QSS gotchas
+[`clearStuckHoverIfCursorLeft()`](../../app/src/Utils.h) performs this resynchronization after context menus while
+preserving a legitimate hover when the cursor did not leave. If a menu action may delete the spawning widget, retain
+it through `QPointer` before the post-`exec()` check. Styled plain widgets also need `WA_Hover` so real hover
+changes trigger repaint; this is independent of stale-state repair.
 
-- **`palette(...)` roles track the active theme automatically; hardcoded hex does not.** Anything built from
-  a `Theme` hex must be rebuilt on a light/dark switch (we re-apply the whole sheet on
-  `colorSchemeChanged`); `palette(base)` etc. update on their own.
-- **`selection-background-color` and `selection-color` are a set - specify both or neither.** Once a QSS rule
-  gives a text widget (`QLineEdit`/`QPlainTextEdit`/`QTextEdit`) a `selection-background-color`,
-  `QStyleSheetStyle` owns that widget's selection painting and does *not* fall back to the palette's
-  `HighlightedText` for the unset `selection-color` - the selected text keeps its **normal** foreground. On a
-  dark theme that's light text on the accent fill = unreadable. The app-wide palette `Highlight`/`HighlightedText` still covers genuinely stock (unstyled) palette-driven selection, but a QSS rule that sets one selection color must carry its matching half itself. (`Style.cpp`'s `kTextInputs` sets both, from the `SelectionHighlight` / `SelectedText` theme pair.)
+`QSplitterHandle` does not enable `WA_Hover`, so `QSplitter::handle:hover` is otherwise inert.
+`SplitterHandleHoverEnabler` sets the attribute when internally created handles are polished.
+
+## Palette and selection
+
+- `palette(role)` follows a palette change automatically. QSS values generated from Theme colors require rebuilding
+  the stylesheet when the scheme changes.
+- Set `selection-background-color` and `selection-color` together. Once QSS owns selection painting, omitting the
+  foreground does not reliably fall back to `QPalette::HighlightedText`; it may retain the normal text color and
+  become unreadable.

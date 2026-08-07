@@ -1,179 +1,108 @@
-# Darkroom — Architecture
+# Darkroom architecture
 
-C++/Qt6 desktop app (Windows primary target) for organizing a local library of video frames and extracting frames
-from source videos via ffmpeg. Requires Qt 6.8+ (`VideoPlayerWindow` feeds decoded cache images to
-`QVideoSink` through `QVideoFrame(const QImage&)`).
+Darkroom is a C++/Qt 6 desktop application for organizing videos and photos, extracting video frames through ffmpeg,
+and comparing media. Qt 6.8 or newer is required for presenting decoded cache images through
+`QVideoFrame(QImage)`.
 
-This document is the living architectural reference: a high-level index plus the core cross-cutting
-principles. Per-subsystem depth lives in `docs/architecture/*.md`, linked below — read this file first to
-orient, then follow the link for the subsystem you're touching.
+This file is the architectural entry point. Subsystem documents contain structure, rationale, and invariants; code
+contains implementation detail. Keep both in sync.
 
-**Keep this file and the linked docs in sync.**
+## Working route
 
-**These docs stay at the architecture/design level - structure, rationale, and invariants, not implementation.** Describe how the pieces fit and *why*; leave the line-by-line *how* to the code.
+1. Read [the coding conventions](docs/guidelines.md).
+2. Follow the relevant subsystem link below and inspect the implementation plus nearby examples.
+3. Before changing QSS, `QComboBox`, or custom styling, read
+   [the Qt styling-system quirks](docs/tips/qt-styling-system-quirks.md).
+4. Keep changes in the app unless responsibility genuinely belongs in a shared submodule, and update durable
+   architectural facts when they change.
 
----
+## Build and source layout
 
-## Quick-start workflow
+The qmake root `Darkroom.pro` builds the app and its static-library submodules: `qtutils`, `cpputils`,
+`cpp-template-utils`, and `magic-alignment`. App sources and headers are discovered recursively under
+`app/src/`, so new files there require no project registration. Generated solutions, Makefiles, IDE state,
+`bin/`, and `build/` are not sources of truth.
 
-1. Read [the coding conventions](docs/guidelines.md) before writing C++, then follow the relevant subsystem
-   link below and inspect the implementation plus nearby examples of the same kind of code.
-2. Before changing QSS, `QComboBox`, or custom styling, also read
-   [the Qt styling-system quirks](docs/tips/qt-styling-system-quirks.md); it records framework dead ends and
-   the established solutions in `Theme/Style.cpp`.
-3. Keep changes inside the app unless the responsibility genuinely belongs in a shared submodule. Preserve
-   the architectural invariants below and update the relevant document when behavior or rationale changes.
+`app/src/` is divided into:
 
----
+- `Core/` for the library, catalog, persistence, identity, and I/O routing.
+- `UiComponents/` for reusable widgets and feature composites.
+- `Windows/` for top-level windows, dialogs, and interactive workflows.
+- `Theme/` for palette and application styling.
+- Root modules for settings, utilities, ffmpeg, import workers, and application startup.
 
-## Build & dependencies
+App includes are layer-qualified from `src`, such as `"Core/Catalog.h"` and
+`"UiComponents/MediaItemWidget.h"`. Submodule headers follow their configured include roots.
 
-- **Build system**: qmake, top-level `Darkroom.pro` (`SUBDIRS`): the app itself (`app/app.pro`) plus the
-  static-library Git submodules it links — `qtutils`/`cpputils`/`cpp-template-utils` and `magic-alignment`
-  (a Qt-only automatic image-alignment library used by `PhotoCompareWindow`, same `$$files` glob convention).
-  Sources and headers come from a recursive glob evaluated each time qmake runs —
-  `SOURCES += $$files(src/*.cpp, true)`, `HEADERS += $$files(src/*.h, true)` + `$$files(src/*.hpp, true)`.
-  Because the glob walks the *whole* `src/` subtree, a new file dropped anywhere under it is enumerated
-  automatically. **New source files do not need to be registered in any way**.
-  (`Q_OBJECT` types are moc'd automatically because the headers are globbed in the same way.)
-- **Generated artifacts are not sources of truth.** Do not edit `Darkroom.sln`, `Makefile`, `.qmake.stash`,
-  `.vs/`, `.qtcreator/`, `.qtc_clangd/`, `bin/`, or `build/`; qmake/project configuration and `app/src/`
-  are authoritative.
-- **Source layout** (under `app/src/`): reusable UI widgets and feature-level composites in `UiComponents/`
-  (`ThumbnailWidget`, `MediaItemWidget`, `MediaBrowserWidget`, `MarkerSlider`, `SortControl`, `SegmentedToggle`,
-  `PreviewFrameCountCombo`, `LabelSidebar`) plus their close UI
-  helpers (`LabelVisuals`, `DragGestureHelper`, `LabelMimeType`); top-level windows + dialogs in `Windows/`
-  (`MainWindow`, `CompareWindow`, `PhotoCompareWindow`, `FrameViewerWindow`, `VideoPlayerWindow`, the `*Dialog`s); the non-UI core
-  model in `Core/` (`Library`, `Catalog`, `MetadataStore`, `MediaId`); and the visual theming in `Theme/` (`Theme`,
-  `Style`). `Settings`, `Utils`, `Ffmpeg`, `Import`, and `main.cpp` stay at the `src/` root.
-- **INCLUDEPATH**: `src` plus the submodules `qtutils`, `cpputils`, `cpp-template-utils`, and
-  `magic-alignment/src` (its headers are included unqualified: `"MagicAlignment.h"`). With `src` on the
-  path, app headers are included **layer-qualified** — `"UiComponents/ThumbnailWidget.h"`,
-  `"Windows/MainWindow.h"`, `"Core/Catalog.h"`, and the few root headers as `"Utils.h"` — regardless of the
-  including file's location; submodule headers likewise drop their prefix (`qtutils/widgets/layouts/cflowlayout.h`
-  → `"widgets/layouts/cflowlayout.h"`).
-- **Tests**: `tests/tests.pro` (a `SUBDIRS` sibling of the app) builds `DarkroomTests`, a Catch2 console app
-  (single-header `cpp-template-utils/3rdparty/catch2/catch.hpp`) that compiles the `Core/` sources plus
-  `Utils.cpp` directly and runs on every CI platform — so the disk-touching tests double as case-sensitivity
-  coverage on Linux. The suite deliberately targets *silent* breakage, not UI (which daily use self-detects):
-  stored-format backward compatibility (golden fixtures in `tests/PersistenceTests.cpp` — extend them when the
-  schema evolves, never weaken), `MediaId` case-folding/hash/key invariants, `Catalog` mutation logic
-  (relocation incl. the collision-refusal guards, the last-ordinary-label invariant, photo content-dedup),
-  the case-insensitive frame-file listing the Linux leg exists to protect (`tests/UtilsTests.cpp`), and the
-  catalog-vs-disk integrity scan's verdict grid (`tests/CatalogIntegrityTests.cpp`), with
-  `requireRebuildStable()` asserting after mutations that the in-memory model matches a fresh
-  `rebuildIndex()` re-derivation. Test files are listed explicitly in `tests.pro` (no glob) — register new
-  ones there.
-- Don't build/compile here — the toolchain (Qt, compiler) isn't
-  in this environment by design; reason about correctness by inspecting the affected code and reviewing the
-  diff as a separate pass.
+`tests/tests.pro` builds the Catch2 core test executable. Tests protect silent breakage: persisted-format
+compatibility, identity invariants, catalog mutations, case-sensitive filesystem behavior, and catalog-integrity
+verdicts. Test sources are listed explicitly and new test files must be registered there.
 
----
+## Cross-cutting principles
 
-## Core principles
-
-A handful of cross-cutting rules that apply beyond any one subsystem. Check these before writing new code,
-not just when reading existing code.
-
-- **`Catalog` is the authoritative in-memory model of the media-item set, keyed by `MediaId`.** It is kept current
-  by its own mutation API (`addMediaItem`/`removeMediaItem`/`applyRename`/`addLabel`/...), not by re-deriving from
-  disk on every refresh — only the on-demand integrity tools walk the library tree. See
-  [data-model.md](docs/architecture/data-model.md) and [catalog-and-labels.md](docs/architecture/catalog-and-labels.md).
-- **`Library` is the stable root-bound ownership boundary.** `MainWindow` owns it as a normal member; its
-  private state contains one immutable root, `MetadataStore`, and `Catalog`, constructed and replaced as a
-  unit. The object itself is immovable and never rebuilt, so collaborators can borrow it for life.
-  **`Library::setRoot()` is its only loader** — first root and later switches alike: it fully loads a candidate
-  before publishing it, and failure leaves the current state untouched. A default-constructed `Library` is
-  empty, which exists so `MainWindow` can hold it as a plain member and load it in its constructor before
-  building any UI. `MainWindow` owns both initial-library recovery and later switching (the **Library** menu:
-  open a root, or pick one of the recent ones); `main()` never handles a `Library`. Persistent consumers borrow
-  `Library&`, while synchronous operations may borrow its current
-  `Catalog` or `MetadataStore`. There is no global active-library/catalog/store accessor. See
-  [data-model.md](docs/architecture/data-model.md). `Library::catalogChanged` is the stable invalidation seam across
-  both catalog mutations and state replacement; persistent views subscribe to the `Library`, never to the replaceable
-  `Catalog` instance.
-- **Persistent JSON is read and written through one checked path.** Library loading distinguishes absent files
-  from unreadable, malformed, or schema-invalid files and passes the validated objects directly into the
-  model - loaders never parse them a second time. Atomic writes check directory creation, open, full byte
-  count, and commit; a failure keeps the affected store dirty, is reported asynchronously by `MainWindow`,
-  and blocks silent state loss on library switch or close. See [data-model.md](docs/architecture/data-model.md).
-- **A label owns nothing on disk.** The folder an item's frames sit in happens to share a name with one of
-  the item's labels — that's a per-item storage detail, never a property stored on the label itself. See
-  [catalog-and-labels.md](docs/architecture/catalog-and-labels.md).
-- **`Catalog`'s mutation API refuses or no-ops on ambiguity rather than silently deleting data.** No
-  operation will orphan an item (leave it with zero ordinary labels) or silently drop a registry entry that
-  still has a backing folder. Label creation/rename also enforce one portable, safe directory component;
-  `Catalog::createLabel()` owns backing-folder creation so an invalid name cannot reach the filesystem before
-  the model rejects it, and filesystem consumers resolve label folders through verified Catalog paths. See
-  [catalog-and-labels.md](docs/architecture/catalog-and-labels.md#label-name-and-path-safety).
-- **When swapping a container/widget for a different shape or look, list what the old one gave for free**
-  (selection model, keyboard nav, drag-and-drop, focus handling) and confirm each still has an equivalent
-  before calling the swap done. See
-  [main-window.md](docs/architecture/main-window.md#media-grid--multi-select) for the multi-select
-  regression this caught once already.
-- **All background disk reads go through `Core/IoThreadPool`** — the process-wide I/O router. Fast internal
-  random-access storage gets a bounded 2–6-worker pool; slow, external, network, or unclassified storage
-  shares one serial worker so parallel loads cannot seek-thrash a spinning disk. Post the file read there
-  (`enqueue`, optionally tagged so an owner's destructor can `retire()` its tasks), and hand CPU-bound
-  decoding to a compute pool. See the two-stage read→decode pattern in
-  [media-widgets.md](docs/architecture/media-widgets.md#loading). Long-running work that is *not* a disk read
-  belongs on its own thread instead: the Import dialog's preview batch supervises ffmpeg processes for minutes,
-  and parking that on the serial pool would stall every thumbnail read on the same volume behind it.
-- **Language/framework coding conventions live in [guidelines.md](docs/guidelines.md)** — assertions
-  (`assert_r`, never `<cassert>`), containers (`std::vector` over `QList`), identity (`MediaId` over path),
-  dialog flush via `done()`, natural sorting, `tr()` i18n, and QSS gotchas. Read before writing new code.
-
----
+- **Catalog is the authoritative media-item and label model.** It is keyed by `MediaId`, maintained through its
+  mutation API, and never reconstructed from disk during normal refresh. Disk reconciliation is explicit.
+- **Library is the stable root-bound owner.** MainWindow owns one immovable `Library`; a complete private state
+  containing root, MetadataStore, and Catalog is replaced transactionally. Persistent collaborators borrow
+  `Library&`; narrow direct borrows cannot span `setRoot`.
+- **`Library::catalogChanged` is the stable invalidation seam.** Persistent views subscribe to Library rather than
+  the replaceable Catalog state.
+- **JSON has one checked boundary.** Candidate files are distinguished as absent, invalid, or valid before model
+  construction. Atomic write failure remains dirty and retryable and blocks silent state loss.
+- **Labels own no disk objects.** A stored item's location may imply one ordinary label, but that relationship belongs
+  to the item. Catalog refuses ambiguous mutations, item orphaning, unsafe label paths, and destructive registry
+  changes whose relocation did not complete.
+- **Container replacement must preserve capabilities.** Selection, keyboard navigation, drag-and-drop, focus, and
+  other behavior supplied by the old widget need explicit equivalents in the new one; see
+  [main-window.md](docs/architecture/main-window.md#media-grid--multi-select).
+- **Background disk reads use `Core::IoThreadPool`.** Fast storage receives bounded parallel reads; slow,
+  external, network, or unknown storage shares a serial worker to avoid seek thrashing. CPU decode follows on a
+  compute pool. Long-running non-read work owns an appropriate separate worker instead of blocking the I/O route.
+- **Language and framework conventions live in [guidelines.md](docs/guidelines.md).**
 
 ## Subsystems
 
-### [Data model & identity](docs/architecture/data-model.md)
-The `Library` lifetime and live root-switch transaction; the on-disk structure (`Library::rootFolder()`, storage
-folders, frame folders); the `MediaId` identity scheme; and `MetadataStore` — the dumb `MediaId`-keyed
-persistence layer (with batched-write support) that `Catalog` loads itself from and writes through.
+### [Data model and identity](docs/architecture/data-model.md)
 
-### [Catalog & labels](docs/architecture/catalog-and-labels.md)
-`Catalog`: the in-memory media-item-set model plus the label model layered over it. Stable label ids, the
-`labels.json` registry, the folder-reconciliation model (exactly 3 touch points), the `MediaId`-anchored
-query/mutation API, import lifecycle (`addMediaItem`/`removeMediaItem`/`applyRename`, the duplicate-id guard,
-`BatchScope`), label-name/path safety, the design rationale, and the on-demand integrity tool.
+Stable Library lifetime and root replacement, library layout, `MediaId` and `LabelId`, dumb per-item
+`MetadataStore` persistence, nested writers, and checked JSON publication.
+
+### [Catalog and labels](docs/architecture/catalog-and-labels.md)
+
+The authoritative item/label model, stable label ids, storage-label reconciliation, mutation and relocation
+invariants, verified paths, batching, empty-label persistence, and explicit integrity checking.
 
 ### [Main window](docs/architecture/main-window.md)
-`MainWindow`'s library startup/switching policy, `MediaBrowserWidget`'s grid + sidebar layout, the name filter, the
-All/Videos/Photos media-type switch (and how photo cards render), label assignment (context menu + drag-from-sidebar), sidebar label management
-(rename/color/delete), the media grid's multi-select implementation (and the regression history behind it),
-renaming a media item on disk, and the in-memory Qt-message log + Help → Show log viewer.
 
-### [Media item card & thumbnail widgets](docs/architecture/media-widgets.md)
-`MediaItemWidget` (the grid card: label drop target, label dots, no longer a drag source),
-`ThumbnailWidget` (sizing model, intrinsic drag, two non-obvious rendering bug fixes), `DragGestureHelper`,
-and the card zoom/preview-count mechanism.
+Library startup and switching, browser update layers, lazy grid population, native multi-selection, item and label
+workflow ownership, rename transactions, and diagnostic logging.
 
-### [Frame viewer & video player](docs/architecture/playback.md)
-`FrameViewerWindow` (persistent per-folder thumbnail popup), `VideoPlayerWindow` (built-in player: seek,
-A–B loop, saved loops persisted per-video), its `OscillatingPlayback` process/cache controller and `SingleFrameExtraction`
-single-frame workflow, `MarkerSlider`, and
-`PhotoCompareWindow` (N-way photo compare:
-one shared zoom/pan view + a per-photo alignment transform, one-click auto-align via the `magic-alignment`
-library, two-point calibration, flicker / difference / full-view comparison modes, drop-to-add photos).
+### [Media cards and thumbnails](docs/architecture/media-widgets.md)
 
-### [Settings & theme](docs/architecture/settings-and-theme.md)
-The `Settings.h`/`QSettings` key pattern, `SettingsDialog`, the `Theme` dark/light color system (incl. the
-app-wide `Accent`/`AccentBg` tokens), and the central `Style` stylesheet + custom-widget approach (e.g.
-`SegmentedToggle`) that gives the app its non-stock look.
+`MediaItemWidget`, `ThumbnailWidget`, label-drop and drag behavior, asynchronous read/decode ownership, rendering
+invariants, and card geometry controls.
+
+### [Frame viewing, playback, and photo comparison](docs/architecture/playback.md)
+
+Persistent frame viewing, built-in playback and saved loops, oscillating cache presentation, single-frame extraction,
+and PhotoCompareWindow's shared-view/per-photo-alignment model.
+
+### [Settings and theme](docs/architecture/settings-and-theme.md)
+
+`QSettings` ownership, SettingsDialog behavior, the light/dark color system, central application styling, and custom
+controls used where platform widgets cannot express the intended visuals.
 
 ### [Import and frame extraction](docs/architecture/import.md)
-The UI-free video/photo workers and their interactive batch coordinators; transactional on-demand full-frame
-extraction; preview generation, reuse, and storage; and `ImportDialog`'s staging, duplicate boundaries,
-provisional-label lifecycle, source relocation, and batched catalog publication.
 
----
+UI-free photo/video workers and interactive coordination, preview generation and reuse, transactional on-demand full
+extraction, ImportDialog staging and provisional labels, duplicate boundaries, relocation, and catalog publication.
 
 ## Improvement backlog
 
-**Open:** None currently.
+**Open:** None.
 
-**Decided against / deferred (don't re-litigate without new info):**
-- *Async ffmpeg* — synchronous `waitForFinished` blocking the GUI was judged a non-issue, not worth doing.
-- *Dedup the 3× zoom bound/persist/debounce shape* — deferred; 3 short obvious methods beat the indirection.
-  Revisit at a 4th consumer or if the shape grows.
+**Decided against or deferred:**
+
+- **Async full-frame ffmpeg:** synchronous extraction was judged acceptable for its explicit workflows.
+- **Deduplicate zoom persistence/debounce:** three short consumers remain clearer than an abstraction. Revisit if a
+  fourth consumer appears or the behavior grows.

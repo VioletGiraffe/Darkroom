@@ -1,7 +1,6 @@
 # Darkroom — Coding conventions
 
-Darkroom-specific coding rules. Check these before writing new code. General cross-project working
-principles live in the global `~/.claude/CLAUDE.md` and are not repeated here.
+Darkroom-specific coding rules. General cross-project principles are not repeated here.
 
 ## Assertions — use `assert/advanced_assert.h`, never `<cassert>`
 
@@ -18,7 +17,7 @@ invariant violations are caught in shipped builds without crashing.
 
 Default to `assert_r`. Reach for `assert_debug_only` only for expensive checks.
 
-## Containers — prefer `std::vector` over `QList` (settled 2026-07-03)
+## Containers — prefer `std::vector` over `QList`
 
 Default to `std::vector` for any container. In Qt 6 `QList` is contiguous, so the real differences are its
 copy-on-write (hidden detach costs on every non-const access — hence the `std::as_const` ranged-for idiom)
@@ -51,16 +50,10 @@ string-only needs without touching disk, `MediaId::name()` yields the original f
 
 ## Dialogs — flush caller-visible state from `done(int)`, not the destructor
 
-For a `QDialog` subclass that accumulates state during its lifetime and needs the caller to see the result of
-applying it right after `exec()` returns, do the flush from an overridden `done(int result)` (before
-delegating to `QDialog::done(result)`), not the destructor. `done()` is the single funnel every
-dialog-finishing path runs through (`accept()`, `reject()`, Escape, the window-close button) and runs *while
-`exec()`'s internal event loop is still active*, so the postcondition holds the instant `exec()` returns —
-regardless of whether the dialog is stack- or heap-allocated or kept as a member. A destructor-based flush
-only works if the caller destroys the object before doing anything that depends on the flush, which the
-dialog cannot guarantee from the inside. Reserve the destructor for state nobody else waits on (e.g.
-persisting `QSettings` geometry). See [architecture/import.md](architecture/import.md) for the `ImportDialog`
-case that established this.
+When a dialog accumulates state that its caller must observe immediately after `exec()` returns, flush it from
+an overridden `done(int)` before delegating to `QDialog::done`, not from the destructor. `done()` covers acceptance,
+rejection, Escape, and window close while the dialog still exists. Reserve destruction for state no caller waits on,
+such as persisted geometry.
 
 ## Sorting — natural sort for strings that may contain numbers
 
@@ -89,8 +82,4 @@ wired up yet). Match this for new UI strings:
 ## Qt styling / QSS
 
 Read [tips/qt-styling-system-quirks.md](tips/qt-styling-system-quirks.md) before any `QComboBox` or general
-QSS customization. It documents the QSS / `QStyle` limitations (the border-triangle arrow hack, `image:` /
-`url()` not loading in-memory data, subcontrol geometry not inheriting the base rule, `QProxyStyle` becoming
-unreachable once a subcontrol is QSS-styled, and the popup container being unroundable by QSS) that were
-rediscovered the slow, token-expensive way once already — and the `ComboPopupRounder` solution in
-`Theme/Style.cpp`.
+QSS customization. It records known framework limits and the established remedies in `Theme/Style.cpp`.

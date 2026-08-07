@@ -1,181 +1,110 @@
-# Frame viewer & video player
+# Frame viewing, playback, and photo comparison
 
 [← Back to architecture index](../../ARCHITECTURE.md)
 
-## `FrameViewerWindow` (`src/Windows/FrameViewerWindow.h/.cpp`)
+## FrameViewerWindow
 
-Persistent per-folder thumbnail popup (top-level `QWidget`, reused not destroyed on close). `MainWindow` drives
-it — updates its folder on rename via `currentFolder()` (see [main-window.md](main-window.md)). Uses `CFlowLayout`
-(`qtutils`) — its last consumer, since it needs a plain non-selectable flow grid, unlike `MainWindow`'s grid
-which needs the native multi-select `CFlowLayout` lacks (see
-[main-window.md](main-window.md#media-grid--multi-select)).
+`FrameViewerWindow` is a persistent, reusable top-level thumbnail viewer owned by MainWindow. MainWindow updates or
+clears it when browser workflows rename, remove, or replace its current media item. It uses `CFlowLayout` because
+its thumbnail flow is non-selectable; the main media grid instead requires the native selection and input behavior
+documented in [main-window.md](main-window.md#media-grid--multi-select).
 
----
+## VideoPlayerWindow
 
-## `VideoPlayerWindow`, `OscillatingPlayback`, `SingleFrameExtraction`, and `MarkerSlider`
+`VideoPlayerWindow` coordinates Qt media playback, controls, saved-loop persistence, optional oscillating
+presentation, and single-frame extraction. Open players are tracked app-wide so library replacement can close them
+synchronously before the stable `Library&` begins resolving a different store.
 
-Built-in player (`QMediaPlayer` + `QVideoWidget` + `QAudioOutput`) for the double-click-to-play path. Keeps a
-static list of open instances (app-wide restart/close) and auto-tiles each window into screen thirds once the
-video size is known. Offers an A–B loop plus multiple saved loops per video. The player has one logical
-position/play-state seam so controls keep referring to the frame actually shown when the optional oscillating
-mode temporarily takes presentation over from `QMediaPlayer`. The window owns controls, saved-loop UI/persistence,
-and coordination; the process/cache state machine lives in `OscillatingPlayback`, and single-frame extraction/import
-lives in `SingleFrameExtraction`.
+The player exposes one logical position and play-state seam. Controls therefore refer to the frame actually presented
+whether `QMediaPlayer` or `OscillatingPlayback` currently owns presentation.
 
-`QMediaPlayer` error observation is installed before assigning the source. Resource, access, network, invalid-media,
-and format failures that leave no playable video are reported once with the backend detail and close the unusable
-window. A format error that still leaves a video track playable is reported once as a nonfatal limitation; playback
-continues, since Qt may use `FormatError` for an unsupported secondary stream such as audio.
+Media errors are observed before assigning the source. Fatal source failures are reported once and close an unusable
+window. A backend format error remains nonfatal when a playable video track exists because an unsupported secondary
+stream, commonly audio, need not prevent video playback.
 
 ### Oscillating playback
 
-`OscillatingPlayback` (`src/Windows/OscillatingPlayback.h/.cpp`) prepares an in-memory JPEG cache of the target
-range and then presents it forward and backward without seeking at either turnaround. The range is the A–B interval,
-or the whole video when no valid A–B is set. Preparation is one asynchronous ffmpeg process owned by the controller;
-its constant-rate, at-most-60-fps MJPEG stream is parsed by multipart `Content-length` directly from stdout. There are
-no temporary files and no Darkroom worker thread. The coarse admission limits are 30
-seconds and a 1920×1080 output envelope (smaller sources are not upscaled); the resulting frame-count cap is
-the runaway guard, deliberately without compressed-byte accounting.
+`OscillatingPlayback` prepares an in-memory JPEG cache for the active A-B range, or the whole video when no valid
+range exists, then presents it forward and backward without seeking at turnarounds. One asynchronous ffmpeg process
+streams multipart MJPEG through stdout; the controller owns parsing and process lifetime. There are no temporary
+files or Darkroom worker threads.
 
-Presentation uses an approximately 60 Hz GUI-thread clock. It selects the frame implied by elapsed time, so a
-late tick or 2× playback drops obsolete frames instead of slowing the motion. Linear, blended cosine,
-smoothstep, smootherstep, and true-cosine curves normalize the speed selector as their approximate maximum
-source speed. Except for explicitly unblended True cosine, the nonlinear choices mix easing with a linear
-component, retaining nonzero turnaround velocity instead of nearly dwelling at A/B; switching curve keeps raw
-cycle phase and cuts to the new mapping on the next tick. JPEG decode is inline and transient:
-the decoded `QImage` is submitted to the existing `QVideoSink` through Qt 6.8's `QVideoFrame(QImage)`.
-Formats with no direct Qt video-frame mapping receive one explicit `RGBA8888` conversion.
+Admission bounds range duration, output resolution, and frame count to prevent runaway caches. Presentation is driven
+by elapsed time on the GUI thread, dropping obsolete frames after a late tick rather than slowing the motion. JPEGs
+decode transiently and are submitted to the existing `QVideoSink` through `QVideoFrame(QImage)`, with explicit
+format conversion only when Qt has no direct mapping.
 
-The paused `QMediaPlayer` remains attached to the video widget while the manual frames are submitted. Audio is
-effectively muted during both preparation and oscillation, independently of the persisted user mute choice.
-Changing/clearing A or B, activating a saved loop, seeking, restart-all, or turning the toggle off cancels and
-drops the cache. Normal playback resumes at the discrete timestamp of the last displayed cached frame and
-preserves whether the oscillation was playing or paused. The selected motion curve is global/persisted; the
-toggle and cache are per-window/transient.
+Motion curves map one normalized phase while the speed control retains comparable meaning across curves. Switching
+curve preserves cycle phase. The selected curve is global and persisted; activation and cached frames are
+window-local and transient.
 
-### Frame extraction
+The paused Qt player remains attached while cached frames are submitted. Audio is silent during preparation and
+oscillation. Any operation that invalidates the active range or presentation position drops the cache. Returning to
+normal playback resumes at the last displayed cached timestamp and preserves the logical playing/paused state.
 
-`SingleFrameExtraction` (`src/Windows/SingleFrameExtraction.h/.cpp`) owns the configured blocking `Ffmpeg::extractSingleFrame` call,
-failure reporting, last-destination settings, and the optional library import. Right-clicking the video extracts
-the frame at the clicked moment (left click stays play/pause) to one of three destinations: the library, a picked
-folder, or a repeat of whichever ran last
-(persisted). The library path lands it as an **owned photo** under the configurable "Extracted" label via
-`Import::importPhoto(Move)`, reusing photo import's dedup/collision handling; extraction goes to a temp dir
-under the library root (not system temp) so that move is a same-drive rename. Frames deliberately never go
-into the video's frame folder — a regenerable artifact a re-split wipes wholesale. Folder extraction selects
-the first free `name`, `name (1)`, ... path and ffmpeg refuses overwrites; a failed extraction may leave its new
-partial file. Untracked (staging-preview) videos work too. A successful library import mutates the Catalog, whose
-blanket notification refreshes the browser without routing through the player or MainWindow.
+### Single-frame extraction
 
-### Saved loops
+`SingleFrameExtraction` owns configured ffmpeg extraction, failure reporting, destination persistence, and optional
+library import. It can extract to a chosen folder or import the result as an owned photo under the configured
+Extracted label.
 
-Persisted via `MetadataStore` (see [data-model.md](data-model.md)) under the `"intervals"` field — a list of
-`{start, end, name, speed}` objects keyed by the played video's `MediaId`; (de)serialization owned here per the
-field-owns-its-format convention. `speed` is the playback speed captured when the loop was saved; activating a
-loop restores it (a missing/zero `speed`, from loops saved before the attribute existed, leaves the current speed
-untouched). Deleting the selected saved loop also clears the active A–B interval and any oscillating playback before
-removing its persisted entry.
+Library-bound extraction writes a temporary file under the library root so the subsequent Move import remains a
+same-volume rename. It reuses the normal photo-import collision and deduplication rules. Extracted photos never enter
+the video's regenerable frame folder, which full re-extraction may replace wholesale. Successful import reaches the
+browser through normal Catalog notification.
 
-### Playback speed
+### Saved loops and playback speed
 
-Playback speed is remembered **per video**, not globally, in the `"playbackSpeed"` metadata field. Only an
-explicit non-1× pick writes it; picking 1× removes the field (via `MetadataStore::removeField`), so untouched
-and reverted videos carry no record at all. Restore and loop activation apply a speed without persisting it, so
-a loop's transient speed never overwrites the video's remembered one. Absent means never customized, restored as 1×. Each player borrows the stable `Library&` and resolves the store at the
-read/write point; after a root switch `MainWindow` closes every player synchronously before returning to the
-event loop, so an old video's controls cannot write the new library's state.
+Saved A-B loops are stored per `MediaId` in `MetadataStore`, including their name and captured playback speed.
+Activating a loop restores its speed without overwriting the video's independently remembered speed.
 
-## `MarkerSlider` (`src/UiComponents/MarkerSlider.h/.cpp`)
+Playback speed is also persisted per video. The default 1x value removes the field, distinguishing untouched/default
+state without redundant records. Applying a restored or loop-specific speed can bypass persistence. Players resolve
+the current store only at read/write points; MainWindow closes them before a library switch can redirect those
+operations.
 
-A `QSlider` subclass (paint-only) that draws up to two vertical markers, positioned from the real slider style
-metrics so they align with the handle. Chosen over an overlay widget or a `QGraphicsVideoItem` route because
-it keeps all of `QSlider`'s free behavior (mouse/keyboard seeking, styling, seek signals) and adds only marker
-painting.
+`MarkerSlider` adds paint-only A/B markers to `QSlider` using the slider's real style metrics. Retaining the native
+slider preserves seeking, keyboard input, signals, and styling.
 
----
+## PhotoCompareWindow
 
-## `PhotoCompareWindow` (`src/Windows/PhotoCompareWindow.h/.cpp`)
+`PhotoCompareWindow` compares multiple photos through two transform layers:
 
-N-way photo comparison in a near-square grid of equally sized panes, maximized by default. `MainWindow` offers
-it for any all-photo selection of at least two; `showForFiles` filters missing paths and caps the comparison at
-50 (the same cap applies to photos added later by dropping image files or whole folders, each default-aligned
-against the current reference). Also openable empty from Tools → "Compare photos...". A pane's context menu can
-make its photo the reference (the reference pane is outlined in yellow). Its core mechanism is **two separate
-transform layers**:
+1. A shared view transform supplies zoom and pan in equal-sized pane coordinates.
+2. A per-photo similarity transform maps each image into subject space, defined by the current reference photo.
 
-- **One shared view** (zoom + pan, in widget coordinates — equal pane sizes are what make the same widget
-  position show the same subject point in every pane): wheel zooms all panes around the cursor, drag pans all.
-- **A per-photo alignment transform** (a similarity: uniform scale + rotation + offset) mapping each image
-  into the shared "subject" space, defined as the **reference photo's** pixel coordinates (photo 0 by
-  default; re-elected by two-point calibration or the pane context menu). This is the zoom/crop/rotation-difference compensation. The
-  default normalizes each photo's height to the reference's and centers — so pure resolution differences
-  align with no user action. The view itself stays rotation-free (the reference, by the fold convention
-  below, always has rotation 0).
+Separating these layers lets every pane show the same subject position while compensating independently for scale,
+rotation, and offset. The reference transform is folded into the shared view whenever the reference changes, keeping
+the reference pixels stationary while subject space rebases.
 
-Three ways to set the alignment:
+### Alignment
 
-- **Auto-align (`A`)** — one click estimates every photo's transform against the reference via the
-  `magic-alignment` submodule (a Qt-only static library; a deterministic coarse-to-fine correspondence search
-  with a robust similarity fit and an accept-or-fail verdict — the full pipeline is documented on `alignImages`
-  in `MagicAlignment.h`), feeding the current alignment in as the initial guess. A photo the library cannot align reliably *keeps* its current alignment rather than receiving a
-  plausible-but-wrong one. Rotation is corrected along with scale and offset, but its capture range is
-  small-angle only (a few degrees — horizon-correction grade; a larger real rotation fails honestly); a
-  notable corrected angle is surfaced in the hint bar, being the one component with no manual-adjustment
-  gesture. The bottom bar's **"Ignore rotation"** checkbox removes the rotation degree of freedom from the
-  fit — scale and offset are re-derived by the constrained least squares rather than by zeroing a
-  jointly-fitted angle — for pairs whose apparent rotation is spurious (e.g. depth parallax reading as a
-  slight tilt).
-  An optional **align region** (Shift+drag; one subject-space rect drawn dashed in every pane; Shift+click
-  clears; persists across aligns and reference folds) restricts the alignment evidence to that region — the
-  tool for scenes where no global alignment exists (depth parallax between focus-stack slices, locally moved
-  subjects): align what matters and let the rest fall where it falls.
-  `I` toggles a diagnostic overlay (off by default) that draws the last run's patch evidence as
-  true-footprint squares — accent = used for the fit, orange = outlier, red = no match.
-- **Two-point calibration (`Shift+A`)** — click the same two features in every photo; the photo receiving the
-  session's first point becomes the reference; the two point pairs determine the full similarity exactly
-  (scale from the distance ratio, rotation from the segment angles, offset from the midpoints) — so manual
-  calibration handles arbitrary angles, beyond auto-align's range.
-- **Manually** — Ctrl+wheel / Ctrl+drag adjusts the hovered photo's scale / offset alone (rotation has no
-  manual gesture).
+Default alignment normalizes image height to the reference and centers it. Alignment can then be changed in three
+ways:
 
-Both auto-align and calibration first **fold the reference's transform into the view** (the view pan/zoom
-absorb it, the reference's own transform becomes identity): the reference stays pixel-frozen on screen while
-subject space rebases to its pixel coordinates, and only the other photos move to meet it.
+- **Automatic alignment** uses the `magic-alignment` library to estimate each photo against the reference, starting
+  from its current transform. A failed fit preserves that transform. Rotation can be constrained out of the fit, and
+  an optional subject-space region can restrict evidence when the scene has no useful global alignment.
+- **Two-point calibration** uses corresponding feature pairs to solve the full similarity transform and supports
+  rotations beyond automatic alignment's intended small-angle range.
+- **Manual adjustment** changes an individual photo's scale and offset.
 
-Comparison modes over the aligned set:
+Flicker, difference, and single-photo full-view modes all consume the same aligned image set and shared view; they do
+not maintain independent transforms.
 
-- **Flicker** — hold `1`..`N` (capped at 9) to render that photo in every pane under the shared view; with
-  aligned photos, the fastest way to spot differences.
-- **Difference** (`D`) — every pane except the reference's renders as the per-channel |photo − reference|, so
-  regions that match go dark and only real differences stand out.
-- **Full view** — the bottom slider (`Left`/`Right` steps it) shows one photo full-size across the whole grid,
-  so scrubbing it is a full-size flicker; `Esc` returns to the grid.
+### Image loading and worker ownership
 
-Implementation notes:
-- The pane widget (`PhotoComparePane`) is defined **in the .cpp** — it's a pure viewport; all state (images,
-  mip chains, alignment, view, calibration points) lives in the window, reached via friendship. No `Q_OBJECT`
-  on either class (direct calls, no signals).
-- **Minification quality**: panes paint through a halving mip chain rather than scaling the source in one live
-  pass — the same minification-aliasing lesson as `ThumbnailWidget`'s pre-resample fix, adapted for continuous
-  zoom.
-- **Loading is asynchronous and two-stage**, per the app-wide I/O rule (see
-  [ARCHITECTURE.md](../../ARCHITECTURE.md)): the reads run on `Core/IoThreadPool` as one tagged task, each
-  handing its bytes to a decode on the window's own `CWorkerThreadPool` (`_workerPool`, sized to leave the GUI
-  thread a core); the decode that completes the batch posts `applyLoadedPhotoBatch`, so the ordered batch lands
-  on the GUI thread in one go. **One batch at a time** — `_loadBatch` is non-null while a load is in flight and
-  `dragEnterEvent` denies drops meanwhile (chosen over a pool busy-query API). Closing mid-load aborts the batch
-  (pending decodes become no-ops) and retires the read task by tag, so the read loop is provably gone before the
-  pool member joins.
-- The same `_workerPool` also backs **auto-align**, parallel both across photos and within each `alignImages`
-  call (the library takes a pool parameter and owns no threads of its own). The nesting is deadlock-free because
-  `parallelFor`'s caller drains the range too, and it self-balances: a two-photo compare gives the inner fit
-  every core, while many photos saturate the outer loop and each inner call runs inline. The result is
-  bit-identical to a serial run — no cross-thread floating-point reductions — so alignment stays idempotent. The
-  pool is **window-local on purpose**, living and dying with the window; promote it to an app-wide pool only if
-  a third consumer appears.
-- The alignment is transient, but three things persist across sessions: window geometry, the "Ignore
-  rotation" option, and the align region. The latter two use window-local `QSettings` keys defined in the
-  `.cpp` (deliberately not in `Settings.h`); the region is stored as fractions of the reference frame, so it
-  restores at any resolution and re-anchors to the current reference on open.
-- **`R`** resets every photo to its default alignment and drops the align region and all comparison modes,
-  keeping only the current reference and the persisted "Ignore rotation" option.
+Photo loading follows the app-wide two-stage rule: tagged reads run on `Core::IoThreadPool`, then a window-local
+compute pool decodes images and builds halving mip chains. The completed ordered batch is published to the GUI thread
+at once. Only one load batch is admitted per window; closing aborts pending decode publication and retires tagged I/O
+before the compute pool joins.
+
+The mip chain avoids live one-pass minification artifacts during continuous zoom. The same compute pool runs
+automatic alignment, parallelizing across photos and inside each fit. Nested work is safe because the calling worker
+participates in each parallel range rather than blocking for a saturated child queue. Alignment remains deterministic
+because fits perform no cross-thread floating-point reduction.
+
+The compute pool is window-local because loading and alignment share the window's lifetime and no broader owner needs
+the resource. Alignment state is transient. Window geometry, rotation-constraint preference, and the optional
+alignment region persist; the region is stored relative to the reference dimensions so it restores across
+resolutions.
