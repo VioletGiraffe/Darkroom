@@ -666,8 +666,8 @@ void PhotoCompareWindow::deletePhotoInteractive(int index)
 
 	if (trackedId)
 	{
-		MediaItemManagement::deleteItemsInteractive(catalog, { *trackedId }, this);
-		if (!catalog.containsMediaItem(*trackedId))
+		const MediaItemManagement::DeleteResult result = MediaItemManagement::deleteItemsInteractive(catalog, { *trackedId }, this);
+		if (std::ranges::contains(result.deletedItems, *trackedId))
 			removePhotoFromComparison(index);
 		return;
 	}

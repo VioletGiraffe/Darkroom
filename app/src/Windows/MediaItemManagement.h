@@ -19,6 +19,8 @@ namespace MediaItemManagement
 
 	struct DeleteResult
 	{
+		// Items whose filesystem deletion completed and whose Catalog records were removed, in selection order.
+		std::vector<MediaId> deletedItems;
 		// A failed deletion can partially alter storage without changing the Catalog.
 		bool storageRefreshRequired = false;
 		QStringList affectedFrameFolders;

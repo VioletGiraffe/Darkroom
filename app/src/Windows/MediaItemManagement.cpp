@@ -183,7 +183,10 @@ MediaItemManagement::DeleteResult MediaItemManagement::deleteItemsInteractive(
 			}
 
 			if (failedParts.empty())
+			{
 				catalog.removeMediaItem(id);
+				result.deletedItems.push_back(id);
+			}
 			else
 			{
 				result.storageRefreshRequired = true;
