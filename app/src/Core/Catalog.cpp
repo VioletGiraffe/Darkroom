@@ -603,7 +603,7 @@ bool Catalog::addPhoto(const MediaId& id, const QString& sourcePath, const QStri
 void Catalog::removeMediaItem(const MediaId& id)
 {
 	_metadataStore.beginBatch().remove(id);
-	if (_mediaItems.remove(id) > 0)
+	if (_mediaItems.remove(id))
 		notifyCatalogChanged();
 }
 
