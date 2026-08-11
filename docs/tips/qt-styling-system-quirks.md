@@ -51,6 +51,10 @@ layers:
 
 Gate the global filter before private-type inspection: reject unrelated event types and non-window objects first.
 
+The class name is private API, so the filter asserts it against a public one: a `Qt::Popup` window whose parent
+widget is a `QComboBox` is that container under any name. A fired assertion means Qt renamed it and the recipe
+above is no longer running.
+
 ## Hover state
 
 QSS `:hover` follows `QStyle::State_MouseOver`, derived from `QWidget::underMouse()` and

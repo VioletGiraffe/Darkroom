@@ -1,9 +1,12 @@
 #include "Theme/Style.h"
 #include "Theme/Theme.h"
 
+#include "assert/advanced_assert.h"
+
 #include <QAbstractItemView>
 #include <QApplication>
 #include <QColor>
+#include <QComboBox>
 #include <QEvent>
 #include <QPainter>
 #include <QPalette>
@@ -272,6 +275,13 @@ QPalette paletteFor(const Theme::ThemeColors& t)
 	return p;
 }
 
+// Qt parents a combo's popup container to the combo and gives it Qt::Popup. Both hold under any name Qt gives
+// that private class, which is what makes this a usable cross-check on the name match below.
+[[nodiscard]] bool isPopupOwnedByComboBox(const QWidget& w)
+{
+	return w.windowType() == Qt::Popup && qobject_cast<QComboBox*>(w.parentWidget()) != nullptr;
+}
+
 // The private combo popup's opaque viewport defeats QSS border-radius, so paint its surface here.
 class ComboPopupRounder : public QObject
 {
@@ -285,16 +295,23 @@ public:
 			return QObject::eventFilter(watched, event);
 
 		QWidget* container = static_cast<QWidget*>(watched);
-		if (type == QEvent::Show && container->inherits("QComboBoxPrivateContainer"))
+		const bool isComboContainer = container->inherits("QComboBoxPrivateContainer");
+		if (type == QEvent::Show)
 		{
-			container->setAttribute(Qt::WA_TranslucentBackground);
-			if (QAbstractItemView* view = container->findChild<QAbstractItemView*>())
+			// Failing this means Qt renamed the class and none of the popup styling runs any more.
+			if (isPopupOwnedByComboBox(*container))
+				assert_r(isComboContainer);
+
+			if (isComboContainer)
 			{
+				container->setAttribute(Qt::WA_TranslucentBackground);
+				QAbstractItemView* view = container->findChild<QAbstractItemView*>();
+				assert_and_return_r(view != nullptr, QObject::eventFilter(watched, event));
 				view->setStyleSheet(QStringLiteral("background: transparent; border: none;"));
 				view->viewport()->setAutoFillBackground(false);
 			}
 		}
-		else if (type == QEvent::Paint && container->isWindow() && container->inherits("QComboBoxPrivateContainer"))
+		else if (isComboContainer && container->isWindow())
 		{
 			const Theme::ThemeColors& t = Theme::current();
 			QPainter p(container);
