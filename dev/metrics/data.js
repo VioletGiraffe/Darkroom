@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786478659570,
+  "lastUpdate": 1786487302965,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -10851,6 +10851,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 344.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 36,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 33.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 10,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "07bae048f0d914a2e8f2d2faeca61ef009bc21ce",
+          "message": "MarkerSlider supports tick (that our QSS style disables, so standard QSlider has none)",
+          "timestamp": "2026-08-12T01:23:32+03:00",
+          "tree_id": "6acebacdd4c45e34472056cf906f1a634f6dc7f6",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/07bae048f0d914a2e8f2d2faeca61ef009bc21ce"
+        },
+        "date": 1786487299946,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 14485,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 8789,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1171,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 721.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 345,
             "unit": "KB"
           },
           {
