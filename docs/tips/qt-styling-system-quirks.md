@@ -28,6 +28,9 @@ Known QSS and `QStyle` traps with established remedies. The central implementati
   subcontrol.
 - Styling the popup item view removes native row margins and changes behavior between Qt versions. Set explicit
   `QComboBox QAbstractItemView::item` padding.
+- A styled slider loses its tick marks: `QStyleSheetStyle` draws groove, sub-page, and handle from the QSS boxes and
+  never draws the tickmark subcontrol, and there is no `::tick` subcontrol to style. `MarkerSlider` paints them back
+  from `tickPosition()`/`tickInterval()`, positioning them off `subControlRect` so the geometry follows the style.
 - A QSS-styled item view does not take selected-row colors from `QPalette::Highlight` and
   `HighlightedText`. Style `::item:selected` explicitly.
 - A fully styled combo receives no reliable style-drawn focus ring. Add an explicit `QComboBox:focus` rule.

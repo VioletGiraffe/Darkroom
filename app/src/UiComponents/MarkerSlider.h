@@ -2,7 +2,8 @@
 
 #include <QSlider>
 
-// QSlider with two painted A/B markers; -1 means unset.
+// QSlider that paints the marks QStyleSheetStyle leaves out: tick marks at tickInterval(), plus two optional A/B
+// markers (-1 means unset). Horizontal orientation only.
 class MarkerSlider final : public QSlider
 {
 public:
@@ -11,6 +12,8 @@ public:
 	void setMarkerA(int value);
 	void setMarkerB(int value);
 	void clearMarkers();
+
+	[[nodiscard]] QSize sizeHint() const override;
 
 protected:
 	void paintEvent(QPaintEvent* event) override;

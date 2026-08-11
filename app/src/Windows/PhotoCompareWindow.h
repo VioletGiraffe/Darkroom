@@ -15,8 +15,8 @@
 
 class QCheckBox;
 class QLabel;
-class QSlider;
 class QStackedLayout;
+class MarkerSlider;
 class PhotoComparePane;
 class SegmentedToggle;
 class Library;
@@ -144,7 +144,7 @@ private:
 	QLabel* _dropHintLabel = nullptr;
 	PhotoComparePane* _fullPane = nullptr;
 	QStackedLayout* _viewStack = nullptr;
-	QSlider* _slider = nullptr;
+	MarkerSlider* _slider = nullptr;
 	SegmentedToggle* _diffToggle = nullptr;
 	QCheckBox* _ignoreRotationCheck = nullptr;
 	QLabel* _hintLabel = nullptr;

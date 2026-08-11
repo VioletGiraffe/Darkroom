@@ -4,6 +4,7 @@
 #include "Core/Library.h"
 #include "MagicAlignment.h"
 #include "Theme/Theme.h"
+#include "UiComponents/MarkerSlider.h"
 #include "UiComponents/SegmentedToggle.h"
 #include "Utils.h"
 #include "Windows/MediaItemManagement.h"
@@ -406,7 +407,7 @@ PhotoCompareWindow::PhotoCompareWindow(Library& library, const QStringList& phot
 
 	QHBoxLayout* toolbar = new QHBoxLayout();
 
-	_slider = new QSlider(Qt::Horizontal, this);
+	_slider = new MarkerSlider(Qt::Horizontal, this);
 	_slider->setPageStep(1);
 	_slider->setTickPosition(QSlider::TicksBelow);
 	_slider->setTickInterval(1);
