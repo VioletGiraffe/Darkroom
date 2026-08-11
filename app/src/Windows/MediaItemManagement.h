@@ -10,9 +10,14 @@ class Catalog;
 class QWidget;
 
 // Interactive removal/deletion workflows. Catalog owns metadata mutations; this module owns confirmation,
-// filesystem deletion, and failure reporting.
+// filesystem deletion, failure reporting, and the item naming those dialogs present.
 namespace MediaItemManagement
 {
+	// A photo keeps its extension; a video is named by Catalog::displayName, which drops it.
+	[[nodiscard]] QString itemDisplayName(const Catalog& catalog, const MediaId& id);
+	// Bulleted itemDisplayName lines for a message box, in the given order, capped with an "... and N more" line.
+	[[nodiscard]] QString bulletedItemNameList(const Catalog& catalog, const std::vector<MediaId>& items);
+
 	// The caller owns the initial deletion confirmation. An absent path succeeds. A Trash failure reports QFile's
 	// available diagnostic and offers an explicit, default-cancelled permanent-deletion fallback.
 	[[nodiscard]] bool removePathTrashFirstInteractive(const QString& path, QWidget* dialogParent);

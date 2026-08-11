@@ -1,5 +1,8 @@
 #include "Windows/LabelManagement.h"
 #include "Core/Catalog.h"
+#include "Windows/MediaItemManagement.h"
+
+#include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
 #include <QColor>
 #include <QColorDialog>
@@ -7,6 +10,9 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QObject>
+
+#include <algorithm>
+#include <vector>
 
 LabelId LabelManagement::createLabelOrReport(
 	Catalog& catalog, const QString& name, const QString& color, QWidget* dialogParent)
@@ -90,9 +96,21 @@ void LabelManagement::deleteLabelInteractive(Catalog& catalog, LabelId labelId, 
 		return;
 
 	Catalog::ChangeBatchScope catalogChanges(catalog);
-	if (!catalog.deleteLabel(labelId))
+	std::vector<MediaId> itemsLeftBehind;
+	if (!catalog.deleteLabel(labelId, &itemsLeftBehind))
 	{
-		QMessageBox::warning(dialogParent, QObject::tr("Delete label"),
-			QObject::tr("Could not fully delete \"%1\" - some items may not have been moved.").arg(name));
+		QString failure = QObject::tr("Could not fully delete \"%1\".").arg(name);
+		if (itemsLeftBehind.empty())
+			failure += "\n\n" + QObject::tr("Some items may not have been moved.");
+		else
+		{
+			std::ranges::sort(itemsLeftBehind, [&catalog](const MediaId& a, const MediaId& b) {
+				return NaturalSort::lessCaseInsensitive(
+					MediaItemManagement::itemDisplayName(catalog, a), MediaItemManagement::itemDisplayName(catalog, b));
+			});
+			failure += "\n\n" + QObject::tr("These items could not be moved and are still stored under it:")
+				+ MediaItemManagement::bulletedItemNameList(catalog, itemsLeftBehind);
+		}
+		QMessageBox::warning(dialogParent, QObject::tr("Delete label"), failure);
 	}
 }

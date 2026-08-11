@@ -8,6 +8,8 @@
 #include <QFileInfo>
 #include <QTemporaryDir>
 
+#include <vector>
+
 namespace
 {
 	// A loaded library in a temp root with two folder-backed labels (Alpha, Beta) ready for items.
@@ -285,6 +287,30 @@ TEST_CASE("deleteLabel: relocates, untags, refuses orphaning", "[catalog]")
 	REQUIRE(QDir(f.root + "/Beta/Two").exists());
 	REQUIRE_FALSE(catalog.mediaItemHasLabel(tagger, f.alpha));
 	REQUIRE_FALSE(QDir(f.root + "/Alpha").exists());  // the emptied storage folder is removed
+	requireRebuildStable(catalog);
+}
+
+TEST_CASE("deleteLabel: a blocked relocation keeps the label and reports what stayed", "[catalog]")
+{
+	LibraryFixture f;
+	Catalog& catalog = f.library.catalog();
+
+	const MediaId blocked = f.addVideo("One.mp4", 1000, "Alpha");
+	catalog.addLabel(blocked, f.beta);
+	const MediaId movable = f.addVideo("Two.mp4", 2000, "Alpha");
+	catalog.addLabel(movable, f.beta);
+
+	// An occupied destination is what blocks the move; the rest of the deletion still runs.
+	REQUIRE(QDir{}.mkpath(f.root + "/Beta/One"));
+
+	std::vector<MediaId> itemsLeftBehind;
+	REQUIRE_FALSE(catalog.deleteLabel(f.alpha, &itemsLeftBehind));
+	REQUIRE(itemsLeftBehind.size() == 1);
+	REQUIRE(itemsLeftBehind.front() == blocked);
+
+	REQUIRE(labelIdByName(catalog, "Alpha") == f.alpha);
+	REQUIRE(catalog.folderForMediaItem(blocked) == f.root + "/Alpha/One");
+	REQUIRE(catalog.folderForMediaItem(movable) == f.root + "/Beta/Two");
 	requireRebuildStable(catalog);
 }
 

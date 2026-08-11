@@ -957,8 +957,11 @@ Catalog::DeleteImpact Catalog::deleteLabelImpact(LabelId labelId) const
 	return impact;
 }
 
-bool Catalog::deleteLabel(LabelId labelId)
+bool Catalog::deleteLabel(LabelId labelId, std::vector<MediaId>* itemsLeftBehind)
 {
+	if (itemsLeftBehind)
+		itemsLeftBehind->clear();
+
 	Label* label = mutableLabelById(labelId);
 	if (!label || label->isVirtual())
 		return false;
@@ -988,15 +991,13 @@ bool Catalog::deleteLabel(LabelId labelId)
 	}
 
 	// A blocked relocation still needs this registry entry; rebuilding would otherwise recreate it.
-	bool stillNamed = false;
+	std::vector<MediaId> leftBehind;
 	for (const MediaId& id : mediaItemsForLabel(labelId))
 		if (storageLabelIdOf(_mediaItems.value(id)) == labelId)
-		{
-			stillNamed = true;
-			break;
-		}
+			leftBehind.push_back(id);
+	const bool relocatedEverything = leftBehind.empty();
 
-	if (!stillNamed)
+	if (relocatedEverything)
 	{
 		const QString storageFolderPath = storageFolderForLabel(labelId);
 		if (!storageFolderPath.isEmpty())
@@ -1017,5 +1018,7 @@ bool Catalog::deleteLabel(LabelId labelId)
 
 	saveRegistry();
 	rebuildIndex();
-	return !stillNamed;
+	if (itemsLeftBehind)
+		*itemsLeftBehind = std::move(leftBehind);
+	return relocatedEverything;
 }

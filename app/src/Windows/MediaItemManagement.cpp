@@ -43,21 +43,23 @@ bool permanentlyRemovePath(const QString& path, QString* error)
 	return false;
 }
 
-QString bulletedItemNameList(const Catalog& catalog, const std::vector<MediaId>& selection)
+} // namespace
+
+QString MediaItemManagement::itemDisplayName(const Catalog& catalog, const MediaId& id)
+{
+	return catalog.mediaType(id) == Catalog::MediaType::Photo ? id.name() : catalog.displayName(id);
+}
+
+QString MediaItemManagement::bulletedItemNameList(const Catalog& catalog, const std::vector<MediaId>& items)
 {
 	QString list;
 	constexpr size_t maxListed = 15;
-	for (size_t i = 0; i < std::min(maxListed, selection.size()); ++i)
-	{
-		const MediaId& id = selection[i];
-		list += "\n• " + (catalog.mediaType(id) == Catalog::MediaType::Photo ? id.name() : catalog.displayName(id));
-	}
-	if (selection.size() > maxListed)
-		list += "\n" + QObject::tr("... and %1 more").arg(selection.size() - maxListed);
+	for (size_t i = 0; i < std::min(maxListed, items.size()); ++i)
+		list += "\n• " + itemDisplayName(catalog, items[i]);
+	if (items.size() > maxListed)
+		list += "\n" + QObject::tr("... and %1 more").arg(items.size() - maxListed);
 	return list;
 }
-
-} // namespace
 
 bool MediaItemManagement::removePathTrashFirstInteractive(const QString& path, QWidget* dialogParent)
 {

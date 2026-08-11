@@ -168,8 +168,9 @@ public:
 	[[nodiscard]] DeleteImpact deleteLabelImpact(LabelId labelId) const;
 
 	// Relocates storage, removes extra tags, and then removes the empty backing folder and registry entry.
-	// Refuses Best, unknown ids, orphaning, or incomplete relocation.
-	bool deleteLabel(LabelId labelId);
+	// Refuses Best, unknown ids, orphaning, or incomplete relocation. Incomplete relocation keeps the label and
+	// fills itemsLeftBehind with the items still stored under it; the other refusals leave it empty.
+	bool deleteLabel(LabelId labelId, std::vector<MediaId>* itemsLeftBehind = nullptr);
 
 	// Persists a video's completed split; unknown and already-complete ids no-op.
 	void markSplitComplete(const MediaId& id);
