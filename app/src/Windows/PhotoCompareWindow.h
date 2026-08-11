@@ -1,6 +1,6 @@
 #pragma once
 
-#include "threading/cworkerthread.h"
+#include "threading/cthreadpool.h"
 
 #include <QImage>
 #include <QPointF>
@@ -164,5 +164,5 @@ private:
 	bool _viewTouched = false;
 
 	std::shared_ptr<PhotoLoadBatch> _loadBatch;
-	CWorkerThreadPool _workerPool;
+	CThreadPool _workerPool;
 };

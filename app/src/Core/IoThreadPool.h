@@ -1,6 +1,6 @@
 #pragma once
 
-#include "threading/cworkerthread.h"
+#include "threading/cthreadpool.h"
 
 #include <QString>
 
