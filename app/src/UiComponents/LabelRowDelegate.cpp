@@ -1,5 +1,6 @@
 #include "UiComponents/LabelRowDelegate.h"
-#include "Theme/Icons.h"
+#include "Theme/Theme.h"
+#include "theme/ctintedsvgiconengine.h"
 #include "Theme/Theme.h"
 
 #include <QPainter>
@@ -20,10 +21,7 @@ constexpr int PAD_R = 12;
 constexpr int PAD_V = 6;
 constexpr int COUNT_GAP = 16;
 constexpr int MARGIN = 2;
-constexpr int RADIUS = Theme::ControlRadius;
 constexpr int DIVIDER_H = 12;
-
-inline QColor colorFromHex(const char* hex) { return QColor(QString::fromLatin1(hex)); }
 
 }
 
@@ -31,7 +29,7 @@ QColor LabelRowDelegate::swatchColor(const QString& labelColor)
 {
 	if (!labelColor.isEmpty())
 		return QColor(labelColor);
-	return colorFromHex(Theme::current().MutedText);
+	return Theme::current().palette.textDim;
 }
 
 QSize LabelRowDelegate::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const
@@ -61,11 +59,12 @@ void LabelRowDelegate::paint(QPainter* p, const QStyleOptionViewItem& option, co
 	p->setFont(opt.font);
 
 	const QRect r = opt.rect;
-	const Theme::ThemeColors& t = Theme::current();
+	const Theme::Theme& t = Theme::current();
+	const int RADIUS = t.metrics.controlRadius;
 
 	if (index.data(DividerRole).toBool())
 	{
-		p->setPen(QPen(colorFromHex(t.BorderSubtle), 1.0));
+		p->setPen(QPen(t.palette.borderSubtle, 1.0));
 		const int dy = r.bottom() - 5;
 		p->drawLine(r.left() + PAD_L, dy, r.right() - PAD_R, dy);
 		p->restore();
@@ -93,7 +92,7 @@ void LabelRowDelegate::paint(QPainter* p, const QStyleOptionViewItem& option, co
 		constexpr qreal RING_W     = 1.5;
 		constexpr int   RING_ALPHA = 60;
 
-		const QColor accent = swatch.isValid() ? swatch : colorFromHex(t.AccentBorder);
+		const QColor accent = swatch.isValid() ? swatch : t.palette.accent;
 		QColor tint = accent;
 		tint.setAlpha(TINT_ALPHA);
 		p->setPen(Qt::NoPen);
@@ -118,7 +117,7 @@ void LabelRowDelegate::paint(QPainter* p, const QStyleOptionViewItem& option, co
 
 			const QRectF ringRect = swatchRect.adjusted(-RING_W, -RING_W, RING_W, RING_W);
 			const qreal ringRadius = SWATCH_RADIUS + RING_W;
-			p->setBrush(colorFromHex(t.BackgroundPrimary));
+			p->setBrush(t.palette.windowBg);
 			p->drawRoundedRect(ringRect, ringRadius, ringRadius);
 			QColor halo = accent;
 			halo.setAlpha(RING_ALPHA);
@@ -139,7 +138,7 @@ void LabelRowDelegate::paint(QPainter* p, const QStyleOptionViewItem& option, co
 	}
 
 	if (isAll)
-		p->drawPixmap(QPointF(swatchX, cy - ICON / 2.0), allRowIcon(colorFromHex(t.MutedText), iconDpr(opt)));
+		p->drawPixmap(QPointF(swatchX, cy - ICON / 2.0), allRowIcon(t.palette.textDim, iconDpr(opt)));
 	else if (swatch.isValid())
 	{
 		p->setPen(Qt::NoPen);
@@ -152,14 +151,14 @@ void LabelRowDelegate::paint(QPainter* p, const QStyleOptionViewItem& option, co
 	{
 		const QString star  = QStringLiteral("★");
 		const int     starW = opt.fontMetrics.horizontalAdvance(star);
-		p->setPen(colorFromHex(Theme::StarActive));
+		p->setPen(t.starActive);
 		p->drawText(QRect(nameX, r.top(), starW, r.height()), Qt::AlignLeft | Qt::AlignVCenter, star);
 		nameX += starW + GAP;
 	}
 
 	const int   countW = opt.fontMetrics.horizontalAdvance(count);
 	const QRect countRect(r.right() - PAD_R - countW, r.top(), countW, r.height());
-	p->setPen(colorFromHex(t.MutedText));
+	p->setPen(t.palette.textDim);
 	p->drawText(countRect, Qt::AlignRight | Qt::AlignVCenter, count);
 
 	const QRect nameRect(nameX, r.top(), countRect.left() - (count.isEmpty() ? 0 : COUNT_GAP) - nameX, r.height());
@@ -179,7 +178,7 @@ const QPixmap& LabelRowDelegate::allRowIcon(const QColor& color, qreal dpr) cons
 {
 	if (_allIcon.isNull() || _allIconColor != color || !qFuzzyCompare(_allIconDpr, dpr))
 	{
-		_allIcon = Theme::tintedPixmap(QStringLiteral(":/UI/icon_stack.svg"), color, QSize(ICON, ICON), dpr);
+		_allIcon = tintedSvgPixmap(QStringLiteral(":/UI/icon_stack.svg"), color, QSize(ICON, ICON), dpr);
 		_allIconColor = color;
 		_allIconDpr = dpr;
 	}

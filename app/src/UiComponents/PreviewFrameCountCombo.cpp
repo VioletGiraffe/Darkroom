@@ -1,6 +1,7 @@
 #include "UiComponents/PreviewFrameCountCombo.h"
 #include "Settings.h"
-#include "Theme/Icons.h"
+#include "Theme/Theme.h"
+#include "theme/ctintedsvgiconengine.h"
 
 #include <QAbstractItemView>
 #include <QIcon>
@@ -31,7 +32,7 @@ PreviewFrameCountCombo::PreviewFrameCountCombo(int initialFrameCount, QWidget* p
 	: QComboBox(parent)
 {
 	setToolTip(tr("Number of preview frames shown on each video card"));
-	const QIcon previewCountIcon = Theme::tintedIcon(QStringLiteral(":/UI/icon_columns.svg"), &Theme::ThemeColors::InstructionText);
+	const QIcon previewCountIcon = tintedSvgIcon(QStringLiteral(":/UI/icon_columns.svg"), [] { return Theme::current().instructionText; });
 	for (int n = MIN_PREVIEW_FRAME_COUNT; n <= MAX_PREVIEW_FRAME_COUNT; ++n)
 		addItem(previewCountIcon, (n == 1 ? tr("%1 frame per preview") : tr("%1 frames per preview")).arg(n), n);
 	view()->setItemDelegate(new ClosedControlIconDelegate(this));

@@ -190,7 +190,8 @@ namespace {
 		painter.setRenderHint(QPainter::Antialiasing);
 		painter.setPen(Qt::NoPen);
 		painter.setBrush(QColor(18, 18, 18));
-		painter.drawRoundedRect(imageArea, Theme::ThumbnailMatteRadius, Theme::ThumbnailMatteRadius);
+		const int matteRadius = Theme::current().metrics.thumbnailMatteRadius;
+		painter.drawRoundedRect(imageArea, matteRadius, matteRadius);
 		painter.restore();
 	}
 
@@ -446,7 +447,8 @@ void ThumbnailWidget::paintEvent(QPaintEvent*)
 			// QSS border-radius does not clip custom painting, so clip the image explicitly to the matte.
 			painter.save();
 			QPainterPath roundedImage;
-			roundedImage.addRoundedRect(QRectF(r), Theme::ThumbnailMatteRadius, Theme::ThumbnailMatteRadius);
+			const int matteRadius = Theme::current().metrics.thumbnailMatteRadius;
+			roundedImage.addRoundedRect(QRectF(r), matteRadius, matteRadius);
 			painter.setRenderHint(QPainter::Antialiasing);
 			painter.setClipPath(roundedImage);
 			blit();

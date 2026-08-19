@@ -43,7 +43,7 @@ QSize MarkerSlider::sizeHint() const
 	if (tickPosition() & TicksBelow)
 		++bands;
 	if (bands > 0)
-		hint.setHeight(std::max(hint.height(), Theme::SliderHandleDiameter + bands * TickBand));
+		hint.setHeight(std::max(hint.height(), Theme::current().metrics.sliderHandleDiameter + bands * TickBand));
 	return hint;
 }
 
@@ -73,7 +73,7 @@ void MarkerSlider::paintEvent(QPaintEvent* event)
 	const int interval = tickInterval() > 0 ? tickInterval() : pageStep();
 	if (drawTicks && interval > 0)
 	{
-		painter.setPen(QPen{ QColor{ QString::fromLatin1(Theme::current().BorderStrong) }, 1 });
+		painter.setPen(QPen{ Theme::current().palette.borderStrong, 1 });
 		for (int value = minimum(); value <= maximum(); value += interval)
 		{
 			const int x = xForValue(value);
@@ -86,7 +86,7 @@ void MarkerSlider::paintEvent(QPaintEvent* event)
 
 	if (_markerA >= 0 || _markerB >= 0)
 	{
-		painter.setPen(QPen{ QColor{ QString::fromLatin1(Theme::StarActive) }, 2 });
+		painter.setPen(QPen{ Theme::current().starActive, 2 });
 		for (const int value : { _markerA, _markerB })
 		{
 			if (value < 0)

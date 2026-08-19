@@ -9,7 +9,6 @@ namespace Settings {
 	constexpr const char* FrameStep     = "settings/frameStep";
 	// No settings UI; editable in the settings file.
 	constexpr const char* ExtractedLabelName        = "settings/extractedLabelName";
-	constexpr const char* ColorScheme  = "settings/colorScheme";
 	constexpr const char* PreviewFrameCount = "mainWindow/previewFrameCount";
 }
 
@@ -17,7 +16,6 @@ namespace Defaults {
 	constexpr bool        UseTiff      = false;
 	constexpr int         JpegQuality  = 1;
 	constexpr int         FrameStep    = 3;
-	constexpr int         ColorScheme  = 0;
 	constexpr const char* ExtractedLabelName = "Extracted";
 	constexpr int         PreviewFrameCount = 4;
 }

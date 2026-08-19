@@ -121,7 +121,7 @@ void MediaGrid::paintEvent(QPaintEvent* event)
 			return;
 
 	QPainter p{ viewport() };
-	p.setPen(QColor(QString::fromLatin1(Theme::current().InstructionText)));
+	p.setPen(Theme::current().instructionText);
 	QFont font = p.font();
 	font.setPointSizeF(font.pointSizeF() + 2);
 	p.setFont(font);

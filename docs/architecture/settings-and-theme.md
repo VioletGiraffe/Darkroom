@@ -6,51 +6,60 @@
 
 Shared `QSettings` keys and defaults live in `Settings.h` as matching `Settings::Foo` and `Defaults::Foo`
 constants. Narrow settings used by one implementation remain local to that owner. App-wide derived accessors may
-live in `Utils.h`.
+live in `Utils.h`. Theming preferences are the exception: qtutils' `CThemeController` owns and persists them under
+its own keys.
 
 `QSettings` holds application preferences, not library or per-item state. Per-item fields belong in
 `MetadataStore`; runtime library paths come from an owned or borrowed `Library`. MainWindow's library workflow is
 the sole owner of the last-successful-root and recent-library settings.
 
 `SettingsDialog` excludes library selection, which belongs to the Library menu. Most changes persist on acceptance.
-Color scheme applies immediately so the open dialog and application can preview it; startup applies the saved scheme
-before constructing MainWindow.
+The theming choices - color scheme and one theme per polarity - apply and persist immediately as a live preview;
+rejecting the dialog restores all three.
 
-## Theme colors
+## Themes
 
-`Theme::current()` selects the light or dark `ThemeColors` set. Code consumes named semantic fields rather than
-literal colors. Important families are:
+`Theme::Theme` (`Theme/Theme.h`) is pure data: name and polarity, a `CBasePalette`, `Metrics`, the app-specific
+colors (star and label-UI tones, `instructionText`, `thumbnailMatte`, `readyGreen`), and an optional QSS fragment
+appended after the app sheet so its rules win equal-specificity ties. The selectable themes are one table in
+`Theme.cpp`; `Theme::current()` returns a copy of the resolved one.
 
-- Border tokens distinguish subtle separators, container outlines, and interactive-control edges.
-- Accent border/fill and accent text are separate because tinted surfaces need different contrast.
-- Text-selection background and foreground are an explicit pair.
-- Invariant colors, such as the active Best star, live outside the scheme-specific ramps.
+`Metrics` holds every radius, thickness, and indicator size the stylesheet and custom painting use, so a theme
+reshapes by changing numbers; the fragment covers structure metrics cannot express.
 
-Most widget-local styles read Theme at construction and therefore update when that widget is recreated. The app-wide
-Style sheet and local sheets installed through `Style::applyThemedSheet` subscribe to color-scheme changes and
-rebuild in place.
-
-`Style::install` also publishes Theme colors through the application `QPalette`, allowing stock controls and
-native fallbacks to follow the scheme. Disabled and selection roles are set explicitly. QSS-styled subcontrols may
-ignore palette roles and need their own rules; see
-[qt-styling-system-quirks.md](../tips/qt-styling-system-quirks.md).
+qtutils provides the app-agnostic parts: `CThemeController` (persists the choices, drives
+`QStyleHints::setColorScheme()` so the platform follows, emits `themeChanged()` when the effective theme changes),
+`CBasePalette` with its derivations (nine authored colors, the rest derivable), the tinted icon engine, the
+`themeicon:/` handler, and the styling fixups. The app defines its themes and its stylesheet. Polarity is always
+read from Qt. Colors are `QColor`, stringified only during sheet assembly.
 
 ## Application styling
 
-`Style::install` applies one Theme-generated stylesheet to `qApp` before the main window appears. Shared stock
-control styling and high-volume grid/thumbnail object-name rules live there. Central rules avoid repeated per-instance
-polishing and automatically rebuild on a live scheme change.
+`Style::install` runs once at startup: it installs the `themeicon:/` handler, the focus-frame proxy style, and the
+Qt-fixup event filters, then applies the active theme - `qtPaletteFor()` publishes the palette for stock controls,
+and one theme-generated stylesheet goes to `qApp`. The same apply runs on every `themeChanged()`.
 
-Not every widget belongs in the central sheet. Different scroll areas require different frames, and visuals QSS
-cannot express use custom painting or delegates. Corner radii are named Theme constants so relationships remain
-consistent across central and custom rendering.
+The fixups (`CComboPopupRounder`, `CSplitterHandleHoverEnabler`, `CFocusFrameStyle`) resolve their colors and
+metrics through provider callbacks at each use, so they follow a switch without reinstalling. Their rationale is in
+[qtutils' styling-quirks page](../../qtutils/docs/qt-styling-quirks.md).
 
-`Style::applyThemedSheet(widget, makeSheet)` is the supported local escape hatch when a Theme-derived stylesheet
-must survive a live scheme switch. It applies immediately and regenerates on later changes for the widget's lifetime.
-A short-lived widget recreated after each switch can use a construction-time sheet instead.
+Visuals QSS cannot express use custom painting or delegates, which read `Theme::current()` at paint time and need
+no subscription. `Style::applyThemedSheet(widget, makeSheet)` covers widget-local sheets that must survive a
+switch; a short-lived widget recreated after each switch can use a construction-time sheet instead.
 
-`ComboPopupRounder` and the splitter-hover enabler are application event filters for Qt behaviors QSS cannot repair
-alone. Their constraints and recipes are documented in the styling-quirks page.
+## Icons
+
+Icons are monochrome SVGs with tintable strokes and fills marked `currentColor`; there are no per-theme image
+variants.
+
+- Code-consumed icons: `tintedSvgIcon()` renders per requested size and DPR, resolving its color per render
+  through a callback. `tintedSvgPixmap()` serves delegates that paint directly.
+- QSS-consumed glyphs (checkbox check, combo arrow): `themeicon:/name-rrggbb.svg` URLs built by `themeIconUrl()`
+  during sheet assembly, served by `CThemeIconHandler` patching the source SVG in memory. The tint is part of the
+  URL, so no invalidation is needed.
+
+The Best label's persisted color is deliberately not themed: `Catalog` seeds it from its own constant, keeping
+Core free of the theme runtime.
 
 ## Custom controls
 
@@ -59,13 +68,3 @@ allowing state restoration without triggering work; `currentChanged` represents 
 
 Per-row label visuals use `LabelRowDelegate` because active, hover, and label-specific state cannot be expressed by
 one blanket list rule.
-
-## Icons
-
-Chrome icons are original monochrome SVG resources. `Theme::tintedPixmap` renders an SVG in a requested Theme color.
-`Theme::tintedIcon` uses an on-demand `QIconEngine`, rendering at each requested size and device-pixel ratio rather
-than scaling one rasterization.
-
-Icon tints are named Theme fields rather than captured colors, so every render resolves the active scheme and follows
-a live light/dark change. SVGs referenced directly from QSS remain resource URLs and follow the rules in the styling
-quirks document.

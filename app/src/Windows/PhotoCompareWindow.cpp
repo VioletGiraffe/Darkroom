@@ -131,7 +131,7 @@ private:
 void PhotoComparePane::paintEvent(QPaintEvent*)
 {
 	QPainter painter(this);
-	painter.fillRect(rect(), QColor(Theme::current().ThumbnailMatte));
+	painter.fillRect(rect(), Theme::current().thumbnailMatte);
 
 	const int renderIndex = _owner._flickerIndex >= 0 ? _owner._flickerIndex : photoIndex();
 	PhotoCompareWindow::Photo& photo = _owner._photos[renderIndex];
@@ -164,7 +164,7 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 
 	if (_owner._calibrating)
 	{
-		painter.setPen(QPen(QColor(Theme::current().AccentBorder), 2));
+		painter.setPen(QPen(Theme::current().palette.accent, 2));
 		for (const QPointF& imagePos : photo.calibPoints)
 		{
 			const QPointF c = _owner.widgetFromImage(photo, imagePos);
@@ -180,7 +180,7 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 		for (const PhotoCompareWindow::AlignmentMark& mark : photo.alignMarks)
 		{
 			using Kind = PhotoCompareWindow::AlignmentMark::Kind;
-			const QColor color = mark.kind == Kind::Used || mark.kind == Kind::UsedCoarse ? QColor(Theme::current().AccentBorder)
+			const QColor color = mark.kind == Kind::Used || mark.kind == Kind::UsedCoarse ? Theme::current().palette.accent
 			                   : mark.kind == Kind::Outlier ? QColor(0xe0, 0xa2, 0x30)
 			                                                : QColor(0xd0, 0x40, 0x40);
 			QPen pen(color, 2);
@@ -211,7 +211,7 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 
 	if (renderIndex != photoIndex())
 	{
-		painter.setPen(QPen(QColor(Theme::current().AccentBorder), 3));
+		painter.setPen(QPen(Theme::current().palette.accent, 3));
 		painter.setBrush(Qt::NoBrush);
 		painter.drawRect(rect().adjusted(1, 1, -2, -2));
 	}

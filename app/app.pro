@@ -11,6 +11,7 @@ QMAKE_TARGET_COMPANY     = VioletGiraffe
 QMAKE_TARGET_COPYRIGHT   = Copyright (C) 2026 VioletGiraffe
 
 QT = core gui widgets multimedia multimediawidgets svg
+QT += core-private   # Theme/Style.cpp includes qtutils theme/cthemeiconhandler.h (private QAbstractFileEngineHandler)
 
 CONFIG += strict_c++
 CONFIG -= flat

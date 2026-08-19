@@ -1,49 +1,67 @@
 #pragma once
 
+#include "theme/cbasepalette.h"
+
+DISABLE_COMPILER_WARNINGS
+#include <QString>
+RESTORE_COMPILER_WARNINGS
+
+#include <vector>
+
 namespace Theme {
-// Invariant gold remains legible on both palettes.
-inline constexpr const char* StarActive      = "#cc8a1f";
-inline constexpr const char* StarActiveHover = "#ffd24d";
 
-inline constexpr int ControlRadius = 6;
-inline constexpr int MenuRadius = 8;
-inline constexpr int MenuItemRadius = 5;
-inline constexpr int PopoverRadius = 10;
-inline constexpr int CheckboxRadius = 4;
-inline constexpr int ThumbnailMatteRadius = 4;
-inline constexpr int ScrollBarThickness = 10;
-inline constexpr int ScrollBarHandleRadius = ScrollBarThickness / 2;
-inline constexpr int SliderGrooveThickness = 4;
-inline constexpr int SliderGrooveRadius = SliderGrooveThickness / 2;
-inline constexpr int SliderHandleDiameter = 16;
-inline constexpr int SliderHandleRadius = SliderHandleDiameter / 2;
+// Geometry the stylesheet and custom painting share. Per theme, so a theme can reshape and not only
+// recolour; the defaults are the house values, and a theme overrides only where it differs.
+struct Metrics
+{
+	int controlRadius = 6;
+	int menuRadius = 8;
+	int menuItemRadius = 5;
+	int popoverRadius = 10;
+	int checkboxRadius = 4;
+	int thumbnailMatteRadius = 4;
+	int scrollBarThickness = 10;
+	int sliderGrooveThickness = 4;
+	int sliderHandleDiameter = 16;
+	// FocusFrameStyle expands the label-tight base focus rect by this amount.
+	int focusRectOutset = 2;
 
-// FocusFrameStyle expands the label-tight base focus rect by this amount.
-inline constexpr int FocusRectOutset = 2;
-
-struct ThemeColors {
-	const char* StarButtonDefault;
-	const char* StarButtonHoverUnchecked;
-	const char* StarButtonCheckedHover;
-	const char* MutedText;
-	const char* InstructionText;
-	const char* BackgroundPrimary;
-	const char* BackgroundSecondary;
-	const char* TextPrimary;
-	const char* BorderSubtle;
-	const char* BorderMedium;
-	const char* BorderStrong;
-	const char* AccentBorder;
-	const char* AccentText;
-	const char* AccentBg;
-	const char* SelectionHighlight;
-	const char* SelectedText;
-	const char* ThumbnailMatte;
-	const char* ReadyGreen;
+	// Derived, so they always follow their base values.
+	int scrollBarHandleRadius() const { return scrollBarThickness / 2; }
+	int sliderGrooveRadius() const { return sliderGrooveThickness / 2; }
+	int sliderHandleRadius() const { return sliderHandleDiameter / 2; }
 };
 
-bool isDark();
+// One selectable look. Pure data; the identity is `name` (unique within its polarity).
+struct Theme
+{
+	QString name;
+	bool dark = false;
 
-const ThemeColors& current();
+	CBasePalette palette;
+	Metrics metrics;
+
+	// App colours with no cross-app meaning. Independent hues that cannot derive from the palette
+	// core, authored per theme so each stays legible against its backgrounds.
+	QColor starActive; // the active Best star glyph
+	QColor starButtonDefault;
+	QColor starButtonHoverUnchecked;
+	QColor starButtonCheckedHover;
+	QColor instructionText; // explanatory text, a step quieter than palette.textDim
+	QColor thumbnailMatte;
+	QColor readyGreen;
+
+	QString qssFragment; // optional per-theme QSS, appended after the app sheet so it wins ties
+};
+
+// Every selectable theme, both polarities. The settings dialog lists these.
+[[nodiscard]] const std::vector<Theme>& allThemes();
+
+// The theme in effect - a copy independent of allThemes() storage. Valid once Style::install() ran.
+[[nodiscard]] const Theme& current();
+
+// Re-resolves current() from CThemeController's selection, falling back to the first theme of the
+// active polarity when the stored name no longer exists. Style::apply() calls this; nothing else needs to.
+void selectActiveTheme();
 
 } // namespace Theme

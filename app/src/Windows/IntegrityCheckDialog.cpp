@@ -39,13 +39,13 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog& catalog, const Catalog
 		tr("Catalog inconsistencies and differences from what's actually on disk. Resolve each row on its own, or use a "
 		   "section's blanket action - nothing here is applied automatically."), this);
 	instructions->setWordWrap(true);
-	instructions->setStyleSheet(QStringLiteral("color: %1;").arg(Theme::current().InstructionText));
+	instructions->setStyleSheet(QStringLiteral("color: %1;").arg(Theme::current().instructionText.name()));
 	outer->addWidget(instructions);
 
 	QScrollArea* scroll = new QScrollArea(this);
 	scroll->setWidgetResizable(true);
 	scroll->setStyleSheet(QStringLiteral("QScrollArea { border: 1px solid %1; border-radius: %2px; background: transparent; }")
-		.arg(Theme::current().BorderMedium).arg(Theme::ControlRadius));
+		.arg(Theme::current().palette.border.name()).arg(Theme::current().metrics.controlRadius));
 	QWidget* content = new QWidget(scroll);
 	QVBoxLayout* contentLayout = new QVBoxLayout(content);
 

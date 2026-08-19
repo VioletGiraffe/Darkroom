@@ -13,7 +13,7 @@ contains implementation detail. Keep both in sync.
 1. Read [the coding conventions](docs/guidelines.md).
 2. Follow the relevant subsystem link below and inspect the implementation plus nearby examples.
 3. Before changing QSS, `QComboBox`, or custom styling, read
-   [the Qt styling-system quirks](docs/tips/qt-styling-system-quirks.md).
+   [the Qt styling-system quirks](qtutils/docs/qt-styling-quirks.md).
 4. Keep changes in the app unless responsibility genuinely belongs in a shared submodule, and update durable
    architectural facts when they change.
 
@@ -29,7 +29,7 @@ The qmake root `Darkroom.pro` builds the app and its static-library submodules: 
 - `Core/` for the library, catalog, persistence, identity, and I/O routing.
 - `UiComponents/` for reusable widgets and feature composites.
 - `Windows/` for top-level windows, dialogs, and interactive workflows.
-- `Theme/` for palette and application styling.
+- `Theme/` for the selectable themes and application styling.
 - Root modules for settings, utilities, ffmpeg, import workers, and application startup.
 
 App includes are layer-qualified from `src`, such as `"Core/Catalog.h"` and
@@ -90,8 +90,8 @@ and PhotoCompareWindow's shared-view/per-photo-alignment model.
 
 ### [Settings and theme](docs/architecture/settings-and-theme.md)
 
-`QSettings` ownership, SettingsDialog behavior, the light/dark color system, central application styling, and custom
-controls used where platform widgets cannot express the intended visuals.
+`QSettings` ownership, SettingsDialog behavior, the selectable theme system and its qtutils machinery, central
+application styling, and custom controls used where platform widgets cannot express the intended visuals.
 
 ### [Import and frame extraction](docs/architecture/import.md)
 

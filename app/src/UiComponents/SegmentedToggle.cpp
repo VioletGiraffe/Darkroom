@@ -11,10 +11,8 @@ namespace {
 constexpr int BORDER   = 1;
 constexpr int SEG_HPAD = 12;
 constexpr int SEG_VPAD = 4;
-constexpr int RADIUS   = Theme::ControlRadius;
 constexpr int INSET    = 2;
 
-inline QColor colorFromHex(const char* hex) { return QColor(QString::fromLatin1(hex)); }
 }
 
 SegmentedToggle::SegmentedToggle(const QStringList& segments, QWidget* parent)
@@ -58,8 +56,9 @@ void SegmentedToggle::paintEvent(QPaintEvent*)
 	QPainter p(this);
 	p.setRenderHint(QPainter::Antialiasing);
 
-	const Theme::ThemeColors& t = Theme::current();
-	const QColor border  = colorFromHex(t.BorderStrong);
+	const Theme::Theme& t = Theme::current();
+	const int RADIUS = t.metrics.controlRadius;
+	const QColor border  = t.palette.borderStrong;
 	const QColor textCol = palette().color(QPalette::Text);
 
 	p.setPen(QPen(border, 1));
@@ -85,7 +84,7 @@ void SegmentedToggle::paintEvent(QPaintEvent*)
 		if (selected)
 		{
 			p.setPen(Qt::NoPen);
-			p.setBrush(colorFromHex(t.AccentBg));
+			p.setBrush(t.palette.accentBg);
 			p.drawRoundedRect(seg.adjusted(INSET, INSET, -INSET, -INSET), RADIUS - INSET, RADIUS - INSET);
 		}
 		else if (hovered)
@@ -97,7 +96,7 @@ void SegmentedToggle::paintEvent(QPaintEvent*)
 			p.drawRoundedRect(seg.adjusted(INSET, INSET, -INSET, -INSET), RADIUS - INSET, RADIUS - INSET);
 		}
 
-		p.setPen(selected ? colorFromHex(t.AccentText) : textCol);
+		p.setPen(selected ? t.palette.accentText : textCol);
 		p.drawText(seg, Qt::AlignCenter, _segments[i]);
 	}
 }

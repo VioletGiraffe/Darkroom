@@ -6,7 +6,8 @@
 #include "UiComponents/LabelMimeType.h"
 #include "UiComponents/LabelRowDelegate.h"
 #include "UiComponents/SegmentedToggle.h"
-#include "Theme/Icons.h"
+#include "Theme/Theme.h"
+#include "theme/ctintedsvgiconengine.h"
 #include "Theme/Theme.h"
 #include "Shortcuts.h"
 
@@ -73,7 +74,7 @@ LabelSidebar::LabelSidebar(Library& library, QWidget* parent) : QWidget(parent),
 
 	auto* btnCreateLabel = new QPushButton(tr("Create label"));
 	btnCreateLabel->setObjectName("addLabelButton");
-	btnCreateLabel->setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_plus.svg"), &Theme::ThemeColors::TextPrimary));
+	btnCreateLabel->setIcon(tintedSvgIcon(QStringLiteral(":/UI/icon_plus.svg"), [] { return Theme::current().palette.text; }));
 	btnCreateLabel->setShortcut(QKeySequence(Shortcuts::CreateLabel));
 	btnCreateLabel->setToolTip(tr("Create a new label (%1)").arg(btnCreateLabel->shortcut().toString(QKeySequence::NativeText)));
 	layout->addWidget(btnCreateLabel);

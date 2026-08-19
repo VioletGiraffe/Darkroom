@@ -17,7 +17,8 @@
 #include "Windows/LabelManagement.h"
 #include "Windows/MediaItemManagement.h"
 #include "Windows/SourceRelocation.h"
-#include "Theme/Icons.h"
+#include "Theme/Theme.h"
+#include "theme/ctintedsvgiconengine.h"
 #include "Theme/Theme.h"
 #include "Utils.h"
 #include "UiComponents/MediaItemWidget.h"
@@ -299,7 +300,7 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 
 	QPushButton* addLabelButton = new QPushButton(tr("Create label"));
 	addLabelButton->setObjectName("addLabelButton");
-	addLabelButton->setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_plus.svg"), &Theme::ThemeColors::TextPrimary));
+	addLabelButton->setIcon(tintedSvgIcon(QStringLiteral(":/UI/icon_plus.svg"), [] { return Theme::current().palette.text; }));
 	addLabelButton->setShortcut(QKeySequence(Shortcuts::CreateLabel));
 	addLabelButton->setToolTip(tr("Create a new label (%1)").arg(addLabelButton->shortcut().toString(QKeySequence::NativeText)));
 	connect(addLabelButton, &QPushButton::clicked, this, [this] {
@@ -345,7 +346,7 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 	stagedPaneLayout->addLayout(stagedToolbar);
 
 	_stagedGrid = new MediaGrid();
-	_stagedGrid->setStyleSheet(QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().AccentBg));
+	_stagedGrid->setStyleSheet(QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().palette.accentBg.name()));
 
 	_stagedCardZoomDebounce = new QTimer(this);
 	_stagedCardZoomDebounce->setSingleShot(true);
@@ -388,7 +389,7 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 		   "Double-click a card to preview; right-click for more options. \"Import\" imports every labeled card "
 		   "and clears it from staging."), this);
 	instructions->setWordWrap(true);
-	instructions->setStyleSheet(QStringLiteral("color: %1;").arg(Theme::current().MutedText));
+	instructions->setStyleSheet(QStringLiteral("color: %1;").arg(Theme::current().palette.textDim.name()));
 	outerLayout->addWidget(instructions);
 
 	QHBoxLayout* footer = new QHBoxLayout;

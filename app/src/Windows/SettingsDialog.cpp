@@ -2,15 +2,15 @@
 #include "Settings.h"
 #include "Theme/Style.h"
 #include "Theme/Theme.h"
+#include "theme/cthemecontroller.h"
 #include "UiComponents/SegmentedToggle.h"
 #include "Utils.h"
 
+#include <QComboBox>
 #include <QDialog>
 #include <QDir>
 #include <QFileDialog>
 #include <QFormLayout>
-#include <QGuiApplication>
-#include <QStyleHints>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
@@ -18,6 +18,32 @@
 #include <QSettings>
 #include <QSpinBox>
 #include <QVBoxLayout>
+
+namespace {
+
+// The toggle's segments are System, Light, Dark - mapped explicitly, not by the enum's numbering.
+int toggleIndex(Qt::ColorScheme scheme)
+{
+	switch (scheme)
+	{
+	case Qt::ColorScheme::Light: return 1;
+	case Qt::ColorScheme::Dark: return 2;
+	case Qt::ColorScheme::Unknown: break;
+	}
+	return 0;
+}
+
+Qt::ColorScheme schemeForToggleIndex(int index)
+{
+	switch (index)
+	{
+	case 1: return Qt::ColorScheme::Light;
+	case 2: return Qt::ColorScheme::Dark;
+	default: return Qt::ColorScheme::Unknown;
+	}
+}
+
+} // namespace
 
 GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent)
 {
@@ -52,21 +78,45 @@ GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent
 	auto* form = new QFormLayout;
 	form->addRow(tr("ffmpeg path:"), ffmpegRow);
 
-	_originalScheme = s.value(Settings::ColorScheme, Defaults::ColorScheme).toInt();
+	CThemeController& themes = CThemeController::instance();
+	_originalScheme = themes.schemePreference();
+	_originalLightTheme = themes.themeName(false);
+	_originalDarkTheme = themes.themeName(true);
+
 	_schemeToggle = new SegmentedToggle({ tr("System"), tr("Light"), tr("Dark") }, this);
-	_schemeToggle->setCurrentIndex(_originalScheme);
-
+	_schemeToggle->setCurrentIndex(toggleIndex(_originalScheme));
 	connect(_schemeToggle, &SegmentedToggle::currentChanged, this, [](int index) {
-		QGuiApplication::styleHints()->setColorScheme(static_cast<Qt::ColorScheme>(index));
+		CThemeController::instance().setSchemePreference(schemeForToggleIndex(index));
 	});
+	form->addRow(tr("Color scheme:"), _schemeToggle);
 
-	// Reject must undo the live theme preview.
+	// One selector per polarity; each shows only its themes and applies live, like the scheme toggle
+	const auto addThemeSelector = [&](bool dark, const QString& label) {
+		auto* combo = new QComboBox(this);
+		for (const Theme::Theme& theme : Theme::allThemes())
+		{
+			if (theme.dark == dark)
+				combo->addItem(theme.name);
+		}
+		// A stored name the combo does not hold leaves index 0 - the same first-of-polarity
+		// fallback the theme resolution applies
+		combo->setCurrentText(themes.themeName(dark));
+		connect(combo, &QComboBox::currentTextChanged, this, [dark](const QString& name) {
+			CThemeController::instance().setThemeName(dark, name);
+		});
+		form->addRow(label, combo);
+	};
+	addThemeSelector(false, tr("Light theme:"));
+	addThemeSelector(true, tr("Dark theme:"));
+
+	// Reject must undo the live preview - all three keys
 	if (auto* dialog = qobject_cast<QDialog*>(parent))
 		connect(dialog, &QDialog::rejected, this, [this] {
-			QGuiApplication::styleHints()->setColorScheme(static_cast<Qt::ColorScheme>(_originalScheme));
+			CThemeController& controller = CThemeController::instance();
+			controller.setSchemePreference(_originalScheme);
+			controller.setThemeName(false, _originalLightTheme);
+			controller.setThemeName(true, _originalDarkTheme);
 		});
-
-	form->addRow(tr("Color scheme:"), _schemeToggle);
 
 	auto* layout = new QVBoxLayout(this);
 	layout->addLayout(form);
@@ -76,7 +126,6 @@ GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent
 void GeneralSettingsPage::acceptSettings()
 {
 	QSettings s;
-	s.setValue(Settings::ColorScheme, _schemeToggle->currentIndex());
 	s.setValue(Settings::FfmpegPath, _ffmpegPath->text().trimmed());
 }
 
@@ -99,7 +148,7 @@ EncodingSettingsPage::EncodingSettingsPage(QWidget* parent) : CSettingsPage(pare
 
 	auto* qualityHint = new QLabel(tr("1 = best quality / largest file, 31 = worst / smallest"), this);
 	Style::applyThemedSheet(qualityHint, [] {
-		return QStringLiteral("color: %1;").arg(Theme::current().InstructionText);
+		return QStringLiteral("color: %1;").arg(Theme::current().instructionText.name());
 	});
 	qualityHint->setEnabled(!useTiff);
 

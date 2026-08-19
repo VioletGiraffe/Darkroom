@@ -100,7 +100,7 @@ private:
 inline void ResolvableRow::close(const QString& status, bool resolved)
 {
 	statusLabel->setText(resolved ? QStringLiteral("✓ ") + status : status);
-	statusLabel->setStyleSheet(QStringLiteral("color: %1;").arg(Theme::current().MutedText));
+	statusLabel->setStyleSheet(QStringLiteral("color: %1;").arg(Theme::current().palette.textDim.name()));
 	for (QPushButton* b : buttons)
 		b->setEnabled(false);
 	closed = true;
@@ -123,7 +123,7 @@ inline IntegrityCheckSections::IntegrityCheckSections(const Catalog& catalog, co
                                                       QWidget* content, QVBoxLayout* contentLayout, QWidget* dialog)
 	: _catalog(catalog), _callbacks(callbacks), _dialog(dialog), _content(content), _layout(contentLayout),
 	  _rowStyle(QStringLiteral("QFrame#integrityRow { border: 1px solid %1; border-radius: %2px; }")
-		.arg(Theme::current().BorderSubtle).arg(Theme::ControlRadius))
+		.arg(Theme::current().palette.borderSubtle.name()).arg(Theme::current().metrics.controlRadius))
 {
 	buildUntrackedFolders(report);
 	buildUntrackedPhotos(report);

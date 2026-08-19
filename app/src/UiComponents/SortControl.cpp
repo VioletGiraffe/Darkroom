@@ -1,6 +1,7 @@
 #include "UiComponents/SortControl.h"
 #include "UiComponents/SegmentedToggle.h"
-#include "Theme/Icons.h"
+#include "Theme/Theme.h"
+#include "theme/ctintedsvgiconengine.h"
 #include "Theme/Theme.h"
 
 #include <QCheckBox>
@@ -33,13 +34,13 @@ public:
 		setAttribute(Qt::WA_DeleteOnClose);
 		setAttribute(Qt::WA_TranslucentBackground);
 
-		const Theme::ThemeColors& t = Theme::current();
+		const Theme::Theme& t = Theme::current();
 
 		auto* card = new QFrame(this);
 		card->setObjectName("sortPopoverCard");
 		card->setStyleSheet(QStringLiteral(
 			"QFrame#sortPopoverCard { background-color: palette(window); border: 1px solid %1; border-radius: %2px; }")
-			.arg(t.BorderMedium).arg(Theme::PopoverRadius));
+			.arg(t.palette.border.name()).arg(t.metrics.popoverRadius));
 
 		auto* shadow = new QGraphicsDropShadowEffect(card);
 		shadow->setBlurRadius(20);
@@ -73,7 +74,7 @@ public:
 		auto* divider = new QFrame(card);
 		divider->setFrameShape(QFrame::HLine);
 		divider->setFixedHeight(1);
-		divider->setStyleSheet(QStringLiteral("background-color: %1; border: none;").arg(t.BorderSubtle));
+		divider->setStyleSheet(QStringLiteral("background-color: %1; border: none;").arg(t.palette.borderSubtle.name()));
 		col->addSpacing(4);
 		col->addWidget(divider);
 		col->addSpacing(2);
@@ -114,14 +115,14 @@ private:
 	// Transparent popup area must not overlap the anchor or it intercepts the dismissing click.
 	static constexpr int TOP_MARGIN = GAP;
 
-	static QLabel* makeSectionLabel(const QString& text, const Theme::ThemeColors& t)
+	static QLabel* makeSectionLabel(const QString& text, const Theme::Theme& t)
 	{
 		auto* label = new QLabel(text);
 		QFont f = label->font();
 		if (f.pointSizeF() > 0)
 			f.setPointSizeF(f.pointSizeF() - 1.0);
 		label->setFont(f);
-		label->setStyleSheet(QStringLiteral("color: %1;").arg(t.MutedText));
+		label->setStyleSheet(QStringLiteral("color: %1;").arg(t.palette.textDim.name()));
 		return label;
 	}
 
@@ -147,7 +148,7 @@ SortControl::SortControl(QWidget* parent) : QPushButton(parent)
 	_favoritesFirst = QSettings{}.value(FAVORITES_FIRST_KEY, false).toBool();
 
 	setToolTip(tr("Sort order"));
-	setIcon(Theme::tintedIcon(QStringLiteral(":/UI/icon_sort.svg"), &Theme::ThemeColors::InstructionText));
+	setIcon(tintedSvgIcon(QStringLiteral(":/UI/icon_sort.svg"), [] { return Theme::current().instructionText; }));
 	setIconSize(QSize(20, 15));
 	updateFace();
 	connect(this, &QPushButton::clicked, this, &SortControl::openPopover);

@@ -1,7 +1,6 @@
 #include "Core/Catalog.h"
 #include "Core/JsonPersistence.h"
 #include "Core/MetadataStore.h"
-#include "Theme/Theme.h"
 #include "Utils.h"
 
 #include "assert/advanced_assert.h"
@@ -30,6 +29,9 @@ namespace
 	constexpr QStringView kDurationMsField      = u"durationMs";       // video source length in ms; absent = unknown (pre-existing record / photo)
 	constexpr QStringView kPhotoTypeValue       = u"photo";
 	constexpr QStringView kBestLabelName        = u"Best";
+	// Seeded into the label once at creation and persisted; the star glyph itself is themed separately,
+	// so this is a data-model default, deliberately not a live theme colour.
+	constexpr QStringView kBestLabelColor       = u"#cc8a1f";
 
 	[[nodiscard]] bool isReservedWindowsDeviceName(const QString& name)
 	{
@@ -196,7 +198,7 @@ bool Catalog::ensureBestLabelExists()
 {
 	if (labelById(BestLabelId))
 		return false;
-	_labels.insert(_labels.begin(), Label{ BestLabelId, kBestLabelName.toString(), Theme::StarActive });
+	_labels.insert(_labels.begin(), Label{ BestLabelId, kBestLabelName.toString(), kBestLabelColor.toString() });
 	return true;
 }
 

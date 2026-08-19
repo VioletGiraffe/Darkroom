@@ -3,6 +3,9 @@
 #include "settingsui/csettingsdialog.h"
 #include "settingsui/csettingspage.h"
 
+#include <QString>
+#include <Qt>
+
 class QLineEdit;
 class QSpinBox;
 class SegmentedToggle;
@@ -14,10 +17,13 @@ public:
 	void acceptSettings() override;
 
 private:
-	QLineEdit*       _ffmpegPath    = nullptr;
-	SegmentedToggle* _schemeToggle  = nullptr;
-	// Stored, not effective, scheme so cancellation can restore "System".
-	int              _originalScheme = 0;
+	QLineEdit*       _ffmpegPath   = nullptr;
+	SegmentedToggle* _schemeToggle = nullptr;
+	// The stored preferences, not the effective ones, so cancellation can restore "System" and
+	// names that were falling back.
+	Qt::ColorScheme  _originalScheme = Qt::ColorScheme::Unknown;
+	QString          _originalLightTheme;
+	QString          _originalDarkTheme;
 };
 
 class EncodingSettingsPage final : public CSettingsPage

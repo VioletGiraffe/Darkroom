@@ -1,6 +1,5 @@
 #include "Core/IoThreadPool.h"
 #include "Windows/MainWindow.h"
-#include "Settings.h"
 #include "Theme/Style.h"
 #include "crashhandler/CCrashHandler.h"
 #include "logger/cloggerinmemory.h"
@@ -11,9 +10,7 @@
 #include <QDir>
 #include <QIcon>
 #include <QImageReader>
-#include <QSettings>
 #include <QString>
-#include <QStyleHints>
 
 #ifndef DARKROOM_VERSION
 #error "DARKROOM_VERSION is not defined; set it in app.pro"
@@ -71,9 +68,6 @@ int main(int argc, char* argv[])
 	});
 
 	QImageReader::setAllocationLimit(2048);  // raise Qt's 256 MB decode cap; 67 MP at 3x8 bits already exceeds it
-
-	const int scheme = QSettings{}.value(Settings::ColorScheme, Defaults::ColorScheme).toInt();
-	app.styleHints()->setColorScheme(static_cast<Qt::ColorScheme>(scheme));
 
 	Style::install();
 

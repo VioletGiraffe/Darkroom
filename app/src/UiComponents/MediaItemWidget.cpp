@@ -2,7 +2,8 @@
 #include "UiComponents/LabelMimeType.h"
 #include "UiComponents/ThumbnailWidget.h"
 #include "Theme/Theme.h"
-#include "Theme/Icons.h"
+#include "Theme/Theme.h"
+#include "theme/ctintedsvgiconengine.h"
 #include "Utils.h"
 
 #include <QContextMenuEvent>
@@ -109,7 +110,7 @@ private:
 class FramesReadyBadge final : public QWidget {
 public:
 	explicit FramesReadyBadge(QWidget* parent)
-		: QWidget(parent), _icon(Theme::tintedIcon(QStringLiteral(":/UI/icon_grid.svg"), &Theme::ThemeColors::ReadyGreen))
+		: QWidget(parent), _icon(tintedSvgIcon(QStringLiteral(":/UI/icon_grid.svg"), [] { return Theme::current().readyGreen; }))
 	{
 		setAttribute(Qt::WA_TransparentForMouseEvents);
 		resize(sizeHint());

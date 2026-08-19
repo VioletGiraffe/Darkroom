@@ -5,7 +5,8 @@
 #include "Core/Catalog.h"
 #include "Core/Library.h"
 #include "Core/MetadataStore.h"
-#include "Theme/Icons.h"
+#include "Theme/Theme.h"
+#include "theme/ctintedsvgiconengine.h"
 #include "Utils.h"
 #include "assert/advanced_assert.h"
 #include "dialogs/messagebox.h"
@@ -198,8 +199,8 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 		_audioOutput->setVolume(QAudio::convertVolume(position / qreal(100), QAudio::LogarithmicVolumeScale, QAudio::LinearVolumeScale));
 	};
 	const auto updateMuteIcon = [muteButton] {
-		muteButton->setIcon(Theme::tintedIcon(muteButton->isChecked() ? ":/UI/icon_volume_muted.svg" : ":/UI/icon_volume.svg",
-		                    &Theme::ThemeColors::TextPrimary));
+		muteButton->setIcon(tintedSvgIcon(muteButton->isChecked() ? QStringLiteral(":/UI/icon_volume_muted.svg") : QStringLiteral(":/UI/icon_volume.svg"),
+		                    [] { return Theme::current().palette.text; }));
 	};
 
 	{

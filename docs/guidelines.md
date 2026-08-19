@@ -81,5 +81,5 @@ wired up yet). Match this for new UI strings:
 
 ## Qt styling / QSS
 
-Read [tips/qt-styling-system-quirks.md](tips/qt-styling-system-quirks.md) before any `QComboBox` or general
-QSS customization. It records known framework limits and the established remedies in `Theme/Style.cpp`.
+Read [qtutils' styling-quirks page](../qtutils/docs/qt-styling-quirks.md) before any `QComboBox` or general
+QSS customization. It records known framework limits and the established remedies in the qtutils theme module.

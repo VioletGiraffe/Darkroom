@@ -38,7 +38,7 @@ FrameViewerWindow::FrameViewerWindow(QWidget* parent)
 	_instructionLabel = new QLabel(this);
 	_instructionLabel->setAlignment(Qt::AlignCenter);
 	Style::applyThemedSheet(_instructionLabel, [] {
-		return QStringLiteral("font-size: 16pt; color: %1;").arg(Theme::current().InstructionText);
+		return QStringLiteral("font-size: 16pt; color: %1;").arg(Theme::current().instructionText.name());
 	});
 	_instructionLabel->hide();
 	layout->addWidget(_instructionLabel);

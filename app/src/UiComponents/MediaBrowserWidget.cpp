@@ -3,7 +3,8 @@
 #include "Core/Library.h"
 #include "Settings.h"
 #include "Shortcuts.h"
-#include "Theme/Icons.h"
+#include "Theme/Theme.h"
+#include "theme/ctintedsvgiconengine.h"
 #include "Theme/Style.h"
 #include "Theme/Theme.h"
 #include "UiComponents/LabelVisuals.h"
@@ -242,7 +243,7 @@ void MediaBrowserWidget::setupUi()
 	_nameFilter->setPlaceholderText(tr("filter by name..."));
 	_nameFilter->setClearButtonEnabled(true);
 	_nameFilter->setMinimumWidth(220);
-	_nameFilter->addAction(Theme::tintedIcon(QStringLiteral(":/UI/icon_search.svg"), &Theme::ThemeColors::MutedText),
+	_nameFilter->addAction(tintedSvgIcon(QStringLiteral(":/UI/icon_search.svg"), [] { return Theme::current().palette.textDim; }),
 		QLineEdit::LeadingPosition);
 	connect(_nameFilter, &QLineEdit::textChanged, this, &MediaBrowserWidget::applyNameFilter);
 	headerLayout->addWidget(_nameFilter, 0, Qt::AlignVCenter);
@@ -288,7 +289,7 @@ void MediaBrowserWidget::setupUi()
 	_mediaGrid->setDragUrlsProvider([this](const QList<QListWidgetItem*>& items) { return dragUrlsForItems(items); });
 	_mediaGrid->setCardFactory([this](QListWidgetItem* item) { return buildMediaCard(item); });
 	Style::applyThemedSheet(_mediaGrid, [] {
-		return QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().AccentBg);
+		return QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().palette.accentBg.name());
 	});
 	connect(_mediaGrid, &QListWidget::itemSelectionChanged, this, &MediaBrowserWidget::selectionChanged);
 
