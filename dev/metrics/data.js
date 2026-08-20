@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1787180222424,
+  "lastUpdate": 1787249119017,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -10989,6 +10989,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 353,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 39,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 34,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 10.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "e491d5f1beb08bdd1b4a12b4a5fb929c3feb4e6f",
+          "message": "Settings cleaned up, subrepos updated",
+          "timestamp": "2026-08-20T21:00:13+03:00",
+          "tree_id": "b5b7aeff9f0c721b055e43f22f9c513b3ea7a886",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/e491d5f1beb08bdd1b4a12b4a5fb929c3feb4e6f"
+        },
+        "date": 1787249116530,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 14382,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 9467,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1195,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 734,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 352.5,
             "unit": "KB"
           },
           {
