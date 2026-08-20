@@ -7,7 +7,6 @@
 #include "Utils.h"
 
 #include <QComboBox>
-#include <QDialog>
 #include <QDir>
 #include <QFileDialog>
 #include <QFormLayout>
@@ -109,15 +108,6 @@ GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent
 	addThemeSelector(false, tr("Light theme:"));
 	addThemeSelector(true, tr("Dark theme:"));
 
-	// Reject must undo the live preview - all three keys
-	if (auto* dialog = qobject_cast<QDialog*>(parent))
-		connect(dialog, &QDialog::rejected, this, [this] {
-			CThemeController& controller = CThemeController::instance();
-			controller.setSchemePreference(_originalScheme);
-			controller.setThemeName(false, _originalLightTheme);
-			controller.setThemeName(true, _originalDarkTheme);
-		});
-
 	auto* layout = new QVBoxLayout(this);
 	layout->addLayout(form);
 	layout->addStretch();
@@ -127,6 +117,14 @@ void GeneralSettingsPage::acceptSettings()
 {
 	QSettings s;
 	s.setValue(Settings::FfmpegPath, _ffmpegPath->text().trimmed());
+}
+
+void GeneralSettingsPage::rejectSettings()
+{
+	CThemeController& controller = CThemeController::instance();
+	controller.setSchemePreference(_originalScheme);
+	controller.setThemeName(false, _originalLightTheme);
+	controller.setThemeName(true, _originalDarkTheme);
 }
 
 EncodingSettingsPage::EncodingSettingsPage(QWidget* parent) : CSettingsPage(parent)

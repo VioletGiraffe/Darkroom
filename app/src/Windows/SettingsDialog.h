@@ -15,6 +15,7 @@ class GeneralSettingsPage final : public CSettingsPage
 public:
 	explicit GeneralSettingsPage(QWidget* parent = nullptr);
 	void acceptSettings() override;
+	void rejectSettings() override;
 
 private:
 	QLineEdit*       _ffmpegPath   = nullptr;
