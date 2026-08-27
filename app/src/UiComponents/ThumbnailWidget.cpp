@@ -5,15 +5,12 @@
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
-#include <QApplication>
 #include <QBuffer>
 #include <QByteArray>
 #include <QColor>
-#include <QDesktopServices>
 #include <QFile>
 #include <QImageIOHandler>
 #include <QImageReader>
-#include <QMessageBox>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
@@ -328,6 +325,11 @@ void ThumbnailWidget::setOnMouseWheelCallback(std::function<void(int)> handler)
 	_onZoomRequested = std::move(handler);
 }
 
+void ThumbnailWidget::setOnActivatedCallback(std::function<void()> handler)
+{
+	_onActivated = std::move(handler);
+}
+
 QSize ThumbnailWidget::sizeHint() const
 {
 	if (!_bDynamicSizeHint)
@@ -351,16 +353,9 @@ QSize ThumbnailWidget::sizeHint() const
 
 void ThumbnailWidget::mouseDoubleClickEvent(QMouseEvent* event)
 {
-	if (event->button() == Qt::LeftButton && !_filePath.isEmpty())
-	{
-		if (openFile())
-		{
-			// Hide every app window while the external viewer is active.
-			for (QWidget* w : QApplication::topLevelWidgets())
-				if (w->isVisible() && w->windowType() == Qt::Window)
-					w->showMinimized();
-		}
-	}
+	if (event->button() == Qt::LeftButton && !_filePath.isEmpty() && _onActivated)
+		_onActivated();
+
 	QWidget::mouseDoubleClickEvent(event);
 }
 
@@ -497,15 +492,6 @@ void ThumbnailWidget::applyStyleSettings()
 		THUMBNAIL_BORDER_WIDTH + THUMBNAIL_PADDING,
 		THUMBNAIL_BORDER_WIDTH + THUMBNAIL_PADDING,
 		THUMBNAIL_BORDER_WIDTH + THUMBNAIL_PADDING);
-}
-
-bool ThumbnailWidget::openFile()
-{
-	if (QDesktopServices::openUrl(QUrl::fromLocalFile(_filePath)))
-		return true;
-
-	QMessageBox::warning(this, tr("Error"), tr("Failed to open file:\n%1").arg(_filePath));
-	return false;
 }
 
 void ThumbnailWidget::disarmAsyncTask()

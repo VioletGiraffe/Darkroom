@@ -1,4 +1,5 @@
 #include "Windows/FrameViewerWindow.h"
+#include "Windows/ImageViewerWindow.h"
 #include "Theme/Style.h"
 #include "Theme/Theme.h"
 #include "UiComponents/ThumbnailWidget.h"
@@ -118,12 +119,22 @@ void FrameViewerWindow::refreshDisplay()
 	_instructionLabel->hide();
 	_scrollArea->show();
 
+	QStringList imagePaths;
+	imagePaths.reserve(imageFiles.size());
 	for (const QString& fileName : std::as_const(imageFiles))
+		imagePaths << _folderPath + "/" + fileName;
+
+	for (int index = 0; index < imagePaths.size(); ++index)
 	{
-		const QString filePath = _folderPath + "/" + fileName;
+		// at(), not operator[]: each lambda below holds a copy, so a non-const access here would deep-copy the list every iteration.
+		const QString& filePath = imagePaths.at(index);
 		auto* thumbnail = new ThumbnailWidget(filePath, QFileInfo{ filePath }.completeBaseName(), _thumbnailSize, _thumbnailContainer);
 		connect(thumbnail, &ThumbnailWidget::customContextMenuRequested, this, &FrameViewerWindow::showThumbnailContextMenu);
 		thumbnail->setOnMouseWheelCallback([this](int steps) { zoomThumbnails(steps); });
+		// A frame is not a catalog item, so the viewer opens without a library.
+		thumbnail->setOnActivatedCallback([this, imagePaths, index] {
+			ImageViewerWindow::showForImages(nullptr, imagePaths, index, this);
+		});
 		_thumbnailLayout->addWidget(thumbnail);
 	}
 

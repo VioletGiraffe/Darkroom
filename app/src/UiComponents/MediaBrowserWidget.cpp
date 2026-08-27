@@ -15,6 +15,7 @@
 #include "UiComponents/SortControl.h"
 #include "Utils.h"
 #include "Windows/CompareWindow.h"
+#include "Windows/ImageViewerWindow.h"
 #include "Windows/LabelManagement.h"
 #include "Windows/MediaItemManagement.h"
 #include "Windows/MediaRename.h"
@@ -178,6 +179,21 @@ void renumberGridCaptions(QListWidget* grid)
 	}
 }
 
+std::vector<MediaId> visibleItemsInViewOrder(const QListWidget* grid, const Catalog& catalog, Catalog::MediaType type)
+{
+	const int count = grid->count();
+	std::vector<MediaId> items;
+	items.reserve(count);
+	for (int row = 0; row < count; ++row)
+	{
+		const auto* item = static_cast<const GridItem*>(grid->item(row));
+		if (item->isHidden() || catalog.mediaType(item->mediaId) != type)
+			continue;
+		items.push_back(item->mediaId);
+	}
+	return items;
+}
+
 // A leading '^' anchors the otherwise substring-based, case-insensitive match.
 bool nameMatchesFilter(const QString& name, const QString& query)
 {
@@ -315,9 +331,37 @@ void MediaBrowserWidget::setupUi()
 void MediaBrowserWidget::activateMediaItem(const MediaId& id)
 {
 	if (_library.catalog().mediaType(id) == Catalog::MediaType::Photo)
-		openSourceInSystemApp(id);
+		viewPhoto(id);
 	else
 		playVideo(id);
+}
+
+void MediaBrowserWidget::viewPhoto(const MediaId& id)
+{
+	const Catalog& catalog = _library.catalog();
+	const QString sourcePath = catalog.sourcePathForMediaItem(id);
+	if (!QFile::exists(sourcePath))
+	{
+		reportMissingFile(window(), sourcePath);
+		return;
+	}
+
+	QStringList paths;
+	int startIndex = -1;
+	for (const MediaId& photoId : visiblePhotosInViewOrder())
+	{
+		if (photoId == id)
+			startIndex = static_cast<int>(paths.size());
+		paths << catalog.sourcePathForMediaItem(photoId);
+	}
+
+	if (startIndex < 0) // Not in the grid's current view: nothing to browse through, so show it alone
+	{
+		paths = { sourcePath };
+		startIndex = 0;
+	}
+
+	ImageViewerWindow::showForImages(&_library, std::move(paths), startIndex, window());
 }
 
 void MediaBrowserWidget::playVideo(const MediaId& id)
@@ -876,19 +920,12 @@ std::vector<MediaId> MediaBrowserWidget::selectedMediaItems() const
 
 std::vector<MediaId> MediaBrowserWidget::visibleVideosInViewOrder() const
 {
-	const Catalog& catalog = _library.catalog();
-	const int count = _mediaGrid->count();
+	return visibleItemsInViewOrder(_mediaGrid, _library.catalog(), Catalog::MediaType::Video);
+}
 
-	std::vector<MediaId> videos;
-	videos.reserve(count);
-	for (int row = 0; row < count; ++row)
-	{
-		const auto* item = static_cast<const GridItem*>(_mediaGrid->item(row));
-		if (item->isHidden() || catalog.mediaType(item->mediaId) != Catalog::MediaType::Video)
-			continue;
-		videos.push_back(item->mediaId);
-	}
-	return videos;
+std::vector<MediaId> MediaBrowserWidget::visiblePhotosInViewOrder() const
+{
+	return visibleItemsInViewOrder(_mediaGrid, _library.catalog(), Catalog::MediaType::Photo);
 }
 
 std::vector<MediaId> MediaBrowserWidget::effectiveSelection(std::optional<MediaId> target) const

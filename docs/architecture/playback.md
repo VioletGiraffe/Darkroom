@@ -7,7 +7,21 @@
 `FrameViewerWindow` is a persistent, reusable top-level thumbnail viewer owned by MainWindow. MainWindow updates or
 clears it when browser workflows rename, remove, or replace its current media item. It uses `CFlowLayout` because
 its thumbnail flow is non-selectable; the main media grid instead requires the native selection and input behavior
-documented in [main-window.md](main-window.md#media-grid--multi-select).
+documented in [main-window.md](main-window.md#media-grid--multi-select). Double-clicking a thumbnail opens
+ImageViewerWindow on that frame, through an activation callback the window supplies.
+
+## ImageViewerWindow
+
+`ImageViewerWindow` is a self-deleting viewer over qtutils' `CImageViewerWidget`, which owns the pan/zoom view,
+the scaling, and the info overlay; the window supplies the menu bar, the browsing order, and the library actions.
+Scaling goes through `ImageProcessing::resize` and falls back to `CImageViewerWidget::smoothScale` for pixel
+formats the resizer has no view for. Its chunks run on a pool shared by every viewer rather than the global one,
+which thumbnail decoding already occupies - a scale blocks the GUI thread until it completes.
+
+It browses a path list captured when it opens, skipping entries that have since left the disk. Two callers build
+that list: MediaBrowserWidget from the photos the grid currently shows, and FrameViewerWindow from one frame
+folder. A frame is a file rather than a catalog item, so it opens without a `Library` and the Best action is
+absent; identity for the library actions is derived per image from the file on disk.
 
 ## VideoPlayerWindow
 

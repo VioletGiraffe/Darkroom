@@ -36,6 +36,9 @@ public:
 	// Ctrl+wheel emits signed steps and is consumed; plain wheel propagates to the surrounding view.
 	void setOnMouseWheelCallback(std::function<void(int steps)> handler);
 
+	// Called on a double-click, and only for a thumbnail that has a file path. Without a handler a double-click does nothing.
+	void setOnActivatedCallback(std::function<void()> handler);
+
 	QSize sizeHint() const override;
 
 	// Exposed so MediaItemWidget can keep corner badges clear of proportional film bands.
@@ -50,7 +53,6 @@ protected:
 
 private:
 	void applyStyleSettings();
-	bool openFile();
 
 	void scheduleRender();
 	[[nodiscard]] QSize currentImageArea() const;
@@ -73,6 +75,7 @@ private:
 	std::function<QMimeData*()> _dragMimeDataFactory;
 
 	std::function<void(int)> _onZoomRequested;
+	std::function<void()> _onActivated;
 
 	const bool _bDynamicSizeHint = true;
 	const bool _framed = true;

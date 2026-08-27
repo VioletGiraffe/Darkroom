@@ -45,7 +45,8 @@ INCLUDEPATH += \
 	../qtutils \
 	../cpputils \
 	../cpp-template-utils \
-	../magic-alignment/src
+	../magic-alignment/src \
+	../image-processing
 
 ###################################################
 #                 SOURCES
@@ -65,7 +66,7 @@ RESOURCES += res/resources.qrc
 ###################################################
 
 # magic-alignment before cpputils: it uses the cpputils thread pool, and GNU ld resolves left to right
-LIBS += -L$${DESTDIR} -lqtutils -lmagic-alignment -lcpputils
+LIBS += -L$${DESTDIR} -lqtutils -lmagic-alignment -lcpputils -limage-processing
 include(../cpputils/dependencies.pri)
 
 ###################################################

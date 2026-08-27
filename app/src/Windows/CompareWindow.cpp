@@ -1,4 +1,5 @@
 #include "Windows/CompareWindow.h"
+#include "Windows/ImageViewerWindow.h"
 #include "UiComponents/ThumbnailWidget.h"
 #include "Utils.h"
 #include "assert/advanced_assert.h"
@@ -39,6 +40,11 @@ CompareWindow::CompareWindow(const QStringList& folderPaths, QWidget* parent) : 
 	for (int i = 0; i < folderPaths.size(); ++i)
 	{
 		_thumbnailWidgets.push_back(new ThumbnailWidget(QString{}, QString{}, 0, this));
+		// A pane shows one folder's frame at the slider position, so the viewer browses that folder from there.
+		// It only fires for a pane that has a frame loaded, so the slider position is in range for that folder.
+		_thumbnailWidgets.back()->setOnActivatedCallback([this, i] {
+			ImageViewerWindow::showForImages(nullptr, _folderFrames[static_cast<size_t>(i)], _slider->value(), this);
+		});
 		thumbnailRow->addWidget(_thumbnailWidgets.back());
 	}
 

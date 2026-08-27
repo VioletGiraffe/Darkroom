@@ -85,8 +85,8 @@ invariants, and card geometry controls.
 
 ### [Frame viewing, playback, and photo comparison](docs/architecture/playback.md)
 
-Persistent frame viewing, built-in playback and saved loops, oscillating cache presentation, single-frame extraction,
-and PhotoCompareWindow's shared-view/per-photo-alignment model.
+Persistent frame viewing, the single-image viewer, built-in playback and saved loops, oscillating cache presentation,
+single-frame extraction, and PhotoCompareWindow's shared-view/per-photo-alignment model.
 
 ### [Settings and theme](docs/architecture/settings-and-theme.md)
 
