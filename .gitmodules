@@ -10,3 +10,6 @@
 [submodule "magic-alignment"]
 	path = magic-alignment
 	url = https://github.com/VioletGiraffe/magic-alignment
+[submodule "image-processing"]
+	path = image-processing
+	url = https://github.com/VioletGiraffe/image-processing
