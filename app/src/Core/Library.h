@@ -54,6 +54,7 @@ public:
 
 signals:
 	// Emitted after a successful root replacement or a browser-visible change to the active Catalog.
+	// Delivered from inside the mutating call stack: a receiver that rebuilds widgets must defer.
 	void catalogChanged();
 
 private:

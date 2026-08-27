@@ -221,6 +221,9 @@ MediaBrowserWidget::MediaBrowserWidget(Library& library, QWidget* parent)
 
 void MediaBrowserWidget::setupUi()
 {
+	// catalogChanged arrives inside the mutating call stack, so its refresh is queued: rebuilding there would
+	// destroy the card or sidebar row whose handler is still running.
+	// Zero interval, single shot, coalescing - a multi-item operation's per-item notifications collapse into one rebuild.
 	_catalogRefreshTimer = new QTimer(this);
 	_catalogRefreshTimer->setSingleShot(true);
 	_catalogRefreshTimer->setInterval(0);
@@ -587,7 +590,7 @@ void MediaBrowserWidget::resetForLibrarySwitch()
 // Keep sidebar rebuilding out of rebuildGridItems(): that function can run from a sidebar item's click signal.
 void MediaBrowserWidget::refreshLibraryView()
 {
-	_catalogRefreshTimer->stop();
+	_catalogRefreshTimer->stop(); // drops a queued repeat of the work done here
 	rebuildGridItems();
 	_labelSidebar->refresh();
 }
