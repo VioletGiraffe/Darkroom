@@ -1,8 +1,12 @@
 #pragma once
 
+#include "compiler/compiler_warnings_control.h"
+
+DISABLE_COMPILER_WARNINGS
 #include <QHash>
 #include <QString>
 #include <QStringList>
+RESTORE_COMPILER_WARNINGS
 
 class QWidget;
 class Library;

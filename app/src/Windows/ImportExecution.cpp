@@ -3,14 +3,17 @@
 #include "Core/Catalog.h"
 
 #include "assert/advanced_assert.h"
+#include "compiler/compiler_warnings_control.h"
 #include "dialogs/messagebox.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QAbstractButton>
 #include <QApplication>
 #include <QDir>
 #include <QFileInfo>
 #include <QMessageBox>
 #include <QObject>
+RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 #include <ranges>

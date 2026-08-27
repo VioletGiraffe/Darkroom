@@ -19,17 +19,18 @@
 #include "Windows/SourceRelocation.h"
 #include "Theme/Theme.h"
 #include "theme/ctintedsvgiconengine.h"
-#include "Theme/Theme.h"
 #include "Utils.h"
 #include "UiComponents/MediaItemWidget.h"
 #include "Windows/PhotoCompareWindow.h"
 #include "Windows/VideoPlayerWindow.h"
 
 #include "assert/advanced_assert.h"
+#include "compiler/compiler_warnings_control.h"
 #include "dialogs/messagebox.h"
 #include "threading/cinterruptablethread.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QAbstractItemView>
 #include <QAction>
 #include <QApplication>
@@ -61,11 +62,12 @@
 #include <QPushButton>
 #include <QSettings>
 #include <QSplitter>
-#include <QTimer>
 #include <QThread>
+#include <QTimer>
 #include <QUrl>
 #include <QUuid>
 #include <QVBoxLayout>
+RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 #include <atomic>

@@ -1,11 +1,14 @@
 #include "Theme/Theme.h"
 #include "UiComponents/SegmentedToggle.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QFontMetrics>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPalette>
 #include <QPen>
+RESTORE_COMPILER_WARNINGS
 
 namespace {
 constexpr int BORDER   = 1;

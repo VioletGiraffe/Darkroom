@@ -1,12 +1,15 @@
 #pragma once
 
+#include "compiler/compiler_warnings_control.h"
 #include "threading/cthreadpool.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QImage>
 #include <QPointF>
 #include <QRectF>
 #include <QStringList>
 #include <QWidget>
+RESTORE_COMPILER_WARNINGS
 
 #include <functional>
 #include <memory>

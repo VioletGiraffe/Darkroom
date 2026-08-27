@@ -1,6 +1,10 @@
 #pragma once
 
+#include "compiler/compiler_warnings_control.h"
+
+DISABLE_COMPILER_WARNINGS
 #include <QSlider>
+RESTORE_COMPILER_WARNINGS
 
 // QSlider that paints the marks QStyleSheetStyle leaves out: tick marks at tickInterval(), plus two optional A/B
 // markers (-1 means unset). Horizontal orientation only.

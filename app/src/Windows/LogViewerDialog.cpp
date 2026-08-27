@@ -1,7 +1,9 @@
 #include "LogViewerDialog.h"
 
+#include "compiler/compiler_warnings_control.h"
 #include "logger/cloggerinmemory.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QClipboard>
 #include <QDialogButtonBox>
 #include <QFontDatabase>
@@ -10,6 +12,7 @@
 #include <QPushButton>
 #include <QTextCursor>
 #include <QVBoxLayout>
+RESTORE_COMPILER_WARNINGS
 
 LogViewerDialog::LogViewerDialog(QWidget* parent)
 	: QDialog(parent)

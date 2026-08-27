@@ -1,5 +1,7 @@
 #include "Core/JsonPersistence.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -7,6 +9,7 @@
 #include <QJsonParseError>
 #include <QObject>
 #include <QSaveFile>
+RESTORE_COMPILER_WARNINGS
 
 JsonPersistence::ObjectReadResult JsonPersistence::readObject(const QString& path, QStringView requiredArrayField)
 {

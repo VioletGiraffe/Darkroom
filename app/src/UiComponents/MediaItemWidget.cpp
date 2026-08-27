@@ -2,17 +2,16 @@
 #include "UiComponents/LabelMimeType.h"
 #include "UiComponents/ThumbnailWidget.h"
 #include "Theme/Theme.h"
-#include "Theme/Theme.h"
+#include "compiler/compiler_warnings_control.h"
 #include "theme/ctintedsvgiconengine.h"
 #include "Utils.h"
 
-#include <QContextMenuEvent>
+DISABLE_COMPILER_WARNINGS
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QFont>
 #include <QFontMetrics>
-#include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QLabel>
@@ -23,9 +22,8 @@
 #include <QPolygonF>
 #include <QPushButton>
 #include <QResizeEvent>
-#include <QStyleHints>
-#include <QTimer>
 #include <QVBoxLayout>
+RESTORE_COMPILER_WARNINGS
 
 namespace {
 

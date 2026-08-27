@@ -1,7 +1,10 @@
 #include "Core/MetadataStore.h"
 #include "Core/JsonPersistence.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QDebug>
+RESTORE_COMPILER_WARNINGS
 
 #include <utility>
 

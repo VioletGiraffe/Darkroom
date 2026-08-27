@@ -5,7 +5,9 @@
 #include "Utils.h"
 
 #include "assert/advanced_assert.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QApplication>
 #include <QDir>
 #include <QFile>
@@ -15,6 +17,7 @@
 #include <QScopeGuard>
 #include <QSettings>
 #include <QUuid>
+RESTORE_COMPILER_WARNINGS
 
 #include <vector>
 

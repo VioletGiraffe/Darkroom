@@ -7,13 +7,14 @@
 #include "UiComponents/LabelRowDelegate.h"
 #include "UiComponents/SegmentedToggle.h"
 #include "Theme/Theme.h"
+#include "compiler/compiler_warnings_control.h"
 #include "theme/ctintedsvgiconengine.h"
-#include "Theme/Theme.h"
 #include "Shortcuts.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QAbstractItemView>
-#include <QHBoxLayout>
 #include <QHash>
+#include <QHBoxLayout>
 #include <QKeySequence>
 #include <QLabel>
 #include <QListWidget>
@@ -23,6 +24,7 @@
 #include <QPushButton>
 #include <QVariant>
 #include <QVBoxLayout>
+RESTORE_COMPILER_WARNINGS
 
 namespace {
 constexpr int kLabelIdRole = Qt::UserRole;

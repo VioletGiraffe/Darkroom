@@ -1,6 +1,8 @@
 #include "UiComponents/MediaGrid.h"
 #include "Theme/Theme.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QColor>
 #include <QCursor>
 #include <QDrag>
@@ -12,6 +14,7 @@
 #include <QScrollBar>
 #include <QUrl>
 #include <QWheelEvent>
+RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 

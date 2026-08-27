@@ -1,6 +1,10 @@
 #pragma once
 
+#include "compiler/compiler_warnings_control.h"
+
+DISABLE_COMPILER_WARNINGS
 #include <QString>
+RESTORE_COMPILER_WARNINGS
 
 // Stable source identity: case-insensitive filename plus byte size. Derived on demand, with no id registry.
 class MediaId

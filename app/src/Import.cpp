@@ -4,12 +4,15 @@
 #include "Ffmpeg.h"
 #include "Settings.h"
 #include "Utils.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QObject>
 #include <QSettings>
+RESTORE_COMPILER_WARNINGS
 
 // False tells import to extract afresh. dstPreviewDir is always initially empty.
 static bool copyPreviewFrames(const QString& srcPreviewDir, const QString& dstPreviewDir)

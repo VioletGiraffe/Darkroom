@@ -1,12 +1,15 @@
 #include "UiComponents/PreviewFrameCountCombo.h"
 #include "Settings.h"
 #include "Theme/Theme.h"
+#include "compiler/compiler_warnings_control.h"
 #include "theme/ctintedsvgiconengine.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QAbstractItemView>
 #include <QIcon>
-#include <QStyleOptionViewItem>
 #include <QStyledItemDelegate>
+#include <QStyleOptionViewItem>
+RESTORE_COMPILER_WARNINGS
 
 namespace {
 

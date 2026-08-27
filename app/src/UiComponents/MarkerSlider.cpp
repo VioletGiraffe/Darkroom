@@ -1,8 +1,11 @@
 #include "UiComponents/MarkerSlider.h"
 #include "Theme/Theme.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QPainter>
 #include <QStyleOptionSlider>
+RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 

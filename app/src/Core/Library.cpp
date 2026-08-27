@@ -4,7 +4,9 @@
 #include "Core/MetadataStore.h"
 
 #include "assert/advanced_assert.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QDebug>
 #include <QDir>
 #include <QFileInfo>
@@ -14,6 +16,7 @@
 #include <QObject>
 #include <QSet>
 #include <QStringList>
+RESTORE_COMPILER_WARNINGS
 
 #include <limits>
 #include <optional>

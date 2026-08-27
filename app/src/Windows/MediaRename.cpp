@@ -2,13 +2,16 @@
 #include "Core/Catalog.h"
 #include "Utils.h"
 #include "assert/advanced_assert.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QInputDialog>
 #include <QLineEdit>
 #include <QMessageBox>
+RESTORE_COMPILER_WARNINGS
 
 namespace {
 

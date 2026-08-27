@@ -1,5 +1,7 @@
 #include "UiComponents/LabelVisuals.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QAction>
 #include <QColor>
 #include <QMenu>
@@ -8,6 +10,7 @@
 #include <QPen>
 #include <QPixmap>
 #include <QWidget>
+RESTORE_COMPILER_WARNINGS
 
 #include <utility>
 

@@ -1,8 +1,12 @@
 #pragma once
 
+#include "compiler/compiler_warnings_control.h"
+
+DISABLE_COMPILER_WARNINGS
 #include <QListWidget>
 #include <QScrollBar>
 #include <QSize>
+RESTORE_COMPILER_WARNINGS
 
 // A QListWidget whose width hugs its widest delegated row plus frame and visible scrollbar. Callers bound
 // pathological rows with setMaximumWidth() and call updateGeometry() after changing the row set.

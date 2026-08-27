@@ -1,14 +1,17 @@
 #include "Windows/MediaItemManagement.h"
 #include "Core/Catalog.h"
 
+#include "compiler/compiler_warnings_control.h"
 #include "dialogs/messagebox.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QMessageBox>
 #include <QObject>
 #include <QPushButton>
+RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 

@@ -6,7 +6,6 @@
 #include "Theme/Theme.h"
 #include "theme/ctintedsvgiconengine.h"
 #include "Theme/Style.h"
-#include "Theme/Theme.h"
 #include "UiComponents/LabelVisuals.h"
 #include "UiComponents/LabelSidebar.h"
 #include "UiComponents/MediaGrid.h"
@@ -22,8 +21,10 @@
 #include "Windows/PhotoCompareWindow.h"
 #include "Windows/VideoPlayerWindow.h"
 
+#include "compiler/compiler_warnings_control.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QAbstractItemView>
 #include <QAction>
 #include <QApplication>
@@ -44,14 +45,15 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QMetaObject>
+#include <QSet>
 #include <QSettings>
 #include <QShortcut>
 #include <QSignalBlocker>
-#include <QSet>
 #include <QSplitter>
 #include <QTimer>
 #include <QUrl>
 #include <QVBoxLayout>
+RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 #include <utility>

@@ -2,13 +2,16 @@
 #include "Windows/IntegrityCheckSections.h"
 #include "Theme/Theme.h"
 #include "Utils.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QVBoxLayout>
+RESTORE_COMPILER_WARNINGS
 
 #include <memory>
 #include <utility>

@@ -1,12 +1,15 @@
 #pragma once
 
 #include "Core/MediaId.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QList>
 #include <QSize>
 #include <QString>
 #include <QUrl>
 #include <QWidget>
+RESTORE_COMPILER_WARNINGS
 
 #include <optional>
 #include <vector>

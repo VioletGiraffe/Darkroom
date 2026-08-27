@@ -1,7 +1,11 @@
 #pragma once
 
+#include "compiler/compiler_warnings_control.h"
+
+DISABLE_COMPILER_WARNINGS
 #include <QElapsedTimer>
 #include <QPushButton>
+RESTORE_COMPILER_WARNINGS
 
 // Persisted values also define the field-toggle segment order.
 namespace SortBy { enum { Name, Date }; }

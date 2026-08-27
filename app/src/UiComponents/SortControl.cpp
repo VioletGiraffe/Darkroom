@@ -1,9 +1,10 @@
 #include "UiComponents/SortControl.h"
 #include "UiComponents/SegmentedToggle.h"
 #include "Theme/Theme.h"
+#include "compiler/compiler_warnings_control.h"
 #include "theme/ctintedsvgiconengine.h"
-#include "Theme/Theme.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QCheckBox>
 #include <QCloseEvent>
 #include <QFrame>
@@ -12,6 +13,7 @@
 #include <QScreen>
 #include <QSettings>
 #include <QVBoxLayout>
+RESTORE_COMPILER_WARNINGS
 
 #include <functional>
 

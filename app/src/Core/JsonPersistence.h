@@ -1,8 +1,12 @@
 #pragma once
 
+#include "compiler/compiler_warnings_control.h"
+
+DISABLE_COMPILER_WARNINGS
 #include <QJsonObject>
 #include <QString>
 #include <QStringView>
+RESTORE_COMPILER_WARNINGS
 
 namespace JsonPersistence {
 

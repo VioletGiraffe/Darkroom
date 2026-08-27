@@ -2,11 +2,14 @@
 
 #include "Core/MediaId.h"
 #include "UiComponents/ThumbnailWidget.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QColor>
 #include <QSize>
 #include <QStringList>
 #include <QWidget>
+RESTORE_COMPILER_WARNINGS
 
 #include <functional>
 #include <vector>

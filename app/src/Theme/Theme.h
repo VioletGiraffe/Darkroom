@@ -1,5 +1,6 @@
 #pragma once
 
+#include "compiler/compiler_warnings_control.h"
 #include "theme/cbasepalette.h"
 
 DISABLE_COMPILER_WARNINGS

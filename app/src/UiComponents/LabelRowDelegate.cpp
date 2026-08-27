@@ -1,13 +1,15 @@
 #include "UiComponents/LabelRowDelegate.h"
 #include "Theme/Theme.h"
+#include "compiler/compiler_warnings_control.h"
 #include "theme/ctintedsvgiconengine.h"
-#include "Theme/Theme.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QPainter>
 #include <QPalette>
 #include <QPen>
 #include <QStyle>
 #include <QWidget>
+RESTORE_COMPILER_WARNINGS
 
 namespace {
 

@@ -1,12 +1,15 @@
 #include "Ffmpeg.h"
 #include "Utils.h"
 #include "assert/advanced_assert.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QDir>
 #include <QFileInfo>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QStringList>
+RESTORE_COMPILER_WARNINGS
 
 #include <vector>
 

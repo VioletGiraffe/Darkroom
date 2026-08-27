@@ -1,6 +1,7 @@
 #include "Theme/Style.h"
 #include "Theme/Theme.h"
 
+#include "compiler/compiler_warnings_control.h"
 #include "theme/cbasepalette.h"
 #include "theme/cstylefixups.h"
 #include "theme/cthemecontroller.h"

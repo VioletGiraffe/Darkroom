@@ -2,8 +2,10 @@
 #include "Ffmpeg.h"
 #include "Settings.h"
 
+#include "compiler/compiler_warnings_control.h"
 #include "dialogs/messagebox.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QByteArray>
 #include <QCoreApplication>
 #include <QCursor>
@@ -22,13 +24,16 @@
 #include <QStringList>
 #include <QUrl>
 #include <QWidget>
+RESTORE_COMPILER_WARNINGS
 
 // QtDBus is linked on these platforms only (see app.pro), for revealInFileManager.
 #if !defined Q_OS_WIN && !defined Q_OS_MACOS
+DISABLE_COMPILER_WARNINGS
 #include <QDBusConnection>
 #include <QDBusMessage>
 #include <QDBusPendingCall>
 #include <QDBusPendingCallWatcher>
+RESTORE_COMPILER_WARNINGS
 #endif
 
 #include <functional>

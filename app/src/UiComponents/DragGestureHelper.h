@@ -1,9 +1,12 @@
 #pragma once
 
+#include "compiler/compiler_warnings_control.h"
+
+DISABLE_COMPILER_WARNINGS
 #include <QPixmap>
 #include <QPoint>
-#include <QSize>
 #include <QWidget>
+RESTORE_COMPILER_WARNINGS
 
 #include <functional>
 

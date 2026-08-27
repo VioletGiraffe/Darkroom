@@ -3,9 +3,10 @@
 #include "Windows/IntegrityCheckDialog.h"
 #include "Theme/Theme.h"
 #include "Utils.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QApplication>
-#include <QCoreApplication>
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -16,6 +17,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QVBoxLayout>
+RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 #include <deque>

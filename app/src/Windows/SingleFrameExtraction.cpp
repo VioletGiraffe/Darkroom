@@ -6,7 +6,9 @@
 #include "Import.h"
 #include "Settings.h"
 #include "Utils.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QCursor>
 #include <QDir>
 #include <QFileInfo>
@@ -16,6 +18,7 @@
 #include <QTemporaryDir>
 #include <QTime>
 #include <QToolTip>
+RESTORE_COMPILER_WARNINGS
 
 namespace Settings {
 	constexpr const char* LastFrameExtractionMode   = "VideoPlayer/LastFrameExtractionMode";

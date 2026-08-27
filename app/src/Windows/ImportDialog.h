@@ -3,10 +3,13 @@
 #include "Core/MediaId.h"
 #include "Import.h"  // Import::PhotoImportMode, used by importPhotoGroup
 #include "Windows/SourceRelocation.h"  // SourceRelocation::Mode, importVideoGroup's parameter
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QDialog>
 #include <QHash>
 #include <QStringList>
+RESTORE_COMPILER_WARNINGS
 
 #include <vector>
 

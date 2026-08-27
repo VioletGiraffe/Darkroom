@@ -1,10 +1,14 @@
 #include "UiComponents/DragGestureHelper.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QApplication>
 #include <QDrag>
 #include <QListWidget>
 #include <QMimeData>
 #include <QMouseEvent>
+#include <QSize>
+RESTORE_COMPILER_WARNINGS
 
 void DragGestureHelper::mousePressed(const QMouseEvent* event)
 {

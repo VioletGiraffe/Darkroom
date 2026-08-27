@@ -4,7 +4,9 @@
 #include "Utils.h"
 
 #include "assert/advanced_assert.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QDir>
 #include <QImage>
 #include <QObject>
@@ -13,6 +15,7 @@
 #include <QVideoFrameFormat>
 #include <QVideoSink>
 #include <QVideoWidget>
+RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 #include <cmath>

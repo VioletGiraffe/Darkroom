@@ -3,9 +3,12 @@
 #include "Core/LabelId.h"
 #include "Core/MediaId.h"
 #include "Import.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QHash>
 #include <QStringList>
+RESTORE_COMPILER_WARNINGS
 
 #include <vector>
 

@@ -3,14 +3,16 @@
 #include "Core/LabelId.h"
 #include "Core/MediaId.h"
 #include "Core/MetadataStore.h"  // BatchScope holds a MetadataStore::Writer by value
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QHash>
 #include <QJsonObject>
 #include <QList>
 #include <QSet>
 #include <QString>
-#include <QStringList>
 #include <QStringView>
+RESTORE_COMPILER_WARNINGS
 
 #include <functional>
 #include <utility>

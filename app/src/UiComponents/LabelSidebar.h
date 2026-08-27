@@ -1,11 +1,13 @@
 #pragma once
 
 #include "Core/LabelId.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QList>
 #include <QSet>
-#include <QString>
 #include <QWidget>
+RESTORE_COMPILER_WARNINGS
 
 class QListWidget;
 class QListWidgetItem;

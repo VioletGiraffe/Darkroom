@@ -10,8 +10,10 @@
 #include "Windows/MediaItemManagement.h"
 
 #include "assert/advanced_assert.h"
+#include "compiler/compiler_warnings_control.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QApplication>
 #include <QBuffer>
 #include <QCheckBox>
@@ -36,13 +38,14 @@
 #include <QPainter>
 #include <QPolygonF>
 #include <QSettings>
-#include <QSlider>
 #include <QSignalBlocker>
+#include <QSlider>
 #include <QStackedLayout>
 #include <QtMath>
 #include <QUrl>
 #include <QVBoxLayout>
 #include <QWheelEvent>
+RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 #include <atomic>

@@ -2,15 +2,18 @@
 #include "Windows/MainWindow.h"
 #include "Theme/Style.h"
 #include "crashhandler/CCrashHandler.h"
+#include "compiler/compiler_warnings_control.h"
 #include "logger/cloggerinmemory.h"
 #include "utility/macro_utils.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QApplication>
 #include <QDebug>
 #include <QDir>
 #include <QIcon>
 #include <QImageReader>
 #include <QString>
+RESTORE_COMPILER_WARNINGS
 
 #ifndef DARKROOM_VERSION
 #error "DARKROOM_VERSION is not defined; set it in app.pro"

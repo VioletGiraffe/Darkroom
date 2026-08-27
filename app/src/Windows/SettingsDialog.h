@@ -1,10 +1,13 @@
 #pragma once
 
+#include "compiler/compiler_warnings_control.h"
 #include "settingsui/csettingsdialog.h"
 #include "settingsui/csettingspage.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QString>
 #include <Qt>
+RESTORE_COMPILER_WARNINGS
 
 class QLineEdit;
 class QSpinBox;

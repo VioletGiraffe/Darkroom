@@ -2,11 +2,14 @@
 #include "Core/Catalog.h"
 #include "Utils.h"
 
+#include "compiler/compiler_warnings_control.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QDir>
 #include <QFileInfo>
 #include <QSet>
+RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 #include <utility>

@@ -9,8 +9,10 @@
 #include "theme/ctintedsvgiconengine.h"
 #include "Utils.h"
 #include "assert/advanced_assert.h"
+#include "compiler/compiler_warnings_control.h"
 #include "dialogs/messagebox.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QAudio>
 #include <QAudioOutput>
 #include <QCheckBox>
@@ -32,8 +34,8 @@
 #include <QMessageBox>
 #include <QMouseEvent>
 #include <QPushButton>
-#include <QSettings>
 #include <QScreen>
+#include <QSettings>
 #include <QShortcut>
 #include <QSignalBlocker>
 #include <QSlider>
@@ -45,6 +47,7 @@
 #include <QVideoSink>
 #include <QVideoWidget>
 #include <QWheelEvent>
+RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 #include <cmath>
@@ -196,7 +199,7 @@ VideoPlayerWindow::VideoPlayerWindow(Library& library, const QString& videoPath,
 	muteButton->setToolTip(tr("Mute (M). Oscillating playback is always muted."));
 
 	const auto applyVolume = [this](int position) {
-		_audioOutput->setVolume(QAudio::convertVolume(position / qreal(100), QAudio::LogarithmicVolumeScale, QAudio::LinearVolumeScale));
+		_audioOutput->setVolume(QAudio::convertVolume((float)position / 100.0f, QAudio::LogarithmicVolumeScale, QAudio::LinearVolumeScale));
 	};
 	const auto updateMuteIcon = [muteButton] {
 		muteButton->setIcon(tintedSvgIcon(muteButton->isChecked() ? QStringLiteral(":/UI/icon_volume_muted.svg") : QStringLiteral(":/UI/icon_volume.svg"),

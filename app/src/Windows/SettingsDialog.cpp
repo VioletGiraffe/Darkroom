@@ -5,7 +5,9 @@
 #include "theme/cthemecontroller.h"
 #include "UiComponents/SegmentedToggle.h"
 #include "Utils.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QComboBox>
 #include <QDir>
 #include <QFileDialog>
@@ -17,6 +19,7 @@
 #include <QSettings>
 #include <QSpinBox>
 #include <QVBoxLayout>
+RESTORE_COMPILER_WARNINGS
 
 namespace {
 

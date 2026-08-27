@@ -1,9 +1,12 @@
 #include "Core/MediaId.h"
 
+#include "compiler/compiler_warnings_control.h"
 #include "hash/wheathash.hpp"
 
+DISABLE_COMPILER_WARNINGS
 #include <QFileInfo>
 #include <QStringBuilder>
+RESTORE_COMPILER_WARNINGS
 
 namespace {
 	// Equality and the persisted hash key must share this exact fold. Switching from toLower() would also orphan

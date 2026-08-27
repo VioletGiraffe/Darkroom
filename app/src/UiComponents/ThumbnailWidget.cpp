@@ -2,14 +2,15 @@
 #include "Core/IoThreadPool.h"
 #include "Theme/Theme.h"
 #include "assert/advanced_assert.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QApplication>
 #include <QBuffer>
 #include <QByteArray>
 #include <QColor>
 #include <QDesktopServices>
 #include <QFile>
-#include <QFileInfo>
 #include <QImageIOHandler>
 #include <QImageReader>
 #include <QMessageBox>
@@ -22,6 +23,7 @@
 #include <QTimer>
 #include <QUrl>
 #include <QWheelEvent>
+RESTORE_COMPILER_WARNINGS
 
 #include <memory>
 #include <mutex>

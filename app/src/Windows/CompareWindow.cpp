@@ -2,15 +2,18 @@
 #include "UiComponents/ThumbnailWidget.h"
 #include "Utils.h"
 #include "assert/advanced_assert.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QDir>
 #include <QFileInfo>
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QSlider>
 #include <QShortcut>
+#include <QSlider>
 #include <QTimer>
 #include <QVBoxLayout>
+RESTORE_COMPILER_WARNINGS
 
 static constexpr int COMPARE_CELL_HEIGHT = 500;
 static constexpr int DEBOUNCE_MS = 50;

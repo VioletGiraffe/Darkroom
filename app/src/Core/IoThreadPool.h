@@ -1,8 +1,11 @@
 #pragma once
 
+#include "compiler/compiler_warnings_control.h"
 #include "threading/cthreadpool.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QString>
+RESTORE_COMPILER_WARNINGS
 
 #include <stdint.h>
 

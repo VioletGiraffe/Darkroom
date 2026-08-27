@@ -16,9 +16,11 @@
 #include "Shortcuts.h"
 
 #include "aboutdialog/caboutdialog.h"
+#include "compiler/compiler_warnings_control.h"
 #include "dialogs/messagebox.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QAbstractButton>
 #include <QApplication>
 #include <QCloseEvent>
@@ -30,11 +32,11 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QScopeGuard>
 #include <QSet>
 #include <QSettings>
 #include <QStandardPaths>
-
-#include <QScopeGuard>
+RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 #include <utility>

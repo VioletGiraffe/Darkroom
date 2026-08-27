@@ -3,7 +3,9 @@
 #include "Core/MediaId.h"
 #include "Utils.h"
 #include "Windows/VideoPlayerWindow.h"
+#include "compiler/compiler_warnings_control.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QDialog>
 #include <QDir>
 #include <QFile>
@@ -13,6 +15,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QVBoxLayout>
+RESTORE_COMPILER_WARNINGS
 
 namespace {
 

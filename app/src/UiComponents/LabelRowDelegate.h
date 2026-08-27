@@ -1,8 +1,12 @@
 #pragma once
 
+#include "compiler/compiler_warnings_control.h"
+
+DISABLE_COMPILER_WARNINGS
 #include <QColor>
 #include <QPixmap>
 #include <QStyledItemDelegate>
+RESTORE_COMPILER_WARNINGS
 
 // Paints label rows from the roles below: swatch/name/count, per-label active tint and connecting spine,
 // hover outline, Best star, All icon, and divider. A delegate is required because QSS cannot vary by label color.

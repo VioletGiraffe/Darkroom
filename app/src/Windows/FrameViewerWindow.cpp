@@ -3,8 +3,10 @@
 #include "Theme/Theme.h"
 #include "UiComponents/ThumbnailWidget.h"
 #include "Utils.h"
+#include "compiler/compiler_warnings_control.h"
 #include "widgets/layouts/cflowlayout.h"
 
+DISABLE_COMPILER_WARNINGS
 #include <QApplication>
 #include <QClipboard>
 #include <QDir>
@@ -17,6 +19,7 @@
 #include <QShortcut>
 #include <QTimer>
 #include <QVBoxLayout>
+RESTORE_COMPILER_WARNINGS
 
 static constexpr int DEFAULT_THUMBNAIL_SIZE = 200;
 static constexpr int MIN_THUMBNAIL_SIZE = 60;

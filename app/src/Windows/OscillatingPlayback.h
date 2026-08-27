@@ -1,10 +1,14 @@
 #pragma once
 
+#include "compiler/compiler_warnings_control.h"
+
+DISABLE_COMPILER_WARNINGS
 #include <QByteArray>
 #include <QElapsedTimer>
 #include <QProcess>
 #include <QSize>
 #include <QTimer>
+RESTORE_COMPILER_WARNINGS
 
 #include <optional>
 #include <vector>

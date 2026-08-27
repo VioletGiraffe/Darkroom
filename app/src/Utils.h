@@ -1,7 +1,11 @@
 #pragma once
 
+#include "compiler/compiler_warnings_control.h"
+
+DISABLE_COMPILER_WARNINGS
 // forEachFolder uses QDir in this header; QDir also supplies QString and QStringList.
 #include <QDir>
+RESTORE_COMPILER_WARNINGS
 
 #include <functional>
 
