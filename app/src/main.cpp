@@ -1,3 +1,4 @@
+#include "Core/CpuThreadPool.h"
 #include "Core/IoThreadPool.h"
 #include "Windows/MainWindow.h"
 #include "Theme/Style.h"
@@ -80,6 +81,8 @@ int main(int argc, char* argv[])
 	window.show();
 
 	const int result = app.exec();
+	// I/O first: a read completing there hands its decode to the compute pool.
 	IoThreadPool::finishAllThreads();
+	cpuThreadPool().finishAllThreads();
 	return result;
 }

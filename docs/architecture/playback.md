@@ -15,8 +15,8 @@ ImageViewerWindow on that frame, through an activation callback the window suppl
 `ImageViewerWindow` is a self-deleting viewer over qtutils' `CImageViewerWidget`, which owns the pan/zoom view,
 the scaling, and the info overlay; the window supplies the menu bar, the browsing order, and the library actions.
 Scaling goes through `ImageProcessing::resize` and falls back to `CImageViewerWidget::smoothScale` for pixel
-formats the resizer has no view for. Its chunks run on a pool shared by every viewer rather than the global one,
-which thumbnail decoding already occupies - a scale blocks the GUI thread until it completes.
+formats the resizer has no view for. Its chunks run on `cpuThreadPool()`, which also runs work on the calling
+thread - the GUI thread is blocked for the duration of a scale either way.
 
 Each viewer is parentless, for a taskbar button of its own, and opens fullscreen; double-click and `F` switch
 between fullscreen and a window sized to the image, and the menu bar shows only outside fullscreen. Alone among

@@ -1,9 +1,9 @@
 #include "Windows/ImageViewerWindow.h"
 #include "Core/Catalog.h"
+#include "Core/CpuThreadPool.h"
 #include "Core/Library.h"
 #include "Utils.h"
 #include "assert/advanced_assert.h"
-#include "threading/cthreadpool.h"
 #include "widgets/cimageviewerwidget.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -17,42 +17,12 @@ DISABLE_COMPILER_WARNINGS
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMouseEvent>
-#include <QSemaphore>
 #include <QTimer>
 #include <QUrl>
 RESTORE_COMPILER_WARNINGS
 
-#include <algorithm>
 #include <functional>
-#include <thread>
 #include <utility>
-
-namespace {
-
-// Every viewer shares one pool, built on first use. Not QThreadPool::globalInstance(): thumbnail decoding runs
-// there, and a scale that blocks the GUI thread must not queue behind it.
-CThreadPool& scalingPool()
-{
-	static CThreadPool pool{ std::max(std::thread::hardware_concurrency(), 2u) - 1, "image-viewer" };
-	return pool;
-}
-
-// ImageProcessing::resize needs every body() call finished before this returns, so the pooled chunks are waited
-// on and one runs here. Only ever called from the GUI thread, never from a pool thread that could starve itself.
-void runChunksInParallel(size_t count, const std::function<void(size_t)>& body)
-{
-	if (count == 0)
-		return;
-
-	QSemaphore finished;
-	for (size_t chunk = 1; chunk < count; ++chunk)
-		scalingPool().enqueue([&finished, &body, chunk] { body(chunk); finished.release(); });
-
-	body(0);
-	finished.acquire(static_cast<int>(count - 1));
-}
-
-}
 
 void ImageViewerWindow::showForImages(Library* library, QStringList imagePaths, int startIndex, QWidget* dialogParent)
 {
@@ -78,7 +48,9 @@ ImageViewerWindow::ImageViewerWindow(Library* library, QStringList imagePaths, i
 	setCentralWidget(_view);
 	_view->installEventFilter(this);
 
-	const ImageProcessing::ParallelForFn parallelFor = runChunksInParallel;
+	const ImageProcessing::ParallelForFn parallelFor = [](size_t count, const std::function<void(size_t)>& body) {
+		cpuThreadPool().parallelFor(count, body);
+	};
 	_view->setImageScaler([parallelFor](QImage& dest, const QImage& source, const QRect& srcRect) {
 		if (!ImageProcessing::resize(dest, source, srcRect, parallelFor))
 			CImageViewerWidget::smoothScale(dest, source, srcRect);

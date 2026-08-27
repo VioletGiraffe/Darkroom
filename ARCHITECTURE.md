@@ -57,8 +57,9 @@ verdicts. Test sources are listed explicitly and new test files must be register
   other behavior supplied by the old widget need explicit equivalents in the new one; see
   [main-window.md](docs/architecture/main-window.md#media-grid--multi-select).
 - **Background disk reads use `Core::IoThreadPool`.** Fast storage receives bounded parallel reads; slow,
-  external, network, or unknown storage shares a serial worker to avoid seek thrashing. CPU decode follows on a
-  compute pool. Long-running non-read work owns an appropriate separate worker instead of blocking the I/O route.
+  external, network, or unknown storage shares a serial worker to avoid seek thrashing. CPU work follows on the
+  process-wide `cpuThreadPool()`. Long-running non-read work owns an appropriate separate worker instead of
+  blocking the I/O route.
 - **Language and framework conventions live in [guidelines.md](docs/guidelines.md).**
 
 ## Subsystems
