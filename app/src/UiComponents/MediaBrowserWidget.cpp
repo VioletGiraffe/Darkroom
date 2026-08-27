@@ -33,7 +33,6 @@ DISABLE_COMPILER_WARNINGS
 #include <QColor>
 #include <QComboBox>
 #include <QDateTime>
-#include <QDebug>
 #include <QDesktopServices>
 #include <QDir>
 #include <QElapsedTimer>
@@ -576,7 +575,6 @@ void MediaBrowserWidget::restoreSettings()
 		rebuildGridRows();
 		scrollGridToAnchorKey(scrollAnchorKey);
 		_mediaGrid->ensureVisibleCardsExist();
-		qInfo() << "First grid build:" << timer.elapsed() << "ms";
 	}, Qt::QueuedConnection);
 }
 
