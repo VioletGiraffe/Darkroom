@@ -96,6 +96,8 @@ void FrameViewerWindow::refreshDisplay()
 		delete item;
 	}
 
+	_imagePaths.clear();
+
 	if (_folderPath.isEmpty())
 	{
 		showInstruction(tr("Select a video to view its frames"));
@@ -119,21 +121,19 @@ void FrameViewerWindow::refreshDisplay()
 	_instructionLabel->hide();
 	_scrollArea->show();
 
-	QStringList imagePaths;
-	imagePaths.reserve(imageFiles.size());
+	_imagePaths.reserve(imageFiles.size());
 	for (const QString& fileName : std::as_const(imageFiles))
-		imagePaths << _folderPath + "/" + fileName;
+		_imagePaths << _folderPath + "/" + fileName;
 
-	for (int index = 0; index < imagePaths.size(); ++index)
+	for (int index = 0; index < _imagePaths.size(); ++index)
 	{
-		// at(), not operator[]: each lambda below holds a copy, so a non-const access here would deep-copy the list every iteration.
-		const QString& filePath = imagePaths.at(index);
+		const QString& filePath = _imagePaths.at(index);
 		auto* thumbnail = new ThumbnailWidget(filePath, QFileInfo{ filePath }.completeBaseName(), _thumbnailSize, _thumbnailContainer);
 		connect(thumbnail, &ThumbnailWidget::customContextMenuRequested, this, &FrameViewerWindow::showThumbnailContextMenu);
 		thumbnail->setOnMouseWheelCallback([this](int steps) { zoomThumbnails(steps); });
 		// A frame is not a catalog item, so the viewer opens without a library.
-		thumbnail->setOnActivatedCallback([this, imagePaths, index] {
-			ImageViewerWindow::showForImages(nullptr, imagePaths, index, this);
+		thumbnail->setOnActivatedCallback([this, index] {
+			ImageViewerWindow::showForImages(nullptr, _imagePaths, index, this);
 		});
 		_thumbnailLayout->addWidget(thumbnail);
 	}

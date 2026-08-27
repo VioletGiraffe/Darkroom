@@ -3,6 +3,7 @@
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
+#include <QStringList>
 #include <QWidget>
 RESTORE_COMPILER_WARNINGS
 
@@ -26,7 +27,9 @@ private:
 	void showThumbnailContextMenu(const QPoint& pos);
 	void zoomThumbnails(int steps);
 
+private:
 	QString       _folderPath;
+	QStringList   _imagePaths;
 	int           _thumbnailSize        = 200;
 	QLabel*       _instructionLabel     = nullptr;
 	QScrollArea*  _scrollArea           = nullptr;
