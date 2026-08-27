@@ -18,10 +18,16 @@ Scaling goes through `ImageProcessing::resize` and falls back to `CImageViewerWi
 formats the resizer has no view for. Its chunks run on a pool shared by every viewer rather than the global one,
 which thumbnail decoding already occupies - a scale blocks the GUI thread until it completes.
 
-It browses a path list captured when it opens, skipping entries that have since left the disk. Two callers build
-that list: MediaBrowserWidget from the photos the grid currently shows, and FrameViewerWindow from one frame
-folder. A frame is a file rather than a catalog item, so it opens without a `Library` and the Best action is
-absent; identity for the library actions is derived per image from the file on disk.
+Each viewer is parentless, for a taskbar button of its own, and opens fullscreen; double-click and `F` switch
+between fullscreen and a window sized to the image, and the menu bar shows only outside fullscreen. Alone among
+the windows here it persists no geometry. The current image becomes the window icon after a delay, so several
+open viewers stay distinguishable in the taskbar without an icon being scaled for every image browsed past.
+
+It browses a path list captured when it opens, skipping entries that have since left the disk. Three callers
+build that list: MediaBrowserWidget from the photos the grid currently shows, FrameViewerWindow from one frame
+folder, and CompareWindow from the frames of the pane that was clicked. A frame is a file rather than a catalog
+item, so it opens without a `Library` and the Best action is absent; identity for the library actions is derived
+per image from the file on disk.
 
 ## VideoPlayerWindow
 

@@ -11,6 +11,7 @@ RESTORE_COMPILER_WARNINGS
 class CImageViewerWidget;
 class Library;
 class QAction;
+class QTimer;
 
 // Single-image viewer over the shared CImageViewerWidget, browsing a fixed list of sibling images.
 // Controls are the menu bar and its shortcuts, plus the widget's own mouse zoom and pan.
@@ -18,13 +19,15 @@ class ImageViewerWindow final : public QMainWindow
 {
 public:
 	// Opens a self-deleting viewer on imagePaths[startIndex]. A null library leaves out the library actions:
-	// a frame is a file, not a catalog item.
-	static void showForImages(Library* library, QStringList imagePaths, int startIndex, QWidget* parent);
+	// a frame is a file, not a catalog item. The window is parentless, for a taskbar button of its own;
+	// dialogParent only parents the failure message box shown when the image cannot be opened at all.
+	static void showForImages(Library* library, QStringList imagePaths, int startIndex, QWidget* dialogParent);
 
-	~ImageViewerWindow() override;
+protected:
+	bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
-	ImageViewerWindow(Library* library, QStringList imagePaths, int startIndex, QWidget* parent);
+	ImageViewerWindow(Library* library, QStringList imagePaths, int startIndex);
 
 	// The values are the step through _imagePaths.
 	enum class Direction { Previous = -1, Next = 1 };
@@ -39,6 +42,7 @@ private:
 	[[nodiscard]] MediaId currentMediaId() const;
 	void toggleBest();
 	void updateLibraryActions();
+	void toggleFullScreen();
 
 private:
 	Library* _library = nullptr;
@@ -46,6 +50,7 @@ private:
 	int _index = 0;
 
 	CImageViewerWidget* _view = nullptr;
+	QTimer* _windowIconTimer = nullptr;
 	QAction* _previousAction = nullptr;
 	QAction* _nextAction = nullptr;
 	QAction* _bestAction = nullptr;   // absent without a library
