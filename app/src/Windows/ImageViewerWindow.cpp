@@ -24,15 +24,15 @@ RESTORE_COMPILER_WARNINGS
 #include <functional>
 #include <utility>
 
-void ImageViewerWindow::showForImages(Library* library, QStringList imagePaths, int startIndex, QWidget* parent,
+ImageViewerWindow* ImageViewerWindow::showForImages(Library* library, QStringList imagePaths, int startIndex, QWidget* parent,
 	std::function<void(int index)> onImageChanged)
 {
-	assert_and_return_r(startIndex >= 0 && startIndex < imagePaths.size(), );
+	assert_and_return_r(startIndex >= 0 && startIndex < imagePaths.size(), nullptr);
 
 	if (const QString& startPath = imagePaths.at(startIndex); !QFileInfo::exists(startPath))
 	{
 		reportMissingFile(parent, startPath);
-		return;
+		return nullptr;
 	}
 
 	QWidget* const modalOwner = parent && parent->window()->isModal() ? parent->window() : nullptr;
@@ -41,6 +41,12 @@ void ImageViewerWindow::showForImages(Library* library, QStringList imagePaths, 
 	window->_onImageChanged = std::move(onImageChanged);
 	window->setAttribute(Qt::WA_DeleteOnClose);
 	window->showFullScreen();
+	return window;
+}
+
+void ImageViewerWindow::setExitFullScreenHandler(std::function<bool()> handler)
+{
+	_exitFullScreenHandler = std::move(handler);
 }
 
 ImageViewerWindow::ImageViewerWindow(Library* library, QStringList imagePaths, int startIndex, QWidget* parent)
@@ -173,6 +179,14 @@ bool ImageViewerWindow::eventFilter(QObject* watched, QEvent* event)
 
 void ImageViewerWindow::toggleFullScreen()
 {
+	if (isFullScreen() && _exitFullScreenHandler)
+	{
+		// Cleared before the call: it runs once, and the handler may close this window.
+		const auto handler = std::exchange(_exitFullScreenHandler, {});
+		if (!handler())
+			return;
+	}
+
 	// The platform applies the state change before the WindowStateChange event that toggles the menu bar, so the
 	// transition otherwise lays out and rescales the image twice. Re-enabling repaints once, at the final size.
 	setUpdatesEnabled(false);

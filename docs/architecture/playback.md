@@ -20,9 +20,11 @@ thread - the GUI thread is blocked for the duration of a scale either way.
 
 Each viewer opens fullscreen and is parentless, for a taskbar button of its own; a modal caller owns the window
 instead, Qt blocking input to unparented windows under a modal dialog. Double-click and `F` switch between
-fullscreen and a window sized to the image, and the menu bar shows only outside fullscreen. Alone among
-the windows here it persists no geometry. The current image becomes the window icon after a delay, so several
-open viewers stay distinguishable in the taskbar without an icon being scaled for every image browsed past.
+fullscreen and a window sized to the image, and the menu bar shows only outside fullscreen. A caller that defers
+creating the window behind the viewer can install an exit-fullscreen handler: it runs once when the user leaves
+fullscreen and decides whether that switch still happens. Alone among the windows here it persists no geometry.
+The current image becomes the window icon after a delay, so several open viewers stay distinguishable in the
+taskbar without an icon being scaled for every image browsed past.
 
 It browses a path list captured when it opens, skipping entries that have since left the disk. Four callers
 build that list: MediaBrowserWidget from the photos the grid currently shows, ImportDialog from the staged photos

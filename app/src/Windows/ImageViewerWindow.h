@@ -26,8 +26,13 @@ public:
 	// viewer window when it is modal, since Qt blocks input to unparented windows then; otherwise the viewer
 	// is parentless, for a taskbar button of its own.
 	// onImageChanged reports the browsed-to entry of imagePaths by index; the initial image does not call it.
-	static void showForImages(Library* library, QStringList imagePaths, int startIndex, QWidget* parent,
+	// Null when the start image is missing. The window deletes itself on close: configure the result at once, never store it.
+	static ImageViewerWindow* showForImages(Library* library, QStringList imagePaths, int startIndex, QWidget* parent,
 		std::function<void(int index)> onImageChanged = {});
+
+	// Called when the user leaves fullscreen, before the window state changes; cleared first, so it runs once.
+	// Returning false skips the state change: a handler that closes the viewer must not let it reappear windowed.
+	void setExitFullScreenHandler(std::function<bool()> handler);
 
 protected:
 	bool eventFilter(QObject* watched, QEvent* event) override;
@@ -56,6 +61,7 @@ private:
 	int _index = 0;
 
 	std::function<void(int index)> _onImageChanged;
+	std::function<bool()> _exitFullScreenHandler;
 
 	CImageViewerWidget* _view = nullptr;
 	QTimer* _windowIconTimer = nullptr;
