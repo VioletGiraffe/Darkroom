@@ -330,6 +330,11 @@ void ThumbnailWidget::setOnActivatedCallback(std::function<void()> handler)
 	_onActivated = std::move(handler);
 }
 
+void ThumbnailWidget::disableDragGesture()
+{
+	_dragMimeDataFactory = {};
+}
+
 QSize ThumbnailWidget::sizeHint() const
 {
 	if (!_bDynamicSizeHint)

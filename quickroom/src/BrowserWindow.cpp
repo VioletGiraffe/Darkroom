@@ -298,6 +298,7 @@ QWidget* BrowserWindow::buildTile(QListWidgetItem* item)
 	if (entry.kind == EntryKind::Image)
 	{
 		auto* thumb = new ThumbnailWidget(entry.path, entry.name, tileSize(), nullptr);
+		thumb->disableDragGesture();   // the grid drags the whole selection
 		thumb->setOnActivatedCallback([this, path = entry.path] { viewImage(path); });
 		thumb->setOnMouseWheelCallback(onWheel);
 		connect(thumb, &QWidget::customContextMenuRequested, this, [thumb, onContextMenu](QPoint pos) { onContextMenu(thumb, pos); });

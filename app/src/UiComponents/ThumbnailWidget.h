@@ -39,6 +39,9 @@ public:
 	// Called on a double-click, and only for a thumbnail that has a file path. Without a handler a double-click does nothing.
 	void setOnActivatedCallback(std::function<void()> handler);
 
+	// Drops the widget's own file-URL drag so the surrounding view can drive the drag instead.
+	void disableDragGesture();
+
 	QSize sizeHint() const override;
 
 	// Exposed so MediaItemWidget can keep corner badges clear of proportional film bands.
