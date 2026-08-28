@@ -45,6 +45,21 @@ int tileSize()
 	return qBound(MIN_TILE_SIZE, QSettings{}.value(TILE_SIZE_KEY, DEFAULT_TILE_SIZE).toInt(), MAX_TILE_SIZE);
 }
 
+// The requested folder, else the remembered one, else Pictures, else home. A requested folder that has gone
+// missing falls back like an absent one.
+QString resolveStartFolder(const QString& requested)
+{
+	const auto usable = [](const QString& path) { return !path.isEmpty() && QFileInfo(path).isDir(); };
+
+	if (usable(requested))
+		return requested;
+	if (const QString remembered = QSettings{}.value(LAST_FOLDER_KEY).toString(); usable(remembered))
+		return remembered;
+	if (const QString pictures = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation); usable(pictures))
+		return pictures;
+	return QDir::homePath();
+}
+
 enum class EntryKind { Folder, Image, Video };
 
 class GridEntry final : public QListWidgetItem {
@@ -65,19 +80,24 @@ public:
 
 } // anonymous namespace
 
-BrowserWindow::BrowserWindow()
+void BrowserWindow::showForFolder(const QString& folder, const QString& selectPath)
+{
+	auto* window = new BrowserWindow(resolveStartFolder(folder));
+	window->setAttribute(Qt::WA_DeleteOnClose);
+	window->show();
+	// Scrolling to the item needs the laid-out viewport the window only has once shown.
+	if (!selectPath.isEmpty())
+		window->selectAndScrollToPath(selectPath);
+}
+
+BrowserWindow::BrowserWindow(const QString& folder)
 {
 	setupUi();
 
 	if (!restoreWindowGeometry(this, GEOMETRY_KEY))
 		resize(1200, 800);
 
-	QString startPath = QSettings{}.value(LAST_FOLDER_KEY).toString();
-	if (startPath.isEmpty() || !QFileInfo(startPath).isDir())
-		startPath = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
-	if (startPath.isEmpty() || !QFileInfo(startPath).isDir())
-		startPath = QDir::homePath();
-	navigateTo(startPath);
+	navigateTo(folder);
 }
 
 void BrowserWindow::setupUi()

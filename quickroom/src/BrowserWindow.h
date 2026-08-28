@@ -21,7 +21,9 @@ class QTimer;
 class BrowserWindow final : public QMainWindow
 {
 public:
-	BrowserWindow();
+	// Creates a self-deleting browser window at folder, or at the remembered folder when folder is empty.
+	// selectPath, when the listed folder contains it, becomes the current item.
+	static void showForFolder(const QString& folder = {}, const QString& selectPath = {});
 
 protected:
 	void closeEvent(QCloseEvent* event) override;
@@ -29,6 +31,8 @@ protected:
 	bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
+	explicit BrowserWindow(const QString& folder);
+
 	void setupUi();
 
 	// Lists path into the grid; false and no state change when path is not an existing directory.

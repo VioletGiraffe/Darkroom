@@ -75,8 +75,7 @@ int main(int argc, char* argv[])
 
 	Style::install();
 
-	BrowserWindow window;
-	window.show();
+	BrowserWindow::showForFolder();
 
 	const int result = app.exec();
 	// I/O first: a read completing there hands its decode to the compute pool.
