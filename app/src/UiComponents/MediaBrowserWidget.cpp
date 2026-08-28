@@ -69,6 +69,9 @@ constexpr int MIN_CARD_IMAGE_HEIGHT = 60;
 constexpr int MAX_CARD_IMAGE_HEIGHT = 360;
 constexpr int CARD_IMAGE_HEIGHT_STEP = 20;
 
+// Bounds the auto-fit only; a manual drag can exceed it.
+constexpr int LABEL_SIDEBAR_MAX_WIDTH = 400;
+
 int cardImageHeight()
 {
 	return QSettings{}.value(CARD_IMAGE_HEIGHT_KEY, DEFAULT_CARD_IMAGE_HEIGHT).toInt();
@@ -321,13 +324,13 @@ void MediaBrowserWidget::setupUi()
 	_gridZoomDebounce->setInterval(80);
 	connect(_gridZoomDebounce, &QTimer::timeout, this, &MediaBrowserWidget::rebuildAllCards);
 
-	auto* splitter = new QSplitter(Qt::Horizontal);
-	splitter->addWidget(_labelSidebar);
-	splitter->addWidget(rightPanel);
-	splitter->setStretchFactor(0, 0);
-	splitter->setStretchFactor(1, 1);
-	splitter->setCollapsible(0, false);
-	rootLayout->addWidget(splitter);
+	_splitter = new QSplitter(Qt::Horizontal);
+	_splitter->addWidget(_labelSidebar);
+	_splitter->addWidget(rightPanel);
+	_splitter->setStretchFactor(0, 0);
+	_splitter->setStretchFactor(1, 1);
+	_splitter->setCollapsible(0, false);
+	rootLayout->addWidget(_splitter);
 }
 
 void MediaBrowserWidget::activateMediaItem(const MediaId& id)
@@ -581,10 +584,15 @@ void MediaBrowserWidget::restoreSettings()
 	}, Qt::QueuedConnection);
 }
 
+// Refreshes synchronously, where the catalogChanged path defers: only MainWindow's library-open actions reach this,
+// so no card or sidebar row is on the stack to be destroyed.
 void MediaBrowserWidget::resetForLibrarySwitch()
 {
+	// rebuildGridItems() captures the scroll anchor before rebuilding: clearing first drops the old library's.
 	_mediaGrid->clear();
 	_labelSidebar->setActiveFilter({}, _labelSidebar->isAndMode());
+	refreshLibraryView();
+	fitLabelSidebarWidth();
 }
 
 // Keep sidebar rebuilding out of rebuildGridItems(): that function can run from a sidebar item's click signal.
@@ -593,6 +601,16 @@ void MediaBrowserWidget::refreshLibraryView()
 	_catalogRefreshTimer->stop(); // drops a queued repeat of the work done here
 	rebuildGridItems();
 	_labelSidebar->refresh();
+}
+
+void MediaBrowserWidget::fitLabelSidebarWidth()
+{
+	const QList<int> paneWidths = _splitter->sizes();
+	const int fitted = qMax(paneWidths[0], qMin(_labelSidebar->sizeHint().width(), LABEL_SIDEBAR_MAX_WIDTH));
+	if (fitted == paneWidths[0])
+		return;
+
+	_splitter->setSizes({ fitted, paneWidths[0] + paneWidths[1] - fitted });
 }
 
 int MediaBrowserWidget::previewFrameCount() const

@@ -23,6 +23,7 @@ class PreviewFrameCountCombo;
 class QLineEdit;
 class QListWidgetItem;
 class QObject;
+class QSplitter;
 class QTimer;
 class SegmentedToggle;
 class SortControl;
@@ -85,6 +86,9 @@ private:
 	// applyNameFilter() without materializing cards, for callers that materialize later.
 	void applyNameFilterToRows();
 
+	// Grows the label sidebar to fit its widest row, capped; a wider manual drag is left alone.
+	void fitLabelSidebarWidth();
+
 	void updateCardCanvasSizes();
 	void applyCardSizeHints();
 	[[nodiscard]] QSize cardSizeHintFor(bool isPhoto) const;
@@ -102,6 +106,7 @@ private:
 private:
 	Library& _library;
 
+	QSplitter*       _splitter = nullptr;
 	LabelSidebar*    _labelSidebar = nullptr;
 	QLineEdit*       _nameFilter = nullptr;
 	SegmentedToggle* _mediaTypeFilter = nullptr;

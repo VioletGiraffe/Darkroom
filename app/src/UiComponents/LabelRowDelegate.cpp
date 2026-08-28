@@ -159,7 +159,8 @@ void LabelRowDelegate::paint(QPainter* p, const QStyleOptionViewItem& option, co
 	}
 
 	const int   countW = opt.fontMetrics.horizontalAdvance(count);
-	const QRect countRect(r.right() - PAD_R - countW, r.top(), countW, r.height());
+	// Not r.right(): it is inclusive, so the name would get one pixel less than sizeHint() budgeted.
+	const QRect countRect(r.left() + r.width() - PAD_R - countW, r.top(), countW, r.height());
 	p->setPen(t.palette.textDim);
 	p->drawText(countRect, Qt::AlignRight | Qt::AlignVCenter, count);
 
