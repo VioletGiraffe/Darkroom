@@ -2,6 +2,7 @@
 
 #include "Core/MediaId.h"
 #include "Import.h"  // Import::PhotoImportMode, used by importPhotoGroup
+#include "UiComponents/ContentWidthListWidget.h"
 #include "Windows/SourceRelocation.h"  // SourceRelocation::Mode, importVideoGroup's parameter
 #include "compiler/compiler_warnings_control.h"
 
@@ -137,7 +138,7 @@ private:
 	int _provisionalSeq = 0;
 	QHash<MediaId, StagedEntry> _staged;
 
-	QListWidget* _labelList  = nullptr;
+	ContentWidthListWidget* _labelList = nullptr;
 	QListWidget* _stagedGrid = nullptr;
 
 	QComboBox* _relocateModeCombo = nullptr;

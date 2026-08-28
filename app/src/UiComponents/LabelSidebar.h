@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/LabelId.h"
+#include "UiComponents/ContentWidthListWidget.h"
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -9,7 +10,6 @@ DISABLE_COMPILER_WARNINGS
 #include <QWidget>
 RESTORE_COMPILER_WARNINGS
 
-class QListWidget;
 class QListWidgetItem;
 class SegmentedToggle;
 class Library;
@@ -36,6 +36,8 @@ signals:
 	void renameLabelRequested(LabelId labelId);
 	void setLabelColorRequested(LabelId labelId);
 	void deleteLabelRequested(LabelId labelId);
+	// The widest row moved, so the owner can refit the panel.
+	void preferredWidthChanged();
 
 private:
 	void rebuildRows();
@@ -44,8 +46,8 @@ private:
 	void showRowContextMenu(const QPoint& pos);
 
 private:
-	Library&          _library;
-	QListWidget*      _list        = nullptr;
-	SegmentedToggle*  _andOrToggle = nullptr;
-	QSet<LabelId>     _activeLabelIds;
+	Library&                _library;
+	ContentWidthListWidget* _list        = nullptr;
+	SegmentedToggle*        _andOrToggle = nullptr;
+	QSet<LabelId>           _activeLabelIds;
 };

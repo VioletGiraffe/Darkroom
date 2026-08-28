@@ -481,7 +481,7 @@ void ImportDialog::refreshLabelList()
 		}
 	}
 
-	_labelList->updateGeometry();
+	_labelList->refreshContentWidth();
 }
 
 const ImportDialog::LabelOption* ImportDialog::findLabelOption(const QString& id) const

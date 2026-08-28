@@ -58,6 +58,7 @@ LabelSidebar::LabelSidebar(Library& library, QWidget* parent) : QWidget(parent),
 	_list->setSelectionMode(QAbstractItemView::NoSelection);
 	_list->setMouseTracking(true);
 	_list->setMinimumWidth(140);
+	connect(_list, &ContentWidthListWidget::contentWidthChanged, this, &LabelSidebar::preferredWidthChanged);
 
 	new ListRowDragFilter(_list, [](const QListWidgetItem* item) -> QMimeData* {
 		const LabelId labelId = item->data(kLabelIdRole).value<LabelId>();
@@ -135,7 +136,7 @@ void LabelSidebar::rebuildRows()
 	_activeLabelIds.intersect(existing);
 
 	applyRowHighlight();
-	_list->updateGeometry();
+	_list->refreshContentWidth();
 }
 
 void LabelSidebar::applyRowHighlight()

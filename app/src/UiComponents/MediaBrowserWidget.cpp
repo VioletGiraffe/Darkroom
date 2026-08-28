@@ -331,6 +331,9 @@ void MediaBrowserWidget::setupUi()
 	_splitter->setStretchFactor(1, 1);
 	_splitter->setCollapsible(0, false);
 	rootLayout->addWidget(_splitter);
+
+	// Connected last: the fit needs _splitter, and the sidebar can announce a width as soon as it is laid out.
+	connect(_labelSidebar, &LabelSidebar::preferredWidthChanged, this, &MediaBrowserWidget::fitLabelSidebarWidth);
 }
 
 void MediaBrowserWidget::activateMediaItem(const MediaId& id)
@@ -584,15 +587,10 @@ void MediaBrowserWidget::restoreSettings()
 	}, Qt::QueuedConnection);
 }
 
-// Refreshes synchronously, where the catalogChanged path defers: only MainWindow's library-open actions reach this,
-// so no card or sidebar row is on the stack to be destroyed.
 void MediaBrowserWidget::resetForLibrarySwitch()
 {
-	// rebuildGridItems() captures the scroll anchor before rebuilding: clearing first drops the old library's.
 	_mediaGrid->clear();
 	_labelSidebar->setActiveFilter({}, _labelSidebar->isAndMode());
-	refreshLibraryView();
-	fitLabelSidebarWidth();
 }
 
 // Keep sidebar rebuilding out of rebuildGridItems(): that function can run from a sidebar item's click signal.
