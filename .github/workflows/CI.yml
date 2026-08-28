@@ -123,6 +123,7 @@ jobs:
         rem Own qmake run: the tests step above generated Tests.sln, not the app's project files.
         %QT_ROOT_DIR%\bin\qmake.exe -tp vc -r Darkroom.pro || exit /b 1
         msbuild Darkroom.sln /t:Darkroom /p:Configuration=Release;PlatformToolset=v143 || exit /b 1
+        msbuild Darkroom.sln /t:Quickroom /p:Configuration=Release;PlatformToolset=v143 || exit /b 1
 
         @echo on
         set STAGING_DIR=dist
@@ -141,7 +142,7 @@ jobs:
       run: |
         # Own qmake run: both projects generate the top-level Makefile, and the tests step's version is there now.
         $QT_ROOT_DIR/bin/qmake -r CONFIG+=release Darkroom.pro
-        make -j sub-app
+        make -j sub-app sub-quickroom
 
     - name: .exe file size
       if: startsWith(matrix.os, 'windows')

@@ -19,10 +19,13 @@ contains implementation detail. Keep both in sync.
 
 ## Build and source layout
 
-The qmake root `Darkroom.pro` builds the app and its static-library submodules: `qtutils`, `cpputils`,
-`cpp-template-utils`, and `magic-alignment`. App sources and headers are discovered recursively under
-`app/src/`, so new files there require no project registration. Generated solutions, Makefiles, IDE state,
-`bin/`, and `build/` are not sources of truth.
+The qmake root `Darkroom.pro` builds both apps - Darkroom and [Quickroom](QUICKROOM.md) - and their
+static-library submodules: `qtutils`, `cpputils`, `cpp-template-utils`, `magic-alignment`, and
+`image-processing`. App sources and headers are discovered recursively under `app/src/`, so new files there
+require no project registration - but `quickroom/quickroom.pro` compiles a hand-listed subset of them directly
+(see its comments), so a shared file gaining an app-only include breaks the Quickroom link while Darkroom still
+builds, like the `tests.pro` trap.
+Generated solutions, Makefiles, IDE state, `bin/`, and `build/` are not sources of truth.
 
 `app/src/` is divided into:
 

@@ -1,7 +1,8 @@
 TEMPLATE = subdirs
 
-# The app and its libraries only - the test binary is a separate project, Tests.pro.
-SUBDIRS += app qtutils cpputils cpp-template-utils magic-alignment image-processing
+# The apps and their libraries only - the test binary is a separate project, Tests.pro.
+SUBDIRS += app quickroom qtutils cpputils cpp-template-utils magic-alignment image-processing
 
 qtutils.depends = cpputils
 app.depends = qtutils magic-alignment image-processing
+quickroom.depends = qtutils image-processing
