@@ -11,11 +11,12 @@ Read [DARKROOM.md](DARKROOM.md) first for the shared build layout, the hand-list
 
 `quickroom/src/` holds the Quickroom-only code:
 
-- `main.cpp` - Darkroom's bootstrap shape minus the library. Its own application identity ("Quickroom") keeps
-  its QSettings separate from Darkroom's.
+- `main.cpp` - Darkroom's bootstrap shape minus the library, plus the startup routing below. Its own
+  application identity ("Quickroom") keeps its QSettings separate from Darkroom's.
 - `BrowserWindow` - the main window: navigation toolbar (back/forward/up + editable path field), `MediaGrid`
   of tiles, status-bar counts. Owns the navigation history and the folder listing: folders first in natural
-  name order, unsupported files not shown.
+  name order, unsupported files not shown. Self-deleting, created through `showForFolder`, which resolves the
+  folder to open and can select one entry in it.
 - `IconTileWidget` - tile for entries without an image preview (folders, videos): native file icon + caption,
   styled via the shared `framedThumbnail` QSS rule.
 
@@ -31,9 +32,29 @@ position reflected back into the grid selection; videos open `VideoPlayerWindow`
 
 Browser state (last folder, tile size, window geometry) persists under `browser/*` settings keys.
 
+## Startup
+
+The first command-line path decides which window opens; further paths are ignored.
+
+- **Folder** - the browser, listing it.
+- **Image** - the viewer alone, browsing the images beside it in that folder. No browser is created: building
+  one lists a directory and overwrites the remembered folder, which opening a single file must not do.
+- **Video** - the player alone.
+- **Missing path** - reported, then the browser.
+- **Any other file** - the browser on its folder, where that file is not listed.
+- **No path** - the browser, on the remembered folder, else Pictures, else home.
+
+With a single file the viewer is the only window, so Esc closes it and the app exits. Leaving fullscreen hands
+off to the browser instead: the viewer's exit-fullscreen handler opens it on the image currently shown, then
+closes the viewer. The browser must open first, because closing the only window would quit the app.
+
 ## Improvement backlog
 
-- Drive/computer view above filesystem roots (v2); today the path field is the way across drives.
+- Leaving fullscreen closes the viewer; a setting could keep it open behind the browser instead. The
+  exit-fullscreen handler's return value already selects between the two.
+- The player has no such hand-off: a video opened from the command line never reaches the browser.
+- Drive/computer view above filesystem roots; today the path field is the way across drives.
+- Opening several files at once starts one process each - no single-instance handover.
 - Name filter over the current folder.
 - Video thumbnails: needs per-file ffmpeg extraction and a cache; tiles show the shell icon today.
 - Own app icon: Darkroom's icon is reused.
