@@ -590,6 +590,7 @@ void MediaBrowserWidget::restoreSettings()
 
 void MediaBrowserWidget::resetForLibrarySwitch()
 {
+	// rebuildGridItems() captures the scroll anchor before rebuilding: clearing first drops the old library's.
 	_mediaGrid->clear();
 	_labelSidebar->setActiveFilter({}, _labelSidebar->isAndMode());
 }
