@@ -182,12 +182,12 @@ constexpr char kToolTips[] = R"(
 // Per-card stylesheets create a QStyleSheetStyle proxy per widget and make grid rebuilds expensive.
 constexpr char kGridCards[] = R"(
 	QWidget#mediaItemCard { background: transparent; border: 1px solid %borderSubtle%; border-radius: %controlRadius%px; }
-	QWidget#mediaItemCard:hover { background-color: %accentBg%; border-color: %accent%; }
+	QWidget#mediaItemCard:hover { border-color: %accent%; }
 
 	QWidget#cardThumbnailWell { background-color: %thumbnailMatte%; border: none; border-radius: %thumbnailMatteRadius%px; font-size: 9pt; }
 
 	QWidget#framedThumbnail { background-color: %thumbnailMatte%; border: 1px solid %borderSubtle%; border-radius: %controlRadius%px; padding: 2px; font-size: 9pt; }
-	QWidget#framedThumbnail:hover { background-color: %accentBg%; border-color: %accent%; }
+	QWidget#framedThumbnail:hover { border-color: %accent%; }
 )";
 
 constexpr char kStarButtons[] = R"(
