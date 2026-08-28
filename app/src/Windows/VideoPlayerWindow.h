@@ -7,6 +7,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QMainWindow>
 RESTORE_COMPILER_WARNINGS
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -33,6 +34,8 @@ public:
 
 	// Browsing order for previous/next navigation; empty (the default) leaves navigation inert.
 	void setNavigationOrder(std::vector<MediaId> order);
+	// Reports each item navigated to; the initially loaded one does not call it.
+	void setOnNavigatedToMediaItem(std::function<void(const MediaId& id)> handler);
 
 	static void restartAll();
 	static void closeAll();
@@ -92,6 +95,7 @@ private:
 	Library& _library;
 	MediaId _mediaId;
 	QString _videoPath;
+	std::function<void(const MediaId& id)> _onNavigatedToMediaItem;
 	// The current position is looked up by _mediaId rather than tracked.
 	std::vector<MediaId> _navigationOrder;
 

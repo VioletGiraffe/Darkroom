@@ -74,6 +74,8 @@ private:
 	[[nodiscard]] std::vector<MediaId> effectiveStagedSelection(const StagedGridItem* item) const;
 	void showStagedCardContextMenu(StagedGridItem* item, const QPoint& globalPos);
 	void previewStagedItem(const MediaId& id);
+	// Does nothing when the item is no longer staged.
+	void selectAndScrollToStagedItem(const MediaId& id);
 	void locateStagedSourceFile(const MediaId& id);
 	void copyStagedSourcePath(const MediaId& id);
 	void compareStagedPhotos(const std::vector<MediaId>& photoIds);

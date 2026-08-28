@@ -24,7 +24,8 @@ RESTORE_COMPILER_WARNINGS
 #include <functional>
 #include <utility>
 
-void ImageViewerWindow::showForImages(Library* library, QStringList imagePaths, int startIndex, QWidget* parent)
+void ImageViewerWindow::showForImages(Library* library, QStringList imagePaths, int startIndex, QWidget* parent,
+	std::function<void(int index)> onImageChanged)
 {
 	assert_and_return_r(startIndex >= 0 && startIndex < imagePaths.size(), );
 
@@ -36,6 +37,8 @@ void ImageViewerWindow::showForImages(Library* library, QStringList imagePaths, 
 
 	QWidget* const modalOwner = parent && parent->window()->isModal() ? parent->window() : nullptr;
 	auto* window = new ImageViewerWindow(library, std::move(imagePaths), startIndex, modalOwner);
+	// Assigned after construction: the initial image is the one the caller already acted on.
+	window->_onImageChanged = std::move(onImageChanged);
 	window->setAttribute(Qt::WA_DeleteOnClose);
 	window->showFullScreen();
 }
@@ -151,6 +154,9 @@ void ImageViewerWindow::showImage(int index)
 	_previousAction->setEnabled(adjacentIndex(Direction::Previous) >= 0);
 	_nextAction->setEnabled(adjacentIndex(Direction::Next) >= 0);
 	updateLibraryActions();
+
+	if (_onImageChanged)
+		_onImageChanged(index);
 }
 
 bool ImageViewerWindow::eventFilter(QObject* watched, QEvent* event)

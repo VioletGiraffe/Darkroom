@@ -69,6 +69,8 @@ private:
 	void playVideo(const MediaId& id);
 	// Browsable across the photos the grid currently shows.
 	void viewPhoto(const MediaId& id);
+	// Does nothing when the item is absent or hidden.
+	void selectAndScrollToMediaItem(const MediaId& id);
 	void openSourceInSystemApp(const MediaId& id);
 	void showMediaItemContextMenu(const MediaId& id, const QPoint& globalPos);
 	void deleteMediaItemsInteractive(const std::vector<MediaId>& selection);

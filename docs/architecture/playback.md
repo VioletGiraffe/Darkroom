@@ -30,11 +30,18 @@ its grid currently shows, FrameViewerWindow from one frame folder, and CompareWi
 that was clicked. Neither a frame nor a staged photo is a catalog item, so those callers pass no `Library` and the
 Best action is absent; identity for the library actions is derived per image from the file on disk.
 
+Browsing is reported back by index into the caller's list. MediaBrowserWidget and ImportDialog use that to move
+their grid selection onto the photo on screen. The initial image is not reported: the caller already acted on it.
+
 ## VideoPlayerWindow
 
 `VideoPlayerWindow` coordinates Qt media playback, controls, saved-loop persistence, optional oscillating
 presentation, and single-frame extraction. Open players are tracked app-wide so library replacement can close them
 synchronously before the stable `Library&` begins resolving a different store.
+
+MediaBrowserWidget gives each player it opens the videos the grid currently shows as its previous/next order, and a
+handler that moves the grid selection onto the item navigated to, as with the image viewer above. The initially
+loaded video is not reported.
 
 The player exposes one logical position and play-state seam. Controls therefore refer to the frame actually presented
 whether `QMediaPlayer` or `OscillatingPlayback` currently owns presentation.

@@ -355,9 +355,10 @@ void MediaBrowserWidget::viewPhoto(const MediaId& id)
 		return;
 	}
 
+	std::vector<MediaId> browsedIds = visiblePhotosInViewOrder();
 	QStringList paths;
 	int startIndex = -1;
-	for (const MediaId& photoId : visiblePhotosInViewOrder())
+	for (const MediaId& photoId : browsedIds)
 	{
 		if (photoId == id)
 			startIndex = static_cast<int>(paths.size());
@@ -366,11 +367,13 @@ void MediaBrowserWidget::viewPhoto(const MediaId& id)
 
 	if (startIndex < 0) // Not in the grid's current view: nothing to browse through, so show it alone
 	{
+		browsedIds = { id };
 		paths = { sourcePath };
 		startIndex = 0;
 	}
 
-	ImageViewerWindow::showForImages(&_library, std::move(paths), startIndex, window());
+	ImageViewerWindow::showForImages(&_library, std::move(paths), startIndex, window(),
+		[this, browsedIds = std::move(browsedIds)](int index) { selectAndScrollToMediaItem(browsedIds[static_cast<size_t>(index)]); });
 }
 
 void MediaBrowserWidget::playVideo(const MediaId& id)
@@ -384,6 +387,7 @@ void MediaBrowserWidget::playVideo(const MediaId& id)
 
 	auto* playerWindow = new VideoPlayerWindow(_library, sourcePath, id, nullptr);
 	playerWindow->setNavigationOrder(visibleVideosInViewOrder());
+	playerWindow->setOnNavigatedToMediaItem([this](const MediaId& navigatedId) { selectAndScrollToMediaItem(navigatedId); });
 	playerWindow->show();
 }
 
@@ -842,6 +846,20 @@ void MediaBrowserWidget::scrollGridToAnchorKey(const QString& anchorKey)
 			_mediaGrid->scrollToItem(item, QAbstractItemView::PositionAtTop);
 			return;
 		}
+	}
+}
+
+void MediaBrowserWidget::selectAndScrollToMediaItem(const MediaId& id)
+{
+	for (int row = 0; row < _mediaGrid->count(); ++row)
+	{
+		QListWidgetItem* const item = _mediaGrid->item(row);
+		if (item->isHidden() || static_cast<const GridItem*>(item)->mediaId != id)
+			continue;
+
+		_mediaGrid->setCurrentItem(item, QItemSelectionModel::ClearAndSelect);
+		_mediaGrid->scrollToItem(item);
+		return;
 	}
 }
 

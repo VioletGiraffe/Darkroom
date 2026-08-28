@@ -546,6 +546,11 @@ void VideoPlayerWindow::setNavigationOrder(std::vector<MediaId> order)
 	_navigationOrder = std::move(order);
 }
 
+void VideoPlayerWindow::setOnNavigatedToMediaItem(std::function<void(const MediaId& id)> handler)
+{
+	_onNavigatedToMediaItem = std::move(handler);
+}
+
 std::optional<MediaId> VideoPlayerWindow::adjacentMediaItem(Direction direction) const
 {
 	const auto current = std::find(_navigationOrder.cbegin(), _navigationOrder.cend(), _mediaId);
@@ -572,6 +577,9 @@ void VideoPlayerWindow::loadAdjacentFile(Direction direction)
 		return;
 
 	loadFile(_library.catalog().sourcePathForMediaItem(*mediaId), *mediaId);
+
+	if (_onNavigatedToMediaItem)
+		_onNavigatedToMediaItem(*mediaId);
 }
 
 VideoPlayerWindow::~VideoPlayerWindow()

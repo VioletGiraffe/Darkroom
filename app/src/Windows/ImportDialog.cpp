@@ -50,6 +50,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QInputDialog>
+#include <QItemSelectionModel>
 #include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
@@ -1090,6 +1091,7 @@ void ImportDialog::previewStagedItem(const MediaId& id)
 		return;
 	}
 
+	std::vector<MediaId> browsedIds;
 	QStringList photoPaths;
 	int startIndex = -1;
 	for (int row = 0; row < _stagedGrid->count(); ++row)
@@ -1102,10 +1104,22 @@ void ImportDialog::previewStagedItem(const MediaId& id)
 		if (item->mediaId == id)
 			startIndex = static_cast<int>(photoPaths.size());
 		photoPaths << path;
+		browsedIds.push_back(item->mediaId);
 	}
 
 	// No library: a staged photo is not a catalog item yet.
-	ImageViewerWindow::showForImages(nullptr, std::move(photoPaths), startIndex, this);
+	ImageViewerWindow::showForImages(nullptr, std::move(photoPaths), startIndex, this,
+		[this, browsedIds = std::move(browsedIds)](int index) { selectAndScrollToStagedItem(browsedIds[static_cast<size_t>(index)]); });
+}
+
+void ImportDialog::selectAndScrollToStagedItem(const MediaId& id)
+{
+	const auto it = _staged.constFind(id);
+	if (it == _staged.constEnd())
+		return;
+
+	_stagedGrid->setCurrentItem(it->item, QItemSelectionModel::ClearAndSelect);
+	_stagedGrid->scrollToItem(it->item);
 }
 
 void ImportDialog::locateStagedSourceFile(const MediaId& id)

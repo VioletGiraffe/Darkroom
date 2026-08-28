@@ -8,6 +8,8 @@ DISABLE_COMPILER_WARNINGS
 #include <QStringList>
 RESTORE_COMPILER_WARNINGS
 
+#include <functional>
+
 class CImageViewerWidget;
 class Library;
 class QAction;
@@ -23,7 +25,9 @@ public:
 	// parent parents the failure message box shown when the image cannot be opened at all. It also owns the
 	// viewer window when it is modal, since Qt blocks input to unparented windows then; otherwise the viewer
 	// is parentless, for a taskbar button of its own.
-	static void showForImages(Library* library, QStringList imagePaths, int startIndex, QWidget* parent);
+	// onImageChanged reports the browsed-to entry of imagePaths by index; the initial image does not call it.
+	static void showForImages(Library* library, QStringList imagePaths, int startIndex, QWidget* parent,
+		std::function<void(int index)> onImageChanged = {});
 
 protected:
 	bool eventFilter(QObject* watched, QEvent* event) override;
@@ -50,6 +54,8 @@ private:
 	Library* _library = nullptr;
 	QStringList _imagePaths;
 	int _index = 0;
+
+	std::function<void(int index)> _onImageChanged;
 
 	CImageViewerWidget* _view = nullptr;
 	QTimer* _windowIconTimer = nullptr;
