@@ -43,6 +43,10 @@ The fixups (`CComboPopupRounder`, `CSplitterHandleHoverEnabler`, `CFocusFrameSty
 metrics through provider callbacks at each use, so they follow a switch without reinstalling. Their rationale is in
 [qtutils' styling-quirks page](../../qtutils/docs/qt-styling-quirks.md).
 
+The app sheet is where a visual lives by default; a widget-local sheet is the exception. Widgets the sheet targets
+individually carry an object name (`mediaItemCard`, `framedThumbnail`, `cardStar`), so a widget's own source may set
+none of its visuals.
+
 Visuals QSS cannot express use custom painting or delegates, which read `Theme::current()` at paint time and need
 no subscription. `Style::applyThemedSheet(widget, makeSheet)` covers widget-local sheets that must survive a
 switch; a short-lived widget recreated after each switch can use a construction-time sheet instead.

@@ -100,7 +100,9 @@ constexpr char kMenuBar[] = R"(
 )";
 
 constexpr char kLists[] = R"(
-	QListWidget { border: 1px solid %border%; border-radius: %controlRadius%px; background: transparent; }
+	/* outline: none suppresses the style's focus rect on the current item. */
+	QListWidget { border: 1px solid %border%; border-radius: %controlRadius%px; background: transparent; outline: none; }
+	QListWidget::item:selected { background-color: %accentBg%; border-radius: %controlRadius%px; }
 )";
 
 constexpr char kScrollBars[] = R"(

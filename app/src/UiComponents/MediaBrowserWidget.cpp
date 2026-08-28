@@ -5,7 +5,6 @@
 #include "Shortcuts.h"
 #include "Theme/Theme.h"
 #include "theme/ctintedsvgiconengine.h"
-#include "Theme/Style.h"
 #include "UiComponents/LabelVisuals.h"
 #include "UiComponents/LabelSidebar.h"
 #include "UiComponents/MediaGrid.h"
@@ -311,11 +310,6 @@ void MediaBrowserWidget::setupUi()
 	_mediaGrid->setDragEnabled(true);
 	_mediaGrid->setDragUrlsProvider([this](const QList<QListWidgetItem*>& items) { return dragUrlsForItems(items); });
 	_mediaGrid->setCardFactory([this](QListWidgetItem* item) { return buildMediaCard(item); });
-	Style::applyThemedSheet(_mediaGrid, [] {
-		// outline: none suppresses the style's focus rect on the current item.
-		return QStringLiteral("QListWidget { outline: none; } QListWidget::item:selected { background-color: %1; border-radius: %2px; }")
-			.arg(Theme::current().palette.accentBg.name()).arg(Theme::current().metrics.controlRadius);
-	});
 	connect(_mediaGrid, &QListWidget::itemSelectionChanged, this, &MediaBrowserWidget::selectionChanged);
 
 	mainLayout->addWidget(_mediaGrid, 1);

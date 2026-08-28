@@ -348,7 +348,6 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 	stagedPaneLayout->addLayout(stagedToolbar);
 
 	_stagedGrid = new MediaGrid();
-	_stagedGrid->setStyleSheet(QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().palette.accentBg.name()));
 
 	_stagedCardZoomDebounce = new QTimer(this);
 	_stagedCardZoomDebounce->setSingleShot(true);
