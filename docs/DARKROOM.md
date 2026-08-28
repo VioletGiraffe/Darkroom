@@ -10,10 +10,10 @@ contains implementation detail. Keep both in sync.
 
 ## Working route
 
-1. Read [the coding conventions](docs/guidelines.md).
+1. Read [the coding conventions](guidelines.md).
 2. Follow the relevant subsystem link below and inspect the implementation plus nearby examples.
 3. Before changing QSS, `QComboBox`, or custom styling, read
-   [the Qt styling-system quirks](qtutils/docs/qt-styling-quirks.md).
+   [the Qt styling-system quirks](../qtutils/docs/qt-styling-quirks.md).
 4. Keep changes in the app unless responsibility genuinely belongs in a shared submodule, and update durable
    architectural facts when they change.
 
@@ -58,46 +58,46 @@ verdicts. Test sources are listed explicitly and new test files must be register
   changes whose relocation did not complete.
 - **Container replacement must preserve capabilities.** Selection, keyboard navigation, drag-and-drop, focus, and
   other behavior supplied by the old widget need explicit equivalents in the new one; see
-  [main-window.md](docs/architecture/main-window.md#media-grid--multi-select).
+  [main-window.md](architecture/main-window.md#media-grid--multi-select).
 - **Background disk reads use `Core::IoThreadPool`.** Fast storage receives bounded parallel reads; slow,
   external, network, or unknown storage shares a serial worker to avoid seek thrashing. CPU work follows on the
   process-wide `cpuThreadPool()`. Long-running non-read work owns an appropriate separate worker instead of
   blocking the I/O route.
-- **Language and framework conventions live in [guidelines.md](docs/guidelines.md).**
+- **Language and framework conventions live in [guidelines.md](guidelines.md).**
 
 ## Subsystems
 
-### [Data model and identity](docs/architecture/data-model.md)
+### [Data model and identity](architecture/data-model.md)
 
 Stable Library lifetime and root replacement, library layout, `MediaId` and `LabelId`, dumb per-item
 `MetadataStore` persistence, nested writers, and checked JSON publication.
 
-### [Catalog and labels](docs/architecture/catalog-and-labels.md)
+### [Catalog and labels](architecture/catalog-and-labels.md)
 
 The authoritative item/label model, stable label ids, storage-label reconciliation, mutation and relocation
 invariants, verified paths, batching, empty-label persistence, and explicit integrity checking.
 
-### [Main window](docs/architecture/main-window.md)
+### [Main window](architecture/main-window.md)
 
 Library startup and switching, browser update layers, lazy grid population, native multi-selection, item and label
 workflow ownership, rename transactions, and diagnostic logging.
 
-### [Media cards and thumbnails](docs/architecture/media-widgets.md)
+### [Media cards and thumbnails](architecture/media-widgets.md)
 
 `MediaItemWidget`, `ThumbnailWidget`, label-drop and drag behavior, asynchronous read/decode ownership, rendering
 invariants, and card geometry controls.
 
-### [Frame viewing, playback, and photo comparison](docs/architecture/playback.md)
+### [Frame viewing, playback, and photo comparison](architecture/playback.md)
 
 Persistent frame viewing, the single-image viewer, built-in playback and saved loops, oscillating cache presentation,
 single-frame extraction, and PhotoCompareWindow's shared-view/per-photo-alignment model.
 
-### [Settings and theme](docs/architecture/settings-and-theme.md)
+### [Settings and theme](architecture/settings-and-theme.md)
 
 `QSettings` ownership, SettingsDialog behavior, the selectable theme system and its qtutils machinery, central
 application styling, and custom controls used where platform widgets cannot express the intended visuals.
 
-### [Import and frame extraction](docs/architecture/import.md)
+### [Import and frame extraction](architecture/import.md)
 
 UI-free photo/video workers and interactive coordination, preview generation and reuse, transactional on-demand full
 extraction, ImportDialog staging and provisional labels, duplicate boundaries, relocation, and catalog publication.

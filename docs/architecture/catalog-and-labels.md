@@ -1,6 +1,6 @@
 # Catalog and labels
 
-[← Back to architecture index](../../DARKROOM.md)
+[← Back to architecture index](../DARKROOM.md)
 
 `Catalog` is the authoritative GUI-thread model of the library's media-item set and label registry. It is keyed by
 `MediaId`, kept current through its mutation API, and owned by `Library`. Item and label queries never derive the

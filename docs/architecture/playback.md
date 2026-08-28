@@ -1,6 +1,6 @@
 # Frame viewing, playback, and photo comparison
 
-[← Back to architecture index](../../DARKROOM.md)
+[← Back to architecture index](../DARKROOM.md)
 
 ## FrameViewerWindow
 

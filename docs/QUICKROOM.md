@@ -28,7 +28,7 @@ file URLs - so the image tiles' own single-file drag is disabled.
 Activation: double-click or Enter. Folders navigate in place (queued: the rebuild would delete the tile whose
 handler is still running); images open `ImageViewerWindow` browsing the folder's images, with the browse
 position reflected back into the grid selection; videos open `VideoPlayerWindow`. Both windows take a null
-`Library`, which leaves out their library-bound features (see [playback.md](docs/architecture/playback.md)).
+`Library`, which leaves out their library-bound features (see [playback.md](architecture/playback.md)).
 
 Browser state (last folder, tile size, window geometry) persists under `browser/*` settings keys.
 

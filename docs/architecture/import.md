@@ -1,6 +1,6 @@
 # Import and frame extraction
 
-[← Back to architecture index](../../DARKROOM.md)
+[← Back to architecture index](../DARKROOM.md)
 
 ## On-demand full-frame extraction
 

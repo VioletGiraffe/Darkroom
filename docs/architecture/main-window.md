@@ -1,6 +1,6 @@
 # Main window
 
-[← Back to architecture index](../../DARKROOM.md)
+[← Back to architecture index](../DARKROOM.md)
 
 `MainWindow` owns the stable `Library`, the `MediaBrowserWidget`, and a persistent `FrameViewerWindow`.
 `MediaBrowserWidget` owns the browser toolbar, label sidebar, media grid, view settings, filtering, sorting, card
