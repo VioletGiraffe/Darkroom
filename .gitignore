@@ -25,3 +25,4 @@ Makefile.Release
 
 .DS_Store
 /app/Darkroom_resource.rc
+/quickroom/Quickroom_resource.rc
