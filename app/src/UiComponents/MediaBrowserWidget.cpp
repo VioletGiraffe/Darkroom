@@ -333,7 +333,8 @@ void MediaBrowserWidget::setupUi()
 	rootLayout->addWidget(_splitter);
 
 	// Connected last: the fit needs _splitter, and the sidebar can announce a width as soon as it is laid out.
-	connect(_labelSidebar, &LabelSidebar::preferredWidthChanged, this, &MediaBrowserWidget::fitLabelSidebarWidth);
+	// Queued: the announcement can arrive inside QSplitter's own layout pass, which would overwrite setSizes() made there.
+	connect(_labelSidebar, &LabelSidebar::preferredWidthChanged, this, &MediaBrowserWidget::fitLabelSidebarWidth, Qt::QueuedConnection);
 }
 
 void MediaBrowserWidget::activateMediaItem(const MediaId& id)
