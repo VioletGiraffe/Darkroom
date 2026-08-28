@@ -27,6 +27,11 @@ appended after the app sheet so its rules win equal-specificity ties. The select
 `Metrics` holds every radius, thickness, and indicator size the stylesheet and custom painting use, so a theme
 reshapes by changing numbers; the fragment covers structure metrics cannot express.
 
+The app-specific colors resolve the way the palette's derived fields do: `selectActiveTheme()` fills any left unset
+from the palette and the polarity, so a theme authors its palette and nothing else unless it needs to differ. It also
+supplies its own `accentBg` default ahead of `resolvedPalette`, blended to a target contrast against the window: the
+media grid fills a whole card with that colour, where the library's flat tint is sized for a text highlight.
+
 qtutils provides the app-agnostic parts: `CThemeController` (persists the choices, drives
 `QStyleHints::setColorScheme()` so the platform follows, emits `themeChanged()` when the effective theme changes),
 `CBasePalette` with its derivations (nine authored colors, the rest derivable), the tinted icon engine, the

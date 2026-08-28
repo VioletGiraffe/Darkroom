@@ -42,13 +42,13 @@ struct Theme
 	CBasePalette palette;
 	Metrics metrics;
 
-	// App colours with no cross-app meaning. Independent hues that cannot derive from the palette
-	// core, authored per theme so each stays legible against its backgrounds.
+	// App colours with no cross-app meaning. Left unset, each is filled from the palette and the theme's
+	// polarity; a theme authors one only where it needs to differ.
 	QColor starActive; // the active Best star glyph
 	QColor starButtonDefault;
 	QColor starButtonHoverUnchecked;
 	QColor starButtonCheckedHover;
-	QColor instructionText; // explanatory text, a step quieter than palette.textDim
+	QColor instructionText; // explanatory text and toolbar glyphs: neutral, and stronger than the tinted textDim
 	QColor thumbnailMatte;
 	QColor readyGreen;
 
