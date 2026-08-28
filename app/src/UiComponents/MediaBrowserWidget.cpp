@@ -312,7 +312,9 @@ void MediaBrowserWidget::setupUi()
 	_mediaGrid->setDragUrlsProvider([this](const QList<QListWidgetItem*>& items) { return dragUrlsForItems(items); });
 	_mediaGrid->setCardFactory([this](QListWidgetItem* item) { return buildMediaCard(item); });
 	Style::applyThemedSheet(_mediaGrid, [] {
-		return QStringLiteral("QListWidget::item:selected { background-color: %1; }").arg(Theme::current().palette.accentBg.name());
+		// outline: none suppresses the style's focus rect on the current item.
+		return QStringLiteral("QListWidget { outline: none; } QListWidget::item:selected { background-color: %1; }")
+			.arg(Theme::current().palette.accentBg.name());
 	});
 	connect(_mediaGrid, &QListWidget::itemSelectionChanged, this, &MediaBrowserWidget::selectionChanged);
 
