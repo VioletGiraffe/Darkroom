@@ -18,16 +18,17 @@ Scaling goes through `ImageProcessing::resize` and falls back to `CImageViewerWi
 formats the resizer has no view for. Its chunks run on `cpuThreadPool()`, which also runs work on the calling
 thread - the GUI thread is blocked for the duration of a scale either way.
 
-Each viewer is parentless, for a taskbar button of its own, and opens fullscreen; double-click and `F` switch
-between fullscreen and a window sized to the image, and the menu bar shows only outside fullscreen. Alone among
+Each viewer opens fullscreen and is parentless, for a taskbar button of its own; a modal caller owns the window
+instead, Qt blocking input to unparented windows under a modal dialog. Double-click and `F` switch between
+fullscreen and a window sized to the image, and the menu bar shows only outside fullscreen. Alone among
 the windows here it persists no geometry. The current image becomes the window icon after a delay, so several
 open viewers stay distinguishable in the taskbar without an icon being scaled for every image browsed past.
 
-It browses a path list captured when it opens, skipping entries that have since left the disk. Three callers
-build that list: MediaBrowserWidget from the photos the grid currently shows, FrameViewerWindow from one frame
-folder, and CompareWindow from the frames of the pane that was clicked. A frame is a file rather than a catalog
-item, so it opens without a `Library` and the Best action is absent; identity for the library actions is derived
-per image from the file on disk.
+It browses a path list captured when it opens, skipping entries that have since left the disk. Four callers
+build that list: MediaBrowserWidget from the photos the grid currently shows, ImportDialog from the staged photos
+its grid currently shows, FrameViewerWindow from one frame folder, and CompareWindow from the frames of the pane
+that was clicked. Neither a frame nor a staged photo is a catalog item, so those callers pass no `Library` and the
+Best action is absent; identity for the library actions is derived per image from the file on disk.
 
 ## VideoPlayerWindow
 

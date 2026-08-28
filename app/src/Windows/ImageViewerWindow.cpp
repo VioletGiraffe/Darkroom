@@ -24,23 +24,25 @@ RESTORE_COMPILER_WARNINGS
 #include <functional>
 #include <utility>
 
-void ImageViewerWindow::showForImages(Library* library, QStringList imagePaths, int startIndex, QWidget* dialogParent)
+void ImageViewerWindow::showForImages(Library* library, QStringList imagePaths, int startIndex, QWidget* parent)
 {
 	assert_and_return_r(startIndex >= 0 && startIndex < imagePaths.size(), );
 
 	if (const QString& startPath = imagePaths.at(startIndex); !QFileInfo::exists(startPath))
 	{
-		reportMissingFile(dialogParent, startPath);
+		reportMissingFile(parent, startPath);
 		return;
 	}
 
-	auto* window = new ImageViewerWindow(library, std::move(imagePaths), startIndex);
+	QWidget* const modalOwner = parent && parent->window()->isModal() ? parent->window() : nullptr;
+	auto* window = new ImageViewerWindow(library, std::move(imagePaths), startIndex, modalOwner);
 	window->setAttribute(Qt::WA_DeleteOnClose);
 	window->showFullScreen();
 }
 
-ImageViewerWindow::ImageViewerWindow(Library* library, QStringList imagePaths, int startIndex)
-	: _library(library)
+ImageViewerWindow::ImageViewerWindow(Library* library, QStringList imagePaths, int startIndex, QWidget* parent)
+	: QMainWindow(parent)
+	, _library(library)
 	, _imagePaths(std::move(imagePaths))
 	, _index(startIndex)
 {

@@ -19,15 +19,17 @@ class ImageViewerWindow final : public QMainWindow
 {
 public:
 	// Opens a self-deleting viewer on imagePaths[startIndex]. A null library leaves out the library actions:
-	// a frame is a file, not a catalog item. The window is parentless, for a taskbar button of its own;
-	// dialogParent only parents the failure message box shown when the image cannot be opened at all.
-	static void showForImages(Library* library, QStringList imagePaths, int startIndex, QWidget* dialogParent);
+	// a frame is a file, not a catalog item.
+	// parent parents the failure message box shown when the image cannot be opened at all. It also owns the
+	// viewer window when it is modal, since Qt blocks input to unparented windows then; otherwise the viewer
+	// is parentless, for a taskbar button of its own.
+	static void showForImages(Library* library, QStringList imagePaths, int startIndex, QWidget* parent);
 
 protected:
 	bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
-	ImageViewerWindow(Library* library, QStringList imagePaths, int startIndex);
+	ImageViewerWindow(Library* library, QStringList imagePaths, int startIndex, QWidget* parent);
 
 	// The values are the step through _imagePaths.
 	enum class Direction { Previous = -1, Next = 1 };

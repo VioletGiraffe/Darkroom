@@ -13,6 +13,7 @@
 #include "UiComponents/SegmentedToggle.h"
 #include "Settings.h"
 #include "Shortcuts.h"
+#include "Windows/ImageViewerWindow.h"
 #include "Windows/ImportExecution.h"
 #include "Windows/LabelManagement.h"
 #include "Windows/MediaItemManagement.h"
@@ -38,7 +39,6 @@ DISABLE_COMPILER_WARNINGS
 #include <QColor>
 #include <QColorDialog>
 #include <QComboBox>
-#include <QDesktopServices>
 #include <QDir>
 #include <QDragEnterEvent>
 #include <QDropEvent>
@@ -64,7 +64,6 @@ DISABLE_COMPILER_WARNINGS
 #include <QSplitter>
 #include <QThread>
 #include <QTimer>
-#include <QUrl>
 #include <QUuid>
 #include <QVBoxLayout>
 RESTORE_COMPILER_WARNINGS
@@ -1084,10 +1083,29 @@ void ImportDialog::previewStagedItem(const MediaId& id)
 	const auto it = _staged.constFind(id);
 	if (it == _staged.constEnd())
 		return;
-	if (isSupportedImageFile(it->path))
-		QDesktopServices::openUrl(QUrl::fromLocalFile(it->path));
-	else
+
+	if (!isSupportedImageFile(it->path))
+	{
 		VideoPlayerWindow::createPlayerWindow(_library, it->path, this);
+		return;
+	}
+
+	QStringList photoPaths;
+	int startIndex = -1;
+	for (int row = 0; row < _stagedGrid->count(); ++row)
+	{
+		const auto* item = static_cast<const StagedGridItem*>(_stagedGrid->item(row));
+		const QString& path = _staged.constFind(item->mediaId)->path;
+		if (item->isHidden() || !isSupportedImageFile(path))
+			continue;
+
+		if (item->mediaId == id)
+			startIndex = static_cast<int>(photoPaths.size());
+		photoPaths << path;
+	}
+
+	// No library: a staged photo is not a catalog item yet.
+	ImageViewerWindow::showForImages(nullptr, std::move(photoPaths), startIndex, this);
 }
 
 void ImportDialog::locateStagedSourceFile(const MediaId& id)
