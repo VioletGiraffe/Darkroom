@@ -15,7 +15,6 @@ Theme::Theme s_active;
 
 const std::vector<Theme::Theme>& Theme::allThemes()
 {
-	// Warm neutrals with wine-tinted secondary surfaces and blue selection accents.
 	static const Theme dark{
 		.name = QStringLiteral("Default"),
 		.dark = true,
@@ -23,10 +22,10 @@ const std::vector<Theme::Theme>& Theme::allThemes()
 			.windowBg = c(0x1f1b16), .surface = c(0x1f1b16), .surfaceAlt = c(0x3c2528),
 			.text = c(0xece5da), .textDim = c(0xa97e84),
 			.button = c(0x1f1b16),
-			.accent = c(0x5aa0e8),
-			.selectionBg = c(0x26619f), .selectionFg = c(0xece5da),
+			.accent = c(0xc5344d),
+			.selectionBg = c(0x99293b), .selectionFg = c(0xece5da),
 			.border = c(0x4a453f), .borderSubtle = c(0x34302b), .borderStrong = c(0x78716a),
-			.accentText = c(0x8fc3f0), .accentBg = c(0x22303f),
+			.accentText = c(0xef9fac), .accentBg = c(0x4a262b),
 		},
 		.starActive = c(0xcc8a1f),
 		.starButtonDefault = c(0x443d35),
@@ -44,10 +43,10 @@ const std::vector<Theme::Theme>& Theme::allThemes()
 			.windowBg = c(0xfaf5f0), .surface = c(0xfaf5f0), .surfaceAlt = c(0xedefe1),
 			.text = c(0x241d15), .textDim = c(0x7b815f),
 			.button = c(0xfaf5f0),
-			.accent = c(0x378add),
+			.accent = c(0x1f70c1),
 			.selectionBg = c(0x4a90da), .selectionFg = c(0x241d15),
 			.border = c(0xc7c3bf), .borderSubtle = c(0xdedad5), .borderStrong = c(0x918c85),
-			.accentText = c(0x185fa5), .accentBg = c(0xe6f1fb),
+			.accentText = c(0x185fa5), .accentBg = c(0xc2dbf4),
 		},
 		.starActive = c(0xcc8a1f),
 		.starButtonDefault = c(0xd0d0cc),
