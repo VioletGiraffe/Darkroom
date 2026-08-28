@@ -1,6 +1,6 @@
 # Frame viewing, playback, and photo comparison
 
-[← Back to architecture index](../../ARCHITECTURE.md)
+[← Back to architecture index](../../DARKROOM.md)
 
 ## FrameViewerWindow
 
@@ -36,8 +36,10 @@ their grid selection onto the photo on screen. The initial image is not reported
 ## VideoPlayerWindow
 
 `VideoPlayerWindow` coordinates Qt media playback, controls, saved-loop persistence, optional oscillating
-presentation, and single-frame extraction. Open players are tracked app-wide so library replacement can close them
-synchronously before the stable `Library&` begins resolving a different store.
+presentation, and single-frame extraction. Like the image viewer, it takes an optional `Library`; without one the
+library-bound features (metadata persistence, prev/next navigation, extract-to-library) are absent. Open players are
+tracked app-wide so library replacement can close them synchronously before the stable `Library&` begins resolving a
+different store.
 
 MediaBrowserWidget gives each player it opens the videos the grid currently shows as its previous/next order, and a
 handler that moves the grid selection onto the item navigated to, as with the image viewer above. The initially

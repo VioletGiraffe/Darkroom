@@ -1,6 +1,6 @@
 # Media cards and thumbnails
 
-[← Back to architecture index](../../ARCHITECTURE.md)
+[← Back to architecture index](../../DARKROOM.md)
 
 ## MediaItemWidget
 
@@ -88,4 +88,4 @@ containing view. Each owner bounds and persists its setting, then debounces card
 - FrameViewerWindow rebuilds its thumbnail flow.
 
 These three small owner-specific persistence/debounce paths remain intentionally separate; see the
-[backlog](../../ARCHITECTURE.md#improvement-backlog).
+[backlog](../../DARKROOM.md#improvement-backlog).

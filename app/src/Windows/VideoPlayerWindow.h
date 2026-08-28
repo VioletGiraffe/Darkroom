@@ -29,7 +29,9 @@ class VideoPlayerWindow final : public QMainWindow
 {
 public:
 	// mediaId keys per-video metadata; derive it from videoPath for ad-hoc playback.
-	VideoPlayerWindow(Library& library, const QString& videoPath, const MediaId& mediaId, QWidget* parent);
+	// A null library leaves out the library-bound features: metadata persistence (speed, saved loops),
+	// prev/next navigation, and extract-to-library.
+	VideoPlayerWindow(Library* library, const QString& videoPath, const MediaId& mediaId, QWidget* parent);
 	~VideoPlayerWindow() override;
 
 	// Browsing order for previous/next navigation; empty (the default) leaves navigation inert.
@@ -41,7 +43,7 @@ public:
 	static void closeAll();
 
 	// Opens a self-managing ad-hoc player.
-	static void createPlayerWindow(Library& library, const QString& videoPath, QWidget* parent);
+	static void createPlayerWindow(Library* library, const QString& videoPath, QWidget* parent);
 
 private:
 	friend class OscillatingPlayback;
@@ -92,7 +94,7 @@ private:
 private:
 	static std::vector<VideoPlayerWindow*> _instances;
 
-	Library& _library;
+	Library* _library = nullptr;
 	MediaId _mediaId;
 	QString _videoPath;
 	std::function<void(const MediaId& id)> _onNavigatedToMediaItem;

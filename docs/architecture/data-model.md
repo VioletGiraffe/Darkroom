@@ -1,6 +1,6 @@
 # Data model and identity
 
-[← Back to architecture index](../../ARCHITECTURE.md)
+[← Back to architecture index](../../DARKROOM.md)
 
 ## Library as the stable lifetime boundary
 

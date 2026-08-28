@@ -1086,7 +1086,7 @@ void ImportDialog::previewStagedItem(const MediaId& id)
 
 	if (!isSupportedImageFile(it->path))
 	{
-		VideoPlayerWindow::createPlayerWindow(_library, it->path, this);
+		VideoPlayerWindow::createPlayerWindow(&_library, it->path, this);
 		return;
 	}
 

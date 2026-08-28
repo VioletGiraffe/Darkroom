@@ -381,7 +381,7 @@ void MediaBrowserWidget::playVideo(const MediaId& id)
 		return;
 	}
 
-	auto* playerWindow = new VideoPlayerWindow(_library, sourcePath, id, nullptr);
+	auto* playerWindow = new VideoPlayerWindow(&_library, sourcePath, id, nullptr);
 	playerWindow->setNavigationOrder(visibleVideosInViewOrder());
 	playerWindow->setOnNavigatedToMediaItem([this](const MediaId& navigatedId) { selectAndScrollToMediaItem(navigatedId); });
 	playerWindow->show();

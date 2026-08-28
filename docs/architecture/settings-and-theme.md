@@ -1,6 +1,6 @@
 # Settings and theme
 
-[← Back to architecture index](../../ARCHITECTURE.md)
+[← Back to architecture index](../../DARKROOM.md)
 
 ## Settings ownership
 
