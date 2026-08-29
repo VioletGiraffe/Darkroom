@@ -108,8 +108,6 @@ win*{
 
 mac*{
 	LIBS += -framework AppKit
-
-	QMAKE_POST_LINK = cp -f -p $${DESTDIR}/*.dylib $${DESTDIR}/$${TARGET}.app/Contents/MacOS/ || true
 }
 
 linux*|freebsd{

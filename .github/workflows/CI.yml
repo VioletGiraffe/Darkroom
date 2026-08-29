@@ -130,6 +130,7 @@ jobs:
         RMDIR /S /Q %STAGING_DIR%
         mkdir %STAGING_DIR%
         copy /y bin\release\Darkroom.exe "%STAGING_DIR%\" >nul
+        copy /y bin\release\Quickroom.exe "%STAGING_DIR%\" >nul
         FOR %%p IN (%STAGING_DIR%\*.exe) DO %QT_ROOT_DIR%\bin\windeployqt.exe --dir %STAGING_DIR% --force --release --no-translations --no-system-d3d-compiler --no-system-dxc-compiler --no-opengl-sw --skip-plugin-types networkinformation --skip-plugin-types tls %%p
 
         del  %STAGING_DIR%\dxil.dll >nul
@@ -143,6 +144,10 @@ jobs:
         # Own qmake run: both projects generate the top-level Makefile, and the tests step's version is there now.
         $QT_ROOT_DIR/bin/qmake -r CONFIG+=release Darkroom.pro
         make -j sub-app sub-quickroom
+
+    - name: Build .dmg (macOS)
+      if: ${{ !cancelled() && startsWith(matrix.os, 'macos') }}
+      run: ./scripts/create_dmg.sh $QT_ROOT_DIR
 
     - name: .exe file size
       if: startsWith(matrix.os, 'windows')
@@ -203,3 +208,10 @@ jobs:
       with:
         name: Darkroom.exe
         path: Darkroom.exe
+
+    - name: Archive .dmg
+      if: success() && startsWith(matrix.os, 'macos')
+      uses: actions/upload-artifact@v4
+      with:
+        name: Darkroom.dmg
+        path: Darkroom.dmg

@@ -1,6 +1,8 @@
 #define MyAppName "Darkroom"
 #define MyAppPublisher "VioletGiraffe"
 #define MyAppExeName "Darkroom.exe"
+#define QuickroomName "Quickroom"
+#define QuickroomExeName "Quickroom.exe"
 #define VCRedistExeName "vc_redist.x64.exe"
 ; Version is read from the built exe (which gets it from VERSION in app.pro) - single source of truth
 #define MyAppVersion GetVersionNumbersString(AddBackslash(SourcePath) + "dist\" + MyAppExeName)
@@ -29,21 +31,26 @@ LZMAUseSeparateProcess=yes
 LZMABlockSize=8192
 
 [Files]
-; Main exe has its own entry so ignoreversion forces overwrite on same-version rebuilds. Being a non-wildcard
-; Source, it also makes a missing exe (e.g. a failed build) a hard compile error instead of a silent broken installer.
-Source: "{#SourcePath}\dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#SourcePath}\dist\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs; Excludes: "{#VCRedistExeName},{#MyAppExeName}"
+; Each app exe has its own entry so ignoreversion forces overwrite on same-version rebuilds. Being non-wildcard
+; Sources, they also make a missing exe (e.g. a failed build) a hard compile error instead of a silent broken installer.
+Source: "{#SourcePath}\dist\{#MyAppExeName}";    DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourcePath}\dist\{#QuickroomExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourcePath}\dist\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs; Excludes: "{#VCRedistExeName},{#MyAppExeName},{#QuickroomExeName}"
 Source: "{#SourcePath}\dist\{#VCRedistExeName}";  DestDir: "{tmp}"; Flags: deleteafterinstall
 Source: "{#SourcePath}\LICENSE"; DestDir: "{app}"
 Source: "{#SourcePath}\NOTICE";  DestDir: "{app}"
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{autoprograms}\{#QuickroomName}"; Filename: "{app}\{#QuickroomExeName}"
 Name: "{autoprograms}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{autodesktop}\{#QuickroomName}"; Filename: "{app}\{#QuickroomExeName}"; Tasks: quickroomdesktopicon
 
 [Tasks]
-Name: desktopicon; Description: {cm:CreateDesktopIcon}; GroupDescription: {cm:AdditionalIcons};
+; Literal descriptions, not {cm:CreateDesktopIcon}: that message takes no parameter, so two tasks using it read identically.
+Name: desktopicon; Description: "Create a desktop icon for &{#MyAppName}"; GroupDescription: {cm:AdditionalIcons};
+Name: quickroomdesktopicon; Description: "Create a desktop icon for &{#QuickroomName}"; GroupDescription: {cm:AdditionalIcons};
 
 [Run]
 Filename: "{tmp}\{#VCRedistExeName}"; Parameters: "/install /quiet /norestart"; StatusMsg: Installing Microsoft C++ Runtime...; Flags: runhidden waituntilterminated skipifdoesntexist

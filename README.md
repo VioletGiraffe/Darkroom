@@ -23,7 +23,8 @@ video, tag everything with colored labels, flip through thumbnails, and compare 
 
 ## Quickroom
 
-Quickroom is a companion app in this same repo: a fast image/folder browser and viewer.
+Quickroom is a companion app in this same repo: a fast image/folder browser and viewer. It installs together
+with Darkroom, so there is nothing extra to download.
 
 - **Folder browser**: a thumbnail grid of the images and videos in it.
 - **Fullscreen (or windowed) viewing with zoom and pan support**: point Quickroom at an image and it opens fullscreen; arrow keys move to next or previous image in the same folder; `F` or double-click switches from full-screen image view to folder browsing.
