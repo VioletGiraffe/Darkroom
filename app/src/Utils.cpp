@@ -188,13 +188,10 @@ QChar invalidFilenameChar(const QString& name)
 	return {};
 }
 
-static const QStringList FRAME_IMAGE_SUFFIXES { "jpg", "jpeg", "tif", "tiff", "png" };
-
 QStringList listFrameImageFiles(const QDir& dir)
 {
-	QStringList files = dir.entryList(QDir::Files, QDir::Name);
-	files.removeIf([](const QString& fileName) { return !FRAME_IMAGE_SUFFIXES.contains(QFileInfo(fileName).suffix().toLower()); });
-	return files;
+	static const QStringList frameImageGlobs { "*.jpg", "*.jpeg", "*.tif", "*.tiff", "*.png" };
+	return dir.entryList(frameImageGlobs, QDir::Files, QDir::Name);
 }
 
 QDateTime parseTrailingTimestamp(const QString& text)
