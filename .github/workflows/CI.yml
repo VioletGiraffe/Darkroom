@@ -168,17 +168,20 @@ jobs:
           $sections | Sort-Object KB -Descending
         }
 
-        $exe = Get-Item "bin\release\Darkroom.exe"
+        $darkroom  = Get-Item "bin\release\Darkroom.exe"
+        $quickroom = Get-Item "bin\release\Quickroom.exe"
+
         $sectionsByExe = @{}
-        foreach ($b in $exe, (Get-Item "bin\release\Quickroom.exe")) {
+        foreach ($b in $darkroom, $quickroom) {
           "{0,10:N2} KB  {1}" -f ($b.Length / 1KB), $b.Name
           $sectionsByExe[$b.Name] = Get-PeSectionSizes $b.FullName
           $sectionsByExe[$b.Name] | Format-Table Name, KB -AutoSize
         }
 
-        # Metrics history tracks only the main executable.
-        "EXE_KB=$([math]::Round($exe.Length / 1KB, 2))" >> $env:GITHUB_ENV
-        "SECTIONS_JSON=$($sectionsByExe[$exe.Name] | ConvertTo-Json -Compress -AsArray)" >> $env:GITHUB_ENV
+        "EXE_KB=$([math]::Round($darkroom.Length / 1KB, 2))" >> $env:GITHUB_ENV
+        "QUICKROOM_KB=$([math]::Round($quickroom.Length / 1KB, 2))" >> $env:GITHUB_ENV
+        # Per-section charts cover the main executable only.
+        "SECTIONS_JSON=$($sectionsByExe[$darkroom.Name] | ConvertTo-Json -Compress -AsArray)" >> $env:GITHUB_ENV
 
     - name: Binary sizes - Mac
       if: startsWith(matrix.os, 'macos')
@@ -198,6 +201,7 @@ jobs:
           @{ name = 'Lines of code (app)';  unit = 'LOC'; value = [int]$env:LOC_APP  }
           @{ name = 'Lines of code (libs)'; unit = 'LOC'; value = [int]$env:LOC_LIBS }
           @{ name = 'Darkroom.exe size';    unit = 'KB';  value = [double]$env:EXE_KB }
+          @{ name = 'Quickroom.exe size';   unit = 'KB';  value = [double]$env:QUICKROOM_KB }
         )
 
         # Darkroom.exe's PE sections, measured by the earlier size step. Each becomes its own chart; .msvcjmc is skipped.
