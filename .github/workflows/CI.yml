@@ -42,24 +42,33 @@ jobs:
         submodules: recursive
         token: ${{ secrets.magic_pat }}
 
-    - name: LOC count - app
+    - name: LOC count - Darkroom
       if: "startsWith(matrix.os, 'windows')"
       shell: pwsh
       run: |
         winget install --id AlDanial.Cloc --exact --silent --accept-package-agreements --accept-source-agreements
         "$env:LOCALAPPDATA\Microsoft\WinGet\Links" >> $env:GITHUB_PATH
 
-        $result = cloc --include-lang="C,C++,C/C++ Header" --strip-str-comments --exclude-dir=tests,bin,build,.git,3rdparty --by-file --json --quiet ./app/ ./quickroom/ | ConvertFrom-Json
+        $result = cloc --include-lang="C,C++,C/C++ Header" --strip-str-comments --exclude-dir=tests,bin,build,.git,3rdparty --by-file --json --quiet ./app/ | ConvertFrom-Json
 
         $loc = $result.SUM.code
-        "App C/C++ code: $loc LOC"
-        "LOC_APP=$loc" >> $env:GITHUB_ENV
+        "Darkroom C/C++ code: $loc LOC"
+        "LOC_DARKROOM=$loc" >> $env:GITHUB_ENV
 
         # Per-file counts (everything except the 'header' and 'SUM' meta entries)
         $result.PSObject.Properties |
           Where-Object { $_.Name -notin 'header','SUM' } |
           Sort-Object { $_.Value.code } -Descending |
           ForEach-Object { "{0,6}  {1}" -f $_.Value.code, $_.Name }
+
+    # Quickroom's own sources only; the app/src/ files it also compiles are counted once, under Darkroom.
+    - name: LOC count - Quickroom
+      if: "startsWith(matrix.os, 'windows')"
+      shell: pwsh
+      run: |
+        $loc = (cloc --include-lang="C,C++,C/C++ Header" --strip-str-comments --exclude-dir=tests,bin,build,.git,3rdparty --json --quiet ./quickroom/ | ConvertFrom-Json).SUM.code
+        "Quickroom C/C++ code: $loc LOC"
+        "LOC_QUICKROOM=$loc" >> $env:GITHUB_ENV
 
     - name: LOC count - libs
       if: "startsWith(matrix.os, 'windows')"
@@ -198,10 +207,11 @@ jobs:
       shell: pwsh
       run: |
         $data = @(
-          @{ name = 'Lines of code (app)';  unit = 'LOC'; value = [int]$env:LOC_APP  }
-          @{ name = 'Lines of code (libs)'; unit = 'LOC'; value = [int]$env:LOC_LIBS }
-          @{ name = 'Darkroom.exe size';    unit = 'KB';  value = [double]$env:EXE_KB }
-          @{ name = 'Quickroom.exe size';   unit = 'KB';  value = [double]$env:QUICKROOM_KB }
+          @{ name = 'Lines of code (Darkroom)';  unit = 'LOC'; value = [int]$env:LOC_DARKROOM }
+          @{ name = 'Lines of code (Quickroom)'; unit = 'LOC'; value = [int]$env:LOC_QUICKROOM }
+          @{ name = 'Lines of code (libs)';      unit = 'LOC'; value = [int]$env:LOC_LIBS }
+          @{ name = 'Darkroom.exe size';         unit = 'KB';  value = [double]$env:EXE_KB }
+          @{ name = 'Quickroom.exe size';        unit = 'KB';  value = [double]$env:QUICKROOM_KB }
         )
 
         # Darkroom.exe's PE sections, measured by the earlier size step. Each becomes its own chart; .msvcjmc is skipped.
