@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1787946786479,
+  "lastUpdate": 1787962132507,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -11536,6 +11536,75 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .text",
             "value": 850,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 374,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 59.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 38,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 11,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "7397521ab470003e0418a96dc1fb8c07adc5b386",
+          "message": "DMG artifact; Quickroom added to the Windows installer",
+          "timestamp": "2026-08-29T03:02:21+03:00",
+          "tree_id": "15b40c5c7f0498f45f8e446c8e8e86342c4ecccd",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/7397521ab470003e0418a96dc1fb8c07adc5b386"
+        },
+        "date": 1787962129790,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 15224,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 14165,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1356.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 849,
             "unit": "KB"
           },
           {
