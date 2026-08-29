@@ -4,6 +4,7 @@
 #include "Theme/Theme.h"
 #include "compiler/compiler_warnings_control.h"
 #include "theme/ctintedsvgiconengine.h"
+#include "widgets/clabelelided.h"
 #include "Utils.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -14,14 +15,12 @@ DISABLE_COMPILER_WARNINGS
 #include <QFontMetrics>
 #include <QHBoxLayout>
 #include <QIcon>
-#include <QLabel>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPointer>
 #include <QPolygonF>
 #include <QPushButton>
-#include <QResizeEvent>
 #include <QVBoxLayout>
 RESTORE_COMPILER_WARNINGS
 
@@ -76,33 +75,6 @@ private:
 	static constexpr int GAP = 4;
 
 	std::vector<QColor> _colors;
-};
-
-class ElidedLabel final : public QLabel {
-public:
-	using QLabel::QLabel;
-
-	void setFullText(const QString& text)
-	{
-		_full = text;
-		setToolTip(text);
-		updateElision();
-	}
-
-protected:
-	void resizeEvent(QResizeEvent* event) override
-	{
-		QLabel::resizeEvent(event);
-		updateElision();
-	}
-
-private:
-	void updateElision()
-	{
-		setText(fontMetrics().elidedText(_full, Qt::ElideRight, width()));
-	}
-
-	QString _full;
 };
 
 class FramesReadyBadge final : public QWidget {
@@ -286,14 +258,14 @@ MediaItemWidget::MediaItemWidget(
 	_labelDots->hide();
 	footerLayout->addWidget(_labelDots, 0, Qt::AlignVCenter);
 
-	auto* name = new ElidedLabel(_footer);
+	auto* name = new CLabelElided(_footer);
 	name->setObjectName("cardName");
 	name->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 	name->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
 	QFont nameFont = name->font();
 	nameFont.setPointSize(9);
 	name->setFont(nameFont);
-	name->setFullText(label);
+	name->setText(label);
 	_name = name;
 	footerLayout->addWidget(name, 1);
 
@@ -307,7 +279,7 @@ void MediaItemWidget::setInBest(bool inBest)
 
 void MediaItemWidget::setLabel(const QString& label)
 {
-	static_cast<ElidedLabel*>(_name)->setFullText(label);
+	_name->setText(label);
 }
 
 void MediaItemWidget::setLabelDots(const std::vector<QColor>& colors, const QString& tooltip)

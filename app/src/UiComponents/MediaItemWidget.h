@@ -14,10 +14,10 @@ RESTORE_COMPILER_WARNINGS
 #include <functional>
 #include <vector>
 
+class CLabelElided;
 class QDragEnterEvent;
 class QDragMoveEvent;
 class QDropEvent;
-class QLabel;
 class QPushButton;
 
 class MediaItemWidget final : public QWidget {
@@ -82,7 +82,7 @@ private:
 	ThumbnailWidget*             _thumb = nullptr;
 	QWidget*                     _footer = nullptr;
 	QPushButton*                 _starButton = nullptr;
-	QLabel*                      _name = nullptr;
+	CLabelElided*                _name = nullptr;
 	QWidget*                     _labelDots = nullptr;
 	QWidget*                     _framesReadyBadge = nullptr;
 	QWidget*                     _durationBadge = nullptr;
