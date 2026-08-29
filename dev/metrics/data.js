@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1787962566947,
+  "lastUpdate": 1787963163628,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -11654,6 +11654,75 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/VioletGiraffe/Darkroom/commit/5be7907fe7af01568a6faf3d61d5cf38e9ef4143"
         },
         "date": 1787962564450,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (app)",
+            "value": 15224,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 14165,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1356.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 849,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 374,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 59.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 38,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 11,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "84c01e876c843d105346b14614691e36aa436cd2",
+          "message": "create_dmg.sh: LZMA compression",
+          "timestamp": "2026-08-29T03:19:58+03:00",
+          "tree_id": "66a7beb3b123a098a6bbc960818e42edcef8a381",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/84c01e876c843d105346b14614691e36aa436cd2"
+        },
+        "date": 1787963157467,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
