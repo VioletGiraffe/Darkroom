@@ -28,6 +28,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QTimer>
 #include <QToolBar>
 #include <QUrl>
+#include <QVBoxLayout>
 RESTORE_COMPILER_WARNINGS
 
 namespace {
@@ -39,10 +40,28 @@ constexpr int DEFAULT_TILE_SIZE = 160;
 constexpr int MIN_TILE_SIZE  = 80;
 constexpr int MAX_TILE_SIZE  = 400;
 constexpr int TILE_SIZE_STEP = 20;
+// Grid cells exceed the tile by this margin per side, leaving the view's selection background visible around it.
+constexpr int SELECTION_RING = 6;
 
 int tileSize()
 {
 	return qBound(MIN_TILE_SIZE, QSettings{}.value(TILE_SIZE_KEY, DEFAULT_TILE_SIZE).toInt(), MAX_TILE_SIZE);
+}
+
+QSize cellSize(int tile)
+{
+	const int side = tile + 2 * SELECTION_RING;
+	return { side, side };
+}
+
+// A plain QWidget paints no background of its own, so the cell's selection background shows through the margin.
+QWidget* inSelectionFrame(QWidget* tile)
+{
+	auto* frame = new QWidget();
+	auto* layout = new QVBoxLayout(frame);
+	layout->setContentsMargins(SELECTION_RING, SELECTION_RING, SELECTION_RING, SELECTION_RING);
+	layout->addWidget(tile);
+	return frame;
 }
 
 // The requested folder, else the remembered one, else Pictures, else home. A requested folder that has gone
@@ -158,7 +177,7 @@ bool BrowserWindow::listDirectory(const QString& path)
 	_currentPath = dir.absolutePath();
 
 	int folders = 0, images = 0, videos = 0;
-	const int tile = tileSize();
+	const QSize cell = cellSize(tileSize());
 	for (const QFileInfo& info : dir.entryInfoList(QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot, QDir::Unsorted))
 	{
 		EntryKind kind;
@@ -175,7 +194,7 @@ bool BrowserWindow::listDirectory(const QString& path)
 		item->path = info.absoluteFilePath();
 		item->name = info.fileName();
 		item->kind = kind;
-		item->setSizeHint(QSize(tile, tile));
+		item->setSizeHint(cell);
 		_grid->addItem(item);
 	}
 	_grid->sortItems(Qt::AscendingOrder);
@@ -322,7 +341,7 @@ QWidget* BrowserWindow::buildTile(QListWidgetItem* item)
 		thumb->setOnActivatedCallback([this, path = entry.path] { viewImage(path); });
 		thumb->setOnMouseWheelCallback(onWheel);
 		connect(thumb, &QWidget::customContextMenuRequested, this, [thumb, onContextMenu](QPoint pos) { onContextMenu(thumb, pos); });
-		return thumb;
+		return inSelectionFrame(thumb);
 	}
 
 	auto* tile = new IconTileWidget(_iconProvider.icon(QFileInfo(entry.path)), entry.name, tileSize(), nullptr);
@@ -337,7 +356,7 @@ QWidget* BrowserWindow::buildTile(QListWidgetItem* item)
 		tile->setOnActivatedCallback([this, path = entry.path] { playVideo(path); });
 	tile->setOnMouseWheelCallback(onWheel);
 	connect(tile, &QWidget::customContextMenuRequested, this, [tile, onContextMenu](QPoint pos) { onContextMenu(tile, pos); });
-	return tile;
+	return inSelectionFrame(tile);
 }
 
 void BrowserWindow::zoomTiles(int steps)
@@ -353,9 +372,9 @@ void BrowserWindow::zoomTiles(int steps)
 
 void BrowserWindow::applyTileSize()
 {
-	const int tile = tileSize();
+	const QSize cell = cellSize(tileSize());
 	for (int row = 0, rows = _grid->count(); row < rows; ++row)
-		_grid->item(row)->setSizeHint(QSize(tile, tile));
+		_grid->item(row)->setSizeHint(cell);
 	_grid->discardAllCards();
 	_grid->ensureVisibleCardsExist();
 }

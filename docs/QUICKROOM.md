@@ -24,7 +24,8 @@ Read [DARKROOM.md](DARKROOM.md) first for the shared build layout, the hand-list
 Image tiles are `ThumbnailWidget`s (single-file constructor - the FrameViewerWindow pattern), so lazy
 dwell-loading, async decode, and Ctrl+wheel zoom are shared behavior, and `MediaGrid`'s card factory
 materializes tiles on demand. The grid drives drag and drop - a multi-selection exports all selected paths as
-file URLs - so the image tiles' own single-file drag is disabled.
+file URLs - so the image tiles' own single-file drag is disabled. Tiles are opaque, so cells are laid out
+larger than the tile: the margin is where the view paints the selection background.
 
 Activation: double-click or Enter. Folders navigate in place (queued: the rebuild would delete the tile whose
 handler is still running); images open `ImageViewerWindow` browsing the folder's images, with the browse
