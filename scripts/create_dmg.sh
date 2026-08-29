@@ -50,7 +50,7 @@ echo "${MYSELF}: creating ${DMG}"
 ln -s /Applications "${STAGE}/"
 
 # -srcfolder populates via a private nobrowse mount - no volume appears under /Volumes for Spotlight to grab and pin.
-hdiutil create "${DMG}" -ov -volname "${VOLUME}" -fs "HFS+" -format UDZO -srcfolder "${STAGE}"
+hdiutil create "${DMG}" -ov -volname "${VOLUME}" -fs "HFS+" -format ULMO -srcfolder "${STAGE}"
 
 rm -rf "${STAGE}"
 
