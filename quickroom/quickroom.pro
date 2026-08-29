@@ -79,6 +79,7 @@ SOURCES += \
 	../app/src/UiComponents/DragGestureHelper.cpp \
 	../app/src/UiComponents/MarkerSlider.cpp
 
+RESOURCES += res/quickroom.qrc
 # Theme and the shared windows load icons from the app's resource file.
 RESOURCES += ../app/res/resources.qrc
 
@@ -102,12 +103,12 @@ win*{
 	Debug:QMAKE_LFLAGS += /DEBUG:FASTLINK /INCREMENTAL
 
 	LIBS += -lUser32
-	# Darkroom's icon until Quickroom has its own.
-	RC_ICONS = ../app/res/icon.ico
+	RC_ICONS = res/quickroom.ico
 }
 
 mac*{
 	LIBS += -framework AppKit
+	ICON = res/quickroom.icns
 }
 
 linux*|freebsd{

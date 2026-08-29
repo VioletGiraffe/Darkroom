@@ -83,11 +83,12 @@ win*{
 	Debug:QMAKE_LFLAGS += /DEBUG:FASTLINK /INCREMENTAL
 
 	LIBS += -lUser32
-	RC_ICONS = res/icon.ico
+	RC_ICONS = res/darkroom.ico
 }
 
 mac*{
 	LIBS += -framework AppKit
+	ICON = res/darkroom.icns
 }
 
 linux*|freebsd{

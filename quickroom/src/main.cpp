@@ -160,7 +160,7 @@ int main(int argc, char* argv[])
 	app.setOrganizationName("VioletGiraffe");
 	app.setApplicationName("Quickroom");
 	app.setApplicationVersion(STRINGIFY_EXPANDED_ARGUMENT(QUICKROOM_VERSION));
-	app.setWindowIcon(QIcon(":/icon.svg"));
+	app.setWindowIcon(QIcon(":/quickroom.svg"));
 
 	CCrashHandler::setMinidumpsStorageFolderPath(QDir::tempPath().toStdString());
 	CCrashHandler crashHandler([](const wchar_t* msg) {

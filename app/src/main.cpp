@@ -64,7 +64,7 @@ int main(int argc, char* argv[])
 	app.setOrganizationName("VioletGiraffe");
 	app.setApplicationName("Darkroom");
 	app.setApplicationVersion(STRINGIFY_EXPANDED_ARGUMENT(DARKROOM_VERSION));
-	app.setWindowIcon(QIcon(":/icon.svg"));
+	app.setWindowIcon(QIcon(":/darkroom.svg"));
 
 	CCrashHandler::setMinidumpsStorageFolderPath(QDir::tempPath().toStdString());
 	CCrashHandler crashHandler([](const wchar_t* msg) {
