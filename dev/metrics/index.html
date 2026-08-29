@@ -126,7 +126,8 @@
       return b ? b.value : null;
     });
 
-    // Build chart specs: grouped (combined) charts, then solo charts for the remainder.
+    // Build chart specs: one per group, plus a solo chart for every series no group claimed.
+    // `order` is the position of the chart's first series in the data, which is the order CI emits them in.
     const used = new Set();
     const groupSpecs = [];
     for (const g of GROUPS) {
@@ -134,15 +135,15 @@
       if (!names.length) continue;
       names.forEach(n => used.add(n));
       groupSpecs.push({
-        title: g.title, unit: g.unit, wide: !!g.wide, combined: true,
+        title: g.title, unit: g.unit, wide: !!g.wide, combined: true, order: seriesNames.indexOf(names[0]),
         datasets: names.map((n, i) => ({ label: g.strip ? g.strip(n) : n, data: valuesFor(n), color: PALETTE[i % PALETTE.length] })),
       });
     }
     const soloSpecs = seriesNames.filter(n => !used.has(n)).map((n, i) => ({
-      title: n, unit: unitByName[n], wide: false, combined: false,
+      title: n, unit: unitByName[n], wide: false, combined: false, order: seriesNames.indexOf(n),
       datasets: [{ label: n, data: valuesFor(n), color: PALETTE[i % PALETTE.length] }],
     }));
-    const specs = soloSpecs.concat(groupSpecs);
+    const specs = soloSpecs.concat(groupSpecs).sort((a, b) => a.order - b.order);
 
     const themeVars = () => {
       const cs = getComputedStyle(document.documentElement);
