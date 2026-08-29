@@ -43,7 +43,7 @@ constexpr int TILE_SIZE_STEP = 20;
 // Grid cells exceed the tile by this margin per side, leaving the view's selection background visible around it.
 constexpr int SELECTION_RING = 6;
 
-int tileSize()
+int savedTileSize()
 {
 	return qBound(MIN_TILE_SIZE, QSettings{}.value(TILE_SIZE_KEY, DEFAULT_TILE_SIZE).toInt(), MAX_TILE_SIZE);
 }
@@ -110,6 +110,7 @@ void BrowserWindow::showForFolder(const QString& folder, const QString& selectPa
 }
 
 BrowserWindow::BrowserWindow(const QString& folder)
+	: _tileSize{ savedTileSize() }
 {
 	setupUi();
 
@@ -177,7 +178,7 @@ bool BrowserWindow::listDirectory(const QString& path)
 	_currentPath = dir.absolutePath();
 
 	int folders = 0, images = 0, videos = 0;
-	const QSize cell = cellSize(tileSize());
+	const QSize cell = cellSize(_tileSize);
 	for (const QFileInfo& info : dir.entryInfoList(QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot, QDir::Unsorted))
 	{
 		EntryKind kind;
@@ -336,7 +337,7 @@ QWidget* BrowserWindow::buildTile(QListWidgetItem* item)
 
 	if (entry.kind == EntryKind::Image)
 	{
-		auto* thumb = new ThumbnailWidget(entry.path, entry.name, tileSize(), nullptr);
+		auto* thumb = new ThumbnailWidget(entry.path, entry.name, _tileSize, nullptr);
 		thumb->disableDragGesture();   // the grid drags the whole selection
 		thumb->setOnActivatedCallback([this, path = entry.path] { viewImage(path); });
 		thumb->setOnMouseWheelCallback(onWheel);
@@ -344,7 +345,7 @@ QWidget* BrowserWindow::buildTile(QListWidgetItem* item)
 		return inSelectionFrame(thumb);
 	}
 
-	auto* tile = new IconTileWidget(_iconProvider.icon(QFileInfo(entry.path)), entry.name, tileSize(), nullptr);
+	auto* tile = new IconTileWidget(_iconProvider.icon(QFileInfo(entry.path)), entry.name, _tileSize, nullptr);
 	if (entry.kind == EntryKind::Folder)
 	{
 		// Queued: navigating rebuilds the grid, which would delete this tile mid-handler.
@@ -361,18 +362,18 @@ QWidget* BrowserWindow::buildTile(QListWidgetItem* item)
 
 void BrowserWindow::zoomTiles(int steps)
 {
-	const int current = tileSize();
-	const int next = qBound(MIN_TILE_SIZE, current + steps * TILE_SIZE_STEP, MAX_TILE_SIZE);
-	if (next == current)
+	const int next = qBound(MIN_TILE_SIZE, _tileSize + steps * TILE_SIZE_STEP, MAX_TILE_SIZE);
+	if (next == _tileSize)
 		return;
 
+	_tileSize = next;
 	QSettings{}.setValue(TILE_SIZE_KEY, next);
 	_zoomDebounce->start();
 }
 
 void BrowserWindow::applyTileSize()
 {
-	const QSize cell = cellSize(tileSize());
+	const QSize cell = cellSize(_tileSize);
 	for (int row = 0, rows = _grid->count(); row < rows; ++row)
 		_grid->item(row)->setSizeHint(cell);
 	_grid->discardAllCards();

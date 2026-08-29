@@ -67,6 +67,7 @@ private:
 	QTimer*    _zoomDebounce = nullptr;
 	QFileIconProvider _iconProvider;
 
+	int _tileSize = -1;
 	QString _currentPath;
 	std::vector<QString> _history;
 	int _historyIndex = -1;
