@@ -543,7 +543,7 @@ inline QString IntegrityCheckSections::browseForSourceVideo(const QString& hint)
 inline QString IntegrityCheckSections::browseForSourcePhoto(const QString& hint) const
 {
 	const QString startDir = hint.isEmpty() ? QString{} : QFileInfo(hint).absolutePath();
-	const QString filter = QObject::tr("Image files (%1);;All files (*)").arg(IMAGE_FILE_FILTERS.join(QStringLiteral(" ")));
+	const QString filter = QObject::tr("Image files (%1);;All files (*)").arg(supportedImageFileGlobs());
 	return QFileDialog::getOpenFileName(_dialog, QObject::tr("Locate photo"), startDir, filter);
 }
 

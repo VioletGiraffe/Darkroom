@@ -25,6 +25,8 @@ void clearStuckHoverIfCursorLeft(QWidget* w);
 
 [[nodiscard]] bool isSupportedVideoFile(const QString& filePath);
 [[nodiscard]] bool isSupportedImageFile(const QString& filePath);
+// Space-separated globs of the same suffixes, for a file dialog name filter.
+[[nodiscard]] QString supportedImageFileGlobs();
 [[nodiscard]] bool isSupportedMediaFile(const QString& filePath);
 
 [[nodiscard]] bool isDirectoryOrSupportedFile(const QString& path);
@@ -44,9 +46,7 @@ void clearStuckHoverIfCursorLeft(QWidget* w);
 // Returns the first Windows-illegal filename character, or a null QChar.
 [[nodiscard]] QChar invalidFilenameChar(const QString& name);
 
-extern const QStringList IMAGE_FILE_FILTERS;
-
-// Name-sorted frame image filenames directly in dir. Suffix matching remains case-insensitive on Linux.
+// Name-sorted frame image filenames directly in dir. Suffix matching is case-insensitive.
 [[nodiscard]] QStringList listFrameImageFiles(const QDir& dir);
 
 // Full paths accepted by filterPredicate, recursively or among immediate children. Order is filesystem-defined.

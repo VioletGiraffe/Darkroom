@@ -83,12 +83,18 @@ bool isSupportedVideoFile(const QString& filePath)
 	return supportedExtensions.contains(extension);
 }
 
+// Keep this to formats the deployed Qt image plugins decode.
+static const QStringList SUPPORTED_IMAGE_SUFFIXES { "jpg", "jpeg", "jfif", "png", "tif", "tiff", "webp", "bmp" };
+
 bool isSupportedImageFile(const QString& filePath)
 {
-	// Keep this to formats the deployed Qt image plugins decode.
-	static const QStringList supportedExtensions { "jpg", "jpeg", "jfif", "png", "tif", "tiff", "webp", "bmp" };
-	const QString extension = QFileInfo(filePath).suffix().toLower();
-	return supportedExtensions.contains(extension);
+	return SUPPORTED_IMAGE_SUFFIXES.contains(QFileInfo(filePath).suffix().toLower());
+}
+
+QString supportedImageFileGlobs()
+{
+	static const QString globs = QStringLiteral("*.") + SUPPORTED_IMAGE_SUFFIXES.join(QStringLiteral(" *."));
+	return globs;
 }
 
 bool isSupportedMediaFile(const QString& filePath)
@@ -184,17 +190,8 @@ QChar invalidFilenameChar(const QString& name)
 
 static const QStringList FRAME_IMAGE_SUFFIXES { "jpg", "jpeg", "tif", "tiff", "png" };
 
-const QStringList IMAGE_FILE_FILTERS = [] {
-	QStringList globs;
-	for (const QString& suffix : FRAME_IMAGE_SUFFIXES)
-		globs << "*." + suffix;
-	return globs;
-}();
-
 QStringList listFrameImageFiles(const QDir& dir)
 {
-	// Not entryList(IMAGE_FILE_FILTERS): QDir name filters match case-sensitively on a case-sensitive
-	// filesystem and would miss e.g. ".JPG" files there.
 	QStringList files = dir.entryList(QDir::Files, QDir::Name);
 	files.removeIf([](const QString& fileName) { return !FRAME_IMAGE_SUFFIXES.contains(QFileInfo(fileName).suffix().toLower()); });
 	return files;
