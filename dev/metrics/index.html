@@ -91,9 +91,12 @@
                      '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#86bcb6', '#d37295', '#bab0ac'];
 
     // Combined charts: every series matched by `match` is drawn on one chart. Anything unmatched
-    // gets its own single-line chart. To also merge the two LOC series, add another group here.
+    // gets its own single-line chart.
+    // The per-app groups match by exact name, so 'Lines of code (libs)' keeps a chart of its own.
     const GROUPS = [
       { title: 'Binary size by section', unit: 'KB', wide: true, match: n => n.startsWith('Section '), strip: n => n.replace(/^Section /, '') },
+      { title: 'Lines of code', unit: 'LOC', match: n => n === 'Lines of code (Darkroom)' || n === 'Lines of code (Quickroom)', strip: n => n.replace(/^Lines of code \(|\)$/g, '') },
+      { title: 'Binary size', unit: 'KB', match: n => n === 'Darkroom.exe size' || n === 'Quickroom.exe size', strip: n => n.replace(/\.exe size$/, '') },
     ];
 
     const data = window.BENCHMARK_DATA;

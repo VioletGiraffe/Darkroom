@@ -26,7 +26,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7256,
             "unit": "LOC"
           },
@@ -65,7 +65,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7256,
             "unit": "LOC"
           },
@@ -134,7 +134,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7256,
             "unit": "LOC"
           },
@@ -203,7 +203,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7260,
             "unit": "LOC"
           },
@@ -272,7 +272,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7277,
             "unit": "LOC"
           },
@@ -341,7 +341,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7281,
             "unit": "LOC"
           },
@@ -410,7 +410,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7365,
             "unit": "LOC"
           },
@@ -479,7 +479,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7384,
             "unit": "LOC"
           },
@@ -548,7 +548,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7403,
             "unit": "LOC"
           },
@@ -617,7 +617,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7418,
             "unit": "LOC"
           },
@@ -686,7 +686,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7420,
             "unit": "LOC"
           },
@@ -755,7 +755,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7434,
             "unit": "LOC"
           },
@@ -824,7 +824,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7430,
             "unit": "LOC"
           },
@@ -893,7 +893,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7510,
             "unit": "LOC"
           },
@@ -962,7 +962,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7499,
             "unit": "LOC"
           },
@@ -1031,7 +1031,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7505,
             "unit": "LOC"
           },
@@ -1100,7 +1100,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7641,
             "unit": "LOC"
           },
@@ -1169,7 +1169,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7709,
             "unit": "LOC"
           },
@@ -1238,7 +1238,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7709,
             "unit": "LOC"
           },
@@ -1307,7 +1307,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7724,
             "unit": "LOC"
           },
@@ -1376,7 +1376,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7728,
             "unit": "LOC"
           },
@@ -1445,7 +1445,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7753,
             "unit": "LOC"
           },
@@ -1514,7 +1514,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7758,
             "unit": "LOC"
           },
@@ -1583,7 +1583,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7744,
             "unit": "LOC"
           },
@@ -1652,7 +1652,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7791,
             "unit": "LOC"
           },
@@ -1721,7 +1721,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7933,
             "unit": "LOC"
           },
@@ -1790,7 +1790,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7939,
             "unit": "LOC"
           },
@@ -1859,7 +1859,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7944,
             "unit": "LOC"
           },
@@ -1928,7 +1928,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7944,
             "unit": "LOC"
           },
@@ -1997,7 +1997,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7951,
             "unit": "LOC"
           },
@@ -2066,7 +2066,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7844,
             "unit": "LOC"
           },
@@ -2135,7 +2135,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7842,
             "unit": "LOC"
           },
@@ -2204,7 +2204,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7901,
             "unit": "LOC"
           },
@@ -2273,7 +2273,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7937,
             "unit": "LOC"
           },
@@ -2342,7 +2342,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7969,
             "unit": "LOC"
           },
@@ -2411,7 +2411,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 8176,
             "unit": "LOC"
           },
@@ -2480,7 +2480,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 8139,
             "unit": "LOC"
           },
@@ -2549,7 +2549,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 8137,
             "unit": "LOC"
           },
@@ -2618,7 +2618,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 8130,
             "unit": "LOC"
           },
@@ -2687,7 +2687,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 8119,
             "unit": "LOC"
           },
@@ -2756,7 +2756,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 8113,
             "unit": "LOC"
           },
@@ -2825,7 +2825,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 8108,
             "unit": "LOC"
           },
@@ -2894,7 +2894,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 8124,
             "unit": "LOC"
           },
@@ -2963,7 +2963,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 8143,
             "unit": "LOC"
           },
@@ -3032,7 +3032,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 8152,
             "unit": "LOC"
           },
@@ -3101,7 +3101,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 8149,
             "unit": "LOC"
           },
@@ -3170,7 +3170,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 8141,
             "unit": "LOC"
           },
@@ -3239,7 +3239,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 8111,
             "unit": "LOC"
           },
@@ -3308,7 +3308,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 8111,
             "unit": "LOC"
           },
@@ -3377,7 +3377,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7751,
             "unit": "LOC"
           },
@@ -3446,7 +3446,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7742,
             "unit": "LOC"
           },
@@ -3515,7 +3515,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 7742,
             "unit": "LOC"
           },
@@ -3584,7 +3584,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 10498,
             "unit": "LOC"
           },
@@ -3653,7 +3653,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 10495,
             "unit": "LOC"
           },
@@ -3722,7 +3722,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 10495,
             "unit": "LOC"
           },
@@ -3791,7 +3791,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 10518,
             "unit": "LOC"
           },
@@ -3860,7 +3860,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 10520,
             "unit": "LOC"
           },
@@ -3929,7 +3929,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 10550,
             "unit": "LOC"
           },
@@ -3998,7 +3998,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 10550,
             "unit": "LOC"
           },
@@ -4067,7 +4067,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 10614,
             "unit": "LOC"
           },
@@ -4136,7 +4136,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 10618,
             "unit": "LOC"
           },
@@ -4205,7 +4205,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 10625,
             "unit": "LOC"
           },
@@ -4274,7 +4274,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 10626,
             "unit": "LOC"
           },
@@ -4343,7 +4343,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 10649,
             "unit": "LOC"
           },
@@ -4412,7 +4412,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 10666,
             "unit": "LOC"
           },
@@ -4481,7 +4481,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 10657,
             "unit": "LOC"
           },
@@ -4550,7 +4550,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 10653,
             "unit": "LOC"
           },
@@ -4619,7 +4619,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 10663,
             "unit": "LOC"
           },
@@ -4688,7 +4688,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 10663,
             "unit": "LOC"
           },
@@ -4757,7 +4757,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 10663,
             "unit": "LOC"
           },
@@ -4826,7 +4826,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 10663,
             "unit": "LOC"
           },
@@ -4895,7 +4895,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 10926,
             "unit": "LOC"
           },
@@ -4964,7 +4964,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 10959,
             "unit": "LOC"
           },
@@ -5033,7 +5033,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11107,
             "unit": "LOC"
           },
@@ -5102,7 +5102,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11375,
             "unit": "LOC"
           },
@@ -5171,7 +5171,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11375,
             "unit": "LOC"
           },
@@ -5240,7 +5240,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11375,
             "unit": "LOC"
           },
@@ -5309,7 +5309,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11375,
             "unit": "LOC"
           },
@@ -5378,7 +5378,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11403,
             "unit": "LOC"
           },
@@ -5447,7 +5447,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11434,
             "unit": "LOC"
           },
@@ -5516,7 +5516,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11468,
             "unit": "LOC"
           },
@@ -5585,7 +5585,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11530,
             "unit": "LOC"
           },
@@ -5654,7 +5654,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11534,
             "unit": "LOC"
           },
@@ -5723,7 +5723,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11566,
             "unit": "LOC"
           },
@@ -5792,7 +5792,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11566,
             "unit": "LOC"
           },
@@ -5861,7 +5861,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11566,
             "unit": "LOC"
           },
@@ -5930,7 +5930,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11566,
             "unit": "LOC"
           },
@@ -5999,7 +5999,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11566,
             "unit": "LOC"
           },
@@ -6068,7 +6068,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11566,
             "unit": "LOC"
           },
@@ -6137,7 +6137,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11598,
             "unit": "LOC"
           },
@@ -6206,7 +6206,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11678,
             "unit": "LOC"
           },
@@ -6275,7 +6275,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11678,
             "unit": "LOC"
           },
@@ -6344,7 +6344,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11678,
             "unit": "LOC"
           },
@@ -6413,7 +6413,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11678,
             "unit": "LOC"
           },
@@ -6482,7 +6482,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11701,
             "unit": "LOC"
           },
@@ -6551,7 +6551,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11701,
             "unit": "LOC"
           },
@@ -6620,7 +6620,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11738,
             "unit": "LOC"
           },
@@ -6689,7 +6689,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11762,
             "unit": "LOC"
           },
@@ -6758,7 +6758,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11762,
             "unit": "LOC"
           },
@@ -6827,7 +6827,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11765,
             "unit": "LOC"
           },
@@ -6896,7 +6896,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11826,
             "unit": "LOC"
           },
@@ -6965,7 +6965,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 11872,
             "unit": "LOC"
           },
@@ -7034,7 +7034,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 12050,
             "unit": "LOC"
           },
@@ -7103,7 +7103,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 12174,
             "unit": "LOC"
           },
@@ -7172,7 +7172,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 12207,
             "unit": "LOC"
           },
@@ -7241,7 +7241,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 12239,
             "unit": "LOC"
           },
@@ -7310,7 +7310,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 12239,
             "unit": "LOC"
           },
@@ -7379,7 +7379,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 12264,
             "unit": "LOC"
           },
@@ -7448,7 +7448,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 12276,
             "unit": "LOC"
           },
@@ -7517,7 +7517,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13034,
             "unit": "LOC"
           },
@@ -7586,7 +7586,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13051,
             "unit": "LOC"
           },
@@ -7655,7 +7655,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13063,
             "unit": "LOC"
           },
@@ -7724,7 +7724,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13067,
             "unit": "LOC"
           },
@@ -7793,7 +7793,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13080,
             "unit": "LOC"
           },
@@ -7862,7 +7862,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13101,
             "unit": "LOC"
           },
@@ -7931,7 +7931,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13128,
             "unit": "LOC"
           },
@@ -8000,7 +8000,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13139,
             "unit": "LOC"
           },
@@ -8069,7 +8069,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13139,
             "unit": "LOC"
           },
@@ -8138,7 +8138,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13161,
             "unit": "LOC"
           },
@@ -8207,7 +8207,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13174,
             "unit": "LOC"
           },
@@ -8276,7 +8276,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13174,
             "unit": "LOC"
           },
@@ -8345,7 +8345,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13175,
             "unit": "LOC"
           },
@@ -8414,7 +8414,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13190,
             "unit": "LOC"
           },
@@ -8483,7 +8483,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13190,
             "unit": "LOC"
           },
@@ -8552,7 +8552,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13190,
             "unit": "LOC"
           },
@@ -8621,7 +8621,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13299,
             "unit": "LOC"
           },
@@ -8690,7 +8690,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13329,
             "unit": "LOC"
           },
@@ -8759,7 +8759,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13318,
             "unit": "LOC"
           },
@@ -8828,7 +8828,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13393,
             "unit": "LOC"
           },
@@ -8897,7 +8897,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13441,
             "unit": "LOC"
           },
@@ -8966,7 +8966,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13439,
             "unit": "LOC"
           },
@@ -9035,7 +9035,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13541,
             "unit": "LOC"
           },
@@ -9104,7 +9104,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13620,
             "unit": "LOC"
           },
@@ -9173,7 +9173,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13677,
             "unit": "LOC"
           },
@@ -9242,7 +9242,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13690,
             "unit": "LOC"
           },
@@ -9311,7 +9311,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13773,
             "unit": "LOC"
           },
@@ -9380,7 +9380,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13786,
             "unit": "LOC"
           },
@@ -9449,7 +9449,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13788,
             "unit": "LOC"
           },
@@ -9518,7 +9518,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13794,
             "unit": "LOC"
           },
@@ -9587,7 +9587,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13890,
             "unit": "LOC"
           },
@@ -9656,7 +9656,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13887,
             "unit": "LOC"
           },
@@ -9725,7 +9725,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13887,
             "unit": "LOC"
           },
@@ -9794,7 +9794,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13979,
             "unit": "LOC"
           },
@@ -9863,7 +9863,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13986,
             "unit": "LOC"
           },
@@ -9932,7 +9932,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 14000,
             "unit": "LOC"
           },
@@ -10001,7 +10001,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 14006,
             "unit": "LOC"
           },
@@ -10070,7 +10070,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 14006,
             "unit": "LOC"
           },
@@ -10139,7 +10139,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 13997,
             "unit": "LOC"
           },
@@ -10208,7 +10208,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 14041,
             "unit": "LOC"
           },
@@ -10277,7 +10277,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 14143,
             "unit": "LOC"
           },
@@ -10346,7 +10346,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 14168,
             "unit": "LOC"
           },
@@ -10415,7 +10415,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 14168,
             "unit": "LOC"
           },
@@ -10484,7 +10484,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 14316,
             "unit": "LOC"
           },
@@ -10553,7 +10553,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 14316,
             "unit": "LOC"
           },
@@ -10622,7 +10622,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 14376,
             "unit": "LOC"
           },
@@ -10691,7 +10691,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 14414,
             "unit": "LOC"
           },
@@ -10760,7 +10760,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 14414,
             "unit": "LOC"
           },
@@ -10829,7 +10829,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 14435,
             "unit": "LOC"
           },
@@ -10898,7 +10898,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 14485,
             "unit": "LOC"
           },
@@ -10967,7 +10967,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 14382,
             "unit": "LOC"
           },
@@ -11036,7 +11036,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 14382,
             "unit": "LOC"
           },
@@ -11105,7 +11105,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 14382,
             "unit": "LOC"
           },
@@ -11174,7 +11174,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 14615,
             "unit": "LOC"
           },
@@ -11243,7 +11243,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 14891,
             "unit": "LOC"
           },
@@ -11312,7 +11312,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 14938,
             "unit": "LOC"
           },
@@ -11381,7 +11381,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 14999,
             "unit": "LOC"
           },
@@ -11450,7 +11450,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 14995,
             "unit": "LOC"
           },
@@ -11519,7 +11519,7 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 15198,
             "unit": "LOC"
           },
@@ -11588,13 +11588,8 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 15224,
-            "unit": "LOC"
-          },
-          {
-            "name": "Lines of code (libs)",
-            "value": 14165,
             "unit": "LOC"
           },
           {
@@ -11657,13 +11652,8 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 15224,
-            "unit": "LOC"
-          },
-          {
-            "name": "Lines of code (libs)",
-            "value": 14165,
             "unit": "LOC"
           },
           {
@@ -11726,13 +11716,8 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 15224,
-            "unit": "LOC"
-          },
-          {
-            "name": "Lines of code (libs)",
-            "value": 14165,
             "unit": "LOC"
           },
           {
@@ -11795,13 +11780,8 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 15222,
-            "unit": "LOC"
-          },
-          {
-            "name": "Lines of code (libs)",
-            "value": 14165,
             "unit": "LOC"
           },
           {
@@ -11864,13 +11844,8 @@ window.BENCHMARK_DATA = {
         "tool": "customSmallerIsBetter",
         "benches": [
           {
-            "name": "Lines of code (app)",
+            "name": "Lines of code (Darkroom)",
             "value": 15220,
-            "unit": "LOC"
-          },
-          {
-            "name": "Lines of code (libs)",
-            "value": 14165,
             "unit": "LOC"
           },
           {
@@ -11932,11 +11907,6 @@ window.BENCHMARK_DATA = {
         "date": 1788011678365,
         "tool": "customSmallerIsBetter",
         "benches": [
-          {
-            "name": "Lines of code (app)",
-            "value": 15817,
-            "unit": "LOC"
-          },
           {
             "name": "Lines of code (libs)",
             "value": 13562,
@@ -12001,11 +11971,6 @@ window.BENCHMARK_DATA = {
         "date": 1788012172838,
         "tool": "customSmallerIsBetter",
         "benches": [
-          {
-            "name": "Lines of code (app)",
-            "value": 15817,
-            "unit": "LOC"
-          },
           {
             "name": "Lines of code (libs)",
             "value": 13562,
