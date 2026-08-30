@@ -151,7 +151,7 @@ _glyphs = _font.getGlyphSet()
 _cmap = _font.getBestCmap()
 _upm = _font["head"].unitsPerEm
 _hmtx = _font["hmtx"]
-_cap_units = getattr(_font["OS/2"], "sCapHeight", 0) or _font["head"].yMax
+_cap_units = _font["OS/2"].sCapHeight
 
 
 def _advances(label):
@@ -271,7 +271,7 @@ def render(label, colour, size):
     else:
         cap = round(g["band_h"] * CAP_OF_BAND) * k
         _, sx = impact_fit(label, cap, TEXT_W * size * k)
-        font = ImageFont.truetype(str(IMPACT), max(6, round(cap * _upm / _cap_units)))
+        font = ImageFont.truetype(str(IMPACT), round(cap * _upm / _cap_units))
         mask = font.getmask(label, mode="L")
         w, h = mask.size
         text = Image.new("RGBA", (w, h), (0, 0, 0, 0))
