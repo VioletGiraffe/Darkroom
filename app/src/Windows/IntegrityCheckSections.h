@@ -536,8 +536,8 @@ inline void IntegrityCheckSections::wireSkip(QPushButton* skipButton, Resolvable
 inline QString IntegrityCheckSections::browseForSourceVideo(const QString& hint) const
 {
 	const QString startDir = hint.isEmpty() ? _catalog.anySourceDir() : QFileInfo(hint).absolutePath();
-	return QFileDialog::getOpenFileName(_dialog, QObject::tr("Select source video"), startDir,
-		QObject::tr("Video files (*.mp4 *.mov *.avi *.mkv *.flv);;All files (*)"));
+	const QString filter = QObject::tr("Video files (%1);;All files (*)").arg(supportedVideoFileGlobs());
+	return QFileDialog::getOpenFileName(_dialog, QObject::tr("Select source video"), startDir, filter);
 }
 
 inline QString IntegrityCheckSections::browseForSourcePhoto(const QString& hint) const

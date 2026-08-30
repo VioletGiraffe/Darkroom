@@ -26,6 +26,7 @@ void clearStuckHoverIfCursorLeft(QWidget* w);
 [[nodiscard]] bool isSupportedVideoFile(const QString& filePath);
 [[nodiscard]] bool isSupportedImageFile(const QString& filePath);
 // Space-separated globs of the same suffixes, for a file dialog name filter.
+[[nodiscard]] QString supportedVideoFileGlobs();
 [[nodiscard]] QString supportedImageFileGlobs();
 [[nodiscard]] bool isSupportedMediaFile(const QString& filePath);
 

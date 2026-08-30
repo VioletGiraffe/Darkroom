@@ -76,24 +76,37 @@ QStringList pickEvenlySpacedFrames(const QDir& dir, const QStringList& files, in
 	return out;
 }
 
-bool isSupportedVideoFile(const QString& filePath)
-{
-	static const QStringList supportedExtensions { "mp4", "mov", "avi", "mkv", "flv" };
-	const QString extension = QFileInfo(filePath).suffix().toLower();
-	return supportedExtensions.contains(extension);
-}
+static const QStringList SUPPORTED_VIDEO_SUFFIXES {
+	"mp4", "m4v", "mov", "avi", "mkv", "flv", "webm", "wmv", "mpg", "mpeg", "m2ts", "mts", "ts"
+};
 
 // Keep this to formats the deployed Qt image plugins decode.
 static const QStringList SUPPORTED_IMAGE_SUFFIXES { "jpg", "jpeg", "jfif", "png", "tif", "tiff", "webp", "gif", "bmp" };
+
+static QString suffixesToGlobs(const QStringList& suffixes)
+{
+	return QStringLiteral("*.") + suffixes.join(QStringLiteral(" *."));
+}
+
+bool isSupportedVideoFile(const QString& filePath)
+{
+	return SUPPORTED_VIDEO_SUFFIXES.contains(QFileInfo(filePath).suffix().toLower());
+}
 
 bool isSupportedImageFile(const QString& filePath)
 {
 	return SUPPORTED_IMAGE_SUFFIXES.contains(QFileInfo(filePath).suffix().toLower());
 }
 
+QString supportedVideoFileGlobs()
+{
+	static const QString globs = suffixesToGlobs(SUPPORTED_VIDEO_SUFFIXES);
+	return globs;
+}
+
 QString supportedImageFileGlobs()
 {
-	static const QString globs = QStringLiteral("*.") + SUPPORTED_IMAGE_SUFFIXES.join(QStringLiteral(" *."));
+	static const QString globs = suffixesToGlobs(SUPPORTED_IMAGE_SUFFIXES);
 	return globs;
 }
 
