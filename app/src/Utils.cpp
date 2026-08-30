@@ -84,7 +84,7 @@ bool isSupportedVideoFile(const QString& filePath)
 }
 
 // Keep this to formats the deployed Qt image plugins decode.
-static const QStringList SUPPORTED_IMAGE_SUFFIXES { "jpg", "jpeg", "jfif", "png", "tif", "tiff", "webp", "bmp" };
+static const QStringList SUPPORTED_IMAGE_SUFFIXES { "jpg", "jpeg", "jfif", "png", "tif", "tiff", "webp", "gif", "bmp" };
 
 bool isSupportedImageFile(const QString& filePath)
 {
