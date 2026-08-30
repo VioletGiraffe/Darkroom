@@ -108,17 +108,10 @@ Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; Va
 Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".bmp";  ValueData: "Quickroom.bmp"
 Root: HKA; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueName: "{#QuickroomName}"; ValueData: "Software\{#QuickroomName}\Capabilities"; Flags: uninsdeletevalue
 
-; SupportedTypes keeps Quickroom out of the "Open with" list for formats it cannot decode.
-Root: HKA; Subkey: "Software\Classes\Applications\{#QuickroomExeName}\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""; Flags: uninsdeletekey
-Root: HKA; Subkey: "Software\Classes\Applications\{#QuickroomExeName}\SupportedTypes"; ValueType: string; ValueName: ".jpg";  ValueData: ""
-Root: HKA; Subkey: "Software\Classes\Applications\{#QuickroomExeName}\SupportedTypes"; ValueType: string; ValueName: ".jpeg"; ValueData: ""
-Root: HKA; Subkey: "Software\Classes\Applications\{#QuickroomExeName}\SupportedTypes"; ValueType: string; ValueName: ".jfif"; ValueData: ""
-Root: HKA; Subkey: "Software\Classes\Applications\{#QuickroomExeName}\SupportedTypes"; ValueType: string; ValueName: ".png";  ValueData: ""
-Root: HKA; Subkey: "Software\Classes\Applications\{#QuickroomExeName}\SupportedTypes"; ValueType: string; ValueName: ".webp"; ValueData: ""
-Root: HKA; Subkey: "Software\Classes\Applications\{#QuickroomExeName}\SupportedTypes"; ValueType: string; ValueName: ".tif";  ValueData: ""
-Root: HKA; Subkey: "Software\Classes\Applications\{#QuickroomExeName}\SupportedTypes"; ValueType: string; ValueName: ".tiff"; ValueData: ""
-Root: HKA; Subkey: "Software\Classes\Applications\{#QuickroomExeName}\SupportedTypes"; ValueType: string; ValueName: ".gif";  ValueData: ""
-Root: HKA; Subkey: "Software\Classes\Applications\{#QuickroomExeName}\SupportedTypes"; ValueType: string; ValueName: ".bmp";  ValueData: ""
+; Deliberately no Applications\Quickroom.exe entry: it adds a second, identical-looking Quickroom to the
+; Open With dialog, and choosing that one sets UserChoice to the application rather than to a ProgID. An
+; application has one icon for every type it opens, so that silently defeats the per-type icons above.
+; Quickroom still appears in Open With through the OpenWithProgids values.
 
 [Run]
 Filename: "{tmp}\{#VCRedistExeName}"; Parameters: "/install /quiet /norestart"; StatusMsg: Installing Microsoft C++ Runtime...; Flags: runhidden waituntilterminated skipifdoesntexist
