@@ -53,6 +53,15 @@ The worker returns the identity actually registered because an owned import may 
 additional-label bookkeeping must use that returned identity. A referenced photo receives its first label explicitly;
 an owned photo derives it from its storage directory.
 
+## ffmpeg
+
+ffmpeg is the one external runtime dependency and is never bundled. `ffmpegPath()` (`Utils.h`) returns the configured
+path when it is valid, else `autoDetectedFfmpegPath()`: beside the app (beside the bundle on macOS), then PATH, then
+the Homebrew and MacPorts directories, since Finder-launched apps do not inherit the shell PATH. SettingsDialog shows
+the detection result as the path field's placeholder. Only `Ffmpeg.cpp` and `OscillatingPlayback` spawn it. Without
+it, staged and imported videos silently get no preview; full and single-frame extraction report the failure; photos
+are unaffected.
+
 ## Preview generation and storage
 
 `Ffmpeg::generatePreviewFrames` is the shared fresh-preview engine used by staging, import fallback, full-split

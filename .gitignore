@@ -9,7 +9,6 @@
 # User-specific files
 *.user
 .vs/
-/docs/flags.md
 
 # Build results
 /bin/

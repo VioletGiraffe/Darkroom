@@ -7,7 +7,7 @@
 Shared `QSettings` keys and defaults live in `Settings.h` as matching `Settings::Foo` and `Defaults::Foo`
 constants. Narrow settings used by one implementation remain local to that owner. App-wide derived accessors may
 live in `Utils.h`. Theming preferences are the exception: qtutils' `CThemeController` owns and persists them under
-its own keys.
+its own keys. A few keys have no UI and are edited in the settings file; `Settings.h` marks them.
 
 `QSettings` holds application preferences, not library or per-item state. Per-item fields belong in
 `MetadataStore`; runtime library paths come from an owned or borrowed `Library`. MainWindow's library workflow is
@@ -56,10 +56,13 @@ Visuals QSS cannot express use custom painting or delegates, which read `Theme::
 no subscription. `Style::applyThemedSheet(widget, makeSheet)` covers widget-local sheets that must survive a
 switch; a short-lived widget recreated after each switch can use a construction-time sheet instead.
 
+Qt's stylesheet style renders no slider tick marks, so the app-wide slider rule suppresses the per-photo detent
+ticks PhotoCompareWindow's picker sets.
+
 ## Icons
 
 Icons are monochrome SVGs with tintable strokes and fills marked `currentColor`; there are no per-theme image
-variants.
+variants. They live in `app/res/UI/` and are listed by hand in `resources.qrc`, which Quickroom includes as well.
 
 - Code-consumed icons: `tintedSvgIcon()` renders per requested size and DPR, resolving its color per render
   through a callback. `tintedSvgPixmap()` serves delegates that paint directly.

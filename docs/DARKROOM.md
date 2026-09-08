@@ -17,30 +17,72 @@ contains implementation detail. Keep both in sync.
 4. Keep changes in the app unless responsibility genuinely belongs in a shared submodule, and update durable
    architectural facts when they change.
 
-## Build and source layout
+## Repository layout
 
-The qmake root `Darkroom.pro` builds both apps - Darkroom and [Quickroom](QUICKROOM.md) - and their
-static-library submodules: `qtutils`, `cpputils`, `cpp-template-utils`, `magic-alignment`, and
-`image-processing`. App sources and headers are discovered recursively under `app/src/`, so new files there
-require no project registration - but `quickroom/quickroom.pro` compiles a hand-listed subset of them directly
-(see its comments), so a shared file gaining an app-only include breaks the Quickroom link while Darkroom still
-builds, like the `tests.pro` trap.
-Generated solutions, Makefiles, IDE state, `bin/`, and `build/` are not sources of truth.
+| Path | Holds |
+|---|---|
+| `app/` | Darkroom: `app.pro`, `src/`, `res/` (app icon, the `UI/` icon SVGs, `resources.qrc`) |
+| `quickroom/` | [Quickroom](QUICKROOM.md): its own `src/` and `res/`; compiles a hand-listed subset of `app/src` directly |
+| `tests/` | Catch2 tests over the Core model |
+| `docs/` | this documentation; `mockups/` holds static HTML UI mockups, design input only and not kept in sync with the code |
+| `scripts/` | `create_dmg.sh` (macOS packaging) and `build-filetype-icons.py` (Quickroom file-type icons) |
+| `installer.iss` | Windows installer script (Inno Setup) |
+| `.github/workflows/` | CI |
+| `Darkroom.pro`, `Tests.pro`, `global.pri` | the two qmake roots and their shared compiler settings |
+| `update_repository.sh` / `.bat` | fast-forwards the default branch and moves every submodule to its own default branch |
+| `gh-pages/` | when present, a git worktree of the CI metrics branch; excluded through `.git/info/exclude` |
 
-`app/src/` is divided into:
+Projects, the two source-sharing link traps, CI, and packaging are in [build.md](build.md). Generated solutions,
+Makefiles, IDE state, `bin/`, and `build/` are not sources of truth.
 
-- `Core/` for the library, catalog, persistence, identity, and I/O routing.
-- `UiComponents/` for reusable widgets and feature composites.
-- `Windows/` for top-level windows, dialogs, and interactive workflows.
-- `Theme/` for the selectable themes and application styling.
-- Root modules for settings, utilities, ffmpeg, import workers, and application startup.
+### Submodules
 
-App includes are layer-qualified from `src`, such as `"Core/Catalog.h"` and
-`"UiComponents/MediaItemWidget.h"`. Submodule headers follow their configured include roots.
+Five git submodules build as static libraries. Each is its own include root except where noted:
 
-`tests/tests.pro` builds the Catch2 core test executable. Tests protect silent breakage: persisted-format
-compatibility, identity invariants, catalog mutations, case-sensitive filesystem behavior, and catalog-integrity
-verdicts. Test sources are listed explicitly and new test files must be registered there.
+| Submodule | Supplies here |
+|---|---|
+| `cpputils` | `assert/advanced_assert.h`, `CThreadPool`, interruptible threads, storage-speed detection |
+| `cpp-template-utils` | header-only: compiler-warning control macros, `macro_utils.h`, hashing |
+| `qtutils` | theme machinery (`CThemeController`, `CBasePalette`, tinted icon engine, `themeicon:/`, style fixups), `CImageViewerWidget`, `CFlowLayout`, natural sort, `CLoggerInMemory`, settings/about dialog bases, message-box helpers |
+| `magic-alignment` (root `src/`) | automatic photo alignment fits for PhotoCompareWindow |
+| `image-processing` | SIMD image resize for ImageViewerWindow; has its own tests and a resize-comparison tool |
+
+Link order matters on GNU ld: a library precedes the ones it uses. The `LIBS` comments in each `.pro` state the order.
+
+### `app/src`
+
+Sources and headers are globbed recursively, so a new file needs no registration. The directories:
+
+- `Core/` - library, catalog, persistence, identity, and the two thread pools (`IoThreadPool` routes disk reads by
+  storage speed, `CpuThreadPool` is the process-wide compute pool). UI-free.
+- `UiComponents/` - widgets reused by more than one window.
+- `Windows/` - top-level windows and dialogs, the workflows that prompt the user or pump events (import execution,
+  rename, delete, label management, frame extraction, source relocation), and collaborators that serve one window
+  (`OscillatingPlayback`).
+- `Theme/` - the selectable themes and application styling.
+- `crashhandler/` - Windows-only minidump writer, a no-op elsewhere; both apps install it in `main()` with the temp
+  directory as the dump location.
+- Root - app-wide modules: `Settings.h` (keys and defaults), `Shortcuts.h` (shortcut strings shared by several
+  windows), `Ffmpeg` (process wrapper, UI-free), `Import` (per-item import workers, UI-free), `Utils` (path and file
+  helpers, the supported-extension lists, ffmpeg discovery, window-geometry persistence, error-reporting message
+  boxes), and `main.cpp`.
+
+Placement rule: a file that prompts or pumps events belongs in `Windows/`; a UI-free worker at the root or in
+`Core/`; a widget shared by several windows in `UiComponents/`.
+
+App includes are layer-qualified from `src`, such as `"Core/Catalog.h"` and `"UiComponents/MediaItemWidget.h"`.
+
+### Supported media types
+
+The two extension lists in `Utils.cpp` define what both apps treat as a video or an image. Two artifacts mirror them
+by hand and must be extended with them: the installer's file associations and the Quickroom file-type icons under
+`quickroom/res/filetypes/`, generated by `scripts/build-filetype-icons.py`.
+
+### Resources
+
+Resources are not globbed: an icon added to `app/res/UI/` must be listed in `app/res/resources.qrc`. Quickroom
+includes that same `.qrc`, since the theme and the shared windows load their icons from it, plus its own for the app
+icon.
 
 ## Cross-cutting principles
 
@@ -80,7 +122,7 @@ invariants, verified paths, batching, empty-label persistence, and explicit inte
 ### [Main window](architecture/main-window.md)
 
 Library startup and switching, browser update layers, lazy grid population, native multi-selection, item and label
-workflow ownership, rename transactions, and diagnostic logging.
+workflow ownership, rename transactions, integrity-check ownership, and diagnostic logging.
 
 ### [Media cards and thumbnails](architecture/media-widgets.md)
 
@@ -89,8 +131,9 @@ invariants, and card geometry controls.
 
 ### [Frame viewing, playback, and photo comparison](architecture/playback.md)
 
-Persistent frame viewing, the single-image viewer, built-in playback and saved loops, oscillating cache presentation,
-single-frame extraction, and PhotoCompareWindow's shared-view/per-photo-alignment model.
+Persistent frame viewing, multi-video frame comparison, the single-image viewer, built-in playback and saved loops,
+oscillating cache presentation, single-frame extraction, and PhotoCompareWindow's shared-view/per-photo-alignment
+model.
 
 ### [Settings and theme](architecture/settings-and-theme.md)
 

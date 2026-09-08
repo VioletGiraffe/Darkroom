@@ -96,3 +96,7 @@ re-parsing.
 Both stores save atomically and retain failed writes as dirty, retryable state. UI reporting is queued outside writer
 destruction. A candidate library whose required initial registry cannot be saved is rejected before publication, and
 an existing library cannot be replaced while its pending changes remain unflushed.
+
+Import, rename, relocation, and label mutations approximate transactions across filesystem operations and JSON
+writes. Runtime failures have compensating cleanup; an abrupt termination between the two steps leaves catalog and
+disk out of sync. Integrity checking is the recovery path, not prevention.

@@ -19,6 +19,7 @@ video, tag everything with colored labels, flip through thumbnails, and compare 
 
 1. Download and install Darkroom from Releases.
 2. [Download ffmpeg](https://ffmpeg.org/download.html) if you want video support, Darkroom needs it to read video files. Optional.
+   Put the `ffmpeg` binary next to Darkroom's executable or anywhere on your PATH, or point Settings at it. Without it, photos still work.
 3. Open Darkroom and drag videos, photos, or whole folders onto the window to get started.
 
 ## Quickroom
@@ -34,4 +35,5 @@ with Darkroom, so there is nothing extra to download.
 
 - [docs/DARKROOM.md](docs/DARKROOM.md) - Darkroom's architecture + the index to the per-subsystem documents.
 - [docs/QUICKROOM.md](docs/QUICKROOM.md) -  Quickroom architecture + the index to the per-subsystem documents.
+- [docs/build.md](docs/build.md) - projects, tests, CI, and packaging.
 - [docs/guidelines.md](docs/guidelines.md) - coding conventions for this codebase.

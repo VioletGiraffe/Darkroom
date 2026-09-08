@@ -5,8 +5,9 @@ with Darkroom's image viewer and video player for opening items. It has no libra
 are files, identified by path. It ships from this repo as a second exe built on Darkroom's components, and is
 distributed with Darkroom: the same Windows installer, the same macOS disk image.
 
-Read [DARKROOM.md](DARKROOM.md) first for the shared build layout, the hand-listed source sharing in
-`quickroom/quickroom.pro` (and its link trap), and the coding conventions.
+Read [DARKROOM.md](DARKROOM.md) first for the repository layout and the coding conventions, and
+[build.md](build.md) for how `quickroom/quickroom.pro` compiles a hand-listed subset of `app/src` and the link trap
+that comes with it.
 
 ## Structure
 

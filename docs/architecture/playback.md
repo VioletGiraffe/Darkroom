@@ -10,6 +10,14 @@ its thumbnail flow is non-selectable; the main media grid instead requires the n
 documented in [main-window.md](main-window.md#media-grid--multi-select). Double-clicking a thumbnail opens
 ImageViewerWindow on that frame, through an activation callback the window supplies.
 
+## CompareWindow
+
+`CompareWindow` shows several videos' frame folders side by side: one `ThumbnailWidget` pane per folder and one
+slider spanning the longest folder, so every pane steps together and a shorter folder's pane goes blank past its
+end. Frame loads are debounced behind slider and resize events. Activating a pane opens ImageViewerWindow browsing
+that folder from the current frame. The browser opens it from the context menu of an all-video selection (Inspect for
+one item, Compare selected for several), passing frame-folder paths and no `Library`.
+
 ## ImageViewerWindow
 
 `ImageViewerWindow` is a self-deleting viewer over qtutils' `CImageViewerWidget`, which owns the pan/zoom view,

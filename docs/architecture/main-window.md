@@ -49,6 +49,8 @@ The browser uses the narrowest update that represents a change:
 3. Sorting reorders existing rows together with their attached cards.
 4. Name filtering only hides or reveals rows.
 
+`SortControl` owns and persists the sort field, direction, and favorites-first choice; the browser performs the sort.
+
 The All/Videos/Photos filter is combined with label and name filtering. Photo and video activation differs, but every
 catalog item admitted by the structural filters receives a row even when its source or preview is unavailable. This
 keeps selection-based recovery and management actions reachable.
@@ -92,7 +94,8 @@ import drop handler, preventing an export from feeding back into ImportDialog.
 
 Card context actions and label drops use the same multi-selection-aware target calculation. Label assignment mutates
 Catalog by stable label id. A drop is deferred until the event unwinds because the resulting structural refresh may
-delete the receiving card.
+delete the receiving card. The tri-state label checklist in those context menus is `LabelVisuals`, shared with
+ImportDialog's staged-card menus.
 
 `LabelSidebar` presents the virtual filters and ordinary labels; `LabelManagement` owns create, rename, color, and
 delete interaction. Catalog owns validation, backing paths, relocation, persistence, and change publication. The
@@ -118,6 +121,15 @@ rolled back. This is the only video frame-folder move outside Catalog's label-re
 
 A photo rename changes only the file's base name in place, preserving directory and extension, then re-keys through
 the same Catalog operation. Missing sources are refused.
+
+## Integrity check
+
+MainWindow owns the Tools menu's catalog integrity workflow. `CatalogIntegrity::scan` produces the report;
+`IntegrityCheckDialog` presents it, with `IntegrityCheckSections` building the per-finding rows and recovery
+buttons. Every button calls back into MainWindow, which routes to the owner of the operation: registration, adoption,
+locate (a rename to the found path), entry removal, and dangling-label cleanup go to `Catalog`; re-extraction and
+preview regeneration go to `FrameExtraction`. The dialog runs inside one `Catalog::ChangeBatchScope` (not a
+`BatchScope`: the dialog pumps events), and the browser refreshes once when it closes with changes.
 
 ## Logging and diagnostics
 
