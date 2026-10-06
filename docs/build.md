@@ -38,7 +38,7 @@ behavior, and catalog-integrity verdicts.
 ## CI
 
 `.github/workflows/CI.yml` runs on every push (except to `gh-pages`) and pull request, on Windows (MSVC), Ubuntu
-(GCC 14), and macOS (clang), each against Qt 6.10. Per OS, in order:
+(GCC 14), and macOS (clang), each against Qt 6.11. Per OS, in order:
 
 1. Build and run the tests from `Tests.pro`.
 2. Build both apps from `Darkroom.pro`.
