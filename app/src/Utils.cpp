@@ -81,7 +81,7 @@ static const QStringList SUPPORTED_VIDEO_SUFFIXES {
 };
 
 // Keep this to formats the deployed Qt image plugins decode.
-static const QStringList SUPPORTED_IMAGE_SUFFIXES { "jpg", "jpeg", "jfif", "png", "tif", "tiff", "webp", "gif", "bmp" };
+static const QStringList SUPPORTED_IMAGE_SUFFIXES { "jpg", "jpeg", "jfif", "png", "tif", "tiff", "webp", "gif", "bmp", "svg" };
 
 static QString suffixesToGlobs(const QStringList& suffixes)
 {
