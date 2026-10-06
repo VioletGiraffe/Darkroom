@@ -62,110 +62,64 @@ Name: quickroomdesktopicon; Description: "Create a desktop icon for &{#Quickroom
 ; A file's icon comes from whichever ProgID currently handles its extension, so a distinct icon per format
 ; requires a distinct ProgID per format. Windows 8+ forbids claiming the default handler programmatically:
 ; these entries only make Quickroom eligible, and the [Run] entry sends the user to Settings to choose.
-Root: HKA; Subkey: "Software\Classes\Quickroom.jpeg"; ValueType: string; ValueName: ""; ValueData: "JPEG Image"; Flags: uninsdeletekey
-Root: HKA; Subkey: "Software\Classes\Quickroom.jpeg\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\jpg.ico"
-Root: HKA; Subkey: "Software\Classes\Quickroom.jpeg\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
-Root: HKA; Subkey: "Software\Classes\Quickroom.png"; ValueType: string; ValueName: ""; ValueData: "PNG Image"; Flags: uninsdeletekey
-Root: HKA; Subkey: "Software\Classes\Quickroom.png\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\png.ico"
-Root: HKA; Subkey: "Software\Classes\Quickroom.png\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
-Root: HKA; Subkey: "Software\Classes\Quickroom.webp"; ValueType: string; ValueName: ""; ValueData: "WebP Image"; Flags: uninsdeletekey
-Root: HKA; Subkey: "Software\Classes\Quickroom.webp\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\webp.ico"
-Root: HKA; Subkey: "Software\Classes\Quickroom.webp\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
-Root: HKA; Subkey: "Software\Classes\Quickroom.tiff"; ValueType: string; ValueName: ""; ValueData: "TIFF Image"; Flags: uninsdeletekey
-Root: HKA; Subkey: "Software\Classes\Quickroom.tiff\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\tiff.ico"
-Root: HKA; Subkey: "Software\Classes\Quickroom.tiff\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
-Root: HKA; Subkey: "Software\Classes\Quickroom.gif"; ValueType: string; ValueName: ""; ValueData: "GIF Image"; Flags: uninsdeletekey
-Root: HKA; Subkey: "Software\Classes\Quickroom.gif\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\gif.ico"
-Root: HKA; Subkey: "Software\Classes\Quickroom.gif\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
-Root: HKA; Subkey: "Software\Classes\Quickroom.bmp"; ValueType: string; ValueName: ""; ValueData: "Bitmap Image"; Flags: uninsdeletekey
-Root: HKA; Subkey: "Software\Classes\Quickroom.bmp\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\bmp.ico"
-Root: HKA; Subkey: "Software\Classes\Quickroom.bmp\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
-Root: HKA; Subkey: "Software\Classes\Quickroom.svg"; ValueType: string; ValueName: ""; ValueData: "SVG Image"; Flags: uninsdeletekey
-Root: HKA; Subkey: "Software\Classes\Quickroom.svg\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\svg.ico"
-Root: HKA; Subkey: "Software\Classes\Quickroom.svg\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
-Root: HKA; Subkey: "Software\Classes\Quickroom.mp4"; ValueType: string; ValueName: ""; ValueData: "MP4 Video"; Flags: uninsdeletekey
-Root: HKA; Subkey: "Software\Classes\Quickroom.mp4\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\mp4.ico"
-Root: HKA; Subkey: "Software\Classes\Quickroom.mp4\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
-Root: HKA; Subkey: "Software\Classes\Quickroom.mov"; ValueType: string; ValueName: ""; ValueData: "QuickTime Movie"; Flags: uninsdeletekey
-Root: HKA; Subkey: "Software\Classes\Quickroom.mov\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\mov.ico"
-Root: HKA; Subkey: "Software\Classes\Quickroom.mov\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
-Root: HKA; Subkey: "Software\Classes\Quickroom.avi"; ValueType: string; ValueName: ""; ValueData: "AVI Video"; Flags: uninsdeletekey
-Root: HKA; Subkey: "Software\Classes\Quickroom.avi\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\avi.ico"
-Root: HKA; Subkey: "Software\Classes\Quickroom.avi\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
-Root: HKA; Subkey: "Software\Classes\Quickroom.mkv"; ValueType: string; ValueName: ""; ValueData: "Matroska Video"; Flags: uninsdeletekey
-Root: HKA; Subkey: "Software\Classes\Quickroom.mkv\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\mkv.ico"
-Root: HKA; Subkey: "Software\Classes\Quickroom.mkv\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
-Root: HKA; Subkey: "Software\Classes\Quickroom.webm"; ValueType: string; ValueName: ""; ValueData: "WebM Video"; Flags: uninsdeletekey
-Root: HKA; Subkey: "Software\Classes\Quickroom.webm\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\webm.ico"
-Root: HKA; Subkey: "Software\Classes\Quickroom.webm\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
-Root: HKA; Subkey: "Software\Classes\Quickroom.wmv"; ValueType: string; ValueName: ""; ValueData: "Windows Media Video"; Flags: uninsdeletekey
-Root: HKA; Subkey: "Software\Classes\Quickroom.wmv\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\wmv.ico"
-Root: HKA; Subkey: "Software\Classes\Quickroom.wmv\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
-Root: HKA; Subkey: "Software\Classes\Quickroom.mpeg"; ValueType: string; ValueName: ""; ValueData: "MPEG Video"; Flags: uninsdeletekey
-Root: HKA; Subkey: "Software\Classes\Quickroom.mpeg\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\mpg.ico"
-Root: HKA; Subkey: "Software\Classes\Quickroom.mpeg\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
-Root: HKA; Subkey: "Software\Classes\Quickroom.mts"; ValueType: string; ValueName: ""; ValueData: "MPEG Transport Stream"; Flags: uninsdeletekey
-Root: HKA; Subkey: "Software\Classes\Quickroom.mts\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\mts.ico"
-Root: HKA; Subkey: "Software\Classes\Quickroom.mts\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
-Root: HKA; Subkey: "Software\Classes\Quickroom.flv"; ValueType: string; ValueName: ""; ValueData: "Flash Video"; Flags: uninsdeletekey
-Root: HKA; Subkey: "Software\Classes\Quickroom.flv\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\flv.ico"
-Root: HKA; Subkey: "Software\Classes\Quickroom.flv\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
+#define ProgIdEntries(str ProgId, str TypeName, str IconStem) \
+  'Root: HKA; Subkey: "Software\Classes\Quickroom.' + ProgId + '"; ValueType: string; ValueName: ""; ValueData: "' + TypeName + '"; Flags: uninsdeletekey' + NewLine + \
+  'Root: HKA; Subkey: "Software\Classes\Quickroom.' + ProgId + '\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\' + IconDir + '\' + IconStem + '.ico"' + NewLine + \
+  'Root: HKA; Subkey: "Software\Classes\Quickroom.' + ProgId + '\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\' + QuickroomExeName + '"" ""%1"""'
 
 ; uninsdeletevalue, not uninsdeletekey: the extension keys are shared with every other app that opens the
-; type, and we own only our own value inside them. Aliases of one format share its ProgID and icon.
-; No .ico entry, deliberately: Explorer draws each .ico from its own contents, and a type icon would replace that.
-Root: HKA; Subkey: "Software\Classes\.jpg\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.jpeg"; ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.jpeg\OpenWithProgids"; ValueType: string; ValueName: "Quickroom.jpeg"; ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.jfif\OpenWithProgids"; ValueType: string; ValueName: "Quickroom.jpeg"; ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.png\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.png";  ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.webp\OpenWithProgids"; ValueType: string; ValueName: "Quickroom.webp"; ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.tif\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.tiff"; ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.tiff\OpenWithProgids"; ValueType: string; ValueName: "Quickroom.tiff"; ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.gif\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.gif";  ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.bmp\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.bmp";  ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.svg\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.svg";  ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.mp4\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.mp4";  ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.m4v\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.mp4";  ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.mov\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.mov";  ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.avi\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.avi";  ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.mkv\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.mkv";  ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.webm\OpenWithProgids"; ValueType: string; ValueName: "Quickroom.webm"; ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.wmv\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.wmv";  ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.mpg\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.mpeg"; ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.mpeg\OpenWithProgids"; ValueType: string; ValueName: "Quickroom.mpeg"; ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.m2ts\OpenWithProgids"; ValueType: string; ValueName: "Quickroom.mts";  ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.mts\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.mts";  ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.ts\OpenWithProgids";   ValueType: string; ValueName: "Quickroom.mts";  ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.flv\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.flv";  ValueData: ""; Flags: uninsdeletevalue
+; type, and we own only our own value inside them.
+#define SuffixEntries(str Suffix, str ProgId) \
+  'Root: HKA; Subkey: "Software\Classes\.' + Suffix + '\OpenWithProgids"; ValueType: string; ValueName: "Quickroom.' + ProgId + '"; ValueData: ""; Flags: uninsdeletevalue' + NewLine + \
+  'Root: HKA; Subkey: "Software\' + QuickroomName + '\Capabilities\FileAssociations"; ValueType: string; ValueName: ".' + Suffix + '"; ValueData: "Quickroom.' + ProgId + '"'
 
 ; Capabilities plus RegisteredApplications are what list Quickroom in Settings > Default apps at all.
 Root: HKA; Subkey: "Software\{#QuickroomName}"; Flags: uninsdeletekeyifempty
 Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities"; ValueType: string; ValueName: "ApplicationName"; ValueData: "{#QuickroomName}"; Flags: uninsdeletekey
 Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities"; ValueType: string; ValueName: "ApplicationDescription"; ValueData: "Fast image and video browser and viewer"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".jpg";  ValueData: "Quickroom.jpeg"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".jpeg"; ValueData: "Quickroom.jpeg"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".jfif"; ValueData: "Quickroom.jpeg"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".png";  ValueData: "Quickroom.png"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".webp"; ValueData: "Quickroom.webp"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".tif";  ValueData: "Quickroom.tiff"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".tiff"; ValueData: "Quickroom.tiff"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".gif";  ValueData: "Quickroom.gif"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".bmp";  ValueData: "Quickroom.bmp"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".svg";  ValueData: "Quickroom.svg"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mp4";  ValueData: "Quickroom.mp4"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".m4v";  ValueData: "Quickroom.mp4"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mov";  ValueData: "Quickroom.mov"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".avi";  ValueData: "Quickroom.avi"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mkv";  ValueData: "Quickroom.mkv"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".webm"; ValueData: "Quickroom.webm"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".wmv";  ValueData: "Quickroom.wmv"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mpg";  ValueData: "Quickroom.mpeg"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mpeg"; ValueData: "Quickroom.mpeg"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".m2ts"; ValueData: "Quickroom.mts"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mts";  ValueData: "Quickroom.mts"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".ts";   ValueData: "Quickroom.mts"
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".flv";  ValueData: "Quickroom.flv"
 Root: HKA; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueName: "{#QuickroomName}"; ValueData: "Software\{#QuickroomName}\Capabilities"; Flags: uninsdeletevalue
+
+; One ProgID per icon, then every suffix that maps to it.
+; No .ico suffix, deliberately: Explorer draws each .ico from its own contents, and a type icon would replace that.
+#emit ProgIdEntries("jpeg", "JPEG Image", "jpg")
+#emit SuffixEntries("jpg",  "jpeg")
+#emit SuffixEntries("jpeg", "jpeg")
+#emit SuffixEntries("jfif", "jpeg")
+#emit ProgIdEntries("png", "PNG Image", "png")
+#emit SuffixEntries("png", "png")
+#emit ProgIdEntries("webp", "WebP Image", "webp")
+#emit SuffixEntries("webp", "webp")
+#emit ProgIdEntries("tiff", "TIFF Image", "tiff")
+#emit SuffixEntries("tif",  "tiff")
+#emit SuffixEntries("tiff", "tiff")
+#emit ProgIdEntries("gif", "GIF Image", "gif")
+#emit SuffixEntries("gif", "gif")
+#emit ProgIdEntries("bmp", "Bitmap Image", "bmp")
+#emit SuffixEntries("bmp", "bmp")
+#emit ProgIdEntries("svg", "SVG Image", "svg")
+#emit SuffixEntries("svg", "svg")
+#emit ProgIdEntries("mp4", "MP4 Video", "mp4")
+#emit SuffixEntries("mp4", "mp4")
+#emit SuffixEntries("m4v", "mp4")
+#emit ProgIdEntries("mov", "QuickTime Movie", "mov")
+#emit SuffixEntries("mov", "mov")
+#emit ProgIdEntries("avi", "AVI Video", "avi")
+#emit SuffixEntries("avi", "avi")
+#emit ProgIdEntries("mkv", "Matroska Video", "mkv")
+#emit SuffixEntries("mkv", "mkv")
+#emit ProgIdEntries("webm", "WebM Video", "webm")
+#emit SuffixEntries("webm", "webm")
+#emit ProgIdEntries("wmv", "Windows Media Video", "wmv")
+#emit SuffixEntries("wmv", "wmv")
+#emit ProgIdEntries("mpeg", "MPEG Video", "mpg")
+#emit SuffixEntries("mpg",  "mpeg")
+#emit SuffixEntries("mpeg", "mpeg")
+#emit ProgIdEntries("mts", "MPEG Transport Stream", "mts")
+#emit SuffixEntries("m2ts", "mts")
+#emit SuffixEntries("mts",  "mts")
+#emit SuffixEntries("ts",   "mts")
+#emit ProgIdEntries("flv", "Flash Video", "flv")
+#emit SuffixEntries("flv", "flv")
 
 ; Deliberately no Applications\Quickroom.exe entry: it adds a second, identical-looking Quickroom to the
 ; Open With dialog, and choosing that one sets UserChoice to the application rather than to a ProgID. An
