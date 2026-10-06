@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1788093726766,
+  "lastUpdate": 1791321221246,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -12280,6 +12280,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Lines of code (Darkroom)",
             "value": 15197,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 620,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 13562,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1362,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 647.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 852,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 376.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 59.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 38,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 11,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "7df519cd7f7f66104456902afc9d4fed9a7ffdba",
+          "message": "installer.iss: registering icons by file type for Quickroom",
+          "timestamp": "2026-10-07T00:05:49+03:00",
+          "tree_id": "5849bde848d5dd12a56f038a57dd80221738fa19",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/7df519cd7f7f66104456902afc9d4fed9a7ffdba"
+        },
+        "date": 1791321218799,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 15208,
             "unit": "LOC"
           },
           {
