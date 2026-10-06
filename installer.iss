@@ -121,10 +121,10 @@ Root: HKA; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueNa
 #emit ProgIdEntries("flv", "Flash Video", "flv")
 #emit SuffixEntries("flv", "flv")
 
-; Deliberately no Applications\Quickroom.exe entry: it adds a second, identical-looking Quickroom to the
-; Open With dialog, and choosing that one sets UserChoice to the application rather than to a ProgID. An
-; application has one icon for every type it opens, so that silently defeats the per-type icons above.
-; Quickroom still appears in Open With through the OpenWithProgids values.
+; NoOpenWith keeps the application entry out of the Open With list, leaving the OpenWithProgids entries as
+; the only Quickroom there. Windows creates that application entry per user once the exe is picked by
+; browsing, and choosing it sets UserChoice to the application: one icon for every type it opens.
+Root: HKA; Subkey: "Software\Classes\Applications\{#QuickroomExeName}"; ValueType: string; ValueName: "NoOpenWith"; ValueData: ""; Flags: uninsdeletekey
 
 [Run]
 Filename: "{tmp}\{#VCRedistExeName}"; Parameters: "/install /quiet /norestart"; StatusMsg: Installing Microsoft C++ Runtime...; Flags: runhidden waituntilterminated skipifdoesntexist
