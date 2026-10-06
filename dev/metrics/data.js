@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791324814758,
+  "lastUpdate": 1791326475465,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -12749,6 +12749,85 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/VioletGiraffe/Darkroom/commit/5536ad407d11fea58cb27214ed8ad51fda95fa09"
         },
         "date": 1791324812464,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 15208,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 620,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 13562,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1354.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 645.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 844.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 376.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 59.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 38,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 11,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "bb55da9cc605efcb0c6d78e1a26a769062ef1d55",
+          "message": "Installer: NoOpenWith removed, it locked existing file associations",
+          "timestamp": "2026-10-07T01:36:34+03:00",
+          "tree_id": "5b4231d9b59d6d714b567678b8f8369d14d98de2",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/bb55da9cc605efcb0c6d78e1a26a769062ef1d55"
+        },
+        "date": 1791326473449,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
