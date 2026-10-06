@@ -41,9 +41,10 @@ behavior, and catalog-integrity verdicts.
 (GCC 14), and macOS (clang), each against Qt 6.11. Per OS, in order:
 
 1. Build and run the tests from `Tests.pro`.
-2. Build both apps from `Darkroom.pro`.
-3. Package: `windeployqt` into `dist/` and Inno Setup on Windows; `scripts/create_dmg.sh` on macOS. Both packages
-   are uploaded as workflow artifacts. Linux only builds.
+2. Build both apps from `Darkroom.pro`, even when the tests failed.
+3. Package whenever the apps built, so packaging is checked even when the tests failed: `windeployqt` into
+   `dist/` and Inno Setup on Windows; `scripts/create_dmg.sh` on macOS. The packages are uploaded as workflow
+   artifacts only when every step passed. Linux only builds.
 4. Record metrics: LOC per project and executable sizes (per PE section on Windows) go to the `gh-pages` branch under
    `dev/metrics` through github-action-benchmark, which regenerates the chart there.
 

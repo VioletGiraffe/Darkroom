@@ -128,6 +128,7 @@ jobs:
       run: ./bin/release/DarkroomTests
 
     - name: Build app (Windows)
+      id: build_app_windows
       if: ${{ !cancelled() && startsWith(matrix.os, 'windows') }}
       shell: cmd
       run: |
@@ -136,6 +137,11 @@ jobs:
         msbuild Darkroom.sln /t:Darkroom /p:Configuration=Release;PlatformToolset=v143 || exit /b 1
         msbuild Darkroom.sln /t:Quickroom /p:Configuration=Release;PlatformToolset=v143 || exit /b 1
 
+    # Keyed on the app build alone: packaging is still checked when the tests failed.
+    - name: Build installer (Windows)
+      if: ${{ !cancelled() && steps.build_app_windows.outcome == 'success' }}
+      shell: cmd
+      run: |
         @echo on
         set STAGING_DIR=dist
         RMDIR /S /Q %STAGING_DIR%
@@ -150,6 +156,7 @@ jobs:
         "%programfiles(x86)%\Inno Setup 6\iscc" installer.iss
 
     - name: Build app (Unix)
+      id: build_app_unix
       if: ${{ !cancelled() && !startsWith(matrix.os, 'windows') }}
       run: |
         # Own qmake run: both projects generate the top-level Makefile, and the tests step's version is there now.
@@ -157,7 +164,7 @@ jobs:
         make -j4 sub-app sub-quickroom
 
     - name: Build .dmg (macOS)
-      if: ${{ !cancelled() && startsWith(matrix.os, 'macos') }}
+      if: ${{ !cancelled() && steps.build_app_unix.outcome == 'success' && startsWith(matrix.os, 'macos') }}
       run: ./scripts/create_dmg.sh $QT_ROOT_DIR
 
     - name: Binary sizes - Windows
