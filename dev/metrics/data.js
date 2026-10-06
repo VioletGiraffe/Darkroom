@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791322399535,
+  "lastUpdate": 1791324311551,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -12591,6 +12591,85 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/VioletGiraffe/Darkroom/commit/855ddaab8d684af7f338de4b1802039d50abfe7e"
         },
         "date": 1791322396754,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 15208,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 620,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 13562,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1354.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 645.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 844.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 376.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 59.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 38,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 11,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "5a1ced70cabd986bd08dd01f58d7875b97eb7a4f",
+          "message": "installer.iss: NoOpenWith for Quickroom",
+          "timestamp": "2026-10-07T00:58:47+03:00",
+          "tree_id": "edd2b5ba79b1fd4dfc939ebf29a220e7d9d066f5",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/5a1ced70cabd986bd08dd01f58d7875b97eb7a4f"
+        },
+        "date": 1791324309391,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
