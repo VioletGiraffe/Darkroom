@@ -80,9 +80,40 @@ Root: HKA; Subkey: "Software\Classes\Quickroom.gif\shell\open\command"; ValueTyp
 Root: HKA; Subkey: "Software\Classes\Quickroom.bmp"; ValueType: string; ValueName: ""; ValueData: "Bitmap Image"; Flags: uninsdeletekey
 Root: HKA; Subkey: "Software\Classes\Quickroom.bmp\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\bmp.ico"
 Root: HKA; Subkey: "Software\Classes\Quickroom.bmp\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
+Root: HKA; Subkey: "Software\Classes\Quickroom.svg"; ValueType: string; ValueName: ""; ValueData: "SVG Image"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\Quickroom.svg\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\svg.ico"
+Root: HKA; Subkey: "Software\Classes\Quickroom.svg\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
+Root: HKA; Subkey: "Software\Classes\Quickroom.mp4"; ValueType: string; ValueName: ""; ValueData: "MP4 Video"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\Quickroom.mp4\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\mp4.ico"
+Root: HKA; Subkey: "Software\Classes\Quickroom.mp4\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
+Root: HKA; Subkey: "Software\Classes\Quickroom.mov"; ValueType: string; ValueName: ""; ValueData: "QuickTime Movie"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\Quickroom.mov\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\mov.ico"
+Root: HKA; Subkey: "Software\Classes\Quickroom.mov\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
+Root: HKA; Subkey: "Software\Classes\Quickroom.avi"; ValueType: string; ValueName: ""; ValueData: "AVI Video"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\Quickroom.avi\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\avi.ico"
+Root: HKA; Subkey: "Software\Classes\Quickroom.avi\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
+Root: HKA; Subkey: "Software\Classes\Quickroom.mkv"; ValueType: string; ValueName: ""; ValueData: "Matroska Video"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\Quickroom.mkv\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\mkv.ico"
+Root: HKA; Subkey: "Software\Classes\Quickroom.mkv\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
+Root: HKA; Subkey: "Software\Classes\Quickroom.webm"; ValueType: string; ValueName: ""; ValueData: "WebM Video"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\Quickroom.webm\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\webm.ico"
+Root: HKA; Subkey: "Software\Classes\Quickroom.webm\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
+Root: HKA; Subkey: "Software\Classes\Quickroom.wmv"; ValueType: string; ValueName: ""; ValueData: "Windows Media Video"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\Quickroom.wmv\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\wmv.ico"
+Root: HKA; Subkey: "Software\Classes\Quickroom.wmv\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
+Root: HKA; Subkey: "Software\Classes\Quickroom.mpeg"; ValueType: string; ValueName: ""; ValueData: "MPEG Video"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\Quickroom.mpeg\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\mpg.ico"
+Root: HKA; Subkey: "Software\Classes\Quickroom.mpeg\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
+Root: HKA; Subkey: "Software\Classes\Quickroom.mts"; ValueType: string; ValueName: ""; ValueData: "MPEG Transport Stream"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\Quickroom.mts\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\mts.ico"
+Root: HKA; Subkey: "Software\Classes\Quickroom.mts\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
+Root: HKA; Subkey: "Software\Classes\Quickroom.flv"; ValueType: string; ValueName: ""; ValueData: "Flash Video"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\Quickroom.flv\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#IconDir}\flv.ico"
+Root: HKA; Subkey: "Software\Classes\Quickroom.flv\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#QuickroomExeName}"" ""%1"""
 
-; uninsdeletevalue, not uninsdeletekey: the extension keys are shared with every other image app, and we
-; own only our own value inside them. .jfif is a JPEG alias, so it shares the JPEG ProgID and icon.
+; uninsdeletevalue, not uninsdeletekey: the extension keys are shared with every other app that opens the
+; type, and we own only our own value inside them. Aliases of one format share its ProgID and icon.
+; No .ico entry, deliberately: Explorer draws each .ico from its own contents, and a type icon would replace that.
 Root: HKA; Subkey: "Software\Classes\.jpg\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.jpeg"; ValueData: ""; Flags: uninsdeletevalue
 Root: HKA; Subkey: "Software\Classes\.jpeg\OpenWithProgids"; ValueType: string; ValueName: "Quickroom.jpeg"; ValueData: ""; Flags: uninsdeletevalue
 Root: HKA; Subkey: "Software\Classes\.jfif\OpenWithProgids"; ValueType: string; ValueName: "Quickroom.jpeg"; ValueData: ""; Flags: uninsdeletevalue
@@ -92,11 +123,25 @@ Root: HKA; Subkey: "Software\Classes\.tif\OpenWithProgids";  ValueType: string; 
 Root: HKA; Subkey: "Software\Classes\.tiff\OpenWithProgids"; ValueType: string; ValueName: "Quickroom.tiff"; ValueData: ""; Flags: uninsdeletevalue
 Root: HKA; Subkey: "Software\Classes\.gif\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.gif";  ValueData: ""; Flags: uninsdeletevalue
 Root: HKA; Subkey: "Software\Classes\.bmp\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.bmp";  ValueData: ""; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.svg\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.svg";  ValueData: ""; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.mp4\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.mp4";  ValueData: ""; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.m4v\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.mp4";  ValueData: ""; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.mov\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.mov";  ValueData: ""; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.avi\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.avi";  ValueData: ""; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.mkv\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.mkv";  ValueData: ""; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.webm\OpenWithProgids"; ValueType: string; ValueName: "Quickroom.webm"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.wmv\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.wmv";  ValueData: ""; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.mpg\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.mpeg"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.mpeg\OpenWithProgids"; ValueType: string; ValueName: "Quickroom.mpeg"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.m2ts\OpenWithProgids"; ValueType: string; ValueName: "Quickroom.mts";  ValueData: ""; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.mts\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.mts";  ValueData: ""; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.ts\OpenWithProgids";   ValueType: string; ValueName: "Quickroom.mts";  ValueData: ""; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.flv\OpenWithProgids";  ValueType: string; ValueName: "Quickroom.flv";  ValueData: ""; Flags: uninsdeletevalue
 
 ; Capabilities plus RegisteredApplications are what list Quickroom in Settings > Default apps at all.
 Root: HKA; Subkey: "Software\{#QuickroomName}"; Flags: uninsdeletekeyifempty
 Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities"; ValueType: string; ValueName: "ApplicationName"; ValueData: "{#QuickroomName}"; Flags: uninsdeletekey
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities"; ValueType: string; ValueName: "ApplicationDescription"; ValueData: "Fast image browser and viewer"
+Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities"; ValueType: string; ValueName: "ApplicationDescription"; ValueData: "Fast image and video browser and viewer"
 Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".jpg";  ValueData: "Quickroom.jpeg"
 Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".jpeg"; ValueData: "Quickroom.jpeg"
 Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".jfif"; ValueData: "Quickroom.jpeg"
@@ -106,6 +151,20 @@ Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; Va
 Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".tiff"; ValueData: "Quickroom.tiff"
 Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".gif";  ValueData: "Quickroom.gif"
 Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".bmp";  ValueData: "Quickroom.bmp"
+Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".svg";  ValueData: "Quickroom.svg"
+Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mp4";  ValueData: "Quickroom.mp4"
+Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".m4v";  ValueData: "Quickroom.mp4"
+Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mov";  ValueData: "Quickroom.mov"
+Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".avi";  ValueData: "Quickroom.avi"
+Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mkv";  ValueData: "Quickroom.mkv"
+Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".webm"; ValueData: "Quickroom.webm"
+Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".wmv";  ValueData: "Quickroom.wmv"
+Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mpg";  ValueData: "Quickroom.mpeg"
+Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mpeg"; ValueData: "Quickroom.mpeg"
+Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".m2ts"; ValueData: "Quickroom.mts"
+Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".mts";  ValueData: "Quickroom.mts"
+Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".ts";   ValueData: "Quickroom.mts"
+Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities\FileAssociations"; ValueType: string; ValueName: ".flv";  ValueData: "Quickroom.flv"
 Root: HKA; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueName: "{#QuickroomName}"; ValueData: "Software\{#QuickroomName}\Capabilities"; Flags: uninsdeletevalue
 
 ; Deliberately no Applications\Quickroom.exe entry: it adds a second, identical-looking Quickroom to the
@@ -119,7 +178,7 @@ Filename: "{app}\{#MyAppExeName}"; Description: {cm:LaunchProgram,{#MyAppName}};
 ; shellexec: ms-settings: is a URI, not an exe. runasoriginaluser: Setup is elevated and Settings will not
 ; launch under an elevated token. The registeredAppMachine query needs Windows 11 22H2; older builds ignore
 ; it and open the plain Default apps page.
-Filename: "ms-settings:defaultapps?registeredAppMachine={#QuickroomName}"; Description: "Choose which image types &{#QuickroomName} opens"; Flags: shellexec nowait postinstall skipifsilent runasoriginaluser unchecked
+Filename: "ms-settings:defaultapps?registeredAppMachine={#QuickroomName}"; Description: "Choose which file types &{#QuickroomName} opens"; Flags: shellexec nowait postinstall skipifsilent runasoriginaluser unchecked
 
 [UninstallDelete]
 Type: dirifempty; Name: "{app}\{#IconDir}"
