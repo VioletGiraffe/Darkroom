@@ -27,7 +27,7 @@
 
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
-#include "dialogs/messagebox.h"
+#include "dialogs/messagedialog.h"
 #include "threading/cinterruptablethread.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
@@ -759,7 +759,7 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 	}
 
 	if (!collisionLines.isEmpty())
-		MessageBox::notice(this, tr("Name collision"),
+		MessageDialog::notice(this, tr("Name collision"),
 			tr("Not staged - same name and size as an already staged file, but different content. "
 			   "Only one item per name+size can be tracked; rename the file if both are wanted."),
 			collisionLines.join("\n\n"));
@@ -784,7 +784,7 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 	}
 
 	if (!duplicateLines.isEmpty())
-		MessageBox::notice(this, tr("Already imported"), tr("Not staged - already in the library:"),
+		MessageDialog::notice(this, tr("Already imported"), tr("Not staged - already in the library:"),
 			duplicateLines.join("\n\n"), QMessageBox::Information);
 
 	const int mainWindowFrameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
@@ -933,7 +933,7 @@ void ImportDialog::regenerateInsufficientStagedVideoPreviews(int frameCount)
 	}
 
 	if (!cleanupFailures.isEmpty())
-		MessageBox::notice(this, tr("Preview refresh"), tr("Could not clear preview files for:"), cleanupFailures.join("\n"), QMessageBox::Warning);
+		MessageDialog::notice(this, tr("Preview refresh"), tr("Could not clear preview files for:"), cleanupFailures.join("\n"), QMessageBox::Warning);
 }
 
 void ImportDialog::zoomStagedCards(int steps)
@@ -1414,7 +1414,7 @@ void ImportDialog::runImport()
 		const QString text = move
 			? tr("Importing with \"Move\" will move each source file out of its current location, deleting the original. Continue?")
 			: tr("Importing with \"Copy\" will copy each source file into its destination. Continue?");
-		if (MessageBox::question(this, tr("Import"), text, { move ? tr("Move and import") : tr("Copy and import") },
+		if (MessageDialog::question(this, tr("Import"), text, { move ? tr("Move and import") : tr("Copy and import") },
 				/*defaultIndex*/ 0, /*cancellable*/ true, QMessageBox::Warning) != 0)
 			return;
 	}

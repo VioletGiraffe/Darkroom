@@ -2,7 +2,7 @@
 #include "Core/Catalog.h"
 
 #include "compiler/compiler_warnings_control.h"
-#include "dialogs/messagebox.h"
+#include "dialogs/messagedialog.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QDir>
@@ -94,7 +94,7 @@ bool MediaItemManagement::removePathTrashFirstInteractive(const QString& path, Q
 	if (permanentlyRemovePath(path, &permanentError))
 		return true;
 
-	MessageBox::notice(dialogParent, QObject::tr("Permanent deletion failed"),
+	MessageDialog::notice(dialogParent, QObject::tr("Permanent deletion failed"),
 		QObject::tr("The item could not be permanently deleted:"),
 		QDir::toNativeSeparators(path) + (permanentError.isEmpty() ? QString() : "\n" + permanentError), QMessageBox::Critical);
 	return false;
@@ -202,7 +202,7 @@ MediaItemManagement::DeleteResult MediaItemManagement::deleteItemsInteractive(
 
 	if (!failedItems.empty())
 	{
-		MessageBox::notice(dialogParent, QObject::tr("Delete incomplete"),
+		MessageDialog::notice(dialogParent, QObject::tr("Delete incomplete"),
 			QObject::tr("Some items could not be fully deleted. Their catalog records were kept:"),
 			failedItems.join("\n\n"), QMessageBox::Critical);
 	}

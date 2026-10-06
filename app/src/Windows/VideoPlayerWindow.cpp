@@ -10,7 +10,7 @@
 #include "Utils.h"
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
-#include "dialogs/messagebox.h"
+#include "dialogs/messagedialog.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QAudio>
@@ -966,7 +966,7 @@ void VideoPlayerWindow::onOscillationFailed(
 	setPlaybackActive(shouldResumePlayback);
 	updatePlaybackPositionUi(hasDisplayedPosition ? displayedPosition : _player->position());
 	updateOscillationAvailability();
-	MessageBox::notice(this, tr("Oscillating playback"), error, diagnostics);
+	MessageDialog::notice(this, tr("Oscillating playback"), error, diagnostics);
 }
 
 void VideoPlayerWindow::resolvePendingFormatError()
@@ -1008,7 +1008,7 @@ void VideoPlayerWindow::reportFatalPlaybackError(const QString& details)
 	// The box appears after this returns, by which time the window may hold a different file.
 	const QString fileName = QFileInfo{ _videoPath }.fileName();
 	QTimer::singleShot(0, this, [this, details, fileName] {
-		MessageBox::notice(this, tr("Video playback"),
+		MessageDialog::notice(this, tr("Video playback"),
 			tr("Could not play \"%1\".").arg(fileName), details, QMessageBox::Critical);
 	});
 }
@@ -1021,7 +1021,7 @@ void VideoPlayerWindow::reportRecoverableFormatError(const QString& details)
 	_formatWarningReported = true;
 	QTimer::singleShot(0, this, [this, details] {
 		if (!_fatalPlaybackErrorReported)
-			MessageBox::notice(this, tr("Limited video playback"),
+			MessageDialog::notice(this, tr("Limited video playback"),
 				tr("Some media content is unsupported, but the video can still be played."), details);
 	});
 }

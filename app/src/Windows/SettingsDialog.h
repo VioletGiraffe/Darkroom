@@ -1,8 +1,8 @@
 #pragma once
 
 #include "compiler/compiler_warnings_control.h"
-#include "settingsui/csettingsdialog.h"
-#include "settingsui/csettingspage.h"
+#include "appdialogs/csettingsdialog.h"
+#include "appdialogs/csettingspage.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QString>

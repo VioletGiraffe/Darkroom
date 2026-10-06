@@ -15,9 +15,9 @@
 #include "Settings.h"
 #include "Shortcuts.h"
 
-#include "aboutdialog/caboutdialog.h"
+#include "appdialogs/caboutdialog.h"
 #include "compiler/compiler_warnings_control.h"
-#include "dialogs/messagebox.h"
+#include "dialogs/messagedialog.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -519,7 +519,7 @@ void MainWindow::scanForUntrackedFiles()
 		return;
 	settings.setValue(lastFolderKey, dir);
 
-	const std::optional<int> depth = MessageBox::question(this, tr("Scan for untracked media"),
+	const std::optional<int> depth = MessageDialog::question(this, tr("Scan for untracked media"),
 		tr("Scan subfolders as well, or only this folder?\n\n%1").arg(QDir::toNativeSeparators(dir)),
 		{tr("Include Subfolders"), tr("This Folder Only")});
 	if (!depth)

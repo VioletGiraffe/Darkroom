@@ -4,7 +4,7 @@
 
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
-#include "dialogs/messagebox.h"
+#include "dialogs/messagedialog.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QAbstractButton>
@@ -32,7 +32,7 @@ void showImportFailures(QWidget* dialogParent, const QString& summary, const QSt
 	if (failures.empty())
 		return;
 
-	MessageBox::notice(dialogParent, QObject::tr("Import incomplete"), summary, failures.join("\n\n"), QMessageBox::Critical);
+	MessageDialog::notice(dialogParent, QObject::tr("Import incomplete"), summary, failures.join("\n\n"), QMessageBox::Critical);
 }
 
 } // namespace

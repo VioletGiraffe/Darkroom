@@ -64,7 +64,7 @@ ImageViewerWindow::ImageViewerWindow(Library* library, QStringList imagePaths, i
 	};
 	_view->setImageScaler([parallelFor](QImage& dest, const QImage& source, const QRect& srcRect) {
 		if (!ImageProcessing::resize(dest, source, srcRect, parallelFor))
-			CImageViewerWidget::smoothScale(dest, source, srcRect);
+			CImageViewerWidget::smoothScaleQt(dest, source, srcRect);
 	});
 
 	// The image as the window icon tells several open viewers apart in the taskbar. Restarted per image, so

@@ -3,7 +3,7 @@
 #include "Settings.h"
 
 #include "compiler/compiler_warnings_control.h"
-#include "dialogs/messagebox.h"
+#include "dialogs/messagedialog.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QByteArray>
@@ -331,7 +331,7 @@ void reportFfmpegFailure(QWidget* parent, const Ffmpeg::SplitResult& result, con
 		break;
 	case Status::ExtractionFailed:
 		// ffmpeg's own output goes in the scrollable body - it runs to hundreds of lines for some failures.
-		MessageBox::notice(parent, QObject::tr("Error"),
+		MessageDialog::notice(parent, QObject::tr("Error"),
 			QObject::tr("FFMPEG failed with exit code %1.").arg(result.exitCode),
 			result.errorOutput.trimmed(), QMessageBox::Critical);
 		break;
