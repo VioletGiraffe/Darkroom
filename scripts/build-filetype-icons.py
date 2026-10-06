@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generates Quickroom's per-file-type shell icons: one .ico and one .svg per image and video format.
+"""Generates Quickroom's per-file-type shell icons: one .ico per image and video format.
 
 Windows draws these wherever Quickroom owns a type, so a file's format has to be readable at a glance in a
 crowded list. One design carries that: a coloured body, a cream landscape, and an ink band across it holding
@@ -13,7 +13,15 @@ What the script is arranged around:
   Every label fits its band with a margin. 4-letter labels only manage that on glyphs of their own.
 
 Outputs are committed and this needs Bahnschrift, a Windows font, so it is a dev-time tool - never a build
-step.
+step. Run it with no arguments; it needs Pillow, numpy and fontTools, and rewrites every file in OUT. An icon
+whose inputs did not change regenerates byte-identical.
+
+Adding a format:
+  Add a TYPES entry. Every letter of the label must exist in GLYPHS; the run fails naming a missing one.
+  Look at the label at 16 and 20: where a full-height stem touches the band edge, add a GLYPH_CHOICES spec.
+  Judge the colour on rendered icons beside the others, not by colour distance: CIE76 rated JPG/MKV the
+    closest pair here, and by eye they are not close at all.
+  Mirror the suffix in Utils.cpp's lists and in installer.iss.
 
 Two tiers, split at VECTOR_FROM:
   Below it the wordmark is hand-drawn in GLYPHS, a pixel per cell, so no edge is ever antialiased.
@@ -27,6 +35,8 @@ The face needs three corrections before it can serve as the wordmark:
   A face heavier than STEM_TARGET has erosion pull its contours inward to that weight; Bahnschrift is
     lighter, so erosion is inert for it.
   Nothing hints an outline at these sizes, so grid_fit aligns the cap line and baseline by hand.
+  Stems are not fitted horizontally: at 24 they are 1.7px and look soft magnified, but read well at true
+    size. Snapping and thickening them were tried and made the true-size result no better.
 """
 import struct
 import sys
@@ -35,8 +45,6 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
-from fontTools.pens.svgPathPen import SVGPathPen
-from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 from fontTools.varLib import instancer
 
@@ -45,8 +53,10 @@ WORDMARK_FONT = Path("C:/Windows/Fonts/bahnschrift.ttf")
 WORDMARK_AXES = {"wght": 700, "wdth": 75}   # the "Bold Condensed" instance; both axes are at their extreme
 
 CREAM, INK = (240, 234, 224, 255), (36, 29, 21, 255)
-CREAM_HEX, INK_HEX = "#f0eae0", "#241d15"
 
+# Explorer's 16, 32 and 48 at 100%, 125% and 150% scale (72 excepted), plus 64 for 32 at 200%.
+# Windows scales every other size down from 256. That resamples cleanly from far above and badly from just
+# above, so 60 is drawn here and not left to 64.
 SIZES = [16, 20, 24, 32, 40, 48, 60, 64, 256]
 
 VECTOR_FROM = 24      # at or above this the wordmark comes from the font, below it from the hand-drawn face
@@ -91,7 +101,7 @@ FILM = dict(x=BODY_X_FILM, w=None, sprocket=SPROCKET)
 # WEBP's and SVG's colours are too light for cream sprockets to show: paper bodies only.
 # Indigo, purple and blue are the closest three, so only one of them (MP4) is on a common video format.
 TYPES = [("jpg", "JPG", "#c10500", PAPER), ("png", "PNG", "#c70ea9", PAPER),
-         ("webp", "WEBP", "#decb00", PAPER), ("tiff", "TIF", "#210641", PAPER),
+         ("webp", "WEBP", "#e8a800", PAPER), ("tiff", "TIF", "#210641", PAPER),
          ("gif", "GIF", "#2ba100", PAPER), ("bmp", "BMP", "#3e507a", PAPER),
          ("svg", "SVG", "#00e796", PAPER),
          ("mp4", "MP4", "#004dc4", FILM), ("mov", "MOV", "#0096b6", FILM),
@@ -155,8 +165,8 @@ def _build_variants(*tables):
 # NARROW is merged as-is, its keys already carrying the width.
 GLYPHS = {**_build_variants(FACE, FACE_CONDENSED, FACE_FILM), **NARROW}
 
-# Per-size glyph choices; an absent size, or an absent label, means the widest variant of every letter, which
-# is what every 3-letter label uses at every size. Specs exist only where 15 columns force a judgement.
+# Per-size glyph choices; an absent size, or an absent label, means the widest variant of every letter.
+# Specs exist only where 15 columns force a judgement.
 # MOV and MKV take V4 at 16: on V5 the run fills the canvas exactly, and M must not sit flush against the
 # band edge. V touching the right edge is accepted - its outer column is short, so it already reads as space.
 # SVG takes V4 at 16 to keep S off the band edge.
@@ -183,7 +193,7 @@ def hx(colour):
 
 def geom(size, body=PAPER):
     """Pixel geometry for one size. Rounded per size rather than scaled from a single drawing: that is what
-    keeps the band and body edges on whole pixels, and what the .svg cannot reproduce when scaled down.
+    keeps the band and body edges on whole pixels.
 
     A body with no width fraction derives one so both margins stay equal. Rounding the two independently
     works for the paper body but overflows the film one at 24, where 1/16 rounds up and 14/16 does not.
@@ -273,8 +283,8 @@ def mark_box(size, g):
 
 
 def _load_wordmark_font():
-    """The named instance as static font bytes: Bahnschrift ships variable-only, and both PIL and the SVG pen
-    need an ordinary font."""
+    """The named instance as static font bytes: Bahnschrift ships variable-only, and the metrics read below
+    must be the instance's."""
     f = TTFont(WORDMARK_FONT)
     instancer.instantiateVariableFont(f, WORDMARK_AXES, inplace=True)
     buf = BytesIO()
@@ -284,7 +294,6 @@ def _load_wordmark_font():
 
 _font_bytes = _load_wordmark_font()
 _font = TTFont(BytesIO(_font_bytes))
-_glyphs = _font.getGlyphSet()
 _cmap = _font.getBestCmap()
 _upm = _font["head"].unitsPerEm
 _hmtx = _font["hmtx"]
@@ -302,10 +311,9 @@ def _advances(label):
 
 
 def wordmark_fit(label, cap, avail):
-    """Uniform scale set by cap height, then the horizontal squeeze needed to fit the band width."""
-    s = cap / _cap_units
-    natural = sum(_advances(label)) * s
-    return s, (min(1.0, avail / natural) if natural else 1.0)
+    """The horizontal squeeze that fits the label, at this cap height, into the band width."""
+    natural = sum(_advances(label)) * cap / _cap_units
+    return min(1.0, avail / natural) if natural else 1.0
 
 
 def _stem_of_cap():
@@ -372,7 +380,7 @@ def draw_vector_wordmark(im, label, g, size):
     shape."""
     k = SS
     cap = round(g["band_h"] * CAP_OF_BAND) * k
-    _, sx = wordmark_fit(label, cap, TEXT_W * size * k)
+    sx = wordmark_fit(label, cap, TEXT_W * size * k)
     font = _sized_font(cap)
     mask = font.getmask(label, mode="L")
     w, h = mask.size
@@ -477,60 +485,11 @@ def write_ico(path, images):
     path.write_bytes(bytes(header) + b"".join(blobs))
 
 
-def svg_wordmark(label, g, size):
-    """The wordmark as one <g> element. Depends on the band alone, so it serves any body shape."""
-    cap = g["band_h"] * CAP_OF_BAND
-    s, sx = wordmark_fit(label, cap, TEXT_W * size)
-    x = (size - sum(_advances(label)) * s * sx) / 2
-    baseline = g["band_y"] + g["band_h"] / 2 + cap / 2
-    paths = []
-    for ch in label:
-        pen = SVGPathPen(_glyphs)
-        # Baked into the path data rather than a transform attribute: the stroke below must stay circular.
-        _glyphs[_cmap[ord(ch)]].draw(TransformPen(pen, (s * sx, 0, 0, -s, x, baseline)))
-        commands = pen.getCommands()
-        if commands:
-            paths.append(f'<path d="{commands}"/>')
-        x += _hmtx[_cmap[ord(ch)]][0] * s * sx
-
-    # A stroke is centred on the path, so half of it eats into the glyph: the same inward offset erode makes.
-    # The outer half lands on the band, which the wordmark never leaves.
-    inset = erosion(label, cap, sx)
-    ink_pen = (f' stroke="{INK_HEX}" stroke-width="{2 * inset:.2f}" stroke-linejoin="round"'
-               if inset > 0 else "")
-    return f'  <g fill="{CREAM_HEX}"{ink_pen}>\n    ' + "\n    ".join(paths) + '\n  </g>\n'
-
-
-def write_svg(path, label, colour, body=PAPER):
-    """The vector tier only: the pixel sizes cannot be expressed as one scalable drawing.
-
-    Not grid-fitted either, one drawing having no target grid, so at small sizes this will not match the .ico.
-    """
-    size = 512
-    g = geom(size, body)
-    holes, perf, rim = sprockets(size, g, body["sprocket"]) if body["sprocket"] else ([], 0, 0)
-    perfs = "".join(f'<rect x="{x}" y="{y}" width="{perf}" height="{perf}"/>\n    ' for x, y in holes)
-    mx, my, mw = mark_box(size, mark_frame(g, perf, rim))
-    ridge = " ".join(f"{mx + a * mw:.1f},{my + b * mw:.1f}" for a, b in MARK_RIDGE)
-    cx, cy, r = MARK_SUN
-    path.write_text(
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">\n'
-        f'  <rect x="{g["bx"]}" y="0" width="{g["bw"]}" height="512" fill="{colour}"/>\n'
-        f'  <g fill="{CREAM_HEX}">\n'
-        f'    {perfs}<polygon points="{ridge}"/>\n'
-        f'    <circle cx="{mx + cx * mw:.1f}" cy="{my + cy * mw:.1f}" r="{r * mw:.1f}"/>\n'
-        f'  </g>\n'
-        f'  <rect x="0" y="{g["band_y"]}" width="512" height="{g["band_h"]}" fill="{INK_HEX}"/>\n'
-        + svg_wordmark(label, g, size) + '</svg>\n',
-        encoding="utf-8")
-
-
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     for stem, label, colour, body in TYPES:
         images = [render(label, colour, size, body) for size in SIZES]
         write_ico(OUT / f"{stem}.ico", images)
-        write_svg(OUT / f"{stem}.svg", label, colour, body)
         print(f"{stem:5} {label:5} {colour}  {(OUT / f'{stem}.ico').stat().st_size:>7} B"
               f"  {len(SIZES)} sizes")
 
