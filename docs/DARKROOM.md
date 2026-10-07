@@ -64,8 +64,7 @@ Sources and headers are globbed recursively, so a new file needs no registration
   directory as the dump location.
 - Root - app-wide modules: `Settings.h` (keys and defaults), `Shortcuts.h` (shortcut strings shared by several
   windows), `Ffmpeg` (process wrapper, UI-free), `Import` (per-item import workers, UI-free), `Utils` (path and file
-  helpers, the supported-extension lists, ffmpeg discovery, window-geometry persistence, error-reporting message
-  boxes), and `main.cpp`.
+  helpers, the supported-extension lists, ffmpeg discovery, error-reporting message boxes), and `main.cpp`.
 
 Placement rule: a file that prompts or pumps events belongs in `Windows/`; a UI-free worker at the root or in
 `Core/`; a widget shared by several windows in `UiComponents/`.

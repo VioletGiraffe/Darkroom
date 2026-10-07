@@ -17,7 +17,6 @@ class ThumbnailWidget;
 class CompareWindow final : public QWidget {
 public:
 	explicit CompareWindow(const QStringList& folderPaths, QWidget* parent = nullptr);
-	~CompareWindow();
 
 protected:
 	void resizeEvent(QResizeEvent* event) override;

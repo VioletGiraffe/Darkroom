@@ -53,7 +53,7 @@ string-only needs without touching disk, `MediaId::name()` yields the original f
 When a dialog accumulates state that its caller must observe immediately after `exec()` returns, flush it from
 an overridden `done(int)` before delegating to `QDialog::done`, not from the destructor. `done()` covers acceptance,
 rejection, Escape, and window close while the dialog still exists. Reserve destruction for state no caller waits on,
-such as persisted geometry.
+such as a persisted splitter position.
 
 ## Sorting — natural sort for strings that may contain numbers
 

@@ -26,7 +26,6 @@ public:
 	static void showForFolder(const QString& folder = {}, const QString& selectPath = {});
 
 protected:
-	void closeEvent(QCloseEvent* event) override;
 	// Forwards mouse back/forward buttons from the grid viewport to history navigation.
 	bool eventFilter(QObject* watched, QEvent* event) override;
 

@@ -3,6 +3,7 @@
 #include "Theme/Theme.h"
 #include "Utils.h"
 #include "compiler/compiler_warnings_control.h"
+#include "widgets/cpersistenceenabler.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QHBoxLayout>
@@ -66,11 +67,8 @@ IntegrityCheckDialog::IntegrityCheckDialog(const Catalog& catalog, const Catalog
 	buttons->addWidget(closeButton);
 	outer->addLayout(buttons);
 
-	if (!restoreWindowGeometry(this, "integrityCheckDialog"))
-		resize(700, 500);
+	resize(700, 500);
+	enablePersistence(this, "integrityCheckDialog/window", CPersistenceEnabler::Delayed{ true }, CPersistenceEnabler::SetDefaultSize{ false });
 }
 
-IntegrityCheckDialog::~IntegrityCheckDialog()
-{
-	saveWindowGeometry(this, "integrityCheckDialog");
-}
+IntegrityCheckDialog::~IntegrityCheckDialog() = default;

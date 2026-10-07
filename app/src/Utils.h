@@ -13,9 +13,6 @@ class QDateTime;
 class QMimeData;
 class QWidget;
 
-void saveWindowGeometry(QWidget* w, const QString& key);
-bool restoreWindowGeometry(QWidget* w, const QString& key);
-
 // Clears a stale QSS :hover after a popup's mouse grab bypasses normal leave dispatch. A synthetic Leave is
 // insufficient because :hover follows WA_UnderMouse; a real hover is preserved when the cursor has not moved.
 void clearStuckHoverIfCursorLeft(QWidget* w);

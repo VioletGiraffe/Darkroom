@@ -19,6 +19,7 @@
 #include "compiler/compiler_warnings_control.h"
 #include "dialogs/messagedialog.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
+#include "widgets/cpersistenceenabler.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QAbstractButton>
@@ -140,6 +141,7 @@ MainWindow::MainWindow(QWidget* parent)
 
 	setWindowTitle("Darkroom");
 	resize(1500, 800);
+	enablePersistence(this, "mainWindow/window", CPersistenceEnabler::Delayed{ true }, CPersistenceEnabler::SetDefaultSize{ false });
 	setAcceptDrops(true);
 
 	_frameViewer = new FrameViewerWindow();
@@ -273,13 +275,11 @@ void MainWindow::setupMainMenu()
 
 void MainWindow::saveSettings()
 {
-	saveWindowGeometry(this, "mainWindow");
 	_mediaBrowser->saveSettings();
 }
 
 void MainWindow::restoreSettings()
 {
-	restoreWindowGeometry(this, "mainWindow");
 	_mediaBrowser->restoreSettings();
 }
 

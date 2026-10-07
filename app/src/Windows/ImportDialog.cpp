@@ -30,6 +30,7 @@
 #include "dialogs/messagedialog.h"
 #include "threading/cinterruptablethread.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
+#include "widgets/cpersistenceenabler.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QAbstractItemView>
@@ -402,11 +403,10 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 
 	refreshLabelList();
 
-	if (!restoreWindowGeometry(this, "importDialog"))
-	{
-		resize(1200, 800);
-		setWindowState(Qt::WindowMaximized);
-	}
+	resize(1200, 800);
+	setWindowState(Qt::WindowMaximized);
+	enablePersistence(this, "importDialog/window", CPersistenceEnabler::Delayed{ true }, CPersistenceEnabler::SetDefaultSize{ false });
+
 	const QByteArray splitterState = QSettings{}.value("importDialog/splitter").toByteArray();
 	if (!splitterState.isEmpty())
 		_splitter->restoreState(splitterState);
@@ -414,7 +414,6 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 
 ImportDialog::~ImportDialog()
 {
-	saveWindowGeometry(this, "importDialog");
 	QSettings{}.setValue("importDialog/splitter", _splitter->saveState());
 	QSettings{}.setValue("importDialog/relocateFolder", _relocateFolderEdit->text());
 

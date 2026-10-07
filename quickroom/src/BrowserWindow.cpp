@@ -8,6 +8,7 @@
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
+#include "widgets/cpersistenceenabler.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QDir>
@@ -34,7 +35,6 @@ RESTORE_COMPILER_WARNINGS
 namespace {
 
 const QString LAST_FOLDER_KEY = QStringLiteral("browser/lastFolder");
-const QString GEOMETRY_KEY    = QStringLiteral("browser/geometry");
 const QString TILE_SIZE_KEY   = QStringLiteral("browser/tileSize");
 constexpr int DEFAULT_TILE_SIZE = 160;
 constexpr int MIN_TILE_SIZE  = 80;
@@ -114,8 +114,8 @@ BrowserWindow::BrowserWindow(const QString& folder)
 {
 	setupUi();
 
-	if (!restoreWindowGeometry(this, GEOMETRY_KEY))
-		resize(1200, 800);
+	resize(1200, 800);
+	enablePersistence(this, "browser/window", CPersistenceEnabler::Delayed{ true }, CPersistenceEnabler::SetDefaultSize{ false });
 
 	navigateTo(folder);
 }
@@ -397,10 +397,4 @@ bool BrowserWindow::eventFilter(QObject* watched, QEvent* event)
 		}
 	}
 	return QMainWindow::eventFilter(watched, event);
-}
-
-void BrowserWindow::closeEvent(QCloseEvent* event)
-{
-	saveWindowGeometry(this, GEOMETRY_KEY);
-	QMainWindow::closeEvent(event);
 }

@@ -6,7 +6,6 @@
 #include "dialogs/messagedialog.h"
 
 DISABLE_COMPILER_WARNINGS
-#include <QByteArray>
 #include <QCoreApplication>
 #include <QCursor>
 #include <QDateTime>
@@ -37,17 +36,6 @@ RESTORE_COMPILER_WARNINGS
 #endif
 
 #include <functional>
-
-void saveWindowGeometry(QWidget* w, const QString& key)
-{
-	QSettings{}.setValue(key + "/geometry", w->saveGeometry());
-}
-
-bool restoreWindowGeometry(QWidget* w, const QString& key)
-{
-	const QByteArray ba = QSettings{}.value(key + "/geometry").toByteArray();
-	return !ba.isEmpty() ? w->restoreGeometry(ba) : false;
-}
 
 void clearStuckHoverIfCursorLeft(QWidget* w)
 {

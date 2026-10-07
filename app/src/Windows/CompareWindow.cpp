@@ -4,6 +4,7 @@
 #include "Utils.h"
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
+#include "widgets/cpersistenceenabler.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QDir>
@@ -78,11 +79,7 @@ CompareWindow::CompareWindow(const QStringList& folderPaths, QWidget* parent) : 
 	QShortcut* escShortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
 	connect(escShortcut, &QShortcut::activated, this, &CompareWindow::close);
 
-	restoreWindowGeometry(this, "compareWindow");
-}
-
-CompareWindow::~CompareWindow() {
-	saveWindowGeometry(this, "compareWindow");
+	enablePersistence(this, "compareWindow/window", CPersistenceEnabler::Delayed{ true }, CPersistenceEnabler::SetDefaultSize{ false });
 }
 
 void CompareWindow::resizeEvent(QResizeEvent* event)

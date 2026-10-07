@@ -12,6 +12,7 @@
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
+#include "widgets/cpersistenceenabler.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QApplication>
@@ -441,11 +442,9 @@ PhotoCompareWindow::PhotoCompareWindow(Library& library, const QStringList& phot
 
 	addPhotosFromFiles(photoPaths);
 
-	if (!restoreWindowGeometry(this, "photoCompareWindow"))
-	{
-		resize(1200, 800);
-		setWindowState(Qt::WindowMaximized);
-	}
+	resize(1200, 800);
+	setWindowState(Qt::WindowMaximized);
+	enablePersistence(this, "photoCompareWindow/window", CPersistenceEnabler::Delayed{ true }, CPersistenceEnabler::SetDefaultSize{ false });
 }
 
 PhotoCompareWindow::~PhotoCompareWindow()
@@ -456,7 +455,6 @@ PhotoCompareWindow::~PhotoCompareWindow()
 		// retire() prevents the I/O task from touching this window or enqueueing more decode work.
 		IoThreadPool::retire(reinterpret_cast<uint64_t>(this));
 	}
-	saveWindowGeometry(this, "photoCompareWindow");
 	// Persist the region relative to the reference resolution.
 	const QRectF normalizedAoi = !_alignAoi.isEmpty() && !_photos.empty() ? normalizedFromSubjectRect(_alignAoi) : QRectF();
 	QSettings{}.setValue(Settings::PhotoCompareAoi, normalizedAoi);
