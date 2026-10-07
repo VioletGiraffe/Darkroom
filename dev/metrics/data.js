@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791333272955,
+  "lastUpdate": 1791373285489,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -13031,6 +13031,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 38,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 11,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "9ce7fdc745c5533ddb4ff001fb04daf0c9510e37",
+          "message": "Quickroom: file deletion support + restructuring of deletion in Darkroom",
+          "timestamp": "2026-10-07T14:37:26+03:00",
+          "tree_id": "54a89ede9d0aa4484abda47c8070a28eee095b6c",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/9ce7fdc745c5533ddb4ff001fb04daf0c9510e37"
+        },
+        "date": 1791373283657,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 15326,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 732,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 17184,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1491.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 771.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 993.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 377.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 46,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 38.5,
             "unit": "KB"
           },
           {
