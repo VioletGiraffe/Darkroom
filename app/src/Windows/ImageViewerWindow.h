@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Core/MediaId.h"
-#include "Windows/PathDeletion.h"
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -36,10 +35,15 @@ public:
 	// Returning false skips the state change: a handler that closes the viewer must not let it reappear windowed.
 	void setExitFullScreenHandler(std::function<bool()> handler);
 
-	using DeleteHandler = std::function<bool(const QString& path, PathDeletion::Mode mode)>;
-	// Adds the delete actions; call at most once. The handler deletes path and returns whether it is gone.
-	// After a deletion the viewer shows the nearest remaining image, or closes when none is left.
-	void setDeleteHandler(DeleteHandler handler);
+	// What Del or Shift+Del does to the image shown, in the host's terms.
+	struct RemovalAction
+	{
+		QString text; // menu wording
+		// index is into the imagePaths given to showForImages. Returns whether the image left the host's list.
+		std::function<bool(int index)> remove;
+	};
+	// Call at most once. After a removal the viewer shows the nearest remaining image, or closes when none is left.
+	void setRemovalActions(RemovalAction onDelete, RemovalAction onShiftDelete);
 
 protected:
 	bool eventFilter(QObject* watched, QEvent* event) override;
@@ -61,7 +65,7 @@ private:
 	void toggleBest();
 	void updateLibraryActions();
 	void toggleFullScreen();
-	void deleteCurrentImage(PathDeletion::Mode mode);
+	void removeCurrentImage(const std::function<bool(int index)>& remove);
 
 private:
 	Library* _library = nullptr;
@@ -70,7 +74,6 @@ private:
 
 	std::function<void(int index)> _onImageChanged;
 	std::function<bool()> _exitFullScreenHandler;
-	DeleteHandler _deleteHandler;
 
 	CImageViewerWidget* _view = nullptr;
 	QTimer* _windowIconTimer = nullptr;

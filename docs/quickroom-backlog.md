@@ -7,7 +7,6 @@
 - Opening several files at once starts one process each - no single-instance handover.
 - Name filter over the current folder.
 - Video thumbnails: needs per-file ffmpeg extraction and a cache; tiles show the shell icon today.
-- Delete in the video player; the player holds its file open, so it must release it first.
 - Copy/paste of the grid selection as file URLs, pasting URLs from other apps too, and dropping files onto the
   browser. Paste copies everything given (folders included) off the GUI thread and asks on a name collision.
 - Cut/move, and pasting a clipboard bitmap as a new file.

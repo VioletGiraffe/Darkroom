@@ -368,8 +368,14 @@ void MediaBrowserWidget::viewPhoto(const MediaId& id)
 		startIndex = 0;
 	}
 
-	ImageViewerWindow::showForImages(&_library, std::move(paths), startIndex, window(),
-		[this, browsedIds = std::move(browsedIds)](int index) { selectAndScrollToMediaItem(browsedIds[static_cast<size_t>(index)]); });
+	ImageViewerWindow* const viewer = ImageViewerWindow::showForImages(&_library, std::move(paths), startIndex, window(),
+		[this, browsedIds](int index) { selectAndScrollToMediaItem(browsedIds[static_cast<size_t>(index)]); });
+	if (!viewer)
+		return;
+
+	viewer->setRemovalActions(
+		{ tr("Remove from library (untrack)"), [this, browsedIds](int index) { return untrackMediaItemAndReportGone(browsedIds[static_cast<size_t>(index)]); } },
+		{ tr("Delete"), [this, browsedIds](int index) { return deleteMediaItemAndReportGone(browsedIds[static_cast<size_t>(index)]); } });
 }
 
 void MediaBrowserWidget::playVideo(const MediaId& id)
@@ -384,6 +390,9 @@ void MediaBrowserWidget::playVideo(const MediaId& id)
 	auto* playerWindow = new VideoPlayerWindow(&_library, sourcePath, id, nullptr);
 	playerWindow->setNavigationOrder(visibleVideosInViewOrder());
 	playerWindow->setOnNavigatedToMediaItem([this](const MediaId& navigatedId) { selectAndScrollToMediaItem(navigatedId); });
+	playerWindow->setRemovalActions(
+		{ tr("Remove from library (untrack)"), [this](const MediaId& playedId, const QString&) { return untrackMediaItemAndReportGone(playedId); } },
+		{ tr("Delete"), [this](const MediaId& playedId, const QString&) { return deleteMediaItemAndReportGone(playedId); } });
 	playerWindow->show();
 }
 
@@ -528,6 +537,18 @@ void MediaBrowserWidget::deleteMediaItemsInteractive(const std::vector<MediaId>&
 void MediaBrowserWidget::removeMediaItemsFromLibraryInteractive(const std::vector<MediaId>& selection)
 {
 	MediaItemManagement::removeItemsFromLibraryInteractive(_library.catalog(), selection, window());
+}
+
+bool MediaBrowserWidget::deleteMediaItemAndReportGone(const MediaId& id)
+{
+	deleteMediaItemsInteractive({ id });
+	return !_library.catalog().containsMediaItem(id);
+}
+
+bool MediaBrowserWidget::untrackMediaItemAndReportGone(const MediaId& id)
+{
+	removeMediaItemsFromLibraryInteractive({ id });
+	return !_library.catalog().containsMediaItem(id);
 }
 
 void MediaBrowserWidget::renameMediaItemInteractive(const MediaId& id)

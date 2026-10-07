@@ -310,12 +310,7 @@ void BrowserWindow::viewImage(const QString& path)
 	if (!viewer)
 		return;
 
-	viewer->setDeleteHandler([self, viewer](const QString& deletedPath, PathDeletion::Mode mode) {
-		const bool deleted = !FileOperations::deleteWithConfirmation({ deletedPath }, mode, viewer).empty();
-		if (deleted && self)
-			self->removeEntries({ deletedPath });
-		return deleted;
-	});
+	FileOperations::installDeleteActions(*viewer, imagePaths, entryRemover());
 }
 
 void BrowserWindow::playVideo(const QString& path)
@@ -325,7 +320,15 @@ void BrowserWindow::playVideo(const QString& path)
 		reportMissingFile(this, path);
 		return;
 	}
-	VideoPlayerWindow::createPlayerWindow(nullptr, path, nullptr);
+	FileOperations::installDeleteActions(*VideoPlayerWindow::createPlayerWindow(nullptr, path, nullptr), entryRemover());
+}
+
+std::function<void(const QString& path)> BrowserWindow::entryRemover()
+{
+	return [self = QPointer<BrowserWindow>{ this }](const QString& path) {
+		if (self)
+			self->removeEntries({ path });
+	};
 }
 
 void BrowserWindow::showEntryContextMenu(const QString& path, QPoint globalPos)
@@ -341,14 +344,14 @@ void BrowserWindow::showEntryContextMenu(const QString& path, QPoint globalPos)
 	if (!targets.contains(path))
 		targets = { path };
 	// Queued, like folder activation in buildTile: the tile showing this menu may be among those removed.
-	const auto addDeleteAction = [this, &menu, targets](const QString& text, PathDeletion::Mode mode) {
-		menu.addAction(text, this, [this, targets, mode] {
+	const auto addDeleteAction = [this, &menu, targets](PathDeletion::Mode mode) {
+		menu.addAction(FileOperations::deleteActionText(mode), this, [this, targets, mode] {
 			QMetaObject::invokeMethod(this, [this, targets, mode] { deletePaths(targets, mode); }, Qt::QueuedConnection);
 		});
 	};
 	menu.addSeparator();
-	addDeleteAction(tr("Move to Trash"), PathDeletion::Mode::Trash);
-	addDeleteAction(tr("Delete permanently"), PathDeletion::Mode::Permanent);
+	addDeleteAction(PathDeletion::Mode::Trash);
+	addDeleteAction(PathDeletion::Mode::Permanent);
 
 	menu.exec(globalPos);
 }

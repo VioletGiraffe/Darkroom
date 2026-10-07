@@ -5,6 +5,9 @@
 
 DISABLE_COMPILER_WARNINGS
 #include <QMainWindow>
+#include <QPointer>
+#include <QString>
+#include <QStringList>
 RESTORE_COMPILER_WARNINGS
 
 #include <functional>
@@ -39,11 +42,41 @@ public:
 	// Reports each item navigated to; the initially loaded one does not call it.
 	void setOnNavigatedToMediaItem(std::function<void(const MediaId& id)> handler);
 
+	// What Del or Shift+Del does to the playing item, in the host's terms.
+	struct RemovalAction
+	{
+		QString text; // menu wording
+		// Returns whether the item left the host's list.
+		std::function<bool(const MediaId& id, const QString& videoPath)> remove;
+	};
+	// Call at most once. After a removal the player moves to an adjacent item, or closes when it has none.
+	void setRemovalActions(RemovalAction onDelete, RemovalAction onShiftDelete);
+
 	static void restartAll();
 	static void closeAll();
 
+	// While one is alive, no player holds open a file at or under paths.
+	// On destruction a player whose file is gone moves on as after a removal; the others resume where they were.
+	class FileRelease final
+	{
+	public:
+		explicit FileRelease(const QStringList& paths);
+		~FileRelease();
+		FileRelease(const FileRelease&) = delete;
+		FileRelease& operator=(const FileRelease&) = delete;
+
+	private:
+		struct ReleasedPlayer
+		{
+			QPointer<VideoPlayerWindow> player;
+			qint64 positionMs;
+			bool wasPlaying;
+		};
+		std::vector<ReleasedPlayer> _released;
+	};
+
 	// Opens a self-managing ad-hoc player.
-	static void createPlayerWindow(Library* library, const QString& videoPath, QWidget* parent);
+	static VideoPlayerWindow* createPlayerWindow(Library* library, const QString& videoPath, QWidget* parent);
 
 private:
 	friend class OscillatingPlayback;
@@ -56,6 +89,11 @@ private:
 	// Skips items that have left the library or the disk, and stops at the ends.
 	[[nodiscard]] std::optional<MediaId> adjacentMediaItem(Direction direction) const;
 	void loadAdjacentFile(Direction direction);
+	void performRemoval(const RemovalAction& action);
+	// Next item, else previous, else closes the window.
+	void leaveRemovedItem();
+	// Reloads the current file after a FileRelease.
+	void resumeReleasedFile(qint64 positionMs, bool wasPlaying);
 	void resizeAndMoveWindow();
 	void togglePlayPause();
 	void toggleFullScreen();
@@ -100,6 +138,11 @@ private:
 	std::function<void(const MediaId& id)> _onNavigatedToMediaItem;
 	// The current position is looked up by _mediaId rather than tracked.
 	std::vector<MediaId> _navigationOrder;
+	// Both empty until setRemovalActions.
+	RemovalAction _deleteKeyAction;
+	RemovalAction _shiftDeleteKeyAction;
+	// Seek target for when the file being loaded becomes seekable.
+	std::optional<qint64> _positionToRestoreMs;
 
 	QMediaPlayer* _player = nullptr;
 	QAudioOutput* _audioOutput = nullptr;

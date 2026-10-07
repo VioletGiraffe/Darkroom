@@ -2,6 +2,7 @@
 #include "Core/Catalog.h"
 #include "Core/CpuThreadPool.h"
 #include "Core/Library.h"
+#include "Shortcuts.h"
 #include "Utils.h"
 #include "assert/advanced_assert.h"
 #include "widgets/cimageviewerwidget.h"
@@ -49,17 +50,16 @@ void ImageViewerWindow::setExitFullScreenHandler(std::function<bool()> handler)
 	_exitFullScreenHandler = std::move(handler);
 }
 
-void ImageViewerWindow::setDeleteHandler(DeleteHandler handler)
+void ImageViewerWindow::setRemovalActions(RemovalAction onDelete, RemovalAction onShiftDelete)
 {
-	assert_and_return_r(!_deleteHandler, );
-	_deleteHandler = std::move(handler);
-
 	_imageMenu->addSeparator();
-	QAction* trashAction = _imageMenu->addAction(tr("Move to Trash"), this, [this] { deleteCurrentImage(PathDeletion::Mode::Trash); });
-	trashAction->setShortcut(QKeySequence(Qt::Key_Delete));
-	QAction* deleteAction = _imageMenu->addAction(tr("Delete permanently"), this, [this] { deleteCurrentImage(PathDeletion::Mode::Permanent); });
-	deleteAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::Key_Delete));
-	addActions({ trashAction, deleteAction }); // for the shortcuts, see buildMenus
+	const auto addRemovalAction = [this](RemovalAction removal, const char* shortcut) {
+		QAction* action = _imageMenu->addAction(removal.text, this, [this, remove = std::move(removal.remove)] { removeCurrentImage(remove); });
+		action->setShortcut(QKeySequence(shortcut));
+		addAction(action); // for the shortcut, see buildMenus
+	};
+	addRemovalAction(std::move(onDelete), Shortcuts::RemoveFromList);
+	addRemovalAction(std::move(onShiftDelete), Shortcuts::DeleteFile);
 }
 
 ImageViewerWindow::ImageViewerWindow(Library* library, QStringList imagePaths, int startIndex, QWidget* parent)
@@ -232,19 +232,21 @@ int ImageViewerWindow::adjacentIndex(Direction direction) const
 	return -1;
 }
 
-void ImageViewerWindow::deleteCurrentImage(PathDeletion::Mode mode)
+void ImageViewerWindow::removeCurrentImage(const std::function<bool(int index)>& remove)
 {
-	const QString path = currentPath();
 	// Windows refuses to delete a file that is open.
 	const bool wasAnimated = _view->isAnimated();
 	_view->closeFile();
 
-	if (!_deleteHandler(path, mode))
+	if (!remove(_index))
 	{
 		if (wasAnimated)
-			_view->displayImage(path, false); // resumes the animation
+			_view->displayImage(currentPath(), false); // resumes the animation
 		return;
 	}
+
+	// Cleared so that browsing skips it as it skips a deleted file: a removal may leave the file on disk.
+	_imagePaths[_index].clear();
 
 	int remaining = adjacentIndex(Direction::Next);
 	if (remaining < 0)

@@ -36,9 +36,10 @@ position reflected back into the grid selection; videos open `VideoPlayerWindow`
 `Library`, which leaves out their library-bound features (see [playback.md](architecture/playback.md)).
 
 Deletion: Del moves to Trash, Shift+Del deletes permanently, in the grid (the whole selection, folders with
-their contents) and in the image viewer (the current image). Only a permanent deletion or one including a folder
-asks first. The filesystem step is the shared `PathDeletion` module; the viewer deletes through a handler
-Quickroom installs, and the browser removes the deleted entries in place instead of relisting.
+their contents) and in the image viewer and video player (the current item). Only a permanent deletion or one
+including a folder asks first. The filesystem step is the shared `PathDeletion` module; the viewer and player delete
+through the removal actions `FileOperations` installs, and the browser removes the deleted entries in place instead
+of relisting.
 
 Browser state (last folder, tile size, window geometry) persists under `browser/*` settings keys.
 

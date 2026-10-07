@@ -11,6 +11,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QStringList>
 RESTORE_COMPILER_WARNINGS
 
+#include <functional>
 #include <vector>
 
 class MediaGrid;
@@ -60,6 +61,8 @@ private:
 	void deletePaths(const QStringList& paths, PathDeletion::Mode mode);
 	// Drops the entries of paths; the entry that followed the last of them becomes current.
 	void removeEntries(const QSet<QString>& paths);
+	// removeEntries for one path, safe to call after this window is gone: viewers and players can outlive it.
+	[[nodiscard]] std::function<void(const QString& path)> entryRemover();
 	void updateStatusCounts();
 
 	[[nodiscard]] QWidget* buildTile(QListWidgetItem* item);

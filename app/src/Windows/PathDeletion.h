@@ -11,6 +11,7 @@ class QWidget;
 
 // Interactive deletion of files and folders, folders with their whole contents.
 // The caller owns the initial deletion confirmation.
+// Open video players let go of the paths for the duration, see VideoPlayerWindow::FileRelease.
 namespace PathDeletion
 {
 	enum class Mode { Trash, Permanent };

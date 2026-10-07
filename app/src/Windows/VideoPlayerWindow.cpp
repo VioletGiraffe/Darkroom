@@ -5,6 +5,7 @@
 #include "Core/Catalog.h"
 #include "Core/Library.h"
 #include "Core/MetadataStore.h"
+#include "Shortcuts.h"
 #include "Theme/Theme.h"
 #include "theme/ctintedsvgiconengine.h"
 #include "Utils.h"
@@ -427,6 +428,9 @@ VideoPlayerWindow::VideoPlayerWindow(Library* library, const QString& videoPath,
 			reportFatalPlaybackError(_pendingFormatError.value_or(_player->errorString()));
 		else
 			resolvePendingFormatError();
+
+		if (_positionToRestoreMs && (status == QMediaPlayer::LoadedMedia || status == QMediaPlayer::BufferedMedia))
+			_player->setPosition(*std::exchange(_positionToRestoreMs, std::nullopt));
 	});
 	connect(_player, &QMediaPlayer::hasVideoChanged, this, [this] { resolvePendingFormatError(); });
 
@@ -515,6 +519,7 @@ void VideoPlayerWindow::loadFile(const QString& videoPath, const MediaId& mediaI
 	_pendingFormatError.reset();
 	_formatWarningReported = false;
 	_fatalPlaybackErrorReported = false;
+	_positionToRestoreMs.reset();
 
 	clearAbInterval();
 	{
@@ -589,6 +594,82 @@ void VideoPlayerWindow::loadAdjacentFile(Direction direction)
 		_onNavigatedToMediaItem(*mediaId);
 }
 
+void VideoPlayerWindow::setRemovalActions(RemovalAction onDelete, RemovalAction onShiftDelete)
+{
+	assert_and_return_r(!_deleteKeyAction.remove && !_shiftDeleteKeyAction.remove, );
+	_deleteKeyAction = std::move(onDelete);
+	_shiftDeleteKeyAction = std::move(onShiftDelete);
+
+	QShortcut* deleteKeyShortcut = new QShortcut(QKeySequence(Shortcuts::RemoveFromList), this);
+	connect(deleteKeyShortcut, &QShortcut::activated, this, [this] { performRemoval(_deleteKeyAction); });
+	QShortcut* shiftDeleteKeyShortcut = new QShortcut(QKeySequence(Shortcuts::DeleteFile), this);
+	connect(shiftDeleteKeyShortcut, &QShortcut::activated, this, [this] { performRemoval(_shiftDeleteKeyAction); });
+}
+
+void VideoPlayerWindow::performRemoval(const RemovalAction& action)
+{
+	// Copies: a removal that deletes the file loads another one through FileRelease while it runs.
+	const MediaId id = _mediaId;
+	const QString videoPath = _videoPath;
+	if (action.remove(id, videoPath) && _mediaId == id)
+		leaveRemovedItem();
+}
+
+void VideoPlayerWindow::leaveRemovedItem()
+{
+	if (adjacentMediaItem(Direction::Next))
+		loadAdjacentFile(Direction::Next);
+	else if (adjacentMediaItem(Direction::Previous))
+		loadAdjacentFile(Direction::Previous);
+	else
+		close();
+}
+
+void VideoPlayerWindow::resumeReleasedFile(qint64 positionMs, bool wasPlaying)
+{
+	loadFile(_videoPath, _mediaId);
+	_positionToRestoreMs = positionMs;
+	setPlaybackActive(wasPlaying);
+}
+
+VideoPlayerWindow::FileRelease::FileRelease(const QStringList& paths)
+{
+	QStringList pathKeys;
+	for (const QString& path : paths)
+	{
+		if (!path.isEmpty())
+			pathKeys.push_back(pathComparisonKey(path));
+	}
+
+	for (VideoPlayerWindow* player : VideoPlayerWindow::_instances)
+	{
+		const QString playerKey = pathComparisonKey(player->_videoPath);
+		const bool atOrUnderAPath = std::any_of(pathKeys.cbegin(), pathKeys.cend(), [&playerKey](const QString& key) {
+			return playerKey == key || playerKey.startsWith(key + '/');
+		});
+		if (!atOrUnderAPath)
+			continue;
+
+		_released.push_back({ player, player->currentPlaybackPosition(), player->isPlaybackActive() });
+		player->exitOscillatingPlayback(false);
+		player->_player->setSource({});
+	}
+}
+
+VideoPlayerWindow::FileRelease::~FileRelease()
+{
+	for (const ReleasedPlayer& released : _released)
+	{
+		if (!released.player)
+			continue;
+
+		if (QFileInfo::exists(released.player->_videoPath))
+			released.player->resumeReleasedFile(released.positionMs, released.wasPlaying);
+		else
+			released.player->leaveRemovedItem();
+	}
+}
+
 VideoPlayerWindow::~VideoPlayerWindow()
 {
 	_oscillatingPlayback.reset();
@@ -621,10 +702,11 @@ void VideoPlayerWindow::closeAll()
 		delete win;
 }
 
-void VideoPlayerWindow::createPlayerWindow(Library* library, const QString& videoPath, QWidget* parent)
+VideoPlayerWindow* VideoPlayerWindow::createPlayerWindow(Library* library, const QString& videoPath, QWidget* parent)
 {
 	auto* player = new VideoPlayerWindow(library, videoPath, MediaId::fromFile(videoPath), parent);
 	player->show();
+	return player;
 }
 
 void VideoPlayerWindow::resizeAndMoveWindow()
@@ -1106,6 +1188,13 @@ void VideoPlayerWindow::showContextMenu(const QPoint& globalPos)
 			reportMissingFile(this, _videoPath);
 	});
 	menu.addAction((isFullScreen() ? tr("Exit fullscreen") : tr("Fullscreen")) + "\tF", this, &VideoPlayerWindow::toggleFullScreen);
+
+	if (_deleteKeyAction.remove)
+	{
+		menu.addSeparator();
+		menu.addAction(_deleteKeyAction.text + "\tDel", this, [this] { performRemoval(_deleteKeyAction); });
+		menu.addAction(_shiftDeleteKeyAction.text + "\tShift+Del", this, [this] { performRemoval(_shiftDeleteKeyAction); });
+	}
 
 	menu.exec(globalPos);
 }

@@ -30,9 +30,7 @@ Each viewer opens fullscreen and is parentless, for a taskbar button of its own;
 instead, Qt blocking input to unparented windows under a modal dialog. Double-click and `F` switch between
 fullscreen and a window sized to the image, and the menu bar shows only outside fullscreen. A caller that defers
 creating the window behind the viewer can install an exit-fullscreen handler: it runs once when the user leaves
-fullscreen and decides whether that switch still happens. A caller can also install a delete handler, which adds
-the Trash and permanent-delete actions: the viewer releases the file, the handler deletes it, and the viewer moves
-to the nearest remaining image or closes. Alone among the windows here it persists no geometry.
+fullscreen and decides whether that switch still happens. A caller can also install removal actions, see below. Alone among the windows here it persists no geometry.
 The current image becomes the window icon after a delay, so several open viewers stay distinguishable in the
 taskbar without an icon being scaled for every image browsed past.
 
@@ -63,6 +61,25 @@ whether `QMediaPlayer` or `OscillatingPlayback` currently owns presentation.
 Media errors are observed before assigning the source. Fatal source failures are reported once and close an unusable
 window. A backend format error remains nonfatal when a playable video track exists because an unsupported secondary
 stream, commonly audio, need not prevent video playback.
+
+### Removal actions
+
+The viewer and the player bind Del and Shift+Del to two actions their host supplies, each a menu text and an
+operation that reports whether the item left the host's list. Without them the keys do nothing.
+
+| Host | Del | Shift+Del |
+| --- | --- | --- |
+| MediaBrowserWidget | remove from library | delete to Trash |
+| ImportDialog | remove from staging | delete the source file |
+| Quickroom | move to Trash | delete permanently |
+
+After a removal the window moves to the nearest remaining item, or closes when it has none. Frame viewers and the
+relocation preview players install no actions.
+
+`PathDeletion` holds a `VideoPlayerWindow::FileRelease` while it deletes: players of the affected files drop their
+source first, since an open file cannot be deleted on Windows. Afterwards a player whose file is gone moves on as
+after a removal, and one whose file survived resumes at its position. The viewer closes an animated file itself
+before running an action; a viewer is not released by deletions started elsewhere.
 
 ### Oscillating playback
 

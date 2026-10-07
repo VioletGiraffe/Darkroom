@@ -102,9 +102,7 @@ bool showImageViewer(const QString& path)
 	if (!viewer)
 		return false;
 
-	viewer->setDeleteHandler([viewer](const QString& deletedPath, PathDeletion::Mode mode) {
-		return !FileOperations::deleteWithConfirmation({ deletedPath }, mode, viewer).empty();
-	});
+	FileOperations::installDeleteActions(*viewer, images);
 
 	// No browser exists yet in this mode, so leaving fullscreen opens one on the image being viewed.
 	viewer->setExitFullScreenHandler([viewer, currentPath] {
@@ -139,7 +137,7 @@ void openStartupWindow(const QString& path)
 			return;
 		if (isSupportedVideoFile(path))
 		{
-			VideoPlayerWindow::createPlayerWindow(nullptr, info.absoluteFilePath(), nullptr);
+			FileOperations::installDeleteActions(*VideoPlayerWindow::createPlayerWindow(nullptr, info.absoluteFilePath(), nullptr));
 			return;
 		}
 	}

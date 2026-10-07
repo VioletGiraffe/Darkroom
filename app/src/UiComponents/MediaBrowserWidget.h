@@ -75,6 +75,9 @@ private:
 	void showMediaItemContextMenu(const MediaId& id, const QPoint& globalPos);
 	void deleteMediaItemsInteractive(const std::vector<MediaId>& selection);
 	void removeMediaItemsFromLibraryInteractive(const std::vector<MediaId>& selection);
+	// The two workflows above for one item, as the viewer and player removal actions: true when it left the catalog.
+	[[nodiscard]] bool deleteMediaItemAndReportGone(const MediaId& id);
+	[[nodiscard]] bool untrackMediaItemAndReportGone(const MediaId& id);
 	void renameMediaItemInteractive(const MediaId& id);
 	void toggleBest(const MediaId& id);
 	void zoomCards(int steps);

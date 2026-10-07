@@ -1084,9 +1084,22 @@ void ImportDialog::previewStagedItem(const MediaId& id)
 	if (it == _staged.constEnd())
 		return;
 
+	// Both return whether the item left the staging list.
+	const auto removeStaged = [this](const MediaId& stagedId) {
+		removeStagedItems({ stagedId });
+		return !_staged.contains(stagedId);
+	};
+	const auto deleteStagedSource = [this](const MediaId& stagedId) {
+		deleteStagedSourceFiles({ stagedId });
+		return !_staged.contains(stagedId);
+	};
+
 	if (!isSupportedImageFile(it->path))
 	{
-		VideoPlayerWindow::createPlayerWindow(&_library, it->path, this);
+		VideoPlayerWindow* const player = VideoPlayerWindow::createPlayerWindow(&_library, it->path, this);
+		player->setRemovalActions(
+			{ tr("Remove from staging"), [id, removeStaged](const MediaId&, const QString&) { return removeStaged(id); } },
+			{ tr("Delete source file"), [id, deleteStagedSource](const MediaId&, const QString&) { return deleteStagedSource(id); } });
 		return;
 	}
 
@@ -1107,8 +1120,14 @@ void ImportDialog::previewStagedItem(const MediaId& id)
 	}
 
 	// No library: a staged photo is not a catalog item yet.
-	ImageViewerWindow::showForImages(nullptr, std::move(photoPaths), startIndex, this,
-		[this, browsedIds = std::move(browsedIds)](int index) { selectAndScrollToStagedItem(browsedIds[static_cast<size_t>(index)]); });
+	ImageViewerWindow* const viewer = ImageViewerWindow::showForImages(nullptr, std::move(photoPaths), startIndex, this,
+		[this, browsedIds](int index) { selectAndScrollToStagedItem(browsedIds[static_cast<size_t>(index)]); });
+	if (!viewer)
+		return;
+
+	viewer->setRemovalActions(
+		{ tr("Remove from staging"), [browsedIds, removeStaged](int index) { return removeStaged(browsedIds[static_cast<size_t>(index)]); } },
+		{ tr("Delete source file"), [browsedIds, deleteStagedSource](int index) { return deleteStagedSource(browsedIds[static_cast<size_t>(index)]); } });
 }
 
 void ImportDialog::selectAndScrollToStagedItem(const MediaId& id)
