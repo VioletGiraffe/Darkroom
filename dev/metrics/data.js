@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791373285489,
+  "lastUpdate": 1791376953001,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -13105,6 +13105,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .data",
             "value": 46,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 38.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 11,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "4625a7882e58e48b1920656e7ccc803b543820fa",
+          "message": "File deletion support from the video player and image viewer in Quickroom and Darkroom",
+          "timestamp": "2026-10-07T15:36:40+03:00",
+          "tree_id": "f1aefc41d8359592d8a81d7022fb37a27828e175",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/4625a7882e58e48b1920656e7ccc803b543820fa"
+        },
+        "date": 1791376950572,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 15474,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 774,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 17184,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 1507.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 781.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 1004.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 380.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 48,
             "unit": "KB"
           },
           {
