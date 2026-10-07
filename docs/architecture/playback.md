@@ -30,7 +30,9 @@ Each viewer opens fullscreen and is parentless, for a taskbar button of its own;
 instead, Qt blocking input to unparented windows under a modal dialog. Double-click and `F` switch between
 fullscreen and a window sized to the image, and the menu bar shows only outside fullscreen. A caller that defers
 creating the window behind the viewer can install an exit-fullscreen handler: it runs once when the user leaves
-fullscreen and decides whether that switch still happens. Alone among the windows here it persists no geometry.
+fullscreen and decides whether that switch still happens. A caller can also install a delete handler, which adds
+the Trash and permanent-delete actions: the viewer releases the file, the handler deletes it, and the viewer moves
+to the nearest remaining image or closes. Alone among the windows here it persists no geometry.
 The current image becomes the window icon after a delay, so several open viewers stay distinguishable in the
 taskbar without an icon being scaled for every image browsed past.
 

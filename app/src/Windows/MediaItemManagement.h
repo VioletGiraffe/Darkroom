@@ -21,10 +21,6 @@ namespace MediaItemManagement
 	// Bulleted itemDisplayName lines for a message box, in the given order, capped with an "... and N more" line.
 	[[nodiscard]] QString bulletedItemNameList(const Catalog& catalog, const std::vector<MediaId>& items);
 
-	// The caller owns the initial deletion confirmation. An absent path succeeds. A Trash failure reports QFile's
-	// available diagnostic and offers an explicit, default-cancelled permanent-deletion fallback.
-	[[nodiscard]] bool removePathTrashFirstInteractive(const QString& path, QWidget* dialogParent);
-
 	struct DeleteResult
 	{
 		// Items whose filesystem deletion completed and whose Catalog records were removed, in selection order.

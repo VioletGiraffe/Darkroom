@@ -21,6 +21,8 @@ that comes with it.
   folder to open and can select one entry in it.
 - `IconTileWidget` - tile for entries without an image preview (folders, videos): native file icon + caption,
   styled via the shared `framedThumbnail` QSS rule.
+- `FileOperations` - file operations with Quickroom's confirmation policy, shared by the browser and the
+  standalone viewer.
 
 Image tiles are `ThumbnailWidget`s (single-file constructor - the FrameViewerWindow pattern), so lazy
 dwell-loading, async decode, and Ctrl+wheel zoom are shared behavior, and `MediaGrid`'s card factory
@@ -32,6 +34,11 @@ Activation: double-click or Enter. Folders navigate in place (queued: the rebuil
 handler is still running); images open `ImageViewerWindow` browsing the folder's images, with the browse
 position reflected back into the grid selection; videos open `VideoPlayerWindow`. Both windows take a null
 `Library`, which leaves out their library-bound features (see [playback.md](architecture/playback.md)).
+
+Deletion: Del moves to Trash, Shift+Del deletes permanently, in the grid (the whole selection, folders with
+their contents) and in the image viewer (the current image). Only a permanent deletion or one including a folder
+asks first. The filesystem step is the shared `PathDeletion` module; the viewer deletes through a handler
+Quickroom installs, and the browser removes the deleted entries in place instead of relisting.
 
 Browser state (last folder, tile size, window geometry) persists under `browser/*` settings keys.
 

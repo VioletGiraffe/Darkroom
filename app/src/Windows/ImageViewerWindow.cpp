@@ -49,6 +49,19 @@ void ImageViewerWindow::setExitFullScreenHandler(std::function<bool()> handler)
 	_exitFullScreenHandler = std::move(handler);
 }
 
+void ImageViewerWindow::setDeleteHandler(DeleteHandler handler)
+{
+	assert_and_return_r(!_deleteHandler, );
+	_deleteHandler = std::move(handler);
+
+	_imageMenu->addSeparator();
+	QAction* trashAction = _imageMenu->addAction(tr("Move to Trash"), this, [this] { deleteCurrentImage(PathDeletion::Mode::Trash); });
+	trashAction->setShortcut(QKeySequence(Qt::Key_Delete));
+	QAction* deleteAction = _imageMenu->addAction(tr("Delete permanently"), this, [this] { deleteCurrentImage(PathDeletion::Mode::Permanent); });
+	deleteAction->setShortcut(QKeySequence(Qt::SHIFT | Qt::Key_Delete));
+	addActions({ trashAction, deleteAction }); // for the shortcuts, see buildMenus
+}
+
 ImageViewerWindow::ImageViewerWindow(Library* library, QStringList imagePaths, int startIndex, QWidget* parent)
 	: QMainWindow(parent)
 	, _library(library)
@@ -115,16 +128,16 @@ void ImageViewerWindow::buildMenus()
 	connect(overlayAction, &QAction::toggled, _view, &CImageViewerWidget::setOverlayVisible);
 	_view->setInfoStripHint(tr("Press %1 to hide").arg(overlayAction->shortcut().toString(QKeySequence::NativeText)));
 
-	QMenu* imageMenu = new QMenu(tr("Image"), menuBar);
-	_previousAction = imageMenu->addAction(tr("Previous"), this, [this] { showImage(adjacentIndex(Direction::Previous)); });
+	_imageMenu = new QMenu(tr("Image"), menuBar);
+	_previousAction = _imageMenu->addAction(tr("Previous"), this, [this] { showImage(adjacentIndex(Direction::Previous)); });
 	_previousAction->setShortcuts({ QKeySequence(Qt::Key_Left), QKeySequence(Qt::Key_PageUp) });
-	_nextAction = imageMenu->addAction(tr("Next"), this, [this] { showImage(adjacentIndex(Direction::Next)); });
+	_nextAction = _imageMenu->addAction(tr("Next"), this, [this] { showImage(adjacentIndex(Direction::Next)); });
 	_nextAction->setShortcuts({ QKeySequence(Qt::Key_Right), QKeySequence(Qt::Key_PageDown) });
 
 	if (_library)
 	{
-		imageMenu->addSeparator();
-		_bestAction = imageMenu->addAction(tr("Best"), this, &ImageViewerWindow::toggleBest);
+		_imageMenu->addSeparator();
+		_bestAction = _imageMenu->addAction(tr("Best"), this, &ImageViewerWindow::toggleBest);
 		_bestAction->setCheckable(true);
 		_bestAction->setShortcut(QKeySequence(Qt::Key_B));
 	}
@@ -132,11 +145,11 @@ void ImageViewerWindow::buildMenus()
 	menuBar->addMenu(fileMenu);
 	menuBar->addMenu(editMenu);
 	menuBar->addMenu(viewMenu);
-	menuBar->addMenu(imageMenu);
+	menuBar->addMenu(_imageMenu);
 
 	// A shortcut only matches while one of its action's widgets is visible, and the menu bar is hidden in
 	// fullscreen, so the window holds every action as well.
-	for (const QMenu* menu : { fileMenu, editMenu, viewMenu, imageMenu })
+	for (const QMenu* menu : { fileMenu, editMenu, viewMenu, _imageMenu })
 		for (QAction* action : menu->actions())
 			if (!action->isSeparator())
 				addAction(action);
@@ -217,6 +230,30 @@ int ImageViewerWindow::adjacentIndex(Direction direction) const
 			return index;
 	}
 	return -1;
+}
+
+void ImageViewerWindow::deleteCurrentImage(PathDeletion::Mode mode)
+{
+	const QString path = currentPath();
+	// Windows refuses to delete a file that is open.
+	const bool wasAnimated = _view->isAnimated();
+	_view->closeFile();
+
+	if (!_deleteHandler(path, mode))
+	{
+		if (wasAnimated)
+			_view->displayImage(path, false); // resumes the animation
+		return;
+	}
+
+	int remaining = adjacentIndex(Direction::Next);
+	if (remaining < 0)
+		remaining = adjacentIndex(Direction::Previous);
+
+	if (remaining >= 0)
+		showImage(remaining);
+	else
+		close();
 }
 
 MediaId ImageViewerWindow::currentMediaId() const

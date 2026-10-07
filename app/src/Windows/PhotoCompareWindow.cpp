@@ -8,6 +8,7 @@
 #include "UiComponents/SegmentedToggle.h"
 #include "Utils.h"
 #include "Windows/MediaItemManagement.h"
+#include "Windows/PathDeletion.h"
 
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
@@ -679,7 +680,7 @@ void PhotoCompareWindow::deletePhotoInteractive(int index)
 			QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
 		return;
 
-	if (MediaItemManagement::removePathTrashFirstInteractive(filePath, this))
+	if (PathDeletion::removePathTrashFirstInteractive(filePath, this))
 		removePhotoFromComparison(index);
 }
 

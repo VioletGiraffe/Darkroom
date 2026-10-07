@@ -1,4 +1,5 @@
 #include "BrowserWindow.h"
+#include "FileOperations.h"
 #include "IconTileWidget.h"
 #include "UiComponents/MediaGrid.h"
 #include "UiComponents/ThumbnailWidget.h"
@@ -20,6 +21,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QMenu>
 #include <QMetaObject>
 #include <QMouseEvent>
+#include <QPointer>
 #include <QScrollBar>
 #include <QSettings>
 #include <QShortcut>
@@ -31,6 +33,8 @@ DISABLE_COMPILER_WARNINGS
 #include <QUrl>
 #include <QVBoxLayout>
 RESTORE_COMPILER_WARNINGS
+
+#include <algorithm>
 
 namespace {
 
@@ -161,6 +165,11 @@ void BrowserWindow::setupUi()
 	auto* enterShortcut = new QShortcut(QKeySequence(Qt::Key_Enter), _grid, activateCurrent);
 	enterShortcut->setContext(Qt::WidgetShortcut);
 
+	auto* trashShortcut = new QShortcut(QKeySequence(Qt::Key_Delete), _grid, [this] { deletePaths(selectedPaths(), PathDeletion::Mode::Trash); });
+	trashShortcut->setContext(Qt::WidgetShortcut);
+	auto* deleteShortcut = new QShortcut(QKeySequence(Qt::SHIFT | Qt::Key_Delete), _grid, [this] { deletePaths(selectedPaths(), PathDeletion::Mode::Permanent); });
+	deleteShortcut->setContext(Qt::WidgetShortcut);
+
 	// Coalesce wheel steps into one grid rebuild.
 	_zoomDebounce = new QTimer(this);
 	_zoomDebounce->setSingleShot(true);
@@ -177,17 +186,16 @@ bool BrowserWindow::listDirectory(const QString& path)
 	_grid->clear();
 	_currentPath = dir.absolutePath();
 
-	int folders = 0, images = 0, videos = 0;
 	const QSize cell = cellSize(_tileSize);
 	for (const QFileInfo& info : dir.entryInfoList(QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot, QDir::Unsorted))
 	{
 		EntryKind kind;
 		if (info.isDir())
-			{ kind = EntryKind::Folder; ++folders; }
+			kind = EntryKind::Folder;
 		else if (isSupportedImageFile(info.filePath()))
-			{ kind = EntryKind::Image; ++images; }
+			kind = EntryKind::Image;
 		else if (isSupportedVideoFile(info.filePath()))
-			{ kind = EntryKind::Video; ++videos; }
+			kind = EntryKind::Video;
 		else
 			continue;
 
@@ -204,7 +212,7 @@ bool BrowserWindow::listDirectory(const QString& path)
 
 	_pathEdit->setText(QDir::toNativeSeparators(_currentPath));
 	setWindowTitle((dir.dirName().isEmpty() ? QDir::toNativeSeparators(_currentPath) : dir.dirName()) + QStringLiteral(" - Quickroom"));
-	statusBar()->showMessage(tr("%1 folders, %2 images, %3 videos").arg(folders).arg(images).arg(videos));
+	updateStatusCounts();
 	QSettings{}.setValue(LAST_FOLDER_KEY, _currentPath);
 	return true;
 }
@@ -292,8 +300,22 @@ void BrowserWindow::viewImage(const QString& path)
 	}
 	assert_and_return_r(startIndex >= 0, );
 
-	ImageViewerWindow::showForImages(nullptr, imagePaths, startIndex, this,
-		[this, imagePaths](int index) { selectAndScrollToPath(imagePaths[index]); });
+	// The viewer is parentless and can outlive this window.
+	const QPointer<BrowserWindow> self{ this };
+	ImageViewerWindow* const viewer = ImageViewerWindow::showForImages(nullptr, imagePaths, startIndex, this,
+		[self, imagePaths](int index) {
+			if (self)
+				self->selectAndScrollToPath(imagePaths[index]);
+		});
+	if (!viewer)
+		return;
+
+	viewer->setDeleteHandler([self, viewer](const QString& deletedPath, PathDeletion::Mode mode) {
+		const bool deleted = !FileOperations::deleteWithConfirmation({ deletedPath }, mode, viewer).empty();
+		if (deleted && self)
+			self->removeEntries({ deletedPath });
+		return deleted;
+	});
 }
 
 void BrowserWindow::playVideo(const QString& path)
@@ -313,6 +335,21 @@ void BrowserWindow::showEntryContextMenu(const QString& path, QPoint globalPos)
 		if (!revealInFileManager(path))
 			reportMissingFile(this, path);
 	});
+
+	// A tile outside the selection is acted on alone.
+	QStringList targets = selectedPaths();
+	if (!targets.contains(path))
+		targets = { path };
+	// Queued, like folder activation in buildTile: the tile showing this menu may be among those removed.
+	const auto addDeleteAction = [this, &menu, targets](const QString& text, PathDeletion::Mode mode) {
+		menu.addAction(text, this, [this, targets, mode] {
+			QMetaObject::invokeMethod(this, [this, targets, mode] { deletePaths(targets, mode); }, Qt::QueuedConnection);
+		});
+	};
+	menu.addSeparator();
+	addDeleteAction(tr("Move to Trash"), PathDeletion::Mode::Trash);
+	addDeleteAction(tr("Delete permanently"), PathDeletion::Mode::Permanent);
+
 	menu.exec(globalPos);
 }
 
@@ -327,6 +364,55 @@ void BrowserWindow::selectAndScrollToPath(const QString& path)
 		_grid->scrollToItem(item);
 		return;
 	}
+}
+
+QStringList BrowserWindow::selectedPaths() const
+{
+	QStringList paths;
+	for (const QListWidgetItem* item : _grid->selectedItems())
+		paths.push_back(static_cast<const GridEntry*>(item)->path);
+	return paths;
+}
+
+void BrowserWindow::deletePaths(const QStringList& paths, PathDeletion::Mode mode)
+{
+	removeEntries(FileOperations::deleteWithConfirmation(paths, mode, this));
+}
+
+void BrowserWindow::removeEntries(const QSet<QString>& paths)
+{
+	int rowAfterLastRemoved = -1;
+	for (int row = _grid->count() - 1; row >= 0; --row)
+	{
+		if (!paths.contains(static_cast<const GridEntry*>(_grid->item(row))->path))
+			continue;
+
+		delete _grid->takeItem(row);
+		// Bottom-up: the first removal sets the row, each one above it shifts that row up.
+		rowAfterLastRemoved = rowAfterLastRemoved < 0 ? row : rowAfterLastRemoved - 1;
+	}
+	if (rowAfterLastRemoved < 0)
+		return;
+
+	if (QListWidgetItem* next = _grid->item(std::min(rowAfterLastRemoved, _grid->count() - 1)))
+		_grid->setCurrentItem(next);
+	_grid->ensureVisibleCardsExist();
+	updateStatusCounts();
+}
+
+void BrowserWindow::updateStatusCounts()
+{
+	int folders = 0, images = 0, videos = 0;
+	for (int row = 0, rows = _grid->count(); row < rows; ++row)
+	{
+		switch (static_cast<const GridEntry*>(_grid->item(row))->kind)
+		{
+		case EntryKind::Folder: ++folders; break;
+		case EntryKind::Image:  ++images;  break;
+		case EntryKind::Video:  ++videos;  break;
+		}
+	}
+	statusBar()->showMessage(tr("%1 folders, %2 images, %3 videos").arg(folders).arg(images).arg(videos));
 }
 
 QWidget* BrowserWindow::buildTile(QListWidgetItem* item)

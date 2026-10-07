@@ -73,6 +73,7 @@ SOURCES += \
 	../app/src/Windows/ImageViewerWindow.cpp \
 	../app/src/Windows/VideoPlayerWindow.cpp \
 	../app/src/Windows/OscillatingPlayback.cpp \
+	../app/src/Windows/PathDeletion.cpp \
 	../app/src/Windows/SingleFrameExtraction.cpp \
 	../app/src/UiComponents/ThumbnailWidget.cpp \
 	../app/src/UiComponents/MediaGrid.cpp \

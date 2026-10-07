@@ -16,7 +16,7 @@
 #include "Windows/ImageViewerWindow.h"
 #include "Windows/ImportExecution.h"
 #include "Windows/LabelManagement.h"
-#include "Windows/MediaItemManagement.h"
+#include "Windows/PathDeletion.h"
 #include "Windows/SourceRelocation.h"
 #include "Theme/Theme.h"
 #include "theme/ctintedsvgiconengine.h"
@@ -62,6 +62,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QMimeData>
 #include <QProgressDialog>
 #include <QPushButton>
+#include <QSet>
 #include <QSettings>
 #include <QSplitter>
 #include <QThread>
@@ -1186,10 +1187,14 @@ void ImportDialog::deleteStagedSourceFiles(const std::vector<MediaId>& ids)
 			QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
 		return;
 
+	QStringList paths;
+	for (const MediaId& id : ids)
+		paths.push_back(_staged.value(id).path);
+	const QSet<QString> removedPaths = PathDeletion::removePathsInteractive(paths, PathDeletion::Mode::Trash, this);
+
 	for (const MediaId& id : ids)
 	{
-		const auto it = _staged.constFind(id);
-		if (it != _staged.constEnd() && MediaItemManagement::removePathTrashFirstInteractive(it->path, this))
+		if (removedPaths.contains(_staged.value(id).path))
 			unstage(id);
 	}
 }

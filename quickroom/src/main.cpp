@@ -1,6 +1,7 @@
 #include "BrowserWindow.h"
 #include "Core/CpuThreadPool.h"
 #include "Core/IoThreadPool.h"
+#include "FileOperations.h"
 #include "Theme/Style.h"
 #include "Utils.h"
 #include "Windows/ImageViewerWindow.h"
@@ -100,6 +101,10 @@ bool showImageViewer(const QString& path)
 		[currentPath, images](int browsedIndex) { *currentPath = images.at(browsedIndex); });
 	if (!viewer)
 		return false;
+
+	viewer->setDeleteHandler([viewer](const QString& deletedPath, PathDeletion::Mode mode) {
+		return !FileOperations::deleteWithConfirmation({ deletedPath }, mode, viewer).empty();
+	});
 
 	// No browser exists yet in this mode, so leaving fullscreen opens one on the image being viewed.
 	viewer->setExitFullScreenHandler([viewer, currentPath] {

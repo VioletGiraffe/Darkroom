@@ -1,11 +1,14 @@
 #pragma once
 
+#include "Windows/PathDeletion.h"
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QFileIconProvider>
 #include <QMainWindow>
+#include <QSet>
 #include <QString>
+#include <QStringList>
 RESTORE_COMPILER_WARNINGS
 
 #include <vector>
@@ -52,6 +55,12 @@ private:
 	void showEntryContextMenu(const QString& path, QPoint globalPos);
 	// Does nothing when the path is no longer in the grid.
 	void selectAndScrollToPath(const QString& path);
+
+	[[nodiscard]] QStringList selectedPaths() const;
+	void deletePaths(const QStringList& paths, PathDeletion::Mode mode);
+	// Drops the entries of paths; the entry that followed the last of them becomes current.
+	void removeEntries(const QSet<QString>& paths);
+	void updateStatusCounts();
 
 	[[nodiscard]] QWidget* buildTile(QListWidgetItem* item);
 	void zoomTiles(int steps);
