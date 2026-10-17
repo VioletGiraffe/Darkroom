@@ -8,7 +8,7 @@ Toolchain minimums (Qt 6.8, macOS 13.3) and their reasons are stated at the top 
 
 | Project | Builds | Purpose |
 |---|---|---|
-| `Darkroom.pro` | Darkroom, Quickroom, and all five submodule libraries | the product |
+| `Darkroom.pro` | Darkroom, Quickroom, and all six submodule libraries | the product |
 | `Tests.pro` | `cpputils`, `qtutils`, and `tests/` | the test binary builds and runs on its own, including when the app does not compile |
 
 Every qmake and msbuild invocation names its project: `qmake -tp vc -r Tests.pro`, `msbuild Darkroom.sln /t:Darkroom`.
@@ -22,7 +22,8 @@ The app is not a library. Two projects compile app sources directly and hand-lis
 - `tests/tests.pro` - the model half of `Core/` (`Catalog`, `CatalogIntegrity`, `JsonPersistence`, `Library`,
   `MediaId`, `MetadataStore`) plus `Utils.cpp` for its path helpers. Its `LIBS` are hand-listed too.
 - `quickroom/quickroom.pro` - `Core/`, `Theme/`, and `crashhandler/` whole, plus the closure of the shared viewer and
-  player windows. Its comments name the list.
+  player windows. Its comments name the list. It also compiles the `file-operations` engine and dialogs through that
+  submodule's `.pri` manifests, and links `thin_io` for them.
 
 **The link trap, shared by both:** a compiled app source gaining an `#include` of a submodule library that the project
 does not link breaks that project's link while Darkroom still builds. CI builds tests before the app, so the failure

@@ -17,6 +17,7 @@ DISABLE_COMPILER_WARNINGS
 RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
+#include <utility>
 
 namespace {
 
@@ -61,6 +62,16 @@ MediaGrid::MediaGrid(QWidget* parent)
 void MediaGrid::setDragUrlsProvider(std::function<QList<QUrl>(const QList<QListWidgetItem*>&)> provider)
 {
 	_dragUrlsProvider = std::move(provider);
+}
+
+void MediaGrid::setDragActions(Qt::DropActions actions)
+{
+	_dragActions = actions;
+}
+
+void MediaGrid::setDragFinishedHandler(std::function<void(Qt::DropAction action, const QList<QUrl>& urls)> handler)
+{
+	_dragFinishedHandler = std::move(handler);
 }
 
 void MediaGrid::setCardFactory(std::function<QWidget*(QListWidgetItem*)> factory)
@@ -186,5 +197,7 @@ void MediaGrid::startDrag(Qt::DropActions /*supportedActions*/)
 		drag->setHotSpot(QPoint(pixmap.width() / 2, pixmap.height() / 2));
 	}
 
-	drag->exec(Qt::CopyAction);
+	const Qt::DropAction result = drag->exec(_dragActions);
+	if (_dragFinishedHandler)
+		_dragFinishedHandler(result, urls);
 }

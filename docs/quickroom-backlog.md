@@ -10,9 +10,7 @@
   rewritten in place (stale tile), a file still being copied in by another program (tile built from a partial file),
   and the shown folder being renamed, moved or sent to Trash.
 - Video thumbnails: needs per-file ffmpeg extraction and a cache; tiles show the shell icon today.
-- Copy/paste of the grid selection as file URLs, pasting URLs from other apps too, and dropping files onto the
-  browser. Paste copies everything given (folders included) off the GUI thread and asks on a name collision.
-- Cut/move, and pasting a clipboard bitmap as a new file.
+- Pasting a clipboard bitmap as a new file.
 - Deduplicate the logging/message-handler block shared verbatim by both apps' `main.cpp`.
 - Camera RAW support (DNG, CR2/CR3, NEF, ARW, ...). Needs a third file-type icon family: sRGB has no room
   for a dozen more body colours, so reuse colours across body shapes or vary formats within one family hue;

@@ -22,7 +22,7 @@ that comes with it.
 - `IconTileWidget` - tile for entries without an image preview (folders, videos): native file icon + caption,
   styled via the shared `framedThumbnail` QSS rule.
 - `FileOperations` - file operations with Quickroom's confirmation policy, shared by the browser and the
-  standalone viewer.
+  standalone viewer: deletion, the file clipboard, and copy/move through the `file-operations` engine.
 
 Image tiles are `ThumbnailWidget`s (single-file constructor - the FrameViewerWindow pattern), so lazy
 dwell-loading, async decode, and Ctrl+wheel zoom are shared behavior, and `MediaGrid`'s card factory
@@ -40,6 +40,19 @@ their contents) and in the image viewer and video player (the current item). Onl
 including a folder asks first. The filesystem step is the shared `PathDeletion` module; the viewer and player delete
 through the removal actions `FileOperations` installs, and the browser removes the deleted entries in place instead
 of relisting.
+
+Copy and move:
+
+- Ctrl+C / Ctrl+X put the selection on the clipboard as file URLs, a cut with the marker file managers use for
+  "move on paste" (Explorer's on Windows, KDE's and GNOME's elsewhere). Tiles of cut files are faded, whichever app cut
+  them.
+- Ctrl+V pastes into the folder shown; a folder tile's menu pastes into that folder. Everything on the clipboard is
+  pasted, folders and unsupported files included. A cut is moved and taken off the clipboard.
+- A drop lands in the folder tile under the cursor, else in the folder shown. It follows file managers: a move within
+  one volume, a copy across volumes, unless the copy or move key is held. Dragging out offers copy and move; the target
+  performs a move itself.
+- The `file-operations` engine runs each transfer in its own progress dialog, which asks about collisions. Before a
+  move, open players and viewers release the files moved. The folder watch shows the result.
 
 The browser watches the folder it shows and refreshes it shortly after a change, so changes made by other programs
 appear without F5. A refresh compares the listing with the grid: unchanged entries keep their tiles, and a file

@@ -11,7 +11,7 @@ RESTORE_COMPILER_WARNINGS
 class QResizeEvent;
 class QUrl;
 
-// Icon-mode media grid that exports the selected source URLs with CopyAction and paints an empty message when
+// Icon-mode media grid that exports the selected source URLs by drag and paints an empty message when
 // no item is visible. MediaBrowserWidget supplies the data sources; the view contains no catalog logic.
 class MediaGrid final : public QListWidget {
 public:
@@ -19,6 +19,10 @@ public:
 
 	// Called with the current selection; an empty result cancels the drag.
 	void setDragUrlsProvider(std::function<QList<QUrl>(const QList<QListWidgetItem*>&)> provider);
+	// The actions a drag offers its target; CopyAction unless set. The grid never deletes anything after a move.
+	void setDragActions(Qt::DropActions actions);
+	// Called once a drag ends, with the action the target reported and the URLs dragged.
+	void setDragFinishedHandler(std::function<void(Qt::DropAction action, const QList<QUrl>& urls)> handler);
 
 	// Rows carry no card until they approach the viewport; the owner builds one for the given row on demand.
 	void setCardFactory(std::function<QWidget*(QListWidgetItem*)> factory);
@@ -40,6 +44,8 @@ protected:
 
 private:
 	std::function<QList<QUrl>(const QList<QListWidgetItem*>&)> _dragUrlsProvider;
+	std::function<void(Qt::DropAction action, const QList<QUrl>& urls)> _dragFinishedHandler;
+	Qt::DropActions _dragActions = Qt::CopyAction;
 	std::function<QWidget*(QListWidgetItem*)> _cardFactory;
 	QString _emptyMessage;
 };

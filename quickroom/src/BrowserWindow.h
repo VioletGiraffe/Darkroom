@@ -16,6 +16,9 @@ RESTORE_COMPILER_WARNINGS
 
 class MediaGrid;
 class QAction;
+class QDragEnterEvent;
+class QDragMoveEvent;
+class QDropEvent;
 class QFileSystemWatcher;
 class QLineEdit;
 class QListWidgetItem;
@@ -33,6 +36,11 @@ public:
 protected:
 	// Forwards mouse back/forward buttons from the grid viewport to history navigation.
 	bool eventFilter(QObject* watched, QEvent* event) override;
+
+	// Files dropped anywhere on the window are copied or moved into the folder shown, or into the folder tile under the cursor.
+	void dragEnterEvent(QDragEnterEvent* event) override;
+	void dragMoveEvent(QDragMoveEvent* event) override;
+	void dropEvent(QDropEvent* event) override;
 
 private:
 	explicit BrowserWindow(const QString& folder);
@@ -55,7 +63,8 @@ private:
 	// Opens the viewer browsing all images the grid currently shows.
 	void viewImage(const QString& path);
 	void playVideo(const QString& path);
-	void showEntryContextMenu(const QString& path, QPoint globalPos);
+	void showEntryContextMenu(const QString& path, bool isFolder, QPoint globalPos);
+	void showBackgroundContextMenu(QPoint globalPos);
 	// Does nothing when the path is no longer in the grid.
 	void selectAndScrollToPath(const QString& path);
 
@@ -66,6 +75,17 @@ private:
 	// removeEntries for one path, safe to call after this window is gone: viewers and players can outlive it.
 	[[nodiscard]] std::function<void(const QString& path)> entryRemover();
 	void updateStatusCounts();
+
+	// Copies or moves the files on the clipboard into folder; a cut is moved and taken off the clipboard.
+	void pasteInto(const QString& folder);
+	// Fades the tiles of the files cut to the clipboard, by this or any other app.
+	void updateCutMarks();
+	[[nodiscard]] bool isCut(const QString& path) const;
+
+	// The folder a drop lands in. Empty where it makes no sense: the grid's own items back into their folder or into themselves.
+	[[nodiscard]] QString dropTargetFolder(const QDropEvent& event, const QStringList& sources) const;
+	// Follows file managers: a move within one volume and a copy across volumes, unless the copy or move key is held.
+	[[nodiscard]] Qt::DropAction dropAction(const QDropEvent& event) const;
 
 	[[nodiscard]] QWidget* buildTile(QListWidgetItem* item);
 	void zoomTiles(int steps);
@@ -86,4 +106,8 @@ private:
 	QString _currentPath;
 	std::vector<QString> _history;
 	int _historyIndex = -1;
+
+	QSet<QString> _cutPathKeys; // pathComparisonKey of each cut file
+	// Taken when a drag enters; folder tiles count as the shown folder's volume.
+	bool _dropSourcesOnShownVolume = false;
 };

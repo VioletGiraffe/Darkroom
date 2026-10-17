@@ -46,7 +46,9 @@ INCLUDEPATH += \
 	../qtutils \
 	../cpputils \
 	../cpp-template-utils \
-	../image-processing
+	../image-processing \
+	../file-operations \
+	../thin_io/src
 
 ###################################################
 #                 SOURCES
@@ -81,6 +83,10 @@ SOURCES += \
 	../app/src/UiComponents/DragGestureHelper.cpp \
 	../app/src/UiComponents/MarkerSlider.cpp
 
+# The copy/move engine and its dialogs; not config.pri, which would reset QT and the build settings.
+include(../file-operations/fileoperations/fileoperations.pri)
+include(../file-operations/fileoperationsui/fileoperationsui.pri)
+
 RESOURCES += res/quickroom.qrc
 # Theme and the shared windows load icons from the app's resource file.
 RESOURCES += ../app/res/resources.qrc
@@ -89,7 +95,7 @@ RESOURCES += ../app/res/resources.qrc
 #                 LIBS
 ###################################################
 
-LIBS += -L$${DESTDIR} -lqtutils -lcpputils -limage-processing
+LIBS += -L$${DESTDIR} -lqtutils -lcpputils -limage-processing -lthin_io
 include(../cpputils/dependencies.pri)
 
 ###################################################

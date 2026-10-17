@@ -4,6 +4,7 @@
 #include "UiComponents/MediaGrid.h"
 #include "UiComponents/ThumbnailWidget.h"
 #include "Windows/ImageViewerWindow.h"
+#include "Windows/OpenFileRelease.h"
 #include "Windows/VideoPlayerWindow.h"
 #include "Utils.h"
 #include "assert/advanced_assert.h"
@@ -12,22 +13,30 @@
 #include "widgets/cpersistenceenabler.h"
 
 DISABLE_COMPILER_WARNINGS
+#include <QClipboard>
 #include <QDateTime>
 #include <QDir>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
 #include <QFile>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
+#include <QGraphicsOpacityEffect>
+#include <QGuiApplication>
 #include <QKeySequence>
 #include <QLineEdit>
 #include <QListWidgetItem>
 #include <QMenu>
 #include <QMetaObject>
+#include <QMimeData>
 #include <QMouseEvent>
 #include <QPointer>
 #include <QSettings>
 #include <QShortcut>
 #include <QStandardPaths>
 #include <QStatusBar>
+#include <QStorageInfo>
 #include <QStyle>
 #include <QTimer>
 #include <QToolBar>
@@ -71,6 +80,27 @@ QWidget* inSelectionFrame(QWidget* tile)
 	layout->setContentsMargins(SELECTION_RING, SELECTION_RING, SELECTION_RING, SELECTION_RING);
 	layout->addWidget(tile);
 	return frame;
+}
+
+// A cut file's tile is drawn faded, as file managers draw theirs.
+void setCutMark(QWidget* card, bool cut)
+{
+	if ((card->graphicsEffect() != nullptr) == cut)
+		return;
+
+	QGraphicsOpacityEffect* effect = nullptr;
+	if (cut)
+	{
+		effect = new QGraphicsOpacityEffect();
+		effect->setOpacity(0.5);
+	}
+	card->setGraphicsEffect(effect); // deletes the previous effect
+}
+
+[[nodiscard]] bool clipboardHasFiles()
+{
+	const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
+	return mime && !FileOperations::localFilePaths(*mime).empty();
 }
 
 // The requested folder, else the remembered one, else Pictures, else home. A requested folder that has gone
@@ -210,19 +240,41 @@ void BrowserWindow::setupUi()
 			urls.push_back(QUrl::fromLocalFile(static_cast<const GridEntry*>(item)->path));
 		return urls;
 	});
+	// The target performs a move itself, possibly after the drag returns; released files let it, or its retry, succeed.
+	_grid->setDragActions(Qt::CopyAction | Qt::MoveAction);
+	_grid->setDragFinishedHandler([](Qt::DropAction action, const QList<QUrl>& urls) {
+		if (action != Qt::MoveAction && action != Qt::TargetMoveAction)
+			return;
+		QStringList paths;
+		for (const QUrl& url : urls)
+			paths.push_back(url.toLocalFile());
+		releaseMediaFilesHeldOpen(paths);
+	});
+	_grid->setContextMenuPolicy(Qt::CustomContextMenu);
+	connect(_grid, &QWidget::customContextMenuRequested, this, [this](QPoint pos) {
+		const QPoint globalPos = _grid->viewport()->mapToGlobal(pos);
+		if (const auto* entry = static_cast<const GridEntry*>(_grid->itemAt(pos)))
+			showEntryContextMenu(entry->path, entry->kind == EntryKind::Folder, globalPos);
+		else
+			showBackgroundContextMenu(globalPos);
+	});
 	_grid->viewport()->installEventFilter(this);
 	setCentralWidget(_grid);
+	setAcceptDrops(true);
 
+	// Grid-only: the path field keeps its own keys.
 	const auto activateCurrent = [this] { activateEntry(_grid->currentItem()); };
-	auto* returnShortcut = new QShortcut(QKeySequence(Qt::Key_Return), _grid, activateCurrent);
-	returnShortcut->setContext(Qt::WidgetShortcut);
-	auto* enterShortcut = new QShortcut(QKeySequence(Qt::Key_Enter), _grid, activateCurrent);
-	enterShortcut->setContext(Qt::WidgetShortcut);
+	new QShortcut(QKeySequence(Qt::Key_Return), _grid, activateCurrent, Qt::WidgetShortcut);
+	new QShortcut(QKeySequence(Qt::Key_Enter), _grid, activateCurrent, Qt::WidgetShortcut);
+	new QShortcut(QKeySequence(Qt::Key_Delete), _grid, [this] { deletePaths(selectedPaths(), PathDeletion::Mode::Trash); }, Qt::WidgetShortcut);
+	new QShortcut(QKeySequence(Qt::SHIFT | Qt::Key_Delete), _grid, [this] { deletePaths(selectedPaths(), PathDeletion::Mode::Permanent); }, Qt::WidgetShortcut);
+	new QShortcut(QKeySequence::Copy, _grid, [this] { FileOperations::putPathsOnClipboard(selectedPaths(), false); }, Qt::WidgetShortcut);
+	// Not QKeySequence::Cut: on Windows and Linux it includes Shift+Del, the permanent deletion above.
+	new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_X), _grid, [this] { FileOperations::putPathsOnClipboard(selectedPaths(), true); }, Qt::WidgetShortcut);
+	new QShortcut(QKeySequence::Paste, _grid, [this] { pasteInto(_currentPath); }, Qt::WidgetShortcut);
 
-	auto* trashShortcut = new QShortcut(QKeySequence(Qt::Key_Delete), _grid, [this] { deletePaths(selectedPaths(), PathDeletion::Mode::Trash); });
-	trashShortcut->setContext(Qt::WidgetShortcut);
-	auto* deleteShortcut = new QShortcut(QKeySequence(Qt::SHIFT | Qt::Key_Delete), _grid, [this] { deletePaths(selectedPaths(), PathDeletion::Mode::Permanent); });
-	deleteShortcut->setContext(Qt::WidgetShortcut);
+	connect(QGuiApplication::clipboard(), &QClipboard::dataChanged, this, &BrowserWindow::updateCutMarks);
+	updateCutMarks();
 
 	// Coalesce wheel steps into one grid rebuild.
 	_zoomDebounce = new QTimer(this);
@@ -435,7 +487,7 @@ std::function<void(const QString& path)> BrowserWindow::entryRemover()
 	};
 }
 
-void BrowserWindow::showEntryContextMenu(const QString& path, QPoint globalPos)
+void BrowserWindow::showEntryContextMenu(const QString& path, bool isFolder, QPoint globalPos)
 {
 	QMenu menu(this);
 	menu.addAction(revealInFileManagerActionText(), this, [this, path] {
@@ -447,6 +499,13 @@ void BrowserWindow::showEntryContextMenu(const QString& path, QPoint globalPos)
 	QStringList targets = selectedPaths();
 	if (!targets.contains(path))
 		targets = { path };
+
+	menu.addSeparator();
+	menu.addAction(tr("Cut"), this, [targets] { FileOperations::putPathsOnClipboard(targets, true); });
+	menu.addAction(tr("Copy"), this, [targets] { FileOperations::putPathsOnClipboard(targets, false); });
+	if (isFolder)
+		menu.addAction(tr("Paste into folder"), this, [this, path] { pasteInto(path); })->setEnabled(clipboardHasFiles());
+
 	// Queued, like folder activation in buildTile: the tile showing this menu may be among those removed.
 	const auto addDeleteAction = [this, &menu, targets](PathDeletion::Mode mode) {
 		menu.addAction(FileOperations::deleteActionText(mode), this, [this, targets, mode] {
@@ -458,6 +517,125 @@ void BrowserWindow::showEntryContextMenu(const QString& path, QPoint globalPos)
 	addDeleteAction(PathDeletion::Mode::Permanent);
 
 	menu.exec(globalPos);
+}
+
+void BrowserWindow::showBackgroundContextMenu(QPoint globalPos)
+{
+	QMenu menu(this);
+	menu.addAction(tr("Paste"), this, [this] { pasteInto(_currentPath); })->setEnabled(clipboardHasFiles());
+	menu.exec(globalPos);
+}
+
+void BrowserWindow::pasteInto(const QString& folder)
+{
+	const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
+	if (!mime)
+		return;
+
+	const QStringList sources = FileOperations::localFilePaths(*mime);
+	if (sources.empty())
+		return;
+
+	const bool cut = FileOperations::isMarkedAsCut(*mime);
+	if (cut)
+		QGuiApplication::clipboard()->clear(); // invalidates mime
+	FileOperations::startTransfer(cut ? TransferKind::Move : TransferKind::Copy, sources, folder, this);
+}
+
+void BrowserWindow::updateCutMarks()
+{
+	_cutPathKeys.clear();
+	if (const QMimeData* mime = QGuiApplication::clipboard()->mimeData(); mime && FileOperations::isMarkedAsCut(*mime))
+	{
+		for (const QString& path : FileOperations::localFilePaths(*mime))
+			_cutPathKeys.insert(pathComparisonKey(path));
+	}
+
+	for (int row = 0, rows = _grid->count(); row < rows; ++row)
+	{
+		QListWidgetItem* item = _grid->item(row);
+		if (QWidget* card = _grid->itemWidget(item))
+			setCutMark(card, isCut(static_cast<const GridEntry*>(item)->path));
+	}
+}
+
+bool BrowserWindow::isCut(const QString& path) const
+{
+	return !_cutPathKeys.empty() && _cutPathKeys.contains(pathComparisonKey(path));
+}
+
+QString BrowserWindow::dropTargetFolder(const QDropEvent& event, const QStringList& sources) const
+{
+	const QPoint viewportPos = _grid->viewport()->mapFrom(this, event.position().toPoint());
+	const auto* entry = _grid->viewport()->rect().contains(viewportPos) ? static_cast<const GridEntry*>(_grid->itemAt(viewportPos)) : nullptr;
+	const bool ontoFolderTile = entry && entry->kind == EntryKind::Folder;
+	if (!ontoFolderTile && event.source() == _grid)
+		return {};
+
+	const QString target = ontoFolderTile ? entry->path : _currentPath;
+	const QString targetKey = pathComparisonKey(target);
+	const bool intoASource = std::any_of(sources.cbegin(), sources.cend(), [&targetKey](const QString& source) { return pathComparisonKey(source) == targetKey; });
+	return intoASource ? QString() : target;
+}
+
+Qt::DropAction BrowserWindow::dropAction(const QDropEvent& event) const
+{
+	const Qt::KeyboardModifiers modifiers = event.modifiers();
+#ifdef Q_OS_MACOS
+	// Finder's keys: Option copies, Command moves. Qt reports them as Alt and Control.
+	const bool copyKey = modifiers.testFlag(Qt::AltModifier);
+	const bool moveKey = modifiers.testFlag(Qt::ControlModifier);
+#else
+	const bool copyKey = modifiers.testFlag(Qt::ControlModifier);
+	const bool moveKey = modifiers.testFlag(Qt::ShiftModifier);
+#endif
+	const bool move = !copyKey && (moveKey || _dropSourcesOnShownVolume);
+	const Qt::DropAction preferred = move ? Qt::MoveAction : Qt::CopyAction;
+	if (event.possibleActions().testFlag(preferred))
+		return preferred;
+	return event.possibleActions().testFlag(Qt::CopyAction) ? Qt::CopyAction : Qt::IgnoreAction;
+}
+
+void BrowserWindow::dragEnterEvent(QDragEnterEvent* event)
+{
+	const QStringList sources = FileOperations::localFilePaths(*event->mimeData());
+	if (sources.empty())
+		return;
+
+	_dropSourcesOnShownVolume = QStorageInfo(sources.front()).rootPath() == QStorageInfo(_currentPath).rootPath();
+	dragMoveEvent(event);
+}
+
+void BrowserWindow::dragMoveEvent(QDragMoveEvent* event)
+{
+	const Qt::DropAction action = dropAction(*event);
+	if (action == Qt::IgnoreAction || dropTargetFolder(*event, FileOperations::localFilePaths(*event->mimeData())).isEmpty())
+	{
+		event->ignore();
+		return;
+	}
+	event->setDropAction(action);
+	event->accept();
+}
+
+void BrowserWindow::dropEvent(QDropEvent* event)
+{
+	const QStringList sources = FileOperations::localFilePaths(*event->mimeData());
+	const QString target = dropTargetFolder(*event, sources);
+	const Qt::DropAction action = dropAction(*event);
+	if (sources.empty() || target.isEmpty() || action == Qt::IgnoreAction)
+	{
+		event->ignore();
+		return;
+	}
+
+	// TargetMoveAction: the source must not delete the files, the move below does.
+	event->setDropAction(action == Qt::MoveAction ? Qt::TargetMoveAction : action);
+	event->accept();
+
+	// Queued: the drag source waits for this handler, and a message box here would hold it.
+	const TransferKind kind = action == Qt::MoveAction ? TransferKind::Move : TransferKind::Copy;
+	QMetaObject::invokeMethod(this, [this, kind, sources, target] { FileOperations::startTransfer(kind, sources, target, this); }, Qt::QueuedConnection);
 }
 
 void BrowserWindow::selectAndScrollToPath(const QString& path)
@@ -526,7 +704,14 @@ QWidget* BrowserWindow::buildTile(QListWidgetItem* item)
 {
 	const auto& entry = static_cast<const GridEntry&>(*item);
 	const auto onWheel = [this](int steps) { zoomTiles(steps); };
-	const auto onContextMenu = [this, path = entry.path](QWidget* tile, QPoint pos) { showEntryContextMenu(path, tile->mapToGlobal(pos)); };
+	const auto onContextMenu = [this, path = entry.path, isFolder = entry.kind == EntryKind::Folder](QWidget* tile, QPoint pos) {
+		showEntryContextMenu(path, isFolder, tile->mapToGlobal(pos));
+	};
+	const auto asCard = [this, &entry](QWidget* tile) {
+		QWidget* card = inSelectionFrame(tile);
+		setCutMark(card, isCut(entry.path));
+		return card;
+	};
 
 	if (entry.kind == EntryKind::Image)
 	{
@@ -535,7 +720,7 @@ QWidget* BrowserWindow::buildTile(QListWidgetItem* item)
 		thumb->setOnActivatedCallback([this, path = entry.path] { viewImage(path); });
 		thumb->setOnMouseWheelCallback(onWheel);
 		connect(thumb, &QWidget::customContextMenuRequested, this, [thumb, onContextMenu](QPoint pos) { onContextMenu(thumb, pos); });
-		return inSelectionFrame(thumb);
+		return asCard(thumb);
 	}
 
 	auto* tile = new IconTileWidget(_iconProvider.icon(QFileInfo(entry.path)), entry.name, _tileSize, nullptr);
@@ -550,7 +735,7 @@ QWidget* BrowserWindow::buildTile(QListWidgetItem* item)
 		tile->setOnActivatedCallback([this, path = entry.path] { playVideo(path); });
 	tile->setOnMouseWheelCallback(onWheel);
 	connect(tile, &QWidget::customContextMenuRequested, this, [tile, onContextMenu](QPoint pos) { onContextMenu(tile, pos); });
-	return inSelectionFrame(tile);
+	return asCard(tile);
 }
 
 void BrowserWindow::zoomTiles(int steps)

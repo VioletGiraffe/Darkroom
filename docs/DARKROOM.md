@@ -37,7 +37,8 @@ Makefiles, IDE state, `bin/`, and `build/` are not sources of truth.
 
 ### Submodules
 
-Five git submodules build as static libraries. Each is its own include root except where noted:
+Six git submodules build as static libraries; `file-operations` is compiled from sources by the project using it.
+Each is its own include root except where noted:
 
 | Submodule | Supplies here |
 |---|---|
@@ -46,6 +47,8 @@ Five git submodules build as static libraries. Each is its own include root exce
 | `qtutils` | theme machinery (`CThemeController`, `CBasePalette`, tinted icon engine, `themeicon:/`, style fixups), `CImageViewerWidget`, `CFlowLayout`, natural sort, `CLoggerInMemory`, settings/about dialog bases, message-box helpers |
 | `magic-alignment` (root `src/`) | automatic photo alignment fits for PhotoCompareWindow |
 | `image-processing` | SIMD image resize for ImageViewerWindow; has its own tests and a resize-comparison tool |
+| `thin_io` (root `src/`) | native filesystem access for `file-operations` |
+| `file-operations` | Quickroom only: the copy/move engine and its progress and decision dialogs; has its own tests |
 
 Link order matters on GNU ld: a library precedes the ones it uses. The `LIBS` comments in each `.pro` state the order.
 
