@@ -62,12 +62,25 @@ void ImageViewerWindow::setRemovalActions(RemovalAction onDelete, RemovalAction 
 	addRemovalAction(std::move(onShiftDelete), Shortcuts::DeleteFile);
 }
 
+std::vector<ImageViewerWindow*> ImageViewerWindow::_instances;
+
+void ImageViewerWindow::releaseFilesMatching(const std::function<bool(const QString& path)>& isAffected)
+{
+	for (ImageViewerWindow* viewer : _instances)
+	{
+		if (isAffected(viewer->currentPath()))
+			viewer->_view->closeFile();
+	}
+}
+
 ImageViewerWindow::ImageViewerWindow(Library* library, QStringList imagePaths, int startIndex, QWidget* parent)
 	: QMainWindow(parent)
 	, _library(library)
 	, _imagePaths(std::move(imagePaths))
 	, _index(startIndex)
 {
+	_instances.push_back(this);
+
 	_view = new CImageViewerWidget(this);
 	setCentralWidget(_view);
 	_view->installEventFilter(this);
@@ -90,6 +103,11 @@ ImageViewerWindow::ImageViewerWindow(Library* library, QStringList imagePaths, i
 	buildMenus();
 	menuBar()->setVisible(false); // Initially fullscreen - no menu
 	showImage(_index);
+}
+
+ImageViewerWindow::~ImageViewerWindow()
+{
+	std::erase(_instances, this);
 }
 
 void ImageViewerWindow::buildMenus()
@@ -234,13 +252,11 @@ int ImageViewerWindow::adjacentIndex(Direction direction) const
 
 void ImageViewerWindow::removeCurrentImage(const std::function<bool(int index)>& remove)
 {
-	// Windows refuses to delete a file that is open.
 	const bool wasAnimated = _view->isAnimated();
-	_view->closeFile();
-
 	if (!remove(_index))
 	{
-		if (wasAnimated)
+		// Released for a file operation that then failed or was cancelled
+		if (wasAnimated && !_view->isAnimated())
 			_view->displayImage(currentPath(), false); // resumes the animation
 		return;
 	}

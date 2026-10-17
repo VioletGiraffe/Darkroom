@@ -608,11 +608,12 @@ void VideoPlayerWindow::setRemovalActions(RemovalAction onDelete, RemovalAction 
 
 void VideoPlayerWindow::performRemoval(const RemovalAction& action)
 {
-	// Copies: a removal that deletes the file loads another one through FileRelease while it runs.
-	const MediaId id = _mediaId;
-	const QString videoPath = _videoPath;
-	if (action.remove(id, videoPath) && _mediaId == id)
+	const qint64 positionMs = currentPlaybackPosition();
+	const bool wasPlaying = isPlaybackActive();
+	if (action.remove(_mediaId, _videoPath))
 		leaveRemovedItem();
+	else if (_player->source().isEmpty()) // released for a file operation that then failed or was cancelled
+		resumeReleasedFile(positionMs, wasPlaying);
 }
 
 void VideoPlayerWindow::leaveRemovedItem()
@@ -632,41 +633,15 @@ void VideoPlayerWindow::resumeReleasedFile(qint64 positionMs, bool wasPlaying)
 	setPlaybackActive(wasPlaying);
 }
 
-VideoPlayerWindow::FileRelease::FileRelease(const QStringList& paths)
+void VideoPlayerWindow::releaseFilesMatching(const std::function<bool(const QString& path)>& isAffected)
 {
-	QStringList pathKeys;
-	for (const QString& path : paths)
+	for (VideoPlayerWindow* player : _instances)
 	{
-		if (!path.isEmpty())
-			pathKeys.push_back(pathComparisonKey(path));
-	}
-
-	for (VideoPlayerWindow* player : VideoPlayerWindow::_instances)
-	{
-		const QString playerKey = pathComparisonKey(player->_videoPath);
-		const bool atOrUnderAPath = std::any_of(pathKeys.cbegin(), pathKeys.cend(), [&playerKey](const QString& key) {
-			return playerKey == key || playerKey.startsWith(key + '/');
-		});
-		if (!atOrUnderAPath)
+		if (!isAffected(player->_videoPath))
 			continue;
 
-		_released.push_back({ player, player->currentPlaybackPosition(), player->isPlaybackActive() });
 		player->exitOscillatingPlayback(false);
 		player->_player->setSource({});
-	}
-}
-
-VideoPlayerWindow::FileRelease::~FileRelease()
-{
-	for (const ReleasedPlayer& released : _released)
-	{
-		if (!released.player)
-			continue;
-
-		if (QFileInfo::exists(released.player->_videoPath))
-			released.player->resumeReleasedFile(released.positionMs, released.wasPlaying);
-		else
-			released.player->leaveRemovedItem();
 	}
 }
 

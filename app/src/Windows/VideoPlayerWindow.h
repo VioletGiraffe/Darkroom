@@ -5,9 +5,7 @@
 
 DISABLE_COMPILER_WARNINGS
 #include <QMainWindow>
-#include <QPointer>
 #include <QString>
-#include <QStringList>
 RESTORE_COMPILER_WARNINGS
 
 #include <functional>
@@ -54,26 +52,8 @@ public:
 
 	static void restartAll();
 	static void closeAll();
-
-	// While one is alive, no player holds open a file at or under paths.
-	// On destruction a player whose file is gone moves on as after a removal; the others resume where they were.
-	class FileRelease final
-	{
-	public:
-		explicit FileRelease(const QStringList& paths);
-		~FileRelease();
-		FileRelease(const FileRelease&) = delete;
-		FileRelease& operator=(const FileRelease&) = delete;
-
-	private:
-		struct ReleasedPlayer
-		{
-			QPointer<VideoPlayerWindow> player;
-			qint64 positionMs;
-			bool wasPlaying;
-		};
-		std::vector<ReleasedPlayer> _released;
-	};
+	// Players whose video matches drop their source and stay open without it, see releaseMediaFilesHeldOpen.
+	static void releaseFilesMatching(const std::function<bool(const QString& path)>& isAffected);
 
 	// Opens a self-managing ad-hoc player.
 	static VideoPlayerWindow* createPlayerWindow(Library* library, const QString& videoPath, QWidget* parent);
@@ -92,7 +72,7 @@ private:
 	void performRemoval(const RemovalAction& action);
 	// Next item, else previous, else closes the window.
 	void leaveRemovedItem();
-	// Reloads the current file after a FileRelease.
+	// Reloads the current file after releaseFilesMatching.
 	void resumeReleasedFile(qint64 positionMs, bool wasPlaying);
 	void resizeAndMoveWindow();
 	void togglePlayPause();

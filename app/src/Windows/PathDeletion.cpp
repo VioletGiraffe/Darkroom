@@ -1,5 +1,5 @@
 #include "Windows/PathDeletion.h"
-#include "Windows/VideoPlayerWindow.h"
+#include "Windows/OpenFileRelease.h"
 
 #include "compiler/compiler_warnings_control.h"
 #include "dialogs/messagedialog.h"
@@ -88,8 +88,7 @@ QString PathDeletion::bulletedPathList(const QStringList& paths)
 
 QSet<QString> PathDeletion::removePathsInteractive(const QStringList& paths, Mode mode, QWidget* dialogParent)
 {
-	// Windows refuses to delete a file that is open.
-	const VideoPlayerWindow::FileRelease playersLetGo{ paths };
+	releaseMediaFilesHeldOpen(paths);
 
 	QSet<QString> removed;
 	QStringList failures;

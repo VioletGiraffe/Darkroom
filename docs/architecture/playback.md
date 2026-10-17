@@ -76,10 +76,10 @@ operation that reports whether the item left the host's list. Without them the k
 After a removal the window moves to the nearest remaining item, or closes when it has none. Frame viewers and the
 relocation preview players install no actions.
 
-`PathDeletion` holds a `VideoPlayerWindow::FileRelease` while it deletes: players of the affected files drop their
-source first, since an open file cannot be deleted on Windows. Afterwards a player whose file is gone moves on as
-after a removal, and one whose file survived resumes at its position. The viewer closes an animated file itself
-before running an action; a viewer is not released by deletions started elsewhere.
+An open file cannot be deleted or moved on Windows, so `PathDeletion` first calls `releaseMediaFilesHeldOpen`: every
+player showing an affected file drops its source, and every viewer showing one closes it, an animation stopping on
+its current frame. The windows stay open and do not reopen the file. The window whose own action failed or was
+cancelled is the exception: it reloads its file, a player at its previous position.
 
 ### Oscillating playback
 

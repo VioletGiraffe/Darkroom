@@ -9,6 +9,7 @@ DISABLE_COMPILER_WARNINGS
 RESTORE_COMPILER_WARNINGS
 
 #include <functional>
+#include <vector>
 
 class CImageViewerWidget;
 class Library;
@@ -45,6 +46,11 @@ public:
 	// Call at most once. After a removal the viewer shows the nearest remaining image, or closes when none is left.
 	void setRemovalActions(RemovalAction onDelete, RemovalAction onShiftDelete);
 
+	// Viewers whose current image matches close its file, keeping the frame shown; see releaseMediaFilesHeldOpen.
+	static void releaseFilesMatching(const std::function<bool(const QString& path)>& isAffected);
+
+	~ImageViewerWindow() override;
+
 protected:
 	bool eventFilter(QObject* watched, QEvent* event) override;
 
@@ -68,6 +74,8 @@ private:
 	void removeCurrentImage(const std::function<bool(int index)>& remove);
 
 private:
+	static std::vector<ImageViewerWindow*> _instances;
+
 	Library* _library = nullptr;
 	QStringList _imagePaths;
 	int _index = 0;
