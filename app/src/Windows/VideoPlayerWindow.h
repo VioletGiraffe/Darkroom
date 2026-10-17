@@ -103,6 +103,7 @@ private:
 	void reportRecoverableFormatError(const QString& details);
 
 	void showContextMenu(const QPoint& globalPos);
+	void copyFileToClipboard() const;
 	void extractFrameToLibrary(qint64 timestampMs);
 	void extractFrameToFolder(qint64 timestampMs, const QString& folder);
 	void repeatLastExtraction(qint64 timestampMs);

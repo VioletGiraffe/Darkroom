@@ -71,6 +71,8 @@ private:
 	void toggleBest();
 	void updateLibraryActions();
 	void toggleFullScreen();
+	// The pixels for apps that paste images, the file for file managers and apps that take files.
+	void copyImageAndFileToClipboard();
 	void removeCurrentImage(const std::function<bool(int index)>& remove);
 
 private:

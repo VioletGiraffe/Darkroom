@@ -10,13 +10,17 @@
 DISABLE_COMPILER_WARNINGS
 #include "resize/qimage_resize.h"
 
+#include <QClipboard>
 #include <QDesktopServices>
 #include <QDir>
 #include <QFileInfo>
+#include <QGuiApplication>
+#include <QImage>
 #include <QKeySequence>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QMimeData>
 #include <QMouseEvent>
 #include <QTimer>
 #include <QUrl>
@@ -128,7 +132,7 @@ void ImageViewerWindow::buildMenus()
 	closeAction->setShortcuts({ QKeySequence(Qt::Key_Escape), QKeySequence::Close });
 
 	QMenu* editMenu = new QMenu(tr("Edit"), menuBar);
-	QAction* copyAction = editMenu->addAction(tr("Copy image"), this, [this] { _view->copyToClipboard(); });
+	QAction* copyAction = editMenu->addAction(tr("Copy image"), this, &ImageViewerWindow::copyImageAndFileToClipboard);
 	copyAction->setShortcut(QKeySequence::Copy);
 
 	QMenu* viewMenu = new QMenu(tr("View"), menuBar);
@@ -248,6 +252,15 @@ int ImageViewerWindow::adjacentIndex(Direction direction) const
 			return index;
 	}
 	return -1;
+}
+
+void ImageViewerWindow::copyImageAndFileToClipboard()
+{
+	auto* mime = new QMimeData();
+	if (const QImage& image = _view->sourceImage(); !image.isNull())
+		mime->setImageData(image);
+	mime->setUrls({ QUrl::fromLocalFile(currentPath()) });
+	QGuiApplication::clipboard()->setMimeData(mime);
 }
 
 void ImageViewerWindow::removeCurrentImage(const std::function<bool(int index)>& remove)

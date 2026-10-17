@@ -31,6 +31,7 @@ instead, Qt blocking input to unparented windows under a modal dialog. Double-cl
 fullscreen and a window sized to the image, and the menu bar shows only outside fullscreen. A caller that defers
 creating the window behind the viewer can install an exit-fullscreen handler: it runs once when the user leaves
 fullscreen and decides whether that switch still happens. A caller can also install removal actions, see below. Alone among the windows here it persists no geometry.
+Copy puts both the image and its file on the clipboard, for apps that paste pixels and for those that take files.
 The current image becomes the window icon after a delay, so several open viewers stay distinguishable in the
 taskbar without an icon being scaled for every image browsed past.
 
@@ -54,6 +55,8 @@ different store.
 MediaBrowserWidget gives each player it opens the videos the grid currently shows as its previous/next order, and a
 handler that moves the grid selection onto the item navigated to, as with the image viewer above. The initially
 loaded video is not reported.
+
+Copy puts the video file on the clipboard.
 
 The player exposes one logical position and play-state seam. Controls therefore refer to the frame actually presented
 whether `QMediaPlayer` or `OscillatingPlayback` currently owns presentation.

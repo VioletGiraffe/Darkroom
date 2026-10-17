@@ -17,6 +17,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QAudio>
 #include <QAudioOutput>
 #include <QCheckBox>
+#include <QClipboard>
 #include <QComboBox>
 #include <QCursor>
 #include <QDir>
@@ -33,6 +34,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QMediaPlayer>
 #include <QMenu>
 #include <QMessageBox>
+#include <QMimeData>
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QScreen>
@@ -502,6 +504,9 @@ VideoPlayerWindow::VideoPlayerWindow(Library* library, const QString& videoPath,
 
 	QShortcut* extractFrameShortcut = new QShortcut(QKeySequence(Qt::Key_E), this);
 	connect(extractFrameShortcut, &QShortcut::activated, this, [this] { repeatLastExtraction(currentPlaybackPosition()); });
+
+	QShortcut* copyFileShortcut = new QShortcut(QKeySequence::Copy, this);
+	connect(copyFileShortcut, &QShortcut::activated, this, &VideoPlayerWindow::copyFileToClipboard);
 
 	loadFile(videoPath, mediaId);
 }
@@ -1162,6 +1167,7 @@ void VideoPlayerWindow::showContextMenu(const QPoint& globalPos)
 		if (!revealInFileManager(_videoPath))
 			reportMissingFile(this, _videoPath);
 	});
+	menu.addAction(tr("Copy file") + "\t" + QKeySequence(QKeySequence::Copy).toString(QKeySequence::NativeText), this, &VideoPlayerWindow::copyFileToClipboard);
 	menu.addAction((isFullScreen() ? tr("Exit fullscreen") : tr("Fullscreen")) + "\tF", this, &VideoPlayerWindow::toggleFullScreen);
 
 	if (_deleteKeyAction.remove)
@@ -1191,6 +1197,13 @@ void VideoPlayerWindow::extractFrameToFolder(qint64 timestampMs, const QString& 
 {
 	SingleFrameExtraction::extractToFolderInteractive(_videoPath, timestampMs, folder,
 		[this] { _oscillatingPlayback->resetElapsedBaselineAfterGuiBlock(); }, this);
+}
+
+void VideoPlayerWindow::copyFileToClipboard() const
+{
+	auto* mime = new QMimeData();
+	mime->setUrls({ QUrl::fromLocalFile(_videoPath) });
+	QGuiApplication::clipboard()->setMimeData(mime);
 }
 
 void VideoPlayerWindow::extractFrameToLibrary(qint64 timestampMs)
