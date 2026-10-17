@@ -4,6 +4,7 @@
 #include "Windows/VideoPlayerWindow.h"
 #include "compiler/compiler_warnings_control.h"
 #include "fileoperationsui/cfileoperationdialog.h"
+#include "fileoperationsui/fileoperationtexts.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QClipboard>
@@ -28,24 +29,6 @@ constexpr uint32_t MOVE_DROP_EFFECT = 2; // DROPEFFECT_MOVE, without the Windows
 // The KDE and GNOME cut markers; the GNOME one repeats the URLs after a "cut" line.
 const QString KDE_CUT_FORMAT = QStringLiteral("application/x-kde-cutselection");
 const QString GNOME_COPIED_FILES_FORMAT = QStringLiteral("x-special/gnome-copied-files");
-
-[[nodiscard]] QString transferRequestErrorText(RequestValidationError error)
-{
-	switch (error)
-	{
-	case RequestValidationError::NoSources:
-		return QObject::tr("No valid items are selected for the operation.");
-	case RequestValidationError::InvalidPath:
-		return QObject::tr("The source or destination path is not a valid absolute path.");
-	case RequestValidationError::RootSource:
-		return QObject::tr("A drive root cannot be copied, moved, or deleted.");
-	case RequestValidationError::ExactEntryRequiresSingleSource:
-		return QObject::tr("An exact destination entry can only be chosen for a single source.");
-	case RequestValidationError::DestinationInsideSource:
-		return QObject::tr("The destination cannot be inside a selected source.");
-	}
-	return {};
-}
 
 // The returned function deletes one path on behalf of window and returns whether it is gone.
 [[nodiscard]] std::function<bool(const QString& path)> pathDeleter(QWidget* window, PathDeletion::Mode mode, std::function<void(const QString& path)> onDeleted)
@@ -119,7 +102,7 @@ void FileOperations::startTransfer(TransferKind kind, const QStringList& sources
 	if (!request)
 	{
 		if (request.error() != RequestValidationError::NoSources)
-			QMessageBox::warning(parent, kind == TransferKind::Move ? QObject::tr("Move") : QObject::tr("Copy"), transferRequestErrorText(request.error()));
+			QMessageBox::warning(parent, kind == TransferKind::Move ? QObject::tr("Move") : QObject::tr("Copy"), requestValidationErrorText(request.error()));
 		return;
 	}
 
