@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792272129761,
+  "lastUpdate": 1792272276060,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -13490,6 +13490,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .text",
             "value": 2853,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 401.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 48,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 43.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 12,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "78cf423fa76aa7c0b490ab444c84ee8c074de66f",
+          "message": "Quickroom: copy, cut and paste files, drag and drop in both directions, transfers through file-operations",
+          "timestamp": "2026-10-17T21:51:18+03:00",
+          "tree_id": "05c5efb96097ac160f9cc10f0a50c1d2bbca344d",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/78cf423fa76aa7c0b490ab444c84ee8c074de66f"
+        },
+        "date": 1792272270491,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 15496,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1131,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 28136,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3381.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 2898,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2851.5,
             "unit": "KB"
           },
           {
