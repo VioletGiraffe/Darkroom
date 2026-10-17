@@ -12,8 +12,22 @@ Toolchain minimums (Qt 6.8, macOS 13.3) and their reasons are stated at the top 
 | `Tests.pro` | `cpputils`, `qtutils`, and `tests/` | the test binary builds and runs on its own, including when the app does not compile |
 
 Every qmake and msbuild invocation names its project: `qmake -tp vc -r Tests.pro`, `msbuild Darkroom.sln /t:Darkroom`.
-On Unix both roots generate the same top-level `Makefile`, so generating one overwrites the other; CI re-runs qmake
-in each step. `global.pri` holds the compiler settings every project includes.
+On Unix both roots generate the same top-level `Makefile`, so generating one overwrites the other; each script below
+re-runs qmake for its own project. `global.pri` holds the compiler settings every project includes.
+
+## Scripts
+
+CI and local builds run the same scripts in `scripts/`; the `.bat` files start their `.ps1` counterparts.
+
+| Script | Does | Arguments |
+|---|---|---|
+| `build.bat` / `build.sh` | qmake and build of `Darkroom.pro`; runs nothing | `darkroom` or `quickroom` builds one app, none builds both; debug configuration |
+| `run_tests.bat` / `run_tests.sh` | qmake and build of `Tests.pro`, then `DarkroomTests` | debug configuration; build only or run only; arguments for the test binary |
+
+- The Qt kit comes from `QT_ROOT_DIR`, else from a git-ignored `scripts/local-env.ps1` or `local-env.sh` that sets it;
+  the `.sh` scripts also fall back to a `qmake6` or `qmake` on `PATH`.
+- On Windows the scripts set up the MSVC environment through vswhere when `cl` is not on `PATH`.
+- Exit codes: 1 for a build or test failure, 2 for an incomplete environment.
 
 ## Source sharing without a library
 
@@ -41,8 +55,8 @@ behavior, and catalog-integrity verdicts.
 `.github/workflows/CI.yml` runs on every push (except to `gh-pages`) and pull request, on Windows (MSVC), Ubuntu
 (GCC 14), and macOS (clang), each against Qt 6.11. Per OS, in order:
 
-1. Build and run the tests from `Tests.pro`.
-2. Build both apps from `Darkroom.pro`, even when the tests failed.
+1. Build and run the tests: `run_tests`.
+2. Build both apps, even when the tests failed: `build`. Windows pins the v143 toolset.
 3. Package whenever the apps built, so packaging is checked even when the tests failed: `windeployqt` into
    `dist/` and Inno Setup on Windows; `scripts/create_dmg.sh` on macOS. The packages are uploaded as workflow
    artifacts only when every step passed. Linux only builds.

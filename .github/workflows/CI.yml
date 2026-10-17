@@ -104,38 +104,20 @@ jobs:
         sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 50
         g++ --version
 
-    - name: Build tests (Windows)
+    - name: Build & run tests (Windows)
       if: startsWith(matrix.os, 'windows')
       shell: cmd
-      run: |
-        %QT_ROOT_DIR%\bin\qmake.exe -v
-        %QT_ROOT_DIR%\bin\qmake.exe -tp vc -r Tests.pro || exit /b 1
-        msbuild Tests.sln /t:DarkroomTests /p:Configuration=Release;PlatformToolset=v143 || exit /b 1
+      run: scripts\run_tests.bat -PlatformToolset v143
 
-    - name: Build tests (Unix)
+    - name: Build & run tests (Unix)
       if: ${{ !startsWith(matrix.os, 'windows') }}
-      run: |
-        $QT_ROOT_DIR/bin/qmake -r CONFIG+=release Tests.pro
-        make -j4 sub-tests
-
-    - name: Run tests (Windows)
-      if: startsWith(matrix.os, 'windows')
-      shell: cmd
-      run: bin\release\DarkroomTests.exe
-
-    - name: Run tests (Unix)
-      if: ${{ !startsWith(matrix.os, 'windows') }}
-      run: ./bin/release/DarkroomTests
+      run: ./scripts/run_tests.sh
 
     - name: Build app (Windows)
       id: build_app_windows
       if: ${{ !cancelled() && startsWith(matrix.os, 'windows') }}
       shell: cmd
-      run: |
-        rem Own qmake run: the tests step above generated Tests.sln, not the app's project files.
-        %QT_ROOT_DIR%\bin\qmake.exe -tp vc -r Darkroom.pro || exit /b 1
-        msbuild Darkroom.sln /t:Darkroom /p:Configuration=Release;PlatformToolset=v143 || exit /b 1
-        msbuild Darkroom.sln /t:Quickroom /p:Configuration=Release;PlatformToolset=v143 || exit /b 1
+      run: scripts\build.bat -PlatformToolset v143
 
     # Keyed on the app build alone: packaging is still checked when the tests failed.
     - name: Build installer (Windows)
@@ -158,10 +140,7 @@ jobs:
     - name: Build app (Unix)
       id: build_app_unix
       if: ${{ !cancelled() && !startsWith(matrix.os, 'windows') }}
-      run: |
-        # Own qmake run: both projects generate the top-level Makefile, and the tests step's version is there now.
-        $QT_ROOT_DIR/bin/qmake -r CONFIG+=release Darkroom.pro
-        make -j4 sub-app sub-quickroom
+      run: ./scripts/build.sh
 
     - name: Build .dmg (macOS)
       if: ${{ !cancelled() && steps.build_app_unix.outcome == 'success' && startsWith(matrix.os, 'macos') }}

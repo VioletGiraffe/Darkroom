@@ -27,3 +27,4 @@ Makefile.Release
 /app/Darkroom_resource.rc
 /quickroom/Quickroom_resource.rc
 /scripts/__pycache__/
+/scripts/local-env.*

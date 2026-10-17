@@ -25,7 +25,7 @@ contains implementation detail. Keep both in sync.
 | `quickroom/` | [Quickroom](QUICKROOM.md): its own `src/` and `res/`; compiles a hand-listed subset of `app/src` directly |
 | `tests/` | Catch2 tests over the Core model |
 | `docs/` | this documentation; `mockups/` holds static HTML UI mockups, design input only and not kept in sync with the code |
-| `scripts/` | `create_dmg.sh` (macOS packaging) and `build-filetype-icons.py` (Quickroom file-type icons) |
+| `scripts/` | `build` and `run_tests` (see [build.md](build.md#scripts)), `create_dmg.sh` (macOS packaging), `build-filetype-icons.py` (Quickroom file-type icons) |
 | `installer.iss` | Windows installer script (Inno Setup) |
 | `.github/workflows/` | CI |
 | `Darkroom.pro`, `Tests.pro`, `global.pri` | the two qmake roots and their shared compiler settings |
