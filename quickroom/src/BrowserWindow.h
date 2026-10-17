@@ -16,6 +16,7 @@ RESTORE_COMPILER_WARNINGS
 
 class MediaGrid;
 class QAction;
+class QFileSystemWatcher;
 class QLineEdit;
 class QListWidgetItem;
 class QTimer;
@@ -38,14 +39,15 @@ private:
 
 	void setupUi();
 
-	// Lists path into the grid; false and no state change when path is not an existing directory.
+	// Lists path into the grid and watches it; false and no state change when path is not an existing directory.
 	bool listDirectory(const QString& path);
 	// listDirectory plus a history push; a failed listing reverts the path edit.
 	void navigateTo(const QString& path);
 	void goBack();
 	void goForward();
 	void goUp();
-	// Relists the current folder, keeping the scroll position.
+	// Brings the grid in line with the folder on disk; unchanged entries keep their tiles.
+	// A folder that is gone navigates to its nearest existing ancestor.
 	void refresh();
 	void updateNavigationActions();
 
@@ -76,6 +78,8 @@ private:
 	QAction*   _forwardAction = nullptr;
 	QAction*   _upAction = nullptr;
 	QTimer*    _zoomDebounce = nullptr;
+	QTimer*    _refreshDebounce = nullptr;
+	QFileSystemWatcher* _folderWatcher = nullptr;
 	QFileIconProvider _iconProvider;
 
 	int _tileSize = -1;

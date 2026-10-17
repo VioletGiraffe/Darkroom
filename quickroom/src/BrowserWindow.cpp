@@ -12,9 +12,11 @@
 #include "widgets/cpersistenceenabler.h"
 
 DISABLE_COMPILER_WARNINGS
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QFileSystemWatcher>
 #include <QKeySequence>
 #include <QLineEdit>
 #include <QListWidgetItem>
@@ -22,7 +24,6 @@ DISABLE_COMPILER_WARNINGS
 #include <QMetaObject>
 #include <QMouseEvent>
 #include <QPointer>
-#include <QScrollBar>
 #include <QSettings>
 #include <QShortcut>
 #include <QStandardPaths>
@@ -35,6 +36,10 @@ DISABLE_COMPILER_WARNINGS
 RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
+#include <memory>
+#include <ranges>
+#include <unordered_map>
+#include <vector>
 
 namespace {
 
@@ -90,6 +95,9 @@ public:
 	QString path;
 	QString name;
 	EntryKind kind = EntryKind::Folder;
+	// size and lastModified detect a file rewritten in place, whose tile is then stale.
+	qint64 size = 0;
+	QDateTime lastModified;
 
 	// Folders first, then natural name order.
 	bool operator<(const QListWidgetItem& other) const override
@@ -100,6 +108,52 @@ public:
 		return NaturalSort::lessCaseInsensitive(name, b.name);
 	}
 };
+
+// The browser's entries for dir: folders and supported media files, unsorted.
+std::vector<std::unique_ptr<GridEntry>> listedEntries(const QDir& dir)
+{
+	std::vector<std::unique_ptr<GridEntry>> entries;
+	for (const QFileInfo& info : dir.entryInfoList(QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot, QDir::Unsorted))
+	{
+		EntryKind kind;
+		if (info.isDir())
+			kind = EntryKind::Folder;
+		else if (isSupportedImageFile(info.filePath()))
+			kind = EntryKind::Image;
+		else if (isSupportedVideoFile(info.filePath()))
+			kind = EntryKind::Video;
+		else
+			continue;
+
+		auto entry = std::make_unique<GridEntry>();
+		entry->path = info.absoluteFilePath();
+		entry->name = info.fileName();
+		entry->kind = kind;
+		entry->size = info.size();
+		entry->lastModified = info.lastModified();
+		entries.push_back(std::move(entry));
+	}
+	return entries;
+}
+
+// The row that keeps the sorted grid sorted with entry inserted.
+int sortedInsertionRow(const QListWidget& grid, const GridEntry& entry)
+{
+	return *std::ranges::partition_point(std::views::iota(0, grid.count()), [&](int row) { return *grid.item(row) < entry; });
+}
+
+// path itself when it is a folder, else its closest ancestor that is; a filesystem root when none is.
+QString nearestExistingFolder(QString path)
+{
+	while (!QFileInfo(path).isDir())
+	{
+		const QString parent = QFileInfo(path).absolutePath();
+		if (parent == path)
+			break;
+		path = parent;
+	}
+	return path;
+}
 
 } // anonymous namespace
 
@@ -175,6 +229,18 @@ void BrowserWindow::setupUi()
 	_zoomDebounce->setSingleShot(true);
 	_zoomDebounce->setInterval(80);
 	connect(_zoomDebounce, &QTimer::timeout, this, &BrowserWindow::applyTileSize);
+
+	// Not restarted by further changes: a long copy into the folder refreshes it periodically, not only once it ends.
+	_refreshDebounce = new QTimer(this);
+	_refreshDebounce->setSingleShot(true);
+	_refreshDebounce->setInterval(300);
+	connect(_refreshDebounce, &QTimer::timeout, this, &BrowserWindow::refresh);
+
+	_folderWatcher = new QFileSystemWatcher(this);
+	connect(_folderWatcher, &QFileSystemWatcher::directoryChanged, this, [this] {
+		if (!_refreshDebounce->isActive())
+			_refreshDebounce->start();
+	});
 }
 
 bool BrowserWindow::listDirectory(const QString& path)
@@ -186,25 +252,15 @@ bool BrowserWindow::listDirectory(const QString& path)
 	_grid->clear();
 	_currentPath = dir.absolutePath();
 
-	const QSize cell = cellSize(_tileSize);
-	for (const QFileInfo& info : dir.entryInfoList(QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot, QDir::Unsorted))
-	{
-		EntryKind kind;
-		if (info.isDir())
-			kind = EntryKind::Folder;
-		else if (isSupportedImageFile(info.filePath()))
-			kind = EntryKind::Image;
-		else if (isSupportedVideoFile(info.filePath()))
-			kind = EntryKind::Video;
-		else
-			continue;
+	if (const QStringList watched = _folderWatcher->directories(); !watched.empty())
+		_folderWatcher->removePaths(watched);
+	_folderWatcher->addPath(_currentPath);
 
-		auto* item = new GridEntry();
-		item->path = info.absoluteFilePath();
-		item->name = info.fileName();
-		item->kind = kind;
-		item->setSizeHint(cell);
-		_grid->addItem(item);
+	const QSize cell = cellSize(_tileSize);
+	for (std::unique_ptr<GridEntry>& entry : listedEntries(dir))
+	{
+		entry->setSizeHint(cell);
+		_grid->addItem(entry.release());
 	}
 	_grid->sortItems(Qt::AscendingOrder);
 	_grid->scrollToTop();
@@ -259,9 +315,57 @@ void BrowserWindow::goUp()
 
 void BrowserWindow::refresh()
 {
-	const int scrollPosition = _grid->verticalScrollBar()->value();
-	if (listDirectory(_currentPath))
-		_grid->verticalScrollBar()->setValue(scrollPosition);
+	const QDir dir(_currentPath);
+	if (!dir.exists())
+	{
+		navigateTo(resolveStartFolder(nearestExistingFolder(_currentPath)));
+		return;
+	}
+
+	std::unordered_map<QString, std::unique_ptr<GridEntry>> onDisk;
+	for (std::unique_ptr<GridEntry>& entry : listedEntries(dir))
+	{
+		QString path = entry->path;
+		onDisk.emplace(std::move(path), std::move(entry));
+	}
+
+	// Afterwards onDisk holds only the entries the grid lacks.
+	bool changed = false;
+	for (int row = _grid->count() - 1; row >= 0; --row)
+	{
+		auto* shown = static_cast<GridEntry*>(_grid->item(row));
+		const auto found = onDisk.find(shown->path);
+		if (found == onDisk.end() || found->second->kind != shown->kind)
+		{
+			delete _grid->takeItem(row);
+			changed = true;
+			continue;
+		}
+
+		const GridEntry& current = *found->second;
+		if (shown->kind != EntryKind::Folder && (current.size != shown->size || current.lastModified != shown->lastModified))
+		{
+			shown->size = current.size;
+			shown->lastModified = current.lastModified;
+			_grid->removeItemWidget(shown);
+			changed = true;
+		}
+		onDisk.erase(found);
+	}
+
+	const QSize cell = cellSize(_tileSize);
+	for (auto& [path, entry] : onDisk)
+	{
+		entry->setSizeHint(cell);
+		const int row = sortedInsertionRow(*_grid, *entry);
+		_grid->insertItem(row, entry.release());
+		changed = true;
+	}
+
+	if (!changed)
+		return;
+	_grid->ensureVisibleCardsExist();
+	updateStatusCounts();
 }
 
 void BrowserWindow::updateNavigationActions()

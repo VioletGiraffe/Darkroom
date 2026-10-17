@@ -41,6 +41,11 @@ including a folder asks first. The filesystem step is the shared `PathDeletion` 
 through the removal actions `FileOperations` installs, and the browser removes the deleted entries in place instead
 of relisting.
 
+The browser watches the folder it shows and refreshes it shortly after a change, so changes made by other programs
+appear without F5. A refresh compares the listing with the grid: unchanged entries keep their tiles, and a file
+rewritten in place gets a new one. When the shown folder disappears, the browser moves to its nearest existing
+ancestor.
+
 Browser state (last folder, tile size, window geometry) persists under `browser/*` settings keys.
 
 ## Startup

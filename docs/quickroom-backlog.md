@@ -6,6 +6,9 @@
 - Drive/computer view above filesystem roots; today the path field is the way across drives.
 - Opening several files at once starts one process each - no single-instance handover.
 - Name filter over the current folder.
+- Replace `QFileSystemWatcher` with a folder watcher of our own. On Windows and Linux Qt's directory watch misses a file
+  rewritten in place (stale tile), a file still being copied in by another program (tile built from a partial file),
+  and the shown folder being renamed, moved or sent to Trash.
 - Video thumbnails: needs per-file ffmpeg extraction and a cache; tiles show the shell icon today.
 - Copy/paste of the grid selection as file URLs, pasting URLs from other apps too, and dropping files onto the
   browser. Paste copies everything given (folders included) off the GUI thread and asks on a name collision.
