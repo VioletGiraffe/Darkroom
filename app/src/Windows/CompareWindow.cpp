@@ -44,7 +44,7 @@ CompareWindow::CompareWindow(const QStringList& folderPaths, QWidget* parent) : 
 		// A pane shows one folder's frame at the slider position, so the viewer browses that folder from there.
 		// It only fires for a pane that has a frame loaded, so the slider position is in range for that folder.
 		_thumbnailWidgets.back()->setOnActivatedCallback([this, i] {
-			ImageViewerWindow::showForImages(nullptr, _folderFrames[static_cast<size_t>(i)], _slider->value(), this);
+			ImageViewerWindow::showForImages(_folderFrames[static_cast<size_t>(i)], _slider->value(), this);
 		});
 		thumbnailRow->addWidget(_thumbnailWidgets.back());
 	}

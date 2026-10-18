@@ -16,12 +16,12 @@ ImageViewerWindow on that frame, through an activation callback the window suppl
 slider spanning the longest folder, so every pane steps together and a shorter folder's pane goes blank past its
 end. Frame loads are debounced behind slider and resize events. Activating a pane opens ImageViewerWindow browsing
 that folder from the current frame. The browser opens it from the context menu of an all-video selection (Inspect for
-one item, Compare selected for several), passing frame-folder paths and no `Library`.
+one item, Compare selected for several), passing frame-folder paths.
 
 ## ImageViewerWindow
 
 `ImageViewerWindow` is a self-deleting viewer over qtutils' `CImageViewerWidget`, which owns the pan/zoom view,
-the scaling, and the info overlay; the window supplies the menu bar, the browsing order, and the library actions.
+the scaling, and the info overlay; the window supplies the menu bar and the browsing order.
 Scaling goes through `ImageProcessing::resize` and falls back to `CImageViewerWidget::smoothScale` for pixel
 formats the resizer has no view for. Its chunks run on `cpuThreadPool()`, which also runs work on the calling
 thread - the GUI thread is blocked for the duration of a scale either way.
@@ -30,7 +30,9 @@ Each viewer opens fullscreen and is parentless, for a taskbar button of its own;
 instead, Qt blocking input to unparented windows under a modal dialog. Double-click and `F` switch between
 fullscreen and a window sized to the image, and the menu bar shows only outside fullscreen. A caller that defers
 creating the window behind the viewer can install an exit-fullscreen handler: it runs once when the user leaves
-fullscreen and decides whether that switch still happens. A caller can also install removal actions, see below. Alone among the windows here it persists no geometry.
+fullscreen and decides whether that switch still happens. A caller can also install removal actions, see below, and
+add its own actions to the Image menu, which the viewer keeps current for the image shown: MediaBrowserWidget adds
+Best. Alone among the windows here it persists no geometry.
 Copy puts both the image and its file on the clipboard, for apps that paste pixels and for those that take files.
 The current image becomes the window icon after a delay, so several open viewers stay distinguishable in the
 taskbar without an icon being scaled for every image browsed past.
@@ -38,8 +40,7 @@ taskbar without an icon being scaled for every image browsed past.
 It browses a path list captured when it opens, skipping entries that have since left the disk. Four callers
 build that list: MediaBrowserWidget from the photos the grid currently shows, ImportDialog from the staged photos
 its grid currently shows, FrameViewerWindow from one frame folder, and CompareWindow from the frames of the pane
-that was clicked. Neither a frame nor a staged photo is a catalog item, so those callers pass no `Library` and the
-Best action is absent; identity for the library actions is derived per image from the file on disk.
+that was clicked.
 
 Browsing is reported back by index into the caller's list. MediaBrowserWidget and ImportDialog use that to move
 their grid selection onto the photo on screen. The initial image is not reported: the caller already acted on it.
@@ -47,14 +48,14 @@ their grid selection onto the photo on screen. The initial image is not reported
 ## VideoPlayerWindow
 
 `VideoPlayerWindow` coordinates Qt media playback, controls, saved-loop persistence, optional oscillating
-presentation, and single-frame extraction. Like the image viewer, it takes an optional `Library`; without one the
-library-bound features (metadata persistence, prev/next navigation, extract-to-library) are absent. Open players are
-tracked app-wide so library replacement can close them synchronously before the stable `Library&` begins resolving a
-different store.
+presentation, and single-frame extraction. It does not depend on the library model: a host can supply a getter for a
+`MetadataStore`, a navigation list, and a frame target. `LibraryPlayer` opens players with the library's store and
+the Extracted-label target; Quickroom's players have neither. Open players are tracked app-wide so library replacement
+can close them synchronously before the getter starts returning a different store.
 
-MediaBrowserWidget gives each player it opens the videos the grid currently shows as its previous/next order, and a
-handler that moves the grid selection onto the item navigated to, as with the image viewer above. The initially
-loaded video is not reported.
+MediaBrowserWidget gives each player it opens the paths of the videos the grid currently shows as its previous/next
+order, and a handler that moves the grid selection onto the item navigated to, as with the image viewer above. The
+initially loaded video is not reported. A removal clears the entry, so navigation skips it like a deleted file.
 
 Copy puts the video file on the clipboard.
 
@@ -107,14 +108,14 @@ normal playback resumes at the last displayed cached timestamp and preserves the
 
 ### Single-frame extraction
 
-`SingleFrameExtraction` owns configured ffmpeg extraction, failure reporting, destination persistence, and optional
-library import. It can extract to a chosen folder or import the result as an owned photo under the configured
-Extracted label.
+`SingleFrameExtraction` owns configured ffmpeg extraction into a folder, failure reporting, and the remembered last
+destination that `E` repeats: a chosen folder, or the host's frame target. A frame target names a folder the frame is
+written into, then handles the written file.
 
-Library-bound extraction writes a temporary file under the library root so the subsequent Move import remains a
-same-volume rename. It reuses the normal photo-import collision and deduplication rules. Extracted photos never enter
-the video's regenerable frame folder, which full re-extraction may replace wholesale. Successful import reaches the
-browser through normal Catalog notification.
+`LibraryPlayer`'s target is the configured Extracted label's photo folder, and the frame is tracked there as an owned
+photo. The library holds no two identical files: when a byte-identical photo is already tracked, the frame is deleted
+and that photo gets the label instead. Extracted photos never enter the video's regenerable frame folder, which full
+re-extraction may replace wholesale. Successful import reaches the browser through normal Catalog notification.
 
 ### Saved loops and playback speed
 

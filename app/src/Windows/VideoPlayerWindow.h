@@ -6,6 +6,7 @@
 DISABLE_COMPILER_WARNINGS
 #include <QMainWindow>
 #include <QString>
+#include <QStringList>
 RESTORE_COMPILER_WARNINGS
 
 #include <functional>
@@ -22,23 +23,35 @@ class QCheckBox;
 class QComboBox;
 class QPushButton;
 class MarkerSlider;
-class Library;
+class MetadataStore;
 class OscillatingPlayback;
 struct OscillationRequest;
 
 class VideoPlayerWindow final : public QMainWindow
 {
 public:
-	// mediaId keys per-video metadata; derive it from videoPath for ad-hoc playback.
-	// A null library leaves out the library-bound features: metadata persistence (speed, saved loops),
-	// prev/next navigation, and extract-to-library.
-	VideoPlayerWindow(Library* library, const QString& videoPath, const MediaId& mediaId, QWidget* parent);
+	// Called at each metadata read and write: the store it returns can be replaced between calls.
+	using MetadataStoreProvider = std::function<MetadataStore*()>;
+
+	// metadataStore persists speed and saved loops per video; without it they last until another video loads.
+	VideoPlayerWindow(const QString& videoPath, MetadataStoreProvider metadataStore, QWidget* parent);
 	~VideoPlayerWindow() override;
 
-	// Browsing order for previous/next navigation; empty (the default) leaves navigation inert.
-	void setNavigationOrder(std::vector<MediaId> order);
-	// Reports each item navigated to; the initially loaded one does not call it.
-	void setOnNavigatedToMediaItem(std::function<void(const MediaId& id)> handler);
+	// Previous/next navigation through videoPaths; it stays inert unless they include the video playing.
+	// onNavigated reports the index navigated to; the initial video does not call it.
+	void setNavigation(QStringList videoPaths, std::function<void(int index)> onNavigated);
+
+	// A fixed frame destination offered beside "Extract frame to folder...", and repeated by E when used last.
+	struct FrameTarget
+	{
+		QString text;       // menu wording
+		QString repeatText; // menu wording when E repeats it
+		// Returns the folder to extract into, empty after reporting why there is none.
+		std::function<QString()> prepareFolder;
+		std::function<void(const QString& framePath)> frameWritten;
+	};
+	// Call at most once.
+	void setFrameTarget(FrameTarget target);
 
 	// What Del or Shift+Del does to the playing item, in the host's terms.
 	struct RemovalAction
@@ -55,19 +68,21 @@ public:
 	// Players whose video matches drop their source and stay open without it, see releaseMediaFilesHeldOpen.
 	static void releaseFilesMatching(const std::function<bool(const QString& path)>& isAffected);
 
-	// Opens a self-managing ad-hoc player.
-	static VideoPlayerWindow* createPlayerWindow(Library* library, const QString& videoPath, QWidget* parent);
+	// Opens a self-managing player.
+	static VideoPlayerWindow* createPlayerWindow(const QString& videoPath, QWidget* parent, MetadataStoreProvider metadataStore = {});
 
 private:
 	friend class OscillatingPlayback;
 
-	// The values are the step through _navigationOrder.
+	// The values are the step through _navigationPaths.
 	enum class Direction { Previous = -1, Next = 1 };
 
 	// Everything per-file lives here; the constructor is the first caller.
-	void loadFile(const QString& videoPath, const MediaId& mediaId);
-	// Skips items that have left the library or the disk, and stops at the ends.
-	[[nodiscard]] std::optional<MediaId> adjacentMediaItem(Direction direction) const;
+	void loadFile(const QString& videoPath);
+	// Null without a provider.
+	[[nodiscard]] MetadataStore* currentMetadataStore() const;
+	// Skips entries cleared by a removal or gone from the disk; -1 when the list ends first.
+	[[nodiscard]] int adjacentIndex(Direction direction) const;
 	void loadAdjacentFile(Direction direction);
 	void performRemoval(const RemovalAction& action);
 	// Next item, else previous, else closes the window.
@@ -104,7 +119,7 @@ private:
 
 	void showContextMenu(const QPoint& globalPos);
 	void copyFileToClipboard() const;
-	void extractFrameToLibrary(qint64 timestampMs);
+	void extractFrameToTarget(qint64 timestampMs);
 	void extractFrameToFolder(qint64 timestampMs, const QString& folder);
 	void repeatLastExtraction(qint64 timestampMs);
 
@@ -113,12 +128,13 @@ private:
 private:
 	static std::vector<VideoPlayerWindow*> _instances;
 
-	Library* _library = nullptr;
+	const MetadataStoreProvider _metadataStore;
 	MediaId _mediaId;
 	QString _videoPath;
-	std::function<void(const MediaId& id)> _onNavigatedToMediaItem;
-	// The current position is looked up by _mediaId rather than tracked.
-	std::vector<MediaId> _navigationOrder;
+	QStringList _navigationPaths;
+	int _navigationIndex = -1;
+	std::function<void(int index)> _onNavigated;
+	FrameTarget _frameTarget;
 	// Both empty until setRemovalActions.
 	RemovalAction _deleteKeyAction;
 	RemovalAction _shiftDeleteKeyAction;

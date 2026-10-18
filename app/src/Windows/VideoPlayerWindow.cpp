@@ -2,8 +2,6 @@
 #include "Windows/SingleFrameExtraction.h"
 #include "Windows/OscillatingPlayback.h"
 #include "UiComponents/MarkerSlider.h"
-#include "Core/Catalog.h"
-#include "Core/Library.h"
 #include "Core/MetadataStore.h"
 #include "Shortcuts.h"
 #include "Theme/Theme.h"
@@ -135,8 +133,8 @@ QString oscillationCurveSetting(OscillationCurve curve)
 std::vector<VideoPlayerWindow*> VideoPlayerWindow::_instances;
 
 
-VideoPlayerWindow::VideoPlayerWindow(Library* library, const QString& videoPath, const MediaId& mediaId, QWidget* parent)
-	: QMainWindow(parent), _library(library)
+VideoPlayerWindow::VideoPlayerWindow(const QString& videoPath, MetadataStoreProvider metadataStore, QWidget* parent)
+	: QMainWindow(parent), _metadataStore(std::move(metadataStore))
 {
 	setAttribute(Qt::WA_DeleteOnClose);
 
@@ -177,9 +175,10 @@ VideoPlayerWindow::VideoPlayerWindow(Library* library, const QString& videoPath,
 			return;
 		const double speed = _speedCombo->itemData(index).toDouble();
 		applyPlaybackSpeed(speed);
-		if (!_library)
+		MetadataStore* store = currentMetadataStore();
+		if (!store)
 			return;
-		auto writer = _library->metadataStore().beginBatch();
+		auto writer = store->beginBatch();
 		if (qAbs(speed - 1.0) < 0.001)
 			writer.removeField(_mediaId, u"playbackSpeed");
 		else
@@ -276,7 +275,8 @@ VideoPlayerWindow::VideoPlayerWindow(Library* library, const QString& videoPath,
 		updateOscillationAvailability();
 	};
 	const auto persistIntervals = [this] {
-		if (!_library)
+		MetadataStore* store = currentMetadataStore();
+		if (!store)
 			return;
 		QJsonArray array;
 		for (int i = 1; i < _savedLoopCombo->count(); ++i)
@@ -288,7 +288,7 @@ VideoPlayerWindow::VideoPlayerWindow(Library* library, const QString& videoPath,
 			object.insert("speed", _savedLoopCombo->itemData(i, LoopSpeedRole).toDouble());
 			array.append(object);
 		}
-		_library->metadataStore().beginBatch().set(_mediaId, u"intervals", array);
+		store->beginBatch().set(_mediaId, u"intervals", array);
 	};
 	const auto promptLoopName = [this](const QString& title, const QString& initial) -> std::optional<QString> {
 		bool ok = false;
@@ -508,17 +508,17 @@ VideoPlayerWindow::VideoPlayerWindow(Library* library, const QString& videoPath,
 	QShortcut* copyFileShortcut = new QShortcut(QKeySequence::Copy, this);
 	connect(copyFileShortcut, &QShortcut::activated, this, &VideoPlayerWindow::copyFileToClipboard);
 
-	loadFile(videoPath, mediaId);
+	loadFile(videoPath);
 }
 
-void VideoPlayerWindow::loadFile(const QString& videoPath, const MediaId& mediaId)
+void VideoPlayerWindow::loadFile(const QString& videoPath)
 {
 	exitOscillatingPlayback(false);
 	_player->stop();
 
 	// The metadata below is keyed by the new identity, so it has to be in place first.
 	_videoPath = videoPath;
-	_mediaId = mediaId;
+	_mediaId = MediaId::fromFile(videoPath);
 	setWindowTitle(QFileInfo{ videoPath }.completeBaseName());
 
 	_pendingFormatError.reset();
@@ -527,11 +527,12 @@ void VideoPlayerWindow::loadFile(const QString& videoPath, const MediaId& mediaI
 	_positionToRestoreMs.reset();
 
 	clearAbInterval();
+	MetadataStore* const store = currentMetadataStore();
 	{
 		const QSignalBlocker blocker{ _savedLoopCombo };
 		_savedLoopCombo->clear();
 		_savedLoopCombo->addItem(tr("No loop"));
-		const QJsonArray saved = _library ? _library->metadataStore().get(_mediaId, u"intervals").toArray() : QJsonArray{};
+		const QJsonArray saved = store ? store->get(_mediaId, u"intervals").toArray() : QJsonArray{};
 		for (const QJsonValue& value : saved)
 		{
 			const QJsonObject object = value.toObject();
@@ -540,7 +541,7 @@ void VideoPlayerWindow::loadFile(const QString& videoPath, const MediaId& mediaI
 		}
 	}
 
-	const double storedSpeed = _library ? _library->metadataStore().get(_mediaId, u"playbackSpeed").toDouble() : 0.0;
+	const double storedSpeed = store ? store->get(_mediaId, u"playbackSpeed").toDouble() : 0.0;
 	selectPlaybackSpeed(storedSpeed > 0 ? storedSpeed : 1.0);
 
 	{
@@ -555,48 +556,51 @@ void VideoPlayerWindow::loadFile(const QString& videoPath, const MediaId& mediaI
 		setPlaybackActive(true);
 }
 
-void VideoPlayerWindow::setNavigationOrder(std::vector<MediaId> order)
+MetadataStore* VideoPlayerWindow::currentMetadataStore() const
 {
-	_navigationOrder = std::move(order);
+	return _metadataStore ? _metadataStore() : nullptr;
 }
 
-void VideoPlayerWindow::setOnNavigatedToMediaItem(std::function<void(const MediaId& id)> handler)
+void VideoPlayerWindow::setNavigation(QStringList videoPaths, std::function<void(int index)> onNavigated)
 {
-	_onNavigatedToMediaItem = std::move(handler);
+	_navigationIndex = static_cast<int>(videoPaths.indexOf(_videoPath));
+	_navigationPaths = std::move(videoPaths);
+	_onNavigated = std::move(onNavigated);
 }
 
-std::optional<MediaId> VideoPlayerWindow::adjacentMediaItem(Direction direction) const
+void VideoPlayerWindow::setFrameTarget(FrameTarget target)
 {
-	if (!_library)
-		return std::nullopt;
+	assert_and_return_r(!_frameTarget.prepareFolder, );
+	_frameTarget = std::move(target);
+}
 
-	const auto current = std::find(_navigationOrder.cbegin(), _navigationOrder.cend(), _mediaId);
-	if (current == _navigationOrder.cend())
-		return std::nullopt;
+int VideoPlayerWindow::adjacentIndex(Direction direction) const
+{
+	if (_navigationIndex < 0)
+		return -1;
 
 	const int step = static_cast<int>(direction);
-	const Catalog& catalog = _library->catalog();
-	for (int index = static_cast<int>(current - _navigationOrder.cbegin()) + step;
-	     index >= 0 && index < static_cast<int>(_navigationOrder.size()); index += step)
+	for (int index = _navigationIndex + step; index >= 0 && index < _navigationPaths.size(); index += step)
 	{
-		// The order is a snapshot from when the player opened; a since-deleted item must not block navigation past it.
-		const MediaId& candidate = _navigationOrder[static_cast<size_t>(index)];
-		if (catalog.containsMediaItem(candidate) && QFileInfo::exists(catalog.sourcePathForMediaItem(candidate)))
-			return candidate;
+		// The list is a snapshot from when the player opened; a since-deleted file must not block navigation past it.
+		const QString& candidate = _navigationPaths[index];
+		if (!candidate.isEmpty() && QFileInfo::exists(candidate))
+			return index;
 	}
-	return std::nullopt;
+	return -1;
 }
 
 void VideoPlayerWindow::loadAdjacentFile(Direction direction)
 {
-	const std::optional<MediaId> mediaId = adjacentMediaItem(direction);
-	if (!mediaId)
+	const int index = adjacentIndex(direction);
+	if (index < 0)
 		return;
 
-	loadFile(_library->catalog().sourcePathForMediaItem(*mediaId), *mediaId);
+	_navigationIndex = index;
+	loadFile(_navigationPaths[index]);
 
-	if (_onNavigatedToMediaItem)
-		_onNavigatedToMediaItem(*mediaId);
+	if (_onNavigated)
+		_onNavigated(index);
 }
 
 void VideoPlayerWindow::setRemovalActions(RemovalAction onDelete, RemovalAction onShiftDelete)
@@ -616,16 +620,21 @@ void VideoPlayerWindow::performRemoval(const RemovalAction& action)
 	const qint64 positionMs = currentPlaybackPosition();
 	const bool wasPlaying = isPlaybackActive();
 	if (action.remove(_mediaId, _videoPath))
+	{
+		// Cleared so that navigation skips it as it skips a deleted file: a removal may leave the file on disk.
+		if (_navigationIndex >= 0)
+			_navigationPaths[_navigationIndex].clear();
 		leaveRemovedItem();
+	}
 	else if (_player->source().isEmpty()) // released for a file operation that then failed or was cancelled
 		resumeReleasedFile(positionMs, wasPlaying);
 }
 
 void VideoPlayerWindow::leaveRemovedItem()
 {
-	if (adjacentMediaItem(Direction::Next))
+	if (adjacentIndex(Direction::Next) >= 0)
 		loadAdjacentFile(Direction::Next);
-	else if (adjacentMediaItem(Direction::Previous))
+	else if (adjacentIndex(Direction::Previous) >= 0)
 		loadAdjacentFile(Direction::Previous);
 	else
 		close();
@@ -633,7 +642,7 @@ void VideoPlayerWindow::leaveRemovedItem()
 
 void VideoPlayerWindow::resumeReleasedFile(qint64 positionMs, bool wasPlaying)
 {
-	loadFile(_videoPath, _mediaId);
+	loadFile(_videoPath);
 	_positionToRestoreMs = positionMs;
 	setPlaybackActive(wasPlaying);
 }
@@ -682,9 +691,9 @@ void VideoPlayerWindow::closeAll()
 		delete win;
 }
 
-VideoPlayerWindow* VideoPlayerWindow::createPlayerWindow(Library* library, const QString& videoPath, QWidget* parent)
+VideoPlayerWindow* VideoPlayerWindow::createPlayerWindow(const QString& videoPath, QWidget* parent, MetadataStoreProvider metadataStore)
 {
-	auto* player = new VideoPlayerWindow(library, videoPath, MediaId::fromFile(videoPath), parent);
+	auto* player = new VideoPlayerWindow(videoPath, std::move(metadataStore), parent);
 	player->show();
 	return player;
 }
@@ -1130,8 +1139,8 @@ void VideoPlayerWindow::showContextMenu(const QPoint& globalPos)
 	const qint64 timestampMs = currentPlaybackPosition();
 
 	QMenu menu(this);
-	if (_library)
-		menu.addAction(tr("Extract frame and import to library"), this, [this, timestampMs] { extractFrameToLibrary(timestampMs); });
+	if (_frameTarget.prepareFolder)
+		menu.addAction(_frameTarget.text, this, [this, timestampMs] { extractFrameToTarget(timestampMs); });
 	menu.addAction(tr("Extract frame to folder..."), this, [this, timestampMs] {
 		const QString folder = QFileDialog::getExistingDirectory(this, tr("Extract frame to folder"),
 			SingleFrameExtraction::lastFolder());
@@ -1142,8 +1151,8 @@ void VideoPlayerWindow::showContextMenu(const QPoint& globalPos)
 	const SingleFrameExtraction::LastDestination lastDestination = SingleFrameExtraction::lastDestination();
 	const QString lastFolder = SingleFrameExtraction::lastFolder();
 	QString repeatText;
-	if (lastDestination == SingleFrameExtraction::LastDestination::Library && _library)
-		repeatText = tr("Extract frame → library");
+	if (lastDestination == SingleFrameExtraction::LastDestination::Target && _frameTarget.prepareFolder)
+		repeatText = _frameTarget.repeatText;
 	else if (lastDestination == SingleFrameExtraction::LastDestination::Folder && !lastFolder.isEmpty())
 		repeatText = tr("Extract frame → %1").arg(QDir::toNativeSeparators(lastFolder));
 
@@ -1152,11 +1161,11 @@ void VideoPlayerWindow::showContextMenu(const QPoint& globalPos)
 	repeatAction->setEnabled(!repeatText.isEmpty());
 
 	menu.addSeparator();
-	if (!_navigationOrder.empty())
+	if (_navigationIndex >= 0)
 	{
 		const auto addNavigationAction = [this, &menu](const QString& text, Direction direction) {
 			QAction* action = menu.addAction(text, this, [this, direction] { loadAdjacentFile(direction); });
-			action->setEnabled(adjacentMediaItem(direction).has_value());
+			action->setEnabled(adjacentIndex(direction) >= 0);
 		};
 		addNavigationAction(tr("Previous video") + "\tPgUp", Direction::Previous);
 		addNavigationAction(tr("Next video") + "\tPgDown", Direction::Next);
@@ -1183,8 +1192,8 @@ void VideoPlayerWindow::showContextMenu(const QPoint& globalPos)
 void VideoPlayerWindow::repeatLastExtraction(qint64 timestampMs)
 {
 	const SingleFrameExtraction::LastDestination lastDestination = SingleFrameExtraction::lastDestination();
-	if (lastDestination == SingleFrameExtraction::LastDestination::Library && _library)
-		extractFrameToLibrary(timestampMs);
+	if (lastDestination == SingleFrameExtraction::LastDestination::Target && _frameTarget.prepareFolder)
+		extractFrameToTarget(timestampMs);
 	else if (lastDestination == SingleFrameExtraction::LastDestination::Folder)
 	{
 		const QString lastFolder = SingleFrameExtraction::lastFolder();
@@ -1205,8 +1214,17 @@ void VideoPlayerWindow::copyFileToClipboard() const
 	QGuiApplication::clipboard()->setMimeData(mime);
 }
 
-void VideoPlayerWindow::extractFrameToLibrary(qint64 timestampMs)
+void VideoPlayerWindow::extractFrameToTarget(qint64 timestampMs)
 {
-	assert_and_return_r(_library, );
-	SingleFrameExtraction::extractToLibraryInteractive(*_library, _videoPath, timestampMs, this);
+	assert_and_return_r(_frameTarget.prepareFolder, );
+	const QString folder = _frameTarget.prepareFolder();
+	if (folder.isEmpty())
+		return;
+
+	const QString framePath = SingleFrameExtraction::extractFrame(_videoPath, timestampMs, folder, this);
+	if (framePath.isEmpty())
+		return;
+
+	SingleFrameExtraction::rememberTargetAsLastDestination();
+	_frameTarget.frameWritten(framePath);
 }

@@ -16,6 +16,7 @@
 #include "Windows/CompareWindow.h"
 #include "Windows/ImageViewerWindow.h"
 #include "Windows/LabelManagement.h"
+#include "Windows/LibraryPlayer.h"
 #include "Windows/MediaItemManagement.h"
 #include "Windows/MediaRename.h"
 #include "Windows/PhotoCompareWindow.h"
@@ -368,10 +369,24 @@ void MediaBrowserWidget::viewPhoto(const MediaId& id)
 		startIndex = 0;
 	}
 
-	ImageViewerWindow* const viewer = ImageViewerWindow::showForImages(&_library, std::move(paths), startIndex, window(),
+	ImageViewerWindow* const viewer = ImageViewerWindow::showForImages(std::move(paths), startIndex, window(),
 		[this, browsedIds](int index) { selectAndScrollToMediaItem(browsedIds[static_cast<size_t>(index)]); });
 	if (!viewer)
 		return;
+
+	auto* bestAction = new QAction(tr("Best"), viewer);
+	bestAction->setCheckable(true);
+	bestAction->setShortcut(QKeySequence(Qt::Key_B));
+	connect(bestAction, &QAction::triggered, viewer, [this, viewer, browsedIds] {
+		toggleBest(browsedIds[static_cast<size_t>(viewer->currentImageIndex())]);
+	});
+	viewer->addImageAction(bestAction, [this, bestAction, browsedIds](int index) {
+		const MediaId& id = browsedIds[static_cast<size_t>(index)];
+		const Catalog& catalog = _library.catalog();
+		const bool tracked = catalog.containsMediaItem(id);
+		bestAction->setEnabled(tracked);
+		bestAction->setChecked(tracked && catalog.mediaItemHasLabel(id, Catalog::BestLabelId));
+	});
 
 	viewer->setRemovalActions(
 		{ tr("Remove from library (untrack)"), [this, browsedIds](int index) { return untrackMediaItemAndReportGone(browsedIds[static_cast<size_t>(index)]); } },
@@ -387,13 +402,18 @@ void MediaBrowserWidget::playVideo(const MediaId& id)
 		return;
 	}
 
-	auto* playerWindow = new VideoPlayerWindow(&_library, sourcePath, id, nullptr);
-	playerWindow->setNavigationOrder(visibleVideosInViewOrder());
-	playerWindow->setOnNavigatedToMediaItem([this](const MediaId& navigatedId) { selectAndScrollToMediaItem(navigatedId); });
+	VideoPlayerWindow* const playerWindow = LibraryPlayer::open(_library, sourcePath, nullptr);
+
+	const std::vector<MediaId> navigationIds = visibleVideosInViewOrder();
+	QStringList navigationPaths;
+	for (const MediaId& videoId : navigationIds)
+		navigationPaths << _library.catalog().sourcePathForMediaItem(videoId);
+	playerWindow->setNavigation(std::move(navigationPaths),
+		[this, navigationIds](int index) { selectAndScrollToMediaItem(navigationIds[static_cast<size_t>(index)]); });
+
 	playerWindow->setRemovalActions(
 		{ tr("Remove from library (untrack)"), [this](const MediaId& playedId, const QString&) { return untrackMediaItemAndReportGone(playedId); } },
 		{ tr("Delete"), [this](const MediaId& playedId, const QString&) { return deleteMediaItemAndReportGone(playedId); } });
-	playerWindow->show();
 }
 
 void MediaBrowserWidget::openSourceInSystemApp(const MediaId& id)

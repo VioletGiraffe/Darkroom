@@ -1,9 +1,6 @@
 #include "Windows/SingleFrameExtraction.h"
 
-#include "Core/Catalog.h"
-#include "Core/Library.h"
 #include "Ffmpeg.h"
-#include "Import.h"
 #include "Settings.h"
 #include "Utils.h"
 #include "compiler/compiler_warnings_control.h"
@@ -15,7 +12,6 @@ DISABLE_COMPILER_WARNINGS
 #include <QMessageBox>
 #include <QObject>
 #include <QSettings>
-#include <QTemporaryDir>
 #include <QTime>
 #include <QToolTip>
 RESTORE_COMPILER_WARNINGS
@@ -27,8 +23,8 @@ namespace Settings {
 
 namespace {
 
-constexpr const char* ExtractToLibraryMode = "library";
-constexpr const char* ExtractToFolderMode  = "folder";
+constexpr const char* ExtractToTargetMode = "library"; // value written when the library was the only target
+constexpr const char* ExtractToFolderMode = "folder";
 
 [[nodiscard]] QString firstAvailableFramePath(
 	const QString& videoPath, qint64 timestampMs, const QString& destinationFolder, bool tiff)
@@ -46,28 +42,13 @@ constexpr const char* ExtractToFolderMode  = "folder";
 	}
 }
 
-[[nodiscard]] QString extractSingleFrameInto(const QString& videoPath, qint64 timestampMs, const QString& destinationFolder, QWidget* dialogParent)
-{
-	const bool tiff       = QSettings{}.value(Settings::UseTiff, Defaults::UseTiff).toBool();
-	const int jpegQuality = QSettings{}.value(Settings::JpegQuality, Defaults::JpegQuality).toInt();
-	const QString filePath = firstAvailableFramePath(videoPath, timestampMs, destinationFolder, tiff);
-
-	const Ffmpeg::SplitResult result = Ffmpeg::extractSingleFrame(videoPath, timestampMs, filePath, jpegQuality);
-	if (!result.ok())
-	{
-		reportFfmpegFailure(dialogParent, result, videoPath, destinationFolder);
-		return {};
-	}
-	return filePath;
-}
-
 } // namespace
 
 SingleFrameExtraction::LastDestination SingleFrameExtraction::lastDestination()
 {
 	const QString mode = QSettings{}.value(Settings::LastFrameExtractionMode).toString();
-	if (mode == ExtractToLibraryMode)
-		return LastDestination::Library;
+	if (mode == ExtractToTargetMode)
+		return LastDestination::Target;
 	if (mode == ExtractToFolderMode)
 		return LastDestination::Folder;
 	return LastDestination::None;
@@ -78,9 +59,35 @@ QString SingleFrameExtraction::lastFolder()
 	return QSettings{}.value(Settings::LastFrameExtractionFolder).toString();
 }
 
+void SingleFrameExtraction::rememberTargetAsLastDestination()
+{
+	QSettings{}.setValue(Settings::LastFrameExtractionMode, ExtractToTargetMode);
+}
+
+QString SingleFrameExtraction::extractFrame(const QString& videoPath, qint64 timestampMs, const QString& folder, QWidget* dialogParent)
+{
+	if (!QDir{}.mkpath(folder))
+	{
+		QMessageBox::critical(dialogParent, QObject::tr("Error"), QObject::tr("Failed to create the folder:\n%1").arg(QDir::toNativeSeparators(folder)));
+		return {};
+	}
+
+	const bool tiff       = QSettings{}.value(Settings::UseTiff, Defaults::UseTiff).toBool();
+	const int jpegQuality = QSettings{}.value(Settings::JpegQuality, Defaults::JpegQuality).toInt();
+	const QString filePath = firstAvailableFramePath(videoPath, timestampMs, folder, tiff);
+
+	const Ffmpeg::SplitResult result = Ffmpeg::extractSingleFrame(videoPath, timestampMs, filePath, jpegQuality);
+	if (!result.ok())
+	{
+		reportFfmpegFailure(dialogParent, result, videoPath, folder);
+		return {};
+	}
+	return filePath;
+}
+
 void SingleFrameExtraction::extractToFolderInteractive(const QString& videoPath, qint64 timestampMs, const QString& folder, QWidget* dialogParent)
 {
-	const QString filePath = extractSingleFrameInto(videoPath, timestampMs, folder, dialogParent);
+	const QString filePath = extractFrame(videoPath, timestampMs, folder, dialogParent);
 	if (filePath.isEmpty())
 		return;
 
@@ -88,51 +95,4 @@ void SingleFrameExtraction::extractToFolderInteractive(const QString& videoPath,
 	settings.setValue(Settings::LastFrameExtractionMode, ExtractToFolderMode);
 	settings.setValue(Settings::LastFrameExtractionFolder, folder);
 	QToolTip::showText(QCursor::pos(), QObject::tr("Frame saved:\n%1").arg(QDir::toNativeSeparators(filePath)), dialogParent);
-}
-
-void SingleFrameExtraction::extractToLibraryInteractive(Library& library, const QString& videoPath, qint64 timestampMs, QWidget* dialogParent)
-{
-	Catalog& catalog = library.catalog();
-
-	const QString labelName = QSettings{}.value(Settings::ExtractedLabelName, Defaults::ExtractedLabelName).toString();
-	QString error;
-	const LabelId labelId = catalog.createLabel(labelName, {}, &error);
-	if (labelId == LabelId::None)
-	{
-		QMessageBox::critical(dialogParent, QObject::tr("Error"),
-			QObject::tr("Failed to create the \"%1\" label:\n%2").arg(labelName, error));
-		return;
-	}
-
-	const QString photoFolder = catalog.photoFolderForLabel(labelId);
-	if (photoFolder.isEmpty())
-	{
-		QMessageBox::critical(dialogParent, QObject::tr("Error"),
-			QObject::tr("The \"%1\" label has no usable photo folder.").arg(labelName));
-		return;
-	}
-
-	// Keep the final Move on the library's filesystem.
-	QTemporaryDir tempDir(library.rootFolder() + "/.extract-XXXXXX");
-	if (!tempDir.isValid())
-	{
-		QMessageBox::critical(dialogParent, QObject::tr("Error"),
-			QObject::tr("Failed to create a temporary folder in the library:\n%1").arg(tempDir.errorString()));
-		return;
-	}
-
-	const QString extractedPath = extractSingleFrameInto(videoPath, timestampMs, tempDir.path(), dialogParent);
-	if (extractedPath.isEmpty())
-		return;
-
-	const Import::PhotoResult result = Import::importPhoto(catalog, photoFolder, extractedPath, Import::PhotoImportMode::Move);
-	if (result.status != Import::PhotoStatus::Success)
-	{
-		QMessageBox::critical(dialogParent, QObject::tr("Error"),
-			QObject::tr("Failed to import the extracted frame:\n%1").arg(result.errorMessage));
-		return;
-	}
-
-	QSettings{}.setValue(Settings::LastFrameExtractionMode, ExtractToLibraryMode);
-	QToolTip::showText(QCursor::pos(), QObject::tr("Frame imported into the library under \"%1\"").arg(labelName), dialogParent);
 }

@@ -157,6 +157,8 @@ public:
 	// Creates the backing folder and registry entry, or returns the existing same-name id. color applies only
 	// to a new label; empty chooses randomly. Failure returns None and populates error.
 	LabelId createLabel(const QString& displayName, const QString& color = {}, QString* error = nullptr);
+	// None when no non-virtual label has this name, compared case-insensitively.
+	[[nodiscard]] LabelId ordinaryLabelIdByName(const QString& displayName) const;
 
 	// The same "#rrggbb" generator used by createLabel.
 	static QString randomLabelColor();
@@ -196,7 +198,6 @@ private:
 	bool ensureBestLabelExists();
 	bool ensureFolderLabelExists(const QString& displayName, const QString& color = {});
 	[[nodiscard]] LabelId generateLabelId();
-	[[nodiscard]] LabelId ordinaryLabelIdByName(const QString& displayName) const;
 	[[nodiscard]] QString registryPath() const;
 	[[nodiscard]] QString photosRootFolder() const;
 

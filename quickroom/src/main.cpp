@@ -97,7 +97,7 @@ bool showImageViewer(const QString& path)
 	}
 
 	const auto currentPath = std::make_shared<QString>(images.at(index));
-	ImageViewerWindow* const viewer = ImageViewerWindow::showForImages(nullptr, images, index, nullptr,
+	ImageViewerWindow* const viewer = ImageViewerWindow::showForImages(images, index, nullptr,
 		[currentPath, images](int browsedIndex) { *currentPath = images.at(browsedIndex); });
 	if (!viewer)
 		return false;
@@ -137,7 +137,7 @@ void openStartupWindow(const QString& path)
 			return;
 		if (isSupportedVideoFile(path))
 		{
-			FileOperations::installDeleteActions(*VideoPlayerWindow::createPlayerWindow(nullptr, info.absoluteFilePath(), nullptr));
+			FileOperations::installDeleteActions(*VideoPlayerWindow::createPlayerWindow(info.absoluteFilePath(), nullptr));
 			return;
 		}
 	}

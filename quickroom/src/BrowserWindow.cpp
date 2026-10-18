@@ -458,7 +458,7 @@ void BrowserWindow::viewImage(const QString& path)
 
 	// The viewer is parentless and can outlive this window.
 	const QPointer<BrowserWindow> self{ this };
-	ImageViewerWindow* const viewer = ImageViewerWindow::showForImages(nullptr, imagePaths, startIndex, this,
+	ImageViewerWindow* const viewer = ImageViewerWindow::showForImages(imagePaths, startIndex, this,
 		[self, imagePaths](int index) {
 			if (self)
 				self->selectAndScrollToPath(imagePaths[index]);
@@ -476,7 +476,7 @@ void BrowserWindow::playVideo(const QString& path)
 		reportMissingFile(this, path);
 		return;
 	}
-	FileOperations::installDeleteActions(*VideoPlayerWindow::createPlayerWindow(nullptr, path, nullptr), entryRemover());
+	FileOperations::installDeleteActions(*VideoPlayerWindow::createPlayerWindow(path, nullptr), entryRemover());
 }
 
 std::function<void(const QString& path)> BrowserWindow::entryRemover()

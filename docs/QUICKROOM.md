@@ -32,8 +32,9 @@ larger than the tile: the margin is where the view paints the selection backgrou
 
 Activation: double-click or Enter. Folders navigate in place (queued: the rebuild would delete the tile whose
 handler is still running); images open `ImageViewerWindow` browsing the folder's images, with the browse
-position reflected back into the grid selection; videos open `VideoPlayerWindow`. Both windows take a null
-`Library`, which leaves out their library-bound features (see [playback.md](architecture/playback.md)).
+position reflected back into the grid selection; videos open `VideoPlayerWindow`. Neither window gets Darkroom's
+library features: no Best action, no persisted speed or saved loops, no frame target (see
+[playback.md](architecture/playback.md)).
 
 Deletion: Del moves to Trash, Shift+Del deletes permanently, in the grid (the whole selection, folders with
 their contents) and in the image viewer and video player (the current item). Only a permanent deletion or one

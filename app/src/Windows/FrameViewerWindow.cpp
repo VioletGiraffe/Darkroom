@@ -131,9 +131,8 @@ void FrameViewerWindow::refreshDisplay()
 		auto* thumbnail = new ThumbnailWidget(filePath, QFileInfo{ filePath }.completeBaseName(), _thumbnailSize, _thumbnailContainer);
 		connect(thumbnail, &ThumbnailWidget::customContextMenuRequested, this, &FrameViewerWindow::showThumbnailContextMenu);
 		thumbnail->setOnMouseWheelCallback([this](int steps) { zoomThumbnails(steps); });
-		// A frame is not a catalog item, so the viewer opens without a library.
 		thumbnail->setOnActivatedCallback([this, index] {
-			ImageViewerWindow::showForImages(nullptr, _imagePaths, index, this);
+			ImageViewerWindow::showForImages(_imagePaths, index, this);
 		});
 		_thumbnailLayout->addWidget(thumbnail);
 	}

@@ -2,7 +2,7 @@
 #include "Core/Library.h"
 #include "Core/MediaId.h"
 #include "Utils.h"
-#include "Windows/VideoPlayerWindow.h"
+#include "Windows/LibraryPlayer.h"
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -65,13 +65,13 @@ public:
 
 			QPushButton* playStaged = new QPushButton(tr("Play Staged File"), this);
 			connect(playStaged, &QPushButton::clicked, this, [playerLibrary, previewParent, stagedPath] {
-				VideoPlayerWindow::createPlayerWindow(playerLibrary, stagedPath, previewParent);
+				LibraryPlayer::open(*playerLibrary, stagedPath, previewParent);
 			});
 			buttonRow->addWidget(playStaged);
 
 			QPushButton* playExisting = new QPushButton(tr("Play Existing File"), this);
 			connect(playExisting, &QPushButton::clicked, this, [playerLibrary, previewParent, destPath] {
-				VideoPlayerWindow::createPlayerWindow(playerLibrary, destPath, previewParent);
+				LibraryPlayer::open(*playerLibrary, destPath, previewParent);
 			});
 			buttonRow->addWidget(playExisting);
 		}

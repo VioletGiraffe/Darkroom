@@ -54,11 +54,7 @@ INCLUDEPATH += \
 #                 SOURCES
 ###################################################
 
-# Library.h is the only shared header with Q_OBJECT, so it alone needs listing for moc:
-# its metaobject must link even though Quickroom never creates a Library.
-HEADERS += \
-	$$files(src/*.h, true) \
-	../app/src/Core/Library.h
+HEADERS += $$files(src/*.h, true)
 
 # Shared app sources are compiled in directly (the app is not a library).
 # Wholly shared directories are globbed; the rest is the hand-picked closure of the reused
@@ -66,12 +62,15 @@ HEADERS += \
 # while the app still builds - same failure mode as tests.pro.
 SOURCES += \
 	$$files(src/*.cpp, true) \
-	$$files(../app/src/Core/*.cpp) \
 	$$files(../app/src/Theme/*.cpp) \
 	$$files(../app/src/crashhandler/*.cpp) \
+	../app/src/Core/CpuThreadPool.cpp \
+	../app/src/Core/IoThreadPool.cpp \
+	../app/src/Core/JsonPersistence.cpp \
+	../app/src/Core/MediaId.cpp \
+	../app/src/Core/MetadataStore.cpp \
 	../app/src/Utils.cpp \
 	../app/src/Ffmpeg.cpp \
-	../app/src/Import.cpp \
 	../app/src/Windows/ImageViewerWindow.cpp \
 	../app/src/Windows/VideoPlayerWindow.cpp \
 	../app/src/Windows/OscillatingPlayback.cpp \

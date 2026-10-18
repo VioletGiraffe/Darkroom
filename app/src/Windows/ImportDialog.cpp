@@ -16,6 +16,7 @@
 #include "Windows/ImageViewerWindow.h"
 #include "Windows/ImportExecution.h"
 #include "Windows/LabelManagement.h"
+#include "Windows/LibraryPlayer.h"
 #include "Windows/PathDeletion.h"
 #include "Windows/SourceRelocation.h"
 #include "Theme/Theme.h"
@@ -1096,7 +1097,7 @@ void ImportDialog::previewStagedItem(const MediaId& id)
 
 	if (!isSupportedImageFile(it->path))
 	{
-		VideoPlayerWindow* const player = VideoPlayerWindow::createPlayerWindow(&_library, it->path, this);
+		VideoPlayerWindow* const player = LibraryPlayer::open(_library, it->path, this);
 		player->setRemovalActions(
 			{ tr("Remove from staging"), [id, removeStaged](const MediaId&, const QString&) { return removeStaged(id); } },
 			{ tr("Delete source file"), [id, deleteStagedSource](const MediaId&, const QString&) { return deleteStagedSource(id); } });
@@ -1119,8 +1120,7 @@ void ImportDialog::previewStagedItem(const MediaId& id)
 		browsedIds.push_back(item->mediaId);
 	}
 
-	// No library: a staged photo is not a catalog item yet.
-	ImageViewerWindow* const viewer = ImageViewerWindow::showForImages(nullptr, std::move(photoPaths), startIndex, this,
+	ImageViewerWindow* const viewer = ImageViewerWindow::showForImages(std::move(photoPaths), startIndex, this,
 		[this, browsedIds](int index) { selectAndScrollToStagedItem(browsedIds[static_cast<size_t>(index)]); });
 	if (!viewer)
 		return;

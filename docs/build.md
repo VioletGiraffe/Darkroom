@@ -35,9 +35,9 @@ The app is not a library. Two projects compile app sources directly and hand-lis
 
 - `tests/tests.pro` - the model half of `Core/` (`Catalog`, `CatalogIntegrity`, `JsonPersistence`, `Library`,
   `MediaId`, `MetadataStore`) plus `Utils.cpp` for its path helpers. Its `LIBS` are hand-listed too.
-- `quickroom/quickroom.pro` - `Core/`, `Theme/`, and `crashhandler/` whole, plus the closure of the shared viewer and
-  player windows. Its comments name the list. It also compiles the `file-operations` engine and dialogs through that
-  submodule's `.pri` manifests, and links `thin_io` for them.
+- `quickroom/quickroom.pro` - `Theme/` and `crashhandler/` whole, plus the closure of the shared viewer and player
+  windows, which takes `Core/` without the library model. Its comments name the list. It also compiles the
+  `file-operations` engine and dialogs through that submodule's `.pri` manifests, and links `thin_io` for them.
 
 **The link trap, shared by both:** a compiled app source gaining an `#include` of a submodule library that the project
 does not link breaks that project's link while Darkroom still builds. CI builds tests before the app, so the failure

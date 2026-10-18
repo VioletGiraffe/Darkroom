@@ -1,7 +1,5 @@
 #include "Windows/ImageViewerWindow.h"
-#include "Core/Catalog.h"
 #include "Core/CpuThreadPool.h"
-#include "Core/Library.h"
 #include "Shortcuts.h"
 #include "Utils.h"
 #include "assert/advanced_assert.h"
@@ -29,7 +27,7 @@ RESTORE_COMPILER_WARNINGS
 #include <functional>
 #include <utility>
 
-ImageViewerWindow* ImageViewerWindow::showForImages(Library* library, QStringList imagePaths, int startIndex, QWidget* parent,
+ImageViewerWindow* ImageViewerWindow::showForImages(QStringList imagePaths, int startIndex, QWidget* parent,
 	std::function<void(int index)> onImageChanged)
 {
 	assert_and_return_r(startIndex >= 0 && startIndex < imagePaths.size(), nullptr);
@@ -41,7 +39,7 @@ ImageViewerWindow* ImageViewerWindow::showForImages(Library* library, QStringLis
 	}
 
 	QWidget* const modalOwner = parent && parent->window()->isModal() ? parent->window() : nullptr;
-	auto* window = new ImageViewerWindow(library, std::move(imagePaths), startIndex, modalOwner);
+	auto* window = new ImageViewerWindow(std::move(imagePaths), startIndex, modalOwner);
 	// Assigned after construction: the initial image is the one the caller already acted on.
 	window->_onImageChanged = std::move(onImageChanged);
 	window->setAttribute(Qt::WA_DeleteOnClose);
@@ -52,6 +50,14 @@ ImageViewerWindow* ImageViewerWindow::showForImages(Library* library, QStringLis
 void ImageViewerWindow::setExitFullScreenHandler(std::function<bool()> handler)
 {
 	_exitFullScreenHandler = std::move(handler);
+}
+
+void ImageViewerWindow::addImageAction(QAction* action, std::function<void(int index)> updateForImage)
+{
+	_imageMenu->addAction(action);
+	addAction(action); // for the shortcut, see buildMenus
+	updateForImage(_index);
+	_imageActionUpdaters.push_back(std::move(updateForImage));
 }
 
 void ImageViewerWindow::setRemovalActions(RemovalAction onDelete, RemovalAction onShiftDelete)
@@ -77,9 +83,8 @@ void ImageViewerWindow::releaseFilesMatching(const std::function<bool(const QStr
 	}
 }
 
-ImageViewerWindow::ImageViewerWindow(Library* library, QStringList imagePaths, int startIndex, QWidget* parent)
+ImageViewerWindow::ImageViewerWindow(QStringList imagePaths, int startIndex, QWidget* parent)
 	: QMainWindow(parent)
-	, _library(library)
 	, _imagePaths(std::move(imagePaths))
 	, _index(startIndex)
 {
@@ -155,14 +160,7 @@ void ImageViewerWindow::buildMenus()
 	_previousAction->setShortcuts({ QKeySequence(Qt::Key_Left), QKeySequence(Qt::Key_PageUp) });
 	_nextAction = _imageMenu->addAction(tr("Next"), this, [this] { showImage(adjacentIndex(Direction::Next)); });
 	_nextAction->setShortcuts({ QKeySequence(Qt::Key_Right), QKeySequence(Qt::Key_PageDown) });
-
-	if (_library)
-	{
-		_imageMenu->addSeparator();
-		_bestAction = _imageMenu->addAction(tr("Best"), this, &ImageViewerWindow::toggleBest);
-		_bestAction->setCheckable(true);
-		_bestAction->setShortcut(QKeySequence(Qt::Key_B));
-	}
+	_imageMenu->addSeparator(); // before host actions; QMenu collapses it when none follow
 
 	menuBar->addMenu(fileMenu);
 	menuBar->addMenu(editMenu);
@@ -194,7 +192,8 @@ void ImageViewerWindow::showImage(int index)
 	_windowIconTimer->start();
 	_previousAction->setEnabled(adjacentIndex(Direction::Previous) >= 0);
 	_nextAction->setEnabled(adjacentIndex(Direction::Next) >= 0);
-	updateLibraryActions();
+	for (const auto& updateForImage : _imageActionUpdaters)
+		updateForImage(index);
 
 	if (_onImageChanged)
 		_onImageChanged(index);
@@ -285,39 +284,4 @@ void ImageViewerWindow::removeCurrentImage(const std::function<bool(int index)>&
 		showImage(remaining);
 	else
 		close();
-}
-
-MediaId ImageViewerWindow::currentMediaId() const
-{
-	if (!_library)
-		return {};
-
-	// The file is on disk - it was just displayed - so its identity derives correctly here.
-	const MediaId id = MediaId::fromFile(currentPath());
-	return _library->catalog().containsMediaItem(id) ? id : MediaId{};
-}
-
-void ImageViewerWindow::toggleBest()
-{
-	const MediaId id = currentMediaId();
-	if (!id.isValid())
-		return;
-
-	Catalog& catalog = _library->catalog();
-	if (catalog.mediaItemHasLabel(id, Catalog::BestLabelId))
-		catalog.removeLabel(id, Catalog::BestLabelId);
-	else
-		catalog.addLabel(id, Catalog::BestLabelId);
-
-	updateLibraryActions();
-}
-
-void ImageViewerWindow::updateLibraryActions()
-{
-	if (!_bestAction)
-		return;
-
-	const MediaId id = currentMediaId();
-	_bestAction->setEnabled(id.isValid());
-	_bestAction->setChecked(id.isValid() && _library->catalog().mediaItemHasLabel(id, Catalog::BestLabelId));
 }
