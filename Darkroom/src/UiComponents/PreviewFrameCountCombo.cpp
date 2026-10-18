@@ -1,5 +1,5 @@
 #include "UiComponents/PreviewFrameCountCombo.h"
-#include "Settings.h"
+#include "DarkroomSettings.h"
 #include "Theme/Theme.h"
 #include "compiler/compiler_warnings_control.h"
 #include "theme/ctintedsvgiconengine.h"

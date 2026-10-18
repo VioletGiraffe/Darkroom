@@ -48,7 +48,7 @@ from PIL import Image, ImageDraw, ImageFont
 from fontTools.ttLib import TTFont
 from fontTools.varLib import instancer
 
-OUT = Path(__file__).resolve().parent.parent / "quickroom" / "res" / "filetypes"
+OUT = Path(__file__).resolve().parent.parent / "Quickroom" / "res" / "filetypes"
 WORDMARK_FONT = Path("C:/Windows/Fonts/bahnschrift.ttf")
 WORDMARK_AXES = {"wght": 700, "wdth": 75}   # the "Bold Condensed" instance; both axes are at their extreme
 

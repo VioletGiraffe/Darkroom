@@ -49,7 +49,7 @@ jobs:
         winget install --id AlDanial.Cloc --exact --silent --accept-package-agreements --accept-source-agreements
         "$env:LOCALAPPDATA\Microsoft\WinGet\Links" >> $env:GITHUB_PATH
 
-        $result = cloc --include-lang="C,C++,C/C++ Header" --strip-str-comments --exclude-dir=tests,bin,build,.git,3rdparty --by-file --json --quiet ./app/ | ConvertFrom-Json
+        $result = cloc --include-lang="C,C++,C/C++ Header" --strip-str-comments --exclude-dir=tests,bin,build,.git,3rdparty --by-file --json --quiet ./Darkroom/ ./Shared/ | ConvertFrom-Json
 
         $loc = $result.SUM.code
         "Darkroom C/C++ code: $loc LOC"
@@ -61,12 +61,12 @@ jobs:
           Sort-Object { $_.Value.code } -Descending |
           ForEach-Object { "{0,6}  {1}" -f $_.Value.code, $_.Name }
 
-    # Quickroom's own sources only; the app/src/ files it also compiles are counted once, under Darkroom.
+    # Quickroom's own sources only; Shared is counted once, under Darkroom.
     - name: LOC count - Quickroom
       if: "startsWith(matrix.os, 'windows')"
       shell: pwsh
       run: |
-        $loc = (cloc --include-lang="C,C++,C/C++ Header" --strip-str-comments --exclude-dir=tests,bin,build,.git,3rdparty --json --quiet ./quickroom/ | ConvertFrom-Json).SUM.code
+        $loc = (cloc --include-lang="C,C++,C/C++ Header" --strip-str-comments --exclude-dir=tests,bin,build,.git,3rdparty --json --quiet ./Quickroom/ | ConvertFrom-Json).SUM.code
         "Quickroom C/C++ code: $loc LOC"
         "LOC_QUICKROOM=$loc" >> $env:GITHUB_ENV
 
@@ -74,7 +74,7 @@ jobs:
       if: "startsWith(matrix.os, 'windows')"
       shell: pwsh
       run: |
-        $loc = (cloc --include-lang="C,C++,C/C++ Header" --strip-str-comments --exclude-dir=tests,bin,build,.git,3rdparty,app,quickroom --json --quiet . | ConvertFrom-Json).SUM.code
+        $loc = (cloc --include-lang="C,C++,C/C++ Header" --strip-str-comments --exclude-dir=tests,bin,build,.git,3rdparty,Darkroom,Quickroom,Shared --json --quiet . | ConvertFrom-Json).SUM.code
         "Libs C/C++ code: $loc LOC"
         "LOC_LIBS=$loc" >> $env:GITHUB_ENV
 

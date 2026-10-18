@@ -5,7 +5,7 @@
 #define QuickroomExeName "Quickroom.exe"
 #define IconDir "filetypes"
 #define VCRedistExeName "vc_redist.x64.exe"
-; Version is read from the built exe (which gets it from VERSION in app.pro) - single source of truth
+; Version is read from the built exe (which gets it from VERSION in Darkroom.pro) - single source of truth
 #define MyAppVersion GetVersionNumbersString(AddBackslash(SourcePath) + "dist\" + MyAppExeName)
 
 [Setup]

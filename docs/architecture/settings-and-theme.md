@@ -62,7 +62,7 @@ ticks PhotoCompareWindow's picker sets.
 ## Icons
 
 Icons are monochrome SVGs with tintable strokes and fills marked `currentColor`; there are no per-theme image
-variants. They live in `app/res/UI/` and are listed by hand in `resources.qrc`, which Quickroom includes as well.
+variants. They live in the `res/UI/` folders of `Shared/` and `Darkroom/` and are listed by hand in each tree's `.qrc`.
 
 - Code-consumed icons: `tintedSvgIcon()` renders per requested size and DPR, resolving its color per render
   through a callback. `tintedSvgPixmap()` serves delegates that paint directly.

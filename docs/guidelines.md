@@ -69,7 +69,7 @@ plain lexicographic `<` / `QString::compare`:
 
 ## i18n — route user-facing strings through `tr()`
 
-All user-facing strings in `app/src` are wrapped for translation-readiness (no `.ts` file / `QTranslator`
+All user-facing strings in the apps' sources are wrapped for translation-readiness (no `.ts` file / `QTranslator`
 wired up yet). Match this for new UI strings:
 
 - Member-function strings use `tr(...)`; free-function / namespace-scope strings use `QObject::tr(...)`.

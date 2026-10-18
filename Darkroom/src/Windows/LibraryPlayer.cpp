@@ -3,7 +3,7 @@
 #include "Core/Catalog.h"
 #include "Core/Library.h"
 #include "Core/MediaId.h"
-#include "Settings.h"
+#include "DarkroomSettings.h"
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
 

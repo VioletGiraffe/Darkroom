@@ -5,13 +5,12 @@ with Darkroom's image viewer and video player for opening items. It has no libra
 are files, identified by path. It ships from this repo as a second exe built on Darkroom's components, and is
 distributed with Darkroom: the same Windows installer, the same macOS disk image.
 
-Read [DARKROOM.md](DARKROOM.md) first for the repository layout and the coding conventions, and
-[build.md](build.md) for how `quickroom/quickroom.pro` compiles a hand-listed subset of `app/src` and the link trap
-that comes with it.
+Read [DARKROOM.md](DARKROOM.md) first for the repository layout, including the `Shared` library both apps link, and
+the coding conventions.
 
 ## Structure
 
-`quickroom/src/` holds the Quickroom-only code:
+`Quickroom/src/` holds the Quickroom-only code:
 
 - `main.cpp` - Darkroom's bootstrap shape minus the library, plus the startup routing below. Its own
   application identity ("Quickroom") keeps its QSettings separate from Darkroom's.

@@ -9,7 +9,7 @@
 #include "Theme/Theme.h"
 #include "compiler/compiler_warnings_control.h"
 #include "theme/ctintedsvgiconengine.h"
-#include "Shortcuts.h"
+#include "DarkroomShortcuts.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QAbstractItemView>

@@ -1,14 +1,7 @@
-TEMPLATE = app
-TARGET   = Darkroom
-VERSION  = 1.0.0
-# Surface the version to C++ as a bare token (stringized in main.cpp -> QApplication::applicationVersion()).
-DEFINES += DARKROOM_VERSION=$$VERSION
-
-!versionAtLeast(QT_VERSION, 6.8.0): error("Darkroom requires Qt 6.8 or newer.")
-
-QMAKE_TARGET_PRODUCT     = Darkroom
-QMAKE_TARGET_COMPANY     = VioletGiraffe
-QMAKE_TARGET_COPYRIGHT   = Copyright (C) 2026 VioletGiraffe
+# Code used by both Darkroom and Quickroom, compiled once for both.
+TEMPLATE = lib
+TARGET   = shared
+CONFIG += staticlib
 
 QT = core gui widgets multimedia multimediawidgets svg
 QT += core-private   # Theme/Style.cpp includes qtutils theme/cthemeiconhandler.h (private QAbstractFileEngineHandler)
@@ -45,7 +38,6 @@ INCLUDEPATH += \
 	../qtutils \
 	../cpputils \
 	../cpp-template-utils \
-	../magic-alignment/src \
 	../image-processing
 
 ###################################################
@@ -59,36 +51,18 @@ HEADERS += \
 
 SOURCES += $$files(src/*.cpp, true)
 
-RESOURCES += res/resources.qrc
+# A static library's resources need Q_INIT_RESOURCE(shared) in each app's main().
+RESOURCES += res/shared.qrc
 
 ###################################################
-#                 LIBS
-###################################################
-
-# magic-alignment before cpputils: it uses the cpputils thread pool, and GNU ld resolves left to right
-LIBS += -L$${DESTDIR} -lqtutils -lmagic-alignment -lcpputils -limage-processing
-include(../cpputils/dependencies.pri)
-
-###################################################
-#    Platform-specific compiler options and libs
+#    Platform-specific compiler options
 ###################################################
 
 win*{
-	#LIBS += -lole32 -lShell32 -lUser32
 	QMAKE_CXXFLAGS += /MP /wd4251
 	QMAKE_CXXFLAGS += /std:c++latest /permissive- /Zc:__cplusplus /FS
 	QMAKE_CXXFLAGS_WARN_ON = /W4
 	DEFINES += WIN32_LEAN_AND_MEAN NOMINMAX _SCL_SECURE_NO_WARNINGS
-
-	Debug:QMAKE_LFLAGS += /DEBUG:FASTLINK /INCREMENTAL
-
-	LIBS += -lUser32
-	RC_ICONS = res/darkroom.ico
-}
-
-mac*{
-	LIBS += -framework AppKit
-	ICON = res/darkroom.icns
 }
 
 linux*|freebsd{

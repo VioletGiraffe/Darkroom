@@ -12,8 +12,9 @@
 #include "Core/MediaId.h"
 #include "Windows/VideoPlayerWindow.h"
 #include "Utils.h"
-#include "Settings.h"
+#include "DarkroomSettings.h"
 #include "Shortcuts.h"
+#include "DarkroomShortcuts.h"
 
 #include "appdialogs/caboutdialog.h"
 #include "compiler/compiler_warnings_control.h"

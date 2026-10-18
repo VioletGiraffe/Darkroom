@@ -28,7 +28,7 @@ RESTORE_COMPILER_WARNINGS
 #include <utility>
 
 #ifndef QUICKROOM_VERSION
-#error "QUICKROOM_VERSION is not defined; set it in quickroom.pro"
+#error "QUICKROOM_VERSION is not defined; set it in Quickroom.pro"
 #endif
 
 namespace {
@@ -158,6 +158,8 @@ int main(int argc, char* argv[])
 	AdvancedAssert::setLoggingFunc([](const char* msg) {
 		::memoryLogMessageHandler(QtWarningMsg, QMessageLogContext{}, msg);
 	});
+
+	Q_INIT_RESOURCE(shared);
 
 	QApplication app(argc, argv);
 	app.setOrganizationName("VioletGiraffe");

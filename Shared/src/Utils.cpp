@@ -25,7 +25,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QWidget>
 RESTORE_COMPILER_WARNINGS
 
-// QtDBus is linked on these platforms only (see app.pro), for revealInFileManager.
+// QtDBus is linked on these platforms only (QT += dbus in Shared.pro and both apps), for revealInFileManager.
 #if !defined Q_OS_WIN && !defined Q_OS_MACOS
 DISABLE_COMPILER_WARNINGS
 #include <QDBusConnection>

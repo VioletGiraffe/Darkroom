@@ -2,7 +2,7 @@
 #include "Core/Catalog.h"
 #include "Core/MediaId.h"
 #include "Ffmpeg.h"
-#include "Settings.h"
+#include "DarkroomSettings.h"
 #include "Utils.h"
 #include "compiler/compiler_warnings_control.h"
 

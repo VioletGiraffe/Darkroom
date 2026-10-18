@@ -1,6 +1,7 @@
 #include "Windows/FrameExtraction.h"
 #include "Core/Catalog.h"
 #include "Ffmpeg.h"
+#include "DarkroomSettings.h"
 #include "Settings.h"
 #include "Utils.h"
 

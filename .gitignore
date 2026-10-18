@@ -24,7 +24,7 @@ Makefile.Release
 .qmake.stash
 
 .DS_Store
-/app/Darkroom_resource.rc
-/quickroom/Quickroom_resource.rc
+/Darkroom/Darkroom_resource.rc
+/Quickroom/Quickroom_resource.rc
 /scripts/__pycache__/
 /scripts/local-env.*

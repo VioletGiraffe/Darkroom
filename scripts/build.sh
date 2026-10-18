@@ -8,10 +8,10 @@
 
 set -u
 
-TARGETS="sub-app sub-quickroom"
+TARGETS="sub-Darkroom sub-Quickroom"
 case "${1:-}" in
-	darkroom) TARGETS=sub-app; shift ;;
-	quickroom) TARGETS=sub-quickroom; shift ;;
+	darkroom) TARGETS=sub-Darkroom; shift ;;
+	quickroom) TARGETS=sub-Quickroom; shift ;;
 esac
 
 CONFIG=release

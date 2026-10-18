@@ -8,7 +8,7 @@ Toolchain minimums (Qt 6.8, macOS 13.3) and their reasons are stated at the top 
 
 | Project | Builds | Purpose |
 |---|---|---|
-| `Darkroom.pro` | Darkroom, Quickroom, and all six submodule libraries | the product |
+| `Darkroom.pro` | Darkroom, Quickroom, the `Shared` library they both link, and all six submodule libraries | the product |
 | `Tests.pro` | `cpputils`, `qtutils`, and `tests/` | the test binary builds and runs on its own, including when the app does not compile |
 
 Every qmake and msbuild invocation names its project: `qmake -tp vc -r Tests.pro`, `msbuild Darkroom.sln /t:Darkroom`.
@@ -29,22 +29,24 @@ CI and local builds run the same scripts in `scripts/`; the `.bat` files start t
 - On Windows the scripts set up the MSVC environment through vswhere when `cl` is not on `PATH`.
 - Exit codes: 1 for a build or test failure, 2 for an incomplete environment.
 
-## Source sharing without a library
+## Shared library and tests
 
-The app is not a library. Two projects compile app sources directly and hand-list what they take:
+- `Shared/` builds a static library both apps link.
+- qmake does not pass a static library's `LIBS` on: a library `Shared` starts using must be added to both apps' `LIBS`
+  and to their `depends` in `Darkroom.pro`.
+- Quickroom also compiles the `file-operations` engine and dialogs through that submodule's `.pri` manifests, and links
+  `thin_io` for them.
 
-- `tests/tests.pro` - the model half of `Core/` (`Catalog`, `CatalogIntegrity`, `JsonPersistence`, `Library`,
-  `MediaId`, `MetadataStore`) plus `Utils.cpp` for its path helpers. Its `LIBS` are hand-listed too.
-- `quickroom/quickroom.pro` - `Theme/` and `crashhandler/` whole, plus the closure of the shared viewer and player
-  windows, which takes `Core/` without the library model. Its comments name the list. It also compiles the
-  `file-operations` engine and dialogs through that submodule's `.pri` manifests, and links `thin_io` for them.
+The tests do not link `Shared`: `tests/tests.pro` compiles the sources under test directly, so the tests build even when
+the rest of the apps' code does not. It takes the model half of `Core/` (`Catalog`, `CatalogIntegrity`, `Library` from
+`Darkroom/src`; `JsonPersistence`, `MediaId`, `MetadataStore` from `Shared/src`) plus `Utils.cpp` for its path helpers.
+Its `LIBS` are hand-listed too.
 
-**The link trap, shared by both:** a compiled app source gaining an `#include` of a submodule library that the project
-does not link breaks that project's link while Darkroom still builds. CI builds tests before the app, so the failure
-appears on every OS and looks unrelated to the change. The fix for tests is `tests.pro`'s `LIBS` plus `Tests.pro`'s
-`depends` (without the latter the library is never built first); for Quickroom, `quickroom.pro`'s `LIBS` plus
-`Darkroom.pro`'s `quickroom.depends`. `Utils.cpp` is the usual entry point: its error-reporting functions are why the
-tests link widgets and qtutils at all. Do not split it to suit the test project.
+**The link trap:** a source the tests compile gaining an `#include` of a submodule library the tests do not link breaks
+the tests' link while the apps still build. CI builds tests before the apps, so the failure appears on every OS and looks
+unrelated to the change. The fix is `tests.pro`'s `LIBS` plus `Tests.pro`'s `depends` (without the latter the library
+is never built first). `Utils.cpp` is the usual entry point: its error-reporting functions are why the tests link
+widgets and qtutils at all. Do not split it to suit the test project.
 
 Test sources are listed explicitly in `tests/tests.pro`; a new test file must be registered there. Tests protect
 silent breakage: persisted-format compatibility, identity invariants, catalog mutations, case-sensitive filesystem
@@ -68,7 +70,7 @@ behavior, and catalog-integrity verdicts.
 ## Packaging
 
 - **Windows:** `installer.iss` installs both exes from `dist/`, the VC++ redistributable, and the file-type icons
-  from `quickroom/res/filetypes/`. The version is read from the built `Darkroom.exe`, so `VERSION` in `app.pro` is the
+  from `Quickroom/res/filetypes/`. The version is read from the built `Darkroom.exe`, so `VERSION` in `Darkroom.pro` is the
   single source. `AppId` is fixed: changing it makes an upgrade install beside the old copy. The `[Registry]` section
   registers Quickroom as an eligible handler per supported type under a distinct ProgID each, so every type keeps its
   own icon; Windows forbids claiming the default handler programmatically, so the finish page offers an opt-in

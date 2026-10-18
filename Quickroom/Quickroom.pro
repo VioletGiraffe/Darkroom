@@ -11,7 +11,6 @@ QMAKE_TARGET_COMPANY     = VioletGiraffe
 QMAKE_TARGET_COPYRIGHT   = Copyright (C) 2026 VioletGiraffe
 
 QT = core gui widgets multimedia multimediawidgets svg
-QT += core-private   # Theme/Style.cpp includes qtutils theme/cthemeiconhandler.h (private QAbstractFileEngineHandler)
 
 CONFIG += strict_c++
 CONFIG -= flat
@@ -42,11 +41,10 @@ RCC_DIR     = ../build/$${OUTPUT_DIR}/$${TARGET}
 
 INCLUDEPATH += \
 	src \
-	../app/src \
+	../Shared/src \
 	../qtutils \
 	../cpputils \
 	../cpp-template-utils \
-	../image-processing \
 	../file-operations \
 	../thin_io/src
 
@@ -56,45 +54,20 @@ INCLUDEPATH += \
 
 HEADERS += $$files(src/*.h, true)
 
-# Shared app sources are compiled in directly (the app is not a library).
-# Wholly shared directories are globbed; the rest is the hand-picked closure of the reused
-# viewer and player windows. A shared file gaining an app-only include breaks this link
-# while the app still builds - same failure mode as tests.pro.
-SOURCES += \
-	$$files(src/*.cpp, true) \
-	$$files(../app/src/Theme/*.cpp) \
-	$$files(../app/src/crashhandler/*.cpp) \
-	../app/src/Core/CpuThreadPool.cpp \
-	../app/src/Core/IoThreadPool.cpp \
-	../app/src/Core/JsonPersistence.cpp \
-	../app/src/Core/MediaId.cpp \
-	../app/src/Core/MetadataStore.cpp \
-	../app/src/Utils.cpp \
-	../app/src/Ffmpeg.cpp \
-	../app/src/Windows/ImageViewerWindow.cpp \
-	../app/src/Windows/VideoPlayerWindow.cpp \
-	../app/src/Windows/OscillatingPlayback.cpp \
-	../app/src/Windows/PathDeletion.cpp \
-	../app/src/Windows/OpenFileRelease.cpp \
-	../app/src/Windows/SingleFrameExtraction.cpp \
-	../app/src/UiComponents/ThumbnailWidget.cpp \
-	../app/src/UiComponents/MediaGrid.cpp \
-	../app/src/UiComponents/DragGestureHelper.cpp \
-	../app/src/UiComponents/MarkerSlider.cpp
+SOURCES += $$files(src/*.cpp, true)
 
 # The copy/move engine and its dialogs; not config.pri, which would reset QT and the build settings.
 include(../file-operations/fileoperations/fileoperations.pri)
 include(../file-operations/fileoperationsui/fileoperationsui.pri)
 
 RESOURCES += res/quickroom.qrc
-# Theme and the shared windows load icons from the app's resource file.
-RESOURCES += ../app/res/resources.qrc
 
 ###################################################
 #                 LIBS
 ###################################################
 
-LIBS += -L$${DESTDIR} -lqtutils -lcpputils -limage-processing -lthin_io
+# GNU ld resolves left to right: shared before the libraries it uses
+LIBS += -L$${DESTDIR} -lshared -lqtutils -lcpputils -limage-processing -lthin_io
 include(../cpputils/dependencies.pri)
 
 ###################################################

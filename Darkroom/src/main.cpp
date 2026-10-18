@@ -17,7 +17,7 @@ DISABLE_COMPILER_WARNINGS
 RESTORE_COMPILER_WARNINGS
 
 #ifndef DARKROOM_VERSION
-#error "DARKROOM_VERSION is not defined; set it in app.pro"
+#error "DARKROOM_VERSION is not defined; set it in Darkroom.pro"
 #endif
 
 namespace {
@@ -59,6 +59,8 @@ int main(int argc, char* argv[])
 	AdvancedAssert::setLoggingFunc([](const char* msg) {
 		::memoryLogMessageHandler(QtWarningMsg, QMessageLogContext{}, msg);
 	});
+
+	Q_INIT_RESOURCE(shared);
 
 	QApplication app(argc, argv);
 	app.setOrganizationName("VioletGiraffe");

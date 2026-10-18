@@ -1,0 +1,103 @@
+TEMPLATE = app
+TARGET   = Darkroom
+VERSION  = 1.0.0
+# Surface the version to C++ as a bare token (stringized in main.cpp -> QApplication::applicationVersion()).
+DEFINES += DARKROOM_VERSION=$$VERSION
+
+!versionAtLeast(QT_VERSION, 6.8.0): error("Darkroom requires Qt 6.8 or newer.")
+
+QMAKE_TARGET_PRODUCT     = Darkroom
+QMAKE_TARGET_COMPANY     = VioletGiraffe
+QMAKE_TARGET_COPYRIGHT   = Copyright (C) 2026 VioletGiraffe
+
+QT = core gui widgets multimedia multimediawidgets svg
+
+CONFIG += strict_c++
+CONFIG -= flat
+
+mac* | linux* | freebsd {
+	CONFIG(release, debug|release):CONFIG *= Release optimize_full
+	CONFIG(debug, debug|release):CONFIG *= Debug
+}
+
+exists(../global.pri){
+	include(../global.pri)
+} else {
+	CONFIG += c++2b
+}
+
+Release:OUTPUT_DIR=release/
+Debug:OUTPUT_DIR=debug/
+
+DESTDIR  = ../bin/$${OUTPUT_DIR}
+OBJECTS_DIR = ../build/$${OUTPUT_DIR}/$${TARGET}
+MOC_DIR     = ../build/$${OUTPUT_DIR}/$${TARGET}
+UI_DIR      = ../build/$${OUTPUT_DIR}/$${TARGET}
+RCC_DIR     = ../build/$${OUTPUT_DIR}/$${TARGET}
+
+###################################################
+#               INCLUDEPATH
+###################################################
+
+INCLUDEPATH += \
+	src \
+	../Shared/src \
+	../qtutils \
+	../cpputils \
+	../cpp-template-utils \
+	../magic-alignment/src
+
+###################################################
+#                 SOURCES
+###################################################
+
+HEADERS += $$files(src/*.h, true)
+
+SOURCES += $$files(src/*.cpp, true)
+
+RESOURCES += res/resources.qrc
+
+###################################################
+#                 LIBS
+###################################################
+
+# GNU ld resolves left to right: shared before the libraries it uses, magic-alignment before the cpputils thread pool
+LIBS += -L$${DESTDIR} -lshared -lqtutils -lmagic-alignment -lcpputils -limage-processing
+include(../cpputils/dependencies.pri)
+
+###################################################
+#    Platform-specific compiler options and libs
+###################################################
+
+win*{
+	#LIBS += -lole32 -lShell32 -lUser32
+	QMAKE_CXXFLAGS += /MP /wd4251
+	QMAKE_CXXFLAGS += /std:c++latest /permissive- /Zc:__cplusplus /FS
+	QMAKE_CXXFLAGS_WARN_ON = /W4
+	DEFINES += WIN32_LEAN_AND_MEAN NOMINMAX _SCL_SECURE_NO_WARNINGS
+
+	Debug:QMAKE_LFLAGS += /DEBUG:FASTLINK /INCREMENTAL
+
+	LIBS += -lUser32
+	RC_ICONS = res/darkroom.ico
+}
+
+mac*{
+	LIBS += -framework AppKit
+	ICON = res/darkroom.icns
+}
+
+linux*|freebsd{
+	QT += dbus   # revealInFileManager() talks to org.freedesktop.FileManager1 here (Utils.cpp)
+}
+
+###################################################
+#      Generic stuff for Linux and Mac
+###################################################
+
+linux*|mac*|freebsd {
+	QMAKE_CXXFLAGS_WARN_ON = -Wall -Wextra
+
+	Release:DEFINES += NDEBUG=1
+	Debug:DEFINES += _DEBUG
+}

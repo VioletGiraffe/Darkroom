@@ -1,4 +1,5 @@
 #include "Windows/SettingsDialog.h"
+#include "DarkroomSettings.h"
 #include "Settings.h"
 #include "Theme/Style.h"
 #include "Theme/Theme.h"
