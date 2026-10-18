@@ -1195,8 +1195,7 @@ void VideoPlayerWindow::repeatLastExtraction(qint64 timestampMs)
 
 void VideoPlayerWindow::extractFrameToFolder(qint64 timestampMs, const QString& folder)
 {
-	SingleFrameExtraction::extractToFolderInteractive(_videoPath, timestampMs, folder,
-		[this] { _oscillatingPlayback->resetElapsedBaselineAfterGuiBlock(); }, this);
+	SingleFrameExtraction::extractToFolderInteractive(_videoPath, timestampMs, folder, this);
 }
 
 void VideoPlayerWindow::copyFileToClipboard() const
@@ -1209,6 +1208,5 @@ void VideoPlayerWindow::copyFileToClipboard() const
 void VideoPlayerWindow::extractFrameToLibrary(qint64 timestampMs)
 {
 	assert_and_return_r(_library, );
-	SingleFrameExtraction::extractToLibraryInteractive(*_library, _videoPath, timestampMs,
-		[this] { _oscillatingPlayback->resetElapsedBaselineAfterGuiBlock(); }, this);
+	SingleFrameExtraction::extractToLibraryInteractive(*_library, _videoPath, timestampMs, this);
 }

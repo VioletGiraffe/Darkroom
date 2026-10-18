@@ -92,7 +92,8 @@ streams multipart MJPEG through stdout; the controller owns parsing and process 
 files or Darkroom worker threads.
 
 Admission bounds range duration, output resolution, and frame count to prevent runaway caches. Presentation is driven
-by elapsed time on the GUI thread, dropping obsolete frames after a late tick rather than slowing the motion. JPEGs
+by elapsed time on the GUI thread, dropping obsolete frames after a late tick rather than slowing the motion. A gap
+too long for a late tick is a blocked GUI thread, such as a frame extraction: the motion resumes where it stopped. JPEGs
 decode transiently and are submitted to the existing `QVideoSink` through `QVideoFrame(QImage)`, with explicit
 format conversion only when Qt has no direct mapping.
 

@@ -6,8 +6,6 @@ DISABLE_COMPILER_WARNINGS
 #include <QString>
 RESTORE_COMPILER_WARNINGS
 
-#include <functional>
-
 class Library;
 class QWidget;
 
@@ -24,10 +22,7 @@ namespace SingleFrameExtraction
 	[[nodiscard]] LastDestination lastDestination();
 	[[nodiscard]] QString lastFolder();
 
-	// These workflows are synchronous and do not retain the callback. extractionFinished runs immediately after
-	// the blocking ffmpeg call, before any result UI or import work.
-	void extractToFolderInteractive(const QString& videoPath, qint64 timestampMs, const QString& folder,
-		const std::function<void()>& extractionFinished, QWidget* dialogParent);
-	void extractToLibraryInteractive(Library& library, const QString& videoPath, qint64 timestampMs,
-		const std::function<void()>& extractionFinished, QWidget* dialogParent);
+	// Synchronous: the GUI thread blocks for the ffmpeg call.
+	void extractToFolderInteractive(const QString& videoPath, qint64 timestampMs, const QString& folder, QWidget* dialogParent);
+	void extractToLibraryInteractive(Library& library, const QString& videoPath, qint64 timestampMs, QWidget* dialogParent);
 }

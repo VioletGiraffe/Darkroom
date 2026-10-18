@@ -25,6 +25,8 @@ RESTORE_COMPILER_WARNINGS
 namespace {
 
 constexpr int OscillationTimerIntervalMs = 16;
+// A longer gap between ticks is a blocked GUI thread, not a late tick: the motion resumes where it stopped.
+constexpr qint64 OscillationStallThresholdMs = 250;
 constexpr int OscillationJpegQuality = 2;
 constexpr QImage::Format OscillationFallbackImageFormat = QImage::Format_RGBA8888;
 constexpr const char* OscillationMjpegBoundary = "darkroom_oscillation";
@@ -184,12 +186,6 @@ void OscillatingPlayback::setMaximumSpeed(double speed)
 void OscillatingPlayback::setCurve(OscillationCurve curve)
 {
 	_curve = curve;
-}
-
-void OscillatingPlayback::resetElapsedBaselineAfterGuiBlock()
-{
-	if (_state == State::Playing)
-		_elapsedTimer.restart();
 }
 
 void OscillatingPlayback::startPreparationProcess()
@@ -391,9 +387,13 @@ void OscillatingPlayback::advanceAndPresent()
 	if (_state != State::Playing)
 		return;
 
+	const qint64 elapsedMs = _elapsedTimer.restart();
+	if (elapsedMs > OscillationStallThresholdMs)
+		return;
+
 	const double intervalSeconds = (_request.endMs - _request.startMs) / 1000.0;
 	const double phaseRate = _maximumSpeed / (intervalSeconds * oscillationCurvePeakSlope(_curve));
-	_cyclePhase = std::fmod(_cyclePhase + _elapsedTimer.restart() / 1000.0 * phaseRate, 2.0);
+	_cyclePhase = std::fmod(_cyclePhase + elapsedMs / 1000.0 * phaseRate, 2.0);
 	if (_cyclePhase < 0)
 		_cyclePhase += 2.0;
 	presentCurrentPhase();

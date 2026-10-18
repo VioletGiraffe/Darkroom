@@ -65,7 +65,6 @@ public:
 	void setPlaying(bool playing);
 	void setMaximumSpeed(double speed);
 	void setCurve(OscillationCurve curve);
-	void resetElapsedBaselineAfterGuiBlock();
 
 private:
 	enum class MjpegParseState
