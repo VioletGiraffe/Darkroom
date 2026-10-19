@@ -8,11 +8,13 @@ RESTORE_COMPILER_WARNINGS
 
 #include <functional>
 
+class QItemSelection;
 class QResizeEvent;
 class QUrl;
 
 // Icon-mode media grid that exports the selected source URLs by drag and paints an empty message when
 // no item is visible. MediaBrowserWidget supplies the data sources; the view contains no catalog logic.
+// Every card carries a "selected" dynamic property mirroring its row, so the central sheet can style the selected state.
 class MediaGrid final : public QListWidget {
 public:
 	explicit MediaGrid(QWidget* parent = nullptr);
@@ -41,6 +43,7 @@ protected:
 	void wheelEvent(QWheelEvent* event) override;
 	void resizeEvent(QResizeEvent* event) override;
 	void scrollContentsBy(int dx, int dy) override;
+	void selectionChanged(const QItemSelection& selected, const QItemSelection& deselected) override;
 
 private:
 	std::function<QList<QUrl>(const QList<QListWidgetItem*>&)> _dragUrlsProvider;

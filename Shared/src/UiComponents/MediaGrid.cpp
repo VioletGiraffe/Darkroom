@@ -7,11 +7,13 @@ DISABLE_COMPILER_WARNINGS
 #include <QCursor>
 #include <QDrag>
 #include <QFont>
+#include <QItemSelection>
 #include <QMimeData>
 #include <QPainter>
 #include <QPixmap>
 #include <QResizeEvent>
 #include <QScrollBar>
+#include <QStyle>
 #include <QUrl>
 #include <QWheelEvent>
 RESTORE_COMPILER_WARNINGS
@@ -42,6 +44,21 @@ void paintDragCountBadge(QPixmap& pixmap, int count)
 	p.setFont(font);
 	p.setPen(QColor(255, 255, 255));
 	p.drawText(badge, Qt::AlignCenter, QString::number(count));
+}
+
+// A dynamic property change recomputes no stylesheet rule by itself, and the rule cache is per widget: descendants
+// styled through the card's state must be repolished along with it.
+void setCardSelected(QWidget& card, bool selected)
+{
+	card.setProperty("selected", selected);
+	QList<QWidget*> widgets = card.findChildren<QWidget*>();
+	widgets.push_back(&card);
+	for (QWidget* w : widgets)
+	{
+		w->style()->unpolish(w);
+		w->style()->polish(w);
+	}
+	card.update();
 }
 
 }  // namespace
@@ -100,7 +117,9 @@ void MediaGrid::ensureVisibleCardsExist()
 			QListWidgetItem* rowItem = item(row);
 			if (rowItem->isHidden() || !area.intersects(visualItemRect(rowItem)) || itemWidget(rowItem))
 				continue;
-			setItemWidget(rowItem, _cardFactory(rowItem));
+			QWidget* card = _cardFactory(rowItem);
+			card->setProperty("selected", rowItem->isSelected());   // read by the first polish, so no repolish needed
+			setItemWidget(rowItem, card);
 		}
 	};
 
@@ -165,6 +184,16 @@ void MediaGrid::scrollContentsBy(int dx, int dy)
 {
 	QListWidget::scrollContentsBy(dx, dy);
 	ensureVisibleCardsExist();
+}
+
+void MediaGrid::selectionChanged(const QItemSelection& selected, const QItemSelection& deselected)
+{
+	QListWidget::selectionChanged(selected, deselected);
+
+	for (const QItemSelection* delta : { &selected, &deselected })
+		for (const QModelIndex& index : delta->indexes())
+			if (QWidget* card = itemWidget(itemFromIndex(index)))
+				setCardSelected(*card, delta == &selected);
 }
 
 void MediaGrid::startDrag(Qt::DropActions /*supportedActions*/)

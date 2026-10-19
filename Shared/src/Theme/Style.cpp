@@ -182,14 +182,17 @@ constexpr char kToolTips[] = R"(
 )";
 
 // Per-card stylesheets create a QStyleSheetStyle proxy per widget and make grid rebuilds expensive.
+// "selected" is the dynamic property MediaGrid keeps on each card; Quickroom's card is a frame around the tile.
 constexpr char kGridCards[] = R"(
 	QWidget#mediaItemCard { background: transparent; border: 1px solid %borderSubtle%; border-radius: %controlRadius%px; }
-	QWidget#mediaItemCard:hover { border-color: %accent%; }
+	QWidget#mediaItemCard:hover { border-color: %selectionBg%; border-width: 2px; }
+	QWidget#mediaItemCard[selected="true"] { border-color: %selectionBg%; }
 
 	QWidget#cardThumbnailWell { background-color: %thumbnailMatte%; border: none; border-radius: %thumbnailMatteRadius%px; font-size: 9pt; }
 
 	QWidget#framedThumbnail { background-color: %thumbnailMatte%; border: 1px solid %borderSubtle%; border-radius: %controlRadius%px; padding: 2px; font-size: 9pt; }
-	QWidget#framedThumbnail:hover { border-color: %accent%; }
+	QWidget#framedThumbnail:hover { border-color: %selectionBg%; border-width: 2px; }
+	QWidget[selected="true"] QWidget#framedThumbnail { border-color: %selectionBg%; }
 )";
 
 constexpr char kStarButtons[] = R"(

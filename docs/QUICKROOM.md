@@ -28,7 +28,8 @@ Image tiles are `ThumbnailWidget`s (single-file constructor - the FrameViewerWin
 dwell-loading, async decode, and Ctrl+wheel zoom are shared behavior, and `MediaGrid`'s card factory
 materializes tiles on demand. The grid drives drag and drop - a multi-selection exports all selected paths as
 file URLs - so the image tiles' own single-file drag is disabled. Tiles are opaque, so cells are laid out
-larger than the tile: the margin is where the view paints the selection background.
+larger than the tile: the margin is where the view paints the selection background. The tile's border also
+follows the `selected` property the grid keeps on every card.
 
 Activation: double-click or Enter. Folders navigate in place (queued: the rebuild would delete the tile whose
 handler is still running); images open `ImageViewerWindow` browsing the folder's images, and videos open
