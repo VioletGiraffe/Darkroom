@@ -18,7 +18,8 @@ class QWidget;
 // insufficient because :hover follows WA_UnderMouse; a real hover is preserved when the cursor has not moved.
 void clearStuckHoverIfCursorLeft(QWidget* w);
 
-// Returns up to maxFrames full paths, sampled evenly over the middle 10%-90% of the sorted input.
+// Returns min(maxFrames, files.size()) distinct full paths, sampled evenly over the middle 10%-90% of the sorted input,
+// or over all of it when the window is smaller than that.
 [[nodiscard]] QStringList pickEvenlySpacedFrames(const QDir& dir, const QStringList& files, int maxFrames);
 
 [[nodiscard]] bool isSupportedVideoFile(const QString& filePath);

@@ -52,8 +52,13 @@ QStringList pickEvenlySpacedFrames(const QDir& dir, const QStringList& files, in
 	const int count = static_cast<int>(files.size());
 	const int n = qMin(count, maxFrames);
 
-	const int startIdx = static_cast<int>(count * 0.1f);
-	const int endIdx   = static_cast<int>(count * 0.9f);
+	int startIdx = static_cast<int>(count * 0.1f);
+	int endIdx   = static_cast<int>(count * 0.9f);
+	if (endIdx - startIdx + 1 < n)
+	{
+		startIdx = 0;
+		endIdx = count - 1;
+	}
 
 	QStringList out;
 	out.reserve(n);
