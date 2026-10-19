@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792436288591,
+  "lastUpdate": 1792442548195,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -14206,6 +14206,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 406,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 50,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 44,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 12,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "b25b6620edc5707caa0de4633f5fc2aa1349aa8d",
+          "message": "Grid cell hover highlight themed in Quickroom and Darkroom: corner concentricity fixed on Windows, and the same highlight appears on Mac and Linux (was absent in the default style)",
+          "timestamp": "2026-10-19T23:33:36+03:00",
+          "tree_id": "081e6bcfbfc6736f42735bdfcf09eb828bca2cbe",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/b25b6620edc5707caa0de4633f5fc2aa1349aa8d"
+        },
+        "date": 1792442545889,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 15889,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1128,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 28150,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3409.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 2862.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2871,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 407.5,
             "unit": "KB"
           },
           {
