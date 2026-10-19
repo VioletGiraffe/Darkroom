@@ -31,10 +31,10 @@ file URLs - so the image tiles' own single-file drag is disabled. Tiles are opaq
 larger than the tile: the margin is where the view paints the selection background.
 
 Activation: double-click or Enter. Folders navigate in place (queued: the rebuild would delete the tile whose
-handler is still running); images open `ImageViewerWindow` browsing the folder's images, with the browse
-position reflected back into the grid selection; videos open `VideoPlayerWindow`. Neither window gets Darkroom's
-library features: no Best action, no persisted speed or saved loops, no frame target (see
-[playback.md](architecture/playback.md)).
+handler is still running); images open `ImageViewerWindow` browsing the folder's images, and videos open
+`VideoPlayerWindow` browsing its videos, each with the browse position reflected back into the grid selection.
+Neither window gets Darkroom's library features: no Best action, no persisted speed or saved loops, no frame target
+(see [playback.md](architecture/playback.md)).
 
 Deletion: Del moves to Trash, Shift+Del deletes permanently, in the grid (the whole selection, folders with
 their contents) and in the image viewer and video player (the current item). Only a permanent deletion or one
@@ -69,7 +69,7 @@ The first command-line path decides which window opens; further paths are ignore
 - **Folder** - the browser, listing it.
 - **Image** - the viewer alone, browsing the images beside it in that folder. No browser is created: building
   one lists a directory and overwrites the remembered folder, which opening a single file must not do.
-- **Video** - the player alone.
+- **Video** - the player alone, browsing the videos beside it in that folder.
 - **Missing path** - reported, then the browser.
 - **Any other file** - the browser on its folder, where that file is not listed.
 - **No path** - the browser, on the remembered folder, else Pictures, else home.

@@ -60,13 +60,13 @@ void memoryLogMessageHandler(QtMsgType type, const QMessageLogContext& context, 
 		g_previousMessageHandler(type, context, message);
 }
 
-// Full paths of the images directly in folder, ordered as the browser lists them.
-QStringList imageFilesInFolder(const QString& folder)
+// Full paths of the files directly in folder that isSupported accepts, ordered as the browser lists them.
+QStringList filesInFolder(const QString& folder, bool (*isSupported)(const QString& filePath))
 {
 	const QDir dir(folder);
 	QStringList names;
 	for (const QString& name : dir.entryList(QDir::Files, QDir::Unsorted))
-		if (isSupportedImageFile(name))
+		if (isSupported(name))
 			names.push_back(name);
 
 	std::sort(names.begin(), names.end(), NaturalSort::lessCaseInsensitive);
@@ -81,7 +81,7 @@ QStringList imageFilesInFolder(const QString& folder)
 // Opens the viewer on path, browsing the images beside it. False when the image cannot be shown at all.
 bool showImageViewer(const QString& path)
 {
-	QStringList images = imageFilesInFolder(QFileInfo(path).absolutePath());
+	QStringList images = filesInFolder(QFileInfo(path).absolutePath(), isSupportedImageFile);
 
 	// pathComparisonKey, not ==: the command line may spell the path with different case or separators.
 	const QString startKey = pathComparisonKey(path);
@@ -137,7 +137,9 @@ void openStartupWindow(const QString& path)
 			return;
 		if (isSupportedVideoFile(path))
 		{
-			FileOperations::installDeleteActions(*VideoPlayerWindow::createPlayerWindow(info.absoluteFilePath(), nullptr));
+			VideoPlayerWindow* const player = VideoPlayerWindow::createPlayerWindow(info.absoluteFilePath(), nullptr);
+			FileOperations::installDeleteActions(*player);
+			player->setNavigation(filesInFolder(info.absolutePath(), isSupportedVideoFile), {});
 			return;
 		}
 	}

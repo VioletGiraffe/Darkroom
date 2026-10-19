@@ -53,9 +53,10 @@ presentation, and single-frame extraction. It does not depend on the library mod
 the Extracted-label target; Quickroom's players have neither. Open players are tracked app-wide so library replacement
 can close them synchronously before the getter starts returning a different store.
 
-MediaBrowserWidget gives each player it opens the paths of the videos the grid currently shows as its previous/next
-order, and a handler that moves the grid selection onto the item navigated to, as with the image viewer above. The
-initially loaded video is not reported. A removal clears the entry, so navigation skips it like a deleted file.
+MediaBrowserWidget and Quickroom's browser give each player they open the paths of the videos the grid currently shows
+as its previous/next order, and a handler that moves the grid selection onto the item navigated to, as with the image
+viewer above; Quickroom's standalone player gets the videos beside it in its folder. The initially loaded video is not
+reported. A removal clears the entry, so navigation skips it like a deleted file.
 
 Copy puts the video file on the clipboard.
 

@@ -172,6 +172,19 @@ int sortedInsertionRow(const QListWidget& grid, const GridEntry& entry)
 	return *std::ranges::partition_point(std::views::iota(0, grid.count()), [&](int row) { return *grid.item(row) < entry; });
 }
 
+// Paths of the grid's entries of kind, in listing order.
+QStringList listedPathsOfKind(const QListWidget& grid, EntryKind kind)
+{
+	QStringList paths;
+	for (int row = 0, rows = grid.count(); row < rows; ++row)
+	{
+		const auto& entry = static_cast<const GridEntry&>(*grid.item(row));
+		if (entry.kind == kind)
+			paths.push_back(entry.path);
+	}
+	return paths;
+}
+
 // path itself when it is a folder, else its closest ancestor that is; a filesystem root when none is.
 QString nearestExistingFolder(QString path)
 {
@@ -443,17 +456,8 @@ void BrowserWindow::activateEntry(const QListWidgetItem* item)
 
 void BrowserWindow::viewImage(const QString& path)
 {
-	QStringList imagePaths;
-	int startIndex = -1;
-	for (int row = 0, rows = _grid->count(); row < rows; ++row)
-	{
-		const auto& entry = static_cast<const GridEntry&>(*_grid->item(row));
-		if (entry.kind != EntryKind::Image)
-			continue;
-		if (entry.path == path)
-			startIndex = static_cast<int>(imagePaths.size());
-		imagePaths.push_back(entry.path);
-	}
+	const QStringList imagePaths = listedPathsOfKind(*_grid, EntryKind::Image);
+	const int startIndex = static_cast<int>(imagePaths.indexOf(path));
 	assert_and_return_r(startIndex >= 0, );
 
 	// The viewer is parentless and can outlive this window.
@@ -476,7 +480,16 @@ void BrowserWindow::playVideo(const QString& path)
 		reportMissingFile(this, path);
 		return;
 	}
-	FileOperations::installDeleteActions(*VideoPlayerWindow::createPlayerWindow(path, nullptr), entryRemover());
+
+	VideoPlayerWindow* const player = VideoPlayerWindow::createPlayerWindow(path, nullptr);
+	FileOperations::installDeleteActions(*player, entryRemover());
+
+	// The player is parentless and can outlive this window.
+	const QStringList videoPaths = listedPathsOfKind(*_grid, EntryKind::Video);
+	player->setNavigation(videoPaths, [self = QPointer<BrowserWindow>{ this }, videoPaths](int index) {
+		if (self)
+			self->selectAndScrollToPath(videoPaths[index]);
+	});
 }
 
 std::function<void(const QString& path)> BrowserWindow::entryRemover()

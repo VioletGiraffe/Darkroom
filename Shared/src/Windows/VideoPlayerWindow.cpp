@@ -563,7 +563,10 @@ MetadataStore* VideoPlayerWindow::currentMetadataStore() const
 
 void VideoPlayerWindow::setNavigation(QStringList videoPaths, std::function<void(int index)> onNavigated)
 {
-	_navigationIndex = static_cast<int>(videoPaths.indexOf(_videoPath));
+	// By pathComparisonKey: the player may have been opened with a differently spelled path, such as from the command line.
+	const QString currentKey = pathComparisonKey(_videoPath);
+	const auto current = std::find_if(videoPaths.cbegin(), videoPaths.cend(), [&currentKey](const QString& path) { return pathComparisonKey(path) == currentKey; });
+	_navigationIndex = current == videoPaths.cend() ? -1 : static_cast<int>(current - videoPaths.cbegin());
 	_navigationPaths = std::move(videoPaths);
 	_onNavigated = std::move(onNavigated);
 }
