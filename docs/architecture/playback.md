@@ -99,8 +99,8 @@ affected animation closes it, stopping on its current frame. Still images are de
 
 `OscillatingPlayback` prepares an in-memory JPEG cache for the active A-B range, or the whole video when no valid
 range exists, then presents it forward and backward without seeking at turnarounds. One asynchronous ffmpeg process
-streams multipart MJPEG through stdout; the controller owns parsing and process lifetime. There are no temporary
-files or Darkroom worker threads.
+streams multipart MJPEG through stdout; the controller owns process lifetime, and `MJpegParser` splits the stream into
+frames. There are no temporary files or Darkroom worker threads.
 
 Admission bounds range duration, output resolution, and frame count to prevent runaway caches. Presentation is driven
 by elapsed time on the GUI thread, dropping obsolete frames after a late tick rather than slowing the motion. A gap

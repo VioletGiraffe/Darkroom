@@ -19,7 +19,6 @@ RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 #include <cmath>
-#include <limits>
 
 namespace {
 
@@ -34,16 +33,15 @@ constexpr const char* OscillationMjpegBoundary = "darkroom_oscillation";
 
 OscillatingPlayback::OscillatingPlayback(VideoPlayerWindow& window)
 	: _window(window)
+	, _parser(OscillationMjpegBoundary)
 {
 	_presentationTimer.setTimerType(Qt::PreciseTimer);
 	_presentationTimer.setInterval(OscillationTimerIntervalMs);
 
 	QObject::connect(&_presentationTimer, &QTimer::timeout, &_window, [this] { advanceAndPresent(); });
 	QObject::connect(&_process, &QProcess::readyReadStandardOutput, &_window, [this] {
-		if (_cancellingPreparation)
-			return;
-		_stdoutBuffer += _process.readAllStandardOutput();
-		consumeMjpegParts();
+		if (!_cancellingPreparation)
+			parseFfmpegOutput(_process.readAllStandardOutput());
 	});
 	QObject::connect(&_process, &QProcess::readyReadStandardError, &_window, [this] {
 		if (!_cancellingPreparation)
@@ -168,95 +166,28 @@ void OscillatingPlayback::startPreparationProcess()
 	_process.start(ffmpegPath(), arguments);
 }
 
-void OscillatingPlayback::consumeMjpegParts()
+void OscillatingPlayback::parseFfmpegOutput(QByteArrayView output)
 {
-	const QByteArray boundary = QByteArray("--") + OscillationMjpegBoundary;
-	while (_state == State::Preparing)
+	assert_and_return_r(_state == State::Preparing, );
+
+	switch (_parser.append(output, _compressedFrames))
 	{
-		switch (_parseState)
-		{
-		case MjpegParseState::Boundary:
-		{
-			const qsizetype lineEnd = _stdoutBuffer.indexOf("\r\n");
-			if (lineEnd < 0)
-				return;
-			const QByteArray line = _stdoutBuffer.left(lineEnd);
-			_stdoutBuffer.remove(0, lineEnd + 2);
-			if (line == boundary)
-				_parseState = MjpegParseState::Headers;
-			else if (line == boundary + "--")
-				_parseState = MjpegParseState::Complete;
-			else
-			{
-				fail(_window.tr("ffmpeg returned an invalid oscillation-cache boundary."));
-				return;
-			}
-			break;
-		}
-		case MjpegParseState::Headers:
-		{
-			const qsizetype headerEnd = _stdoutBuffer.indexOf("\r\n\r\n");
-			if (headerEnd < 0)
-				return;
-			const QByteArray headerBlock = _stdoutBuffer.left(headerEnd);
-			_stdoutBuffer.remove(0, headerEnd + 4);
-
-			bool jpegContentType = false;
-			int contentLengthCount = 0;
-			qint64 contentLength = -1;
-			for (QByteArray line : headerBlock.split('\n'))
-			{
-				line = line.trimmed();
-				const qsizetype colon = line.indexOf(':');
-				if (colon <= 0)
-					continue;
-				const QByteArray name = line.left(colon).trimmed().toLower();
-				const QByteArray value = line.mid(colon + 1).trimmed();
-				if (name == "content-type")
-					jpegContentType = value.compare("image/jpeg", Qt::CaseInsensitive) == 0;
-				else if (name == "content-length")
-				{
-					bool ok = false;
-					contentLength = value.toLongLong(&ok, 10);
-					if (!ok)
-						contentLength = -1;
-					++contentLengthCount;
-				}
-			}
-
-			const qint64 maximumPayload = std::numeric_limits<qsizetype>::max() - 2;
-			if (!jpegContentType || contentLengthCount != 1 || contentLength <= 0 || contentLength > maximumPayload)
-			{
-				fail(_window.tr("ffmpeg returned invalid oscillation-cache headers."));
-				return;
-			}
-			_expectedPayloadSize = static_cast<qsizetype>(contentLength);
-			_parseState = MjpegParseState::Payload;
-			break;
-		}
-		case MjpegParseState::Payload:
-			if (_stdoutBuffer.size() < _expectedPayloadSize + 2)
-				return;
-			if (_stdoutBuffer.mid(_expectedPayloadSize, 2) != "\r\n")
-			{
-				fail(_window.tr("ffmpeg returned a malformed oscillation-cache frame."));
-				return;
-			}
-			_compressedFrames.push_back(_stdoutBuffer.left(_expectedPayloadSize));
-			_stdoutBuffer.remove(0, _expectedPayloadSize + 2);
-			_expectedPayloadSize = -1;
-			_parseState = MjpegParseState::Boundary;
-			if (_compressedFrames.size() > static_cast<size_t>(_request.maximumFrameCount))
-			{
-				fail(_window.tr("ffmpeg produced too many oscillation-cache frames."));
-				return;
-			}
-			break;
-		case MjpegParseState::Complete:
-			if (!_stdoutBuffer.trimmed().isEmpty())
-				fail(_window.tr("ffmpeg returned data after the oscillation cache ended."));
-			return;
-		}
+	case MJpegParser::Error::None:
+		if (_compressedFrames.size() > static_cast<size_t>(_request.maximumFrameCount))
+			fail(_window.tr("ffmpeg produced too many oscillation-cache frames."));
+		break;
+	case MJpegParser::Error::InvalidBoundary:
+		fail(_window.tr("ffmpeg returned an invalid oscillation-cache boundary."));
+		break;
+	case MJpegParser::Error::InvalidHeaders:
+		fail(_window.tr("ffmpeg returned invalid oscillation-cache headers."));
+		break;
+	case MJpegParser::Error::MalformedPart:
+		fail(_window.tr("ffmpeg returned a malformed oscillation-cache frame."));
+		break;
+	case MJpegParser::Error::DataAfterEnd:
+		fail(_window.tr("ffmpeg returned data after the oscillation cache ended."));
+		break;
 	}
 }
 
@@ -265,9 +196,8 @@ void OscillatingPlayback::finishPreparation(int exitCode, QProcess::ExitStatus e
 	if (_cancellingPreparation || _state != State::Preparing)
 		return;
 
-	_stdoutBuffer += _process.readAllStandardOutput();
 	_stderr += _process.readAllStandardError();
-	consumeMjpegParts();
+	parseFfmpegOutput(_process.readAllStandardOutput());
 	if (_state != State::Preparing)
 		return;
 
@@ -277,14 +207,12 @@ void OscillatingPlayback::finishPreparation(int exitCode, QProcess::ExitStatus e
 		return;
 	}
 
-	const bool parserComplete = (_parseState == MjpegParseState::Headers && _stdoutBuffer.isEmpty())
-		|| (_parseState == MjpegParseState::Complete && _stdoutBuffer.trimmed().isEmpty());
-	if (!parserComplete || _expectedPayloadSize >= 0)
+	if (!_parser.endsCleanly())
 	{
 		fail(_window.tr("ffmpeg returned a truncated oscillation cache."));
 		return;
 	}
-	if (_compressedFrames.size() < 2 || _compressedFrames.size() > static_cast<size_t>(_request.maximumFrameCount))
+	if (_compressedFrames.size() < 2)
 	{
 		fail(_window.tr("ffmpeg did not produce enough oscillation-cache frames."));
 		return;
@@ -413,11 +341,9 @@ bool OscillatingPlayback::presentFrame(int frameIndex, QString* error)
 
 void OscillatingPlayback::clearCacheAndParser()
 {
-	_stdoutBuffer.clear();
+	_parser = MJpegParser{ OscillationMjpegBoundary };
 	_stderr.clear();
 	_compressedFrames.clear();
-	_parseState = MjpegParseState::Boundary;
-	_expectedPayloadSize = -1;
 	_displayedFrameIndex = -1;
 	_displayedPositionMs.reset();
 	_cyclePhase = 0;

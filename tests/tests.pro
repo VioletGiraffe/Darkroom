@@ -49,12 +49,14 @@ SOURCES += \
 	CatalogIntegrityTests.cpp \
 	UtilsTests.cpp \
 	OscillationCurveTests.cpp \
+	MJpegParserTests.cpp \
 	../Darkroom/src/Core/Catalog.cpp \
 	../Darkroom/src/Core/CatalogIntegrity.cpp \
 	../Darkroom/src/Core/Library.cpp \
 	../Shared/src/Core/JsonPersistence.cpp \
 	../Shared/src/Core/MediaId.cpp \
 	../Shared/src/Core/MetadataStore.cpp \
+	../Shared/src/MJpegParser.cpp \
 	../Shared/src/SharedSettings.cpp \
 	../Shared/src/Utils.cpp \
 	../Shared/src/Windows/OscillationCurve.cpp

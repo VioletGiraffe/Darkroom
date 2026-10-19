@@ -1,10 +1,12 @@
 #pragma once
 
 #include "Windows/OscillationCurve.h"
+#include "MJpegParser.h"
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QByteArray>
+#include <QByteArrayView>
 #include <QElapsedTimer>
 #include <QProcess>
 #include <QSize>
@@ -59,16 +61,8 @@ public:
 	void setCurve(OscillationCurve curve);
 
 private:
-	enum class MjpegParseState
-	{
-		Boundary,
-		Headers,
-		Payload,
-		Complete,
-	};
-
 	void startPreparationProcess();
-	void consumeMjpegParts();
+	void parseFfmpegOutput(QByteArrayView output);
 	void finishPreparation(int exitCode, QProcess::ExitStatus exitStatus);
 	void fail(const QString& message);
 	void advanceAndPresent();
@@ -87,10 +81,8 @@ private:
 	QTimer _presentationTimer;
 	QElapsedTimer _elapsedTimer;
 
-	MjpegParseState _parseState = MjpegParseState::Boundary;
-	QByteArray _stdoutBuffer;
+	MJpegParser _parser;
 	QByteArray _stderr;
-	qsizetype _expectedPayloadSize = -1;
 	std::vector<QByteArray> _compressedFrames;
 
 	double _cyclePhase = 0;
