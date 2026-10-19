@@ -13,7 +13,8 @@ the coding conventions.
 `Quickroom/src/` holds the Quickroom-only code:
 
 - `main.cpp` - Darkroom's bootstrap shape minus the library, plus the startup routing below. Its own
-  application identity ("Quickroom") keeps its QSettings separate from Darkroom's.
+  application identity ("Quickroom") keeps its QSettings separate from Darkroom's; the keys in `Settings.h` fall back to
+  Darkroom's values until Quickroom stores its own.
 - `BrowserWindow` - the main window: navigation toolbar (back/forward/up + editable path field), `MediaGrid`
   of tiles, status-bar counts. Owns the navigation history and the folder listing: folders first in natural
   name order, unsupported files not shown. Self-deleting, created through `showForFolder`, which resolves the

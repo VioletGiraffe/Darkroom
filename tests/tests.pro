@@ -40,7 +40,7 @@ HEADERS += \
 
 # The sources under test are compiled in directly, not linked from Shared: the tests must build even when the rest of the apps' code does not.
 # Utils.cpp is here because Catalog.cpp calls its path helpers; its error-reporting functions are what pull in the widgets and qtutils
-# dependencies below.
+# dependencies below. SharedSettings.cpp is here because Utils.cpp reads the ffmpeg path through it.
 SOURCES += \
 	main.cpp \
 	MediaIdTests.cpp \
@@ -54,6 +54,7 @@ SOURCES += \
 	../Shared/src/Core/JsonPersistence.cpp \
 	../Shared/src/Core/MediaId.cpp \
 	../Shared/src/Core/MetadataStore.cpp \
+	../Shared/src/SharedSettings.cpp \
 	../Shared/src/Utils.cpp
 
 # qtutils before cpputils: it uses cpputils, and GNU ld resolves left to right

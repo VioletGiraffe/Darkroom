@@ -4,10 +4,15 @@
 
 ## Settings ownership
 
-Shared `QSettings` keys and defaults live in `Settings.h` as matching `Settings::Foo` and `Defaults::Foo`
-constants. Narrow settings used by one implementation remain local to that owner. App-wide derived accessors may
-live in `Utils.h`. Theming preferences are the exception: qtutils' `CThemeController` owns and persists them under
-its own keys. A few keys have no UI and are edited in the settings file; `Settings.h` marks them.
+`QSettings` keys and defaults are matching `Settings::Foo` and `Defaults::Foo` constants:
+
+- `Settings.h` holds the keys both apps read. Each app keeps its own store; reads go through `readSharedSetting`,
+  which falls back to Darkroom's store while the app's own store lacks the key.
+- `DarkroomSettings.h` holds Darkroom's app-wide keys. A few have no UI and are edited in the settings file; the
+  header marks them.
+- Narrow settings used by one implementation remain local to that owner.
+- App-wide derived accessors may live in `Utils.h`.
+- Theming preferences are the exception: qtutils' `CThemeController` owns and persists them under its own keys.
 
 `QSettings` holds application preferences, not library or per-item state. Per-item fields belong in
 `MetadataStore`; runtime library paths come from an owned or borrowed `Library`. MainWindow's library workflow is

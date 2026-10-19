@@ -1,6 +1,7 @@
 #include "Core/CpuThreadPool.h"
 #include "Core/IoThreadPool.h"
 #include "Windows/MainWindow.h"
+#include "SharedSettings.h"
 #include "Theme/Style.h"
 #include "crashhandler/CCrashHandler.h"
 #include "compiler/compiler_warnings_control.h"
@@ -64,7 +65,7 @@ int main(int argc, char* argv[])
 
 	QApplication app(argc, argv);
 	app.setOrganizationName("VioletGiraffe");
-	app.setApplicationName("Darkroom");
+	app.setApplicationName(DarkroomApplicationName);
 	app.setApplicationVersion(STRINGIFY_EXPANDED_ARGUMENT(DARKROOM_VERSION));
 	app.setWindowIcon(QIcon(":/darkroom.svg"));
 

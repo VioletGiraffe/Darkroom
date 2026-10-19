@@ -1,6 +1,7 @@
 #include "Utils.h"
 #include "Ffmpeg.h"
 #include "Settings.h"
+#include "SharedSettings.h"
 
 #include "compiler/compiler_warnings_control.h"
 #include "dialogs/messagedialog.h"
@@ -18,7 +19,6 @@ DISABLE_COMPILER_WARNINGS
 #include <QMimeData>
 #include <QProcess>
 #include <QRegularExpression>
-#include <QSettings>
 #include <QStandardPaths>
 #include <QStringList>
 #include <QUrl>
@@ -355,6 +355,6 @@ QString autoDetectedFfmpegPath()
 
 QString ffmpegPath()
 {
-	const QString configured = QSettings{}.value(Settings::FfmpegPath).toString();
+	const QString configured = readSharedSetting(Settings::FfmpegPath).toString();
 	return (!configured.isEmpty() && QFile::exists(configured)) ? configured : autoDetectedFfmpegPath();
 }

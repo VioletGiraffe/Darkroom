@@ -3,6 +3,7 @@
 #include "Ffmpeg.h"
 #include "DarkroomSettings.h"
 #include "Settings.h"
+#include "SharedSettings.h"
 #include "Utils.h"
 
 #include "assert/advanced_assert.h"
@@ -27,8 +28,8 @@ namespace {
 Ffmpeg::SplitOptions configuredSplitOptions()
 {
 	return {
-		.tiff = QSettings{}.value(Settings::UseTiff, Defaults::UseTiff).toBool(),
-		.jpegQuality = QSettings{}.value(Settings::JpegQuality, Defaults::JpegQuality).toInt(),
+		.tiff = readSharedSetting(Settings::UseTiff, Defaults::UseTiff).toBool(),
+		.jpegQuality = readSharedSetting(Settings::JpegQuality, Defaults::JpegQuality).toInt(),
 		.frameStep = QSettings{}.value(Settings::FrameStep, Defaults::FrameStep).toInt(),
 	};
 }

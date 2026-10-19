@@ -1,6 +1,7 @@
 #include "Windows/SettingsDialog.h"
 #include "DarkroomSettings.h"
 #include "Settings.h"
+#include "SharedSettings.h"
 #include "Theme/Style.h"
 #include "Theme/Theme.h"
 #include "theme/cthemecontroller.h"
@@ -52,8 +53,7 @@ GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent
 {
 	setWindowTitle(tr("General"));
 
-	QSettings s;
-	_ffmpegPath = new QLineEdit(s.value(Settings::FfmpegPath).toString(), this);
+	_ffmpegPath = new QLineEdit(readSharedSetting(Settings::FfmpegPath).toString(), this);
 
 	// Show the empty-field fallback, not the configured path.
 	const QString detectedFfmpeg = autoDetectedFfmpegPath();
@@ -135,10 +135,9 @@ EncodingSettingsPage::EncodingSettingsPage(QWidget* parent) : CSettingsPage(pare
 {
 	setWindowTitle(tr("Encoding"));
 
-	QSettings s;
-	const bool useTiff  = s.value(Settings::UseTiff,     Defaults::UseTiff).toBool();
-	const int  quality  = s.value(Settings::JpegQuality, Defaults::JpegQuality).toInt();
-	const int  step     = s.value(Settings::FrameStep,   Defaults::FrameStep).toInt();
+	const bool useTiff  = readSharedSetting(Settings::UseTiff,     Defaults::UseTiff).toBool();
+	const int  quality  = readSharedSetting(Settings::JpegQuality, Defaults::JpegQuality).toInt();
+	const int  step     = QSettings{}.value(Settings::FrameStep,   Defaults::FrameStep).toInt();
 
 	_formatToggle = new SegmentedToggle({ tr("JPEG"), tr("TIFF") }, this);
 	_formatToggle->setCurrentIndex(useTiff ? 1 : 0);
