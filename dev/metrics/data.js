@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792369821960,
+  "lastUpdate": 1792371765499,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -13742,6 +13742,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 43.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 12,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "76b086951dfc7a4f08abdfee05d80432ecb470f8",
+          "message": "Darkroom's renames, relabels and import moves release files held by open players and viewers, which then reopen them at the new location",
+          "timestamp": "2026-10-19T03:54:47+03:00",
+          "tree_id": "02d0065f5fc242dd3e0e4f69fee02b08f4b9988e",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/76b086951dfc7a4f08abdfee05d80432ecb470f8"
+        },
+        "date": 1792371763017,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 15790,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1116,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 28150,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3407,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 2858.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2870,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 405.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 50,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 44.5,
             "unit": "KB"
           },
           {
