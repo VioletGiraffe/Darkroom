@@ -46,6 +46,7 @@ INCLUDEPATH += \
 	../cpputils \
 	../cpp-template-utils \
 	../file-operations \
+	../image-processing \
 	../thin_io/src
 
 ###################################################

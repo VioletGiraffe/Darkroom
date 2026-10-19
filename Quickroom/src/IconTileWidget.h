@@ -4,6 +4,7 @@
 
 DISABLE_COMPILER_WARNINGS
 #include <QIcon>
+#include <QPixmap>
 #include <QWidget>
 RESTORE_COMPILER_WARNINGS
 
@@ -27,6 +28,7 @@ protected:
 
 private:
 	QIcon _icon;
+	QPixmap _scaledIcon;
 	QString _caption;
 	std::function<void()> _onActivated;
 	std::function<void(int steps)> _onWheel;
