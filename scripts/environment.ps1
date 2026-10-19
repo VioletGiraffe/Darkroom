@@ -65,13 +65,14 @@ function Invoke-Qmake([string]$project)
 	finally { Pop-Location }
 }
 
-# Builds the given projects of a solution in the repository root. Exits with code 1 on a build failure.
+# Builds the given targets of a solution in the repository root: project names, or a solution target such as Rebuild.
+# Exits with code 1 on a build failure.
 # platformToolset overrides the toolset qmake wrote into the projects; empty keeps it.
-function Invoke-MSBuild([string]$solution, [string[]]$projects, [string]$configuration, [string]$platformToolset)
+function Invoke-MSBuild([string]$solution, [string[]]$targets, [string]$configuration, [string]$platformToolset)
 {
 	$properties = "/p:Configuration=$configuration"
 	if ($platformToolset) { $properties += ";PlatformToolset=$platformToolset" }
 	# msbuild, not nmake: it also rebuilds what the compiler command line changed for, such as the Qt include paths
-	msbuild (Join-Path $repositoryRoot $solution) "/t:$($projects -join ';')" /nologo /m /v:minimal $properties
+	msbuild (Join-Path $repositoryRoot $solution) "/t:$($targets -join ';')" /nologo /m /v:minimal $properties
 	if ($LASTEXITCODE -ne 0) { exit 1 }
 }

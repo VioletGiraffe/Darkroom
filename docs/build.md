@@ -21,7 +21,7 @@ CI and local builds run the same scripts in `scripts/`; the `.bat` files start t
 
 | Script | Does | Arguments |
 |---|---|---|
-| `build.bat` / `build.sh` | qmake and build of `Darkroom.pro`; runs nothing | `darkroom` or `quickroom` builds one app, none builds both; debug configuration |
+| `build.bat` / `build.sh` | qmake and build of `Darkroom.pro`; runs nothing | `darkroom` or `quickroom` builds one app, none builds both; rebuild of the whole project from scratch; debug configuration |
 | `run_tests.bat` / `run_tests.sh` | qmake and build of `Tests.pro`, then `DarkroomTests` | debug configuration; build only or run only; arguments for the test binary |
 
 - The Qt kit comes from `QT_ROOT_DIR`, else from a git-ignored `scripts/local-env.ps1` or `local-env.sh` that sets it;
