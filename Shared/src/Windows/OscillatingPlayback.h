@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Windows/OscillationCurve.h"
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -15,15 +16,6 @@ RESTORE_COMPILER_WARNINGS
 
 class QString;
 class VideoPlayerWindow;
-
-enum class OscillationCurve
-{
-	Linear,
-	Cosine,
-	TrueCosine,
-	Smoothstep,
-	Smootherstep,
-};
 
 struct OscillationRequest
 {

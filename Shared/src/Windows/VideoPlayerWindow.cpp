@@ -1,6 +1,7 @@
 #include "Windows/VideoPlayerWindow.h"
 #include "Windows/SingleFrameExtraction.h"
 #include "Windows/OscillatingPlayback.h"
+#include "Windows/OscillationCurve.h"
 #include "UiComponents/MarkerSlider.h"
 #include "Core/MetadataStore.h"
 #include "Shortcuts.h"

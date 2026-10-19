@@ -48,6 +48,7 @@ SOURCES += \
 	CatalogTests.cpp \
 	CatalogIntegrityTests.cpp \
 	UtilsTests.cpp \
+	OscillationCurveTests.cpp \
 	../Darkroom/src/Core/Catalog.cpp \
 	../Darkroom/src/Core/CatalogIntegrity.cpp \
 	../Darkroom/src/Core/Library.cpp \
@@ -55,7 +56,8 @@ SOURCES += \
 	../Shared/src/Core/MediaId.cpp \
 	../Shared/src/Core/MetadataStore.cpp \
 	../Shared/src/SharedSettings.cpp \
-	../Shared/src/Utils.cpp
+	../Shared/src/Utils.cpp \
+	../Shared/src/Windows/OscillationCurve.cpp
 
 # qtutils before cpputils: it uses cpputils, and GNU ld resolves left to right
 LIBS += -L$${DESTDIR} -lqtutils -lcpputils
