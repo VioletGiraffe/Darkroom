@@ -247,7 +247,7 @@ void BrowserWindow::setupUi()
 	connect(refreshShortcut, &QShortcut::activated, this, &BrowserWindow::refresh);
 
 	_grid = new MediaGrid();
-	_grid->setObjectName("tileGrid");   // the central sheet rounds this grid's cells to the ring
+	_grid->setObjectName("tileGrid");   // the central sheet rounds this grid's cells to the ring, replacing MediaGrid's own name
 	_grid->setUniformItemSizes(true);
 	_grid->setDragEnabled(true);
 	_grid->setEmptyMessage(tr("No folders or supported media files here."));

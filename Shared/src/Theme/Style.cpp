@@ -103,7 +103,12 @@ constexpr char kLists[] = R"(
 	/* outline: none suppresses the style's focus rect on the current item. */
 	QListWidget { border: 1px solid %border%; border-radius: %controlRadius%px; background: transparent; outline: none; }
 	QListWidget::item:selected { background-color: %accentBg%; border-radius: %controlRadius%px; }
-	QListWidget#tileGrid::item:selected { border-radius: %tileCellRadius%px; }
+
+	/* The grids tint hovered cells themselves, so the platform style's hover highlight never shows under the cards.
+	   The id selectors outrank the generic selected rule above, so the grids restate the selected tint. */
+	QListWidget#mediaGrid::item:hover, QListWidget#tileGrid::item:hover { background-color: %cellHoverBg%; border-radius: %controlRadius%px; }
+	QListWidget#mediaGrid::item:selected, QListWidget#tileGrid::item:selected { background-color: %accentBg%; }
+	QListWidget#tileGrid::item:hover, QListWidget#tileGrid::item:selected { border-radius: %tileCellRadius%px; }
 )";
 
 constexpr char kScrollBars[] = R"(
@@ -228,6 +233,7 @@ QString styleSheetString()
 		{ QStringLiteral("%windowBg%"),                 t.palette.windowBg.name() },
 		{ QStringLiteral("%text%"),                     t.palette.text.name() },
 		{ QStringLiteral("%thumbnailMatte%"),           t.thumbnailMatte.name() },
+		{ QStringLiteral("%cellHoverBg%"),              t.cellHoverBg.name() },
 		{ QStringLiteral("%starButtonDefault%"),        t.starButtonDefault.name() },
 		{ QStringLiteral("%starButtonHoverUnchecked%"), t.starButtonHoverUnchecked.name() },
 		{ QStringLiteral("%starButtonCheckedHover%"),   t.starButtonCheckedHover.name() },

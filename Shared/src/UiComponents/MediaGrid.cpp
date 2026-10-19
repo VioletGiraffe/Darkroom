@@ -66,6 +66,7 @@ void setCardSelected(QWidget& card, bool selected)
 MediaGrid::MediaGrid(QWidget* parent)
 	: QListWidget(parent)
 {
+	setObjectName("mediaGrid");   // the central sheet styles this grid's cells; an owner may rename for its own cell rules
 	setViewMode(QListView::IconMode);
 	setFlow(QListView::LeftToRight);
 	setWrapping(true);
