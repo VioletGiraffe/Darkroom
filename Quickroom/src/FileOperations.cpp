@@ -143,11 +143,10 @@ QString FileOperations::deleteActionText(PathDeletion::Mode mode)
 	return mode == PathDeletion::Mode::Trash ? QObject::tr("Move to Trash") : QObject::tr("Delete permanently");
 }
 
-void FileOperations::installDeleteActions(ImageViewerWindow& viewer, const QStringList& imagePaths, std::function<void(const QString& path)> onDeleted)
+void FileOperations::installDeleteActions(ImageViewerWindow& viewer, std::function<void(const QString& path)> onDeleted)
 {
-	const auto removalAction = [&viewer, &imagePaths, &onDeleted](PathDeletion::Mode mode) {
-		return ImageViewerWindow::RemovalAction{ deleteActionText(mode),
-			[imagePaths, deletePath = pathDeleter(&viewer, mode, onDeleted)](int index) { return deletePath(imagePaths[index]); } };
+	const auto removalAction = [&viewer, &onDeleted](PathDeletion::Mode mode) {
+		return ImageViewerWindow::RemovalAction{ deleteActionText(mode), pathDeleter(&viewer, mode, onDeleted) };
 	};
 	viewer.setRemovalActions(removalAction(PathDeletion::Mode::Trash), removalAction(PathDeletion::Mode::Permanent));
 }

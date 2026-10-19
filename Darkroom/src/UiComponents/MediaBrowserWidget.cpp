@@ -353,10 +353,9 @@ void MediaBrowserWidget::viewPhoto(const MediaId& id)
 		return;
 	}
 
-	std::vector<MediaId> browsedIds = visiblePhotosInViewOrder();
 	QStringList paths;
 	int startIndex = -1;
-	for (const MediaId& photoId : browsedIds)
+	for (const MediaId& photoId : visiblePhotosInViewOrder())
 	{
 		if (photoId == id)
 			startIndex = static_cast<int>(paths.size());
@@ -365,33 +364,31 @@ void MediaBrowserWidget::viewPhoto(const MediaId& id)
 
 	if (startIndex < 0) // Not in the grid's current view: nothing to browse through, so show it alone
 	{
-		browsedIds = { id };
 		paths = { sourcePath };
 		startIndex = 0;
 	}
 
+	// Ids come from the viewer's current paths: a rename while it is open changes an item's id.
 	ImageViewerWindow* const viewer = ImageViewerWindow::showForImages(std::move(paths), startIndex, window(),
-		[this, browsedIds](int index) { selectAndScrollToMediaItem(browsedIds[static_cast<size_t>(index)]); });
+		[this](const QString& path) { selectAndScrollToMediaItem(MediaId::fromFile(path)); });
 	if (!viewer)
 		return;
 
 	auto* bestAction = new QAction(tr("Best"), viewer);
 	bestAction->setCheckable(true);
 	bestAction->setShortcut(QKeySequence(Qt::Key_B));
-	connect(bestAction, &QAction::triggered, viewer, [this, viewer, browsedIds] {
-		toggleBest(browsedIds[static_cast<size_t>(viewer->currentImageIndex())]);
-	});
-	viewer->addImageAction(bestAction, [this, bestAction, browsedIds](int index) {
-		const MediaId& id = browsedIds[static_cast<size_t>(index)];
+	connect(bestAction, &QAction::triggered, viewer, [this, viewer] { toggleBest(MediaId::fromFile(viewer->currentImagePath())); });
+	viewer->addImageAction(bestAction, [this, bestAction](const QString& path) {
+		const MediaId shownId = MediaId::fromFile(path);
 		const Catalog& catalog = _library.catalog();
-		const bool tracked = catalog.containsMediaItem(id);
+		const bool tracked = catalog.containsMediaItem(shownId);
 		bestAction->setEnabled(tracked);
-		bestAction->setChecked(tracked && catalog.mediaItemHasLabel(id, Catalog::BestLabelId));
+		bestAction->setChecked(tracked && catalog.mediaItemHasLabel(shownId, Catalog::BestLabelId));
 	});
 
 	viewer->setRemovalActions(
-		{ tr("Remove from library (untrack)"), [this, browsedIds](int index) { return untrackMediaItemAndReportGone(browsedIds[static_cast<size_t>(index)]); } },
-		{ tr("Delete"), [this, browsedIds](int index) { return deleteMediaItemAndReportGone(browsedIds[static_cast<size_t>(index)]); } });
+		{ tr("Remove from library (untrack)"), [this](const QString& path) { return untrackMediaItemAndReportGone(MediaId::fromFile(path)); } },
+		{ tr("Delete"), [this](const QString& path) { return deleteMediaItemAndReportGone(MediaId::fromFile(path)); } });
 }
 
 void MediaBrowserWidget::playVideo(const MediaId& id)
@@ -405,12 +402,11 @@ void MediaBrowserWidget::playVideo(const MediaId& id)
 
 	VideoPlayerWindow* const playerWindow = LibraryPlayer::open(_library, sourcePath, nullptr);
 
-	const std::vector<MediaId> navigationIds = visibleVideosInViewOrder();
 	QStringList navigationPaths;
-	for (const MediaId& videoId : navigationIds)
+	for (const MediaId& videoId : visibleVideosInViewOrder())
 		navigationPaths << _library.catalog().sourcePathForMediaItem(videoId);
-	playerWindow->setNavigation(std::move(navigationPaths),
-		[this, navigationIds](int index) { selectAndScrollToMediaItem(navigationIds[static_cast<size_t>(index)]); });
+	// Ids come from the player's current paths, as in viewPhoto.
+	playerWindow->setNavigation(std::move(navigationPaths), [this](const QString& path) { selectAndScrollToMediaItem(MediaId::fromFile(path)); });
 
 	playerWindow->setRemovalActions(
 		{ tr("Remove from library (untrack)"), [this](const MediaId& playedId, const QString&) { return untrackMediaItemAndReportGone(playedId); } },

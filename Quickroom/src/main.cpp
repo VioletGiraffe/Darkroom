@@ -24,7 +24,6 @@ DISABLE_COMPILER_WARNINGS
 RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
-#include <memory>
 #include <utility>
 
 #ifndef QUICKROOM_VERSION
@@ -96,18 +95,17 @@ bool showImageViewer(const QString& path)
 		index = 0;
 	}
 
-	const auto currentPath = std::make_shared<QString>(images.at(index));
-	ImageViewerWindow* const viewer = ImageViewerWindow::showForImages(images, index, nullptr,
-		[currentPath, images](int browsedIndex) { *currentPath = images.at(browsedIndex); });
+	ImageViewerWindow* const viewer = ImageViewerWindow::showForImages(std::move(images), index, nullptr);
 	if (!viewer)
 		return false;
 
-	FileOperations::installDeleteActions(*viewer, images);
+	FileOperations::installDeleteActions(*viewer);
 
 	// No browser exists yet in this mode, so leaving fullscreen opens one on the image being viewed.
-	viewer->setExitFullScreenHandler([viewer, currentPath] {
+	viewer->setExitFullScreenHandler([viewer] {
 		// The browser opens before the viewer closes: closing the only window would quit the app.
-		BrowserWindow::showForFolder(QFileInfo(*currentPath).absolutePath(), *currentPath);
+		const QString currentPath = viewer->currentImagePath();
+		BrowserWindow::showForFolder(QFileInfo(currentPath).absolutePath(), currentPath);
 		viewer->close();
 		return false;   // do not un-fullscreen a closing window
 	});

@@ -37,13 +37,15 @@ Copy puts both the image and its file on the clipboard, for apps that paste pixe
 The current image becomes the window icon after a delay, so several open viewers stay distinguishable in the
 taskbar without an icon being scaled for every image browsed past.
 
-It browses a path list captured when it opens, skipping entries that have since left the disk. Four callers
-build that list: MediaBrowserWidget from the photos the grid currently shows, ImportDialog from the staged photos
-its grid currently shows, FrameViewerWindow from one frame folder, and CompareWindow from the frames of the pane
-that was clicked.
+It browses a path list captured when it opens, skipping entries that have since left the disk; moves concluded by
+`followMovedMediaFiles` rebase it. Four callers build that list: MediaBrowserWidget from the photos the grid currently
+shows, ImportDialog from the staged photos its grid currently shows, FrameViewerWindow from one frame folder, and
+CompareWindow from the frames of the pane that was clicked.
 
-Browsing is reported back by index into the caller's list. MediaBrowserWidget and ImportDialog use that to move
-their grid selection onto the photo on screen. The initial image is not reported: the caller already acted on it.
+Browsing, host actions and removal actions receive the current path of the image shown. MediaBrowserWidget and
+ImportDialog derive the item's id from it at that moment, as the player derives its own, so an item renamed while the
+viewer is open keeps working; browsing moves their grid selection onto the photo on screen. The initial image is not
+reported: the caller already acted on it.
 
 ## VideoPlayerWindow
 

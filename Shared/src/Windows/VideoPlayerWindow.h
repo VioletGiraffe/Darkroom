@@ -38,8 +38,8 @@ public:
 	~VideoPlayerWindow() override;
 
 	// Previous/next navigation through videoPaths; it stays inert unless they include the video playing.
-	// onNavigated reports the index navigated to; the initial video does not call it.
-	void setNavigation(QStringList videoPaths, std::function<void(int index)> onNavigated);
+	// onNavigated reports the path navigated to, current as in ImageViewerWindow; the initial video does not call it.
+	void setNavigation(QStringList videoPaths, std::function<void(const QString& path)> onNavigated);
 
 	// A fixed frame destination offered beside "Extract frame to folder...", and repeated by E when used last.
 	struct FrameTarget
@@ -136,7 +136,7 @@ private:
 	QString _videoPath;
 	QStringList _navigationPaths;
 	int _navigationIndex = -1;
-	std::function<void(int index)> _onNavigated;
+	std::function<void(const QString& path)> _onNavigated;
 	FrameTarget _frameTarget;
 	// Both empty until setRemovalActions.
 	RemovalAction _deleteKeyAction;

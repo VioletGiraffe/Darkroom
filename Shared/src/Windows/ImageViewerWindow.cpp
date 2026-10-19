@@ -28,7 +28,7 @@ RESTORE_COMPILER_WARNINGS
 #include <utility>
 
 ImageViewerWindow* ImageViewerWindow::showForImages(QStringList imagePaths, int startIndex, QWidget* parent,
-	std::function<void(int index)> onImageChanged)
+	std::function<void(const QString& path)> onImageChanged)
 {
 	assert_and_return_r(startIndex >= 0 && startIndex < imagePaths.size(), nullptr);
 
@@ -52,11 +52,11 @@ void ImageViewerWindow::setExitFullScreenHandler(std::function<bool()> handler)
 	_exitFullScreenHandler = std::move(handler);
 }
 
-void ImageViewerWindow::addImageAction(QAction* action, std::function<void(int index)> updateForImage)
+void ImageViewerWindow::addImageAction(QAction* action, std::function<void(const QString& path)> updateForImage)
 {
 	_imageMenu->addAction(action);
 	addAction(action); // for the shortcut, see buildMenus
-	updateForImage(_index);
+	updateForImage(currentImagePath());
 	_imageActionUpdaters.push_back(std::move(updateForImage));
 }
 
@@ -78,7 +78,7 @@ void ImageViewerWindow::releaseFilesMatching(const std::function<bool(const QStr
 {
 	for (ImageViewerWindow* viewer : _instances)
 	{
-		if (viewer->_view->isAnimated() && isAffected(viewer->currentPath()))
+		if (viewer->_view->isAnimated() && isAffected(viewer->currentImagePath()))
 		{
 			viewer->_view->closeFile();
 			viewer->_animationReleased = true;
@@ -91,11 +91,11 @@ void ImageViewerWindow::followMovedFiles(const std::function<bool(const QString&
 {
 	for (ImageViewerWindow* viewer : _instances)
 	{
-		const bool reopen = wasReleased(viewer->currentPath());
+		const bool reopen = wasReleased(viewer->currentImagePath());
 		for (QString& path : viewer->_imagePaths)
 			path = newLocation(path);
 
-		viewer->setWindowTitle(QFileInfo{ viewer->currentPath() }.completeBaseName());
+		viewer->setWindowTitle(QFileInfo{ viewer->currentImagePath() }.completeBaseName());
 		if (reopen)
 			viewer->resumeReleasedAnimation();
 	}
@@ -107,7 +107,7 @@ void ImageViewerWindow::resumeReleasedAnimation()
 		return;
 
 	_animationReleased = false;
-	_view->displayImage(currentPath(), false);
+	_view->displayImage(currentImagePath(), false);
 }
 
 ImageViewerWindow::ImageViewerWindow(QStringList imagePaths, int startIndex, QWidget* parent)
@@ -153,11 +153,11 @@ void ImageViewerWindow::buildMenus()
 
 	QMenu* fileMenu = new QMenu(tr("File"), menuBar);
 	fileMenu->addAction(revealInFileManagerActionText(), this, [this] {
-		if (!revealInFileManager(currentPath()))
-			reportMissingFile(this, currentPath());
+		if (!revealInFileManager(currentImagePath()))
+			reportMissingFile(this, currentImagePath());
 	});
 	fileMenu->addAction(tr("Open in system app"), this, [this] {
-		QDesktopServices::openUrl(QUrl::fromLocalFile(currentPath()));
+		QDesktopServices::openUrl(QUrl::fromLocalFile(currentImagePath()));
 	});
 	fileMenu->addSeparator();
 	QAction* closeAction = fileMenu->addAction(tr("Close"), this, &QWidget::close);
@@ -221,10 +221,10 @@ void ImageViewerWindow::showImage(int index)
 	_previousAction->setEnabled(adjacentIndex(Direction::Previous) >= 0);
 	_nextAction->setEnabled(adjacentIndex(Direction::Next) >= 0);
 	for (const auto& updateForImage : _imageActionUpdaters)
-		updateForImage(index);
+		updateForImage(path);
 
 	if (_onImageChanged)
-		_onImageChanged(index);
+		_onImageChanged(path);
 }
 
 bool ImageViewerWindow::eventFilter(QObject* watched, QEvent* event)
@@ -286,13 +286,13 @@ void ImageViewerWindow::copyImageAndFileToClipboard()
 	auto* mime = new QMimeData();
 	if (const QImage& image = _view->sourceImage(); !image.isNull())
 		mime->setImageData(image);
-	mime->setUrls({ QUrl::fromLocalFile(currentPath()) });
+	mime->setUrls({ QUrl::fromLocalFile(currentImagePath()) });
 	QGuiApplication::clipboard()->setMimeData(mime);
 }
 
-void ImageViewerWindow::removeCurrentImage(const std::function<bool(int index)>& remove)
+void ImageViewerWindow::removeCurrentImage(const std::function<bool(const QString& path)>& remove)
 {
-	if (!remove(_index))
+	if (!remove(currentImagePath()))
 	{
 		resumeReleasedAnimation(); // released for a file operation that then failed or was cancelled
 		return;

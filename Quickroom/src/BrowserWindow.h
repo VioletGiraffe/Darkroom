@@ -67,6 +67,8 @@ private:
 	void showBackgroundContextMenu(QPoint globalPos);
 	// Does nothing when the path is no longer in the grid.
 	void selectAndScrollToPath(const QString& path);
+	// selectAndScrollToPath, safe to call after this window is gone, as entryRemover.
+	[[nodiscard]] std::function<void(const QString& path)> pathSelector();
 
 	[[nodiscard]] QStringList selectedPaths() const;
 	void deletePaths(const QStringList& paths, PathDeletion::Mode mode);

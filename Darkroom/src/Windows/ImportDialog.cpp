@@ -1096,16 +1096,16 @@ void ImportDialog::previewStagedItem(const MediaId& id)
 		return !_staged.contains(stagedId);
 	};
 
+	// Staged ids come from the windows' current paths: renaming a staged file while it is open changes its id.
 	if (!isSupportedImageFile(it->path))
 	{
 		VideoPlayerWindow* const player = LibraryPlayer::open(_library, it->path, this);
 		player->setRemovalActions(
-			{ tr("Remove from staging"), [id, removeStaged](const MediaId&, const QString&) { return removeStaged(id); } },
-			{ tr("Delete source file"), [id, deleteStagedSource](const MediaId&, const QString&) { return deleteStagedSource(id); } });
+			{ tr("Remove from staging"), [removeStaged](const MediaId& playedId, const QString&) { return removeStaged(playedId); } },
+			{ tr("Delete source file"), [deleteStagedSource](const MediaId& playedId, const QString&) { return deleteStagedSource(playedId); } });
 		return;
 	}
 
-	std::vector<MediaId> browsedIds;
 	QStringList photoPaths;
 	int startIndex = -1;
 	for (int row = 0; row < _stagedGrid->count(); ++row)
@@ -1118,17 +1118,16 @@ void ImportDialog::previewStagedItem(const MediaId& id)
 		if (item->mediaId == id)
 			startIndex = static_cast<int>(photoPaths.size());
 		photoPaths << path;
-		browsedIds.push_back(item->mediaId);
 	}
 
 	ImageViewerWindow* const viewer = ImageViewerWindow::showForImages(std::move(photoPaths), startIndex, this,
-		[this, browsedIds](int index) { selectAndScrollToStagedItem(browsedIds[static_cast<size_t>(index)]); });
+		[this](const QString& path) { selectAndScrollToStagedItem(MediaId::fromFile(path)); });
 	if (!viewer)
 		return;
 
 	viewer->setRemovalActions(
-		{ tr("Remove from staging"), [browsedIds, removeStaged](int index) { return removeStaged(browsedIds[static_cast<size_t>(index)]); } },
-		{ tr("Delete source file"), [browsedIds, deleteStagedSource](int index) { return deleteStagedSource(browsedIds[static_cast<size_t>(index)]); } });
+		{ tr("Remove from staging"), [removeStaged](const QString& path) { return removeStaged(MediaId::fromFile(path)); } },
+		{ tr("Delete source file"), [deleteStagedSource](const QString& path) { return deleteStagedSource(MediaId::fromFile(path)); } });
 }
 
 void ImportDialog::selectAndScrollToStagedItem(const MediaId& id)

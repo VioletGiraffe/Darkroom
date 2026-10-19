@@ -460,17 +460,11 @@ void BrowserWindow::viewImage(const QString& path)
 	const int startIndex = static_cast<int>(imagePaths.indexOf(path));
 	assert_and_return_r(startIndex >= 0, );
 
-	// The viewer is parentless and can outlive this window.
-	const QPointer<BrowserWindow> self{ this };
-	ImageViewerWindow* const viewer = ImageViewerWindow::showForImages(imagePaths, startIndex, this,
-		[self, imagePaths](int index) {
-			if (self)
-				self->selectAndScrollToPath(imagePaths[index]);
-		});
+	ImageViewerWindow* const viewer = ImageViewerWindow::showForImages(imagePaths, startIndex, this, pathSelector());
 	if (!viewer)
 		return;
 
-	FileOperations::installDeleteActions(*viewer, imagePaths, entryRemover());
+	FileOperations::installDeleteActions(*viewer, entryRemover());
 }
 
 void BrowserWindow::playVideo(const QString& path)
@@ -483,13 +477,7 @@ void BrowserWindow::playVideo(const QString& path)
 
 	VideoPlayerWindow* const player = VideoPlayerWindow::createPlayerWindow(path, nullptr);
 	FileOperations::installDeleteActions(*player, entryRemover());
-
-	// The player is parentless and can outlive this window.
-	const QStringList videoPaths = listedPathsOfKind(*_grid, EntryKind::Video);
-	player->setNavigation(videoPaths, [self = QPointer<BrowserWindow>{ this }, videoPaths](int index) {
-		if (self)
-			self->selectAndScrollToPath(videoPaths[index]);
-	});
+	player->setNavigation(listedPathsOfKind(*_grid, EntryKind::Video), pathSelector());
 }
 
 std::function<void(const QString& path)> BrowserWindow::entryRemover()
@@ -497,6 +485,14 @@ std::function<void(const QString& path)> BrowserWindow::entryRemover()
 	return [self = QPointer<BrowserWindow>{ this }](const QString& path) {
 		if (self)
 			self->removeEntries({ path });
+	};
+}
+
+std::function<void(const QString& path)> BrowserWindow::pathSelector()
+{
+	return [self = QPointer<BrowserWindow>{ this }](const QString& path) {
+		if (self)
+			self->selectAndScrollToPath(path);
 	};
 }
 

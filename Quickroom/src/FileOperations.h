@@ -33,7 +33,6 @@ namespace FileOperations
 	[[nodiscard]] QString deleteActionText(PathDeletion::Mode mode);
 
 	// Give the window its removal actions: Del is Trash, Shift+Del is permanent. onDeleted receives each deleted path.
-	// imagePaths is the list the viewer was opened with.
-	void installDeleteActions(ImageViewerWindow& viewer, const QStringList& imagePaths, std::function<void(const QString& path)> onDeleted = {});
+	void installDeleteActions(ImageViewerWindow& viewer, std::function<void(const QString& path)> onDeleted = {});
 	void installDeleteActions(VideoPlayerWindow& player, std::function<void(const QString& path)> onDeleted = {});
 }

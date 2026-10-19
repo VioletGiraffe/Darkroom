@@ -561,7 +561,7 @@ MetadataStore* VideoPlayerWindow::currentMetadataStore() const
 	return _metadataStore ? _metadataStore() : nullptr;
 }
 
-void VideoPlayerWindow::setNavigation(QStringList videoPaths, std::function<void(int index)> onNavigated)
+void VideoPlayerWindow::setNavigation(QStringList videoPaths, std::function<void(const QString& path)> onNavigated)
 {
 	// By pathComparisonKey: the player may have been opened with a differently spelled path, such as from the command line.
 	const QString currentKey = pathComparisonKey(_videoPath);
@@ -603,7 +603,7 @@ void VideoPlayerWindow::loadAdjacentFile(Direction direction)
 	loadFile(_navigationPaths[index]);
 
 	if (_onNavigated)
-		_onNavigated(index);
+		_onNavigated(_videoPath);
 }
 
 void VideoPlayerWindow::setRemovalActions(RemovalAction onDelete, RemovalAction onShiftDelete)
