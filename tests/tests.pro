@@ -81,7 +81,7 @@ linux*|freebsd{
 }
 
 linux*|mac*|freebsd {
-	QMAKE_CXXFLAGS_WARN_ON = -Wall -Wextra
+	QMAKE_CXXFLAGS_WARN_ON = -Wall -Wextra -Wno-missing-field-initializers # omitted aggregate fields take their defaults by design
 
 	Release:DEFINES += NDEBUG=1
 	Debug:DEFINES += _DEBUG
