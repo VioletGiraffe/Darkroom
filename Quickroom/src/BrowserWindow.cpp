@@ -1,6 +1,7 @@
 #include "BrowserWindow.h"
 #include "FileOperations.h"
 #include "IconTileWidget.h"
+#include "Theme/Theme.h"
 #include "UiComponents/MediaGrid.h"
 #include "UiComponents/ThumbnailWidget.h"
 #include "Windows/ImageViewerWindow.h"
@@ -58,8 +59,10 @@ constexpr int DEFAULT_TILE_SIZE = 160;
 constexpr int MIN_TILE_SIZE  = 80;
 constexpr int MAX_TILE_SIZE  = 400;
 constexpr int TILE_SIZE_STEP = 20;
-// Grid cells exceed the tile by this margin per side, leaving the view's selection background visible around it.
-constexpr int SELECTION_RING = 6;
+int selectionRing()
+{
+	return Theme::current().metrics.tileSelectionRing;
+}
 
 int savedTileSize()
 {
@@ -68,7 +71,7 @@ int savedTileSize()
 
 QSize cellSize(int tile)
 {
-	const int side = tile + 2 * SELECTION_RING;
+	const int side = tile + 2 * selectionRing();
 	return { side, side };
 }
 
@@ -77,7 +80,8 @@ QWidget* inSelectionFrame(QWidget* tile)
 {
 	auto* frame = new QWidget();
 	auto* layout = new QVBoxLayout(frame);
-	layout->setContentsMargins(SELECTION_RING, SELECTION_RING, SELECTION_RING, SELECTION_RING);
+	const int ring = selectionRing();
+	layout->setContentsMargins(ring, ring, ring, ring);
 	layout->addWidget(tile);
 	return frame;
 }
@@ -243,6 +247,7 @@ void BrowserWindow::setupUi()
 	connect(refreshShortcut, &QShortcut::activated, this, &BrowserWindow::refresh);
 
 	_grid = new MediaGrid();
+	_grid->setObjectName("tileGrid");   // the central sheet rounds this grid's cells to the ring
 	_grid->setUniformItemSizes(true);
 	_grid->setDragEnabled(true);
 	_grid->setEmptyMessage(tr("No folders or supported media files here."));

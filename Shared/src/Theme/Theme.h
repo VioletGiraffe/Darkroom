@@ -26,8 +26,13 @@ struct Metrics
 	int sliderHandleDiameter = 16;
 	// FocusFrameStyle expands the label-tight base focus rect by this amount.
 	int focusRectOutset = 2;
+	// Quickroom's grid cell exceeds its tile by this margin per side; the view's selection background fills the margin.
+	int tileSelectionRing = 6;
 
 	// Derived, so they always follow their base values.
+	// The cell corner is concentric with the tile's, so the ring keeps its width across the corner.
+	// Minus one: QSS strokes a 1px border on a path inset by half its width, so the tile's visible radius is controlRadius - 0.5.
+	int tileCellRadius() const { return controlRadius + tileSelectionRing - 1; }
 	int scrollBarHandleRadius() const { return scrollBarThickness / 2; }
 	int sliderGrooveRadius() const { return sliderGrooveThickness / 2; }
 	int sliderHandleRadius() const { return sliderHandleDiameter / 2; }

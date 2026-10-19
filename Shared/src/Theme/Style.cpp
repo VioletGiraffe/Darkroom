@@ -103,6 +103,7 @@ constexpr char kLists[] = R"(
 	/* outline: none suppresses the style's focus rect on the current item. */
 	QListWidget { border: 1px solid %border%; border-radius: %controlRadius%px; background: transparent; outline: none; }
 	QListWidget::item:selected { background-color: %accentBg%; border-radius: %controlRadius%px; }
+	QListWidget#tileGrid::item:selected { border-radius: %tileCellRadius%px; }
 )";
 
 constexpr char kScrollBars[] = R"(
@@ -236,6 +237,7 @@ QString styleSheetString()
 		{ QStringLiteral("%menuItemRadius%"),           QString::number(m.menuItemRadius) },
 		{ QStringLiteral("%checkboxRadius%"),           QString::number(m.checkboxRadius) },
 		{ QStringLiteral("%thumbnailMatteRadius%"),     QString::number(m.thumbnailMatteRadius) },
+		{ QStringLiteral("%tileCellRadius%"),           QString::number(m.tileCellRadius()) },
 		{ QStringLiteral("%scrollBarThickness%"),       QString::number(m.scrollBarThickness) },
 		{ QStringLiteral("%scrollBarHandleRadius%"),    QString::number(m.scrollBarHandleRadius()) },
 		{ QStringLiteral("%sliderGrooveThickness%"),    QString::number(m.sliderGrooveThickness) },
