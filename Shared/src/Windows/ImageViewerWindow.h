@@ -51,6 +51,9 @@ public:
 
 	// Viewers whose current image matches close its file, keeping the frame shown; see releaseMediaFilesHeldOpen.
 	static void releaseFilesMatching(const std::function<bool(const QString& path)>& isAffected);
+	// Rebases the image paths by newLocation; a viewer whose closed image wasReleased reopens it there. See followMovedMediaFiles.
+	static void followMovedFiles(const std::function<bool(const QString& path)>& wasReleased,
+		const std::function<QString(const QString& path)>& newLocation);
 
 	~ImageViewerWindow() override;
 
@@ -73,12 +76,16 @@ private:
 	// The pixels for apps that paste images, the file for file managers and apps that take files.
 	void copyImageAndFileToClipboard();
 	void removeCurrentImage(const std::function<bool(int index)>& remove);
+	// Reopens the current image after releaseFilesMatching closed it; no-op otherwise.
+	void resumeReleasedAnimation();
 
 private:
 	static std::vector<ImageViewerWindow*> _instances;
 
 	QStringList _imagePaths;
 	int _index = 0;
+	// Only an animated image holds its file open, so only an animation is released.
+	bool _animationReleased = false;
 
 	std::function<void(int index)> _onImageChanged;
 	std::function<bool()> _exitFullScreenHandler;

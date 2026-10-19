@@ -8,6 +8,7 @@ DISABLE_COMPILER_WARNINGS
 RESTORE_COMPILER_WARNINGS
 
 #include <functional>
+#include <vector>
 
 class QDateTime;
 class QMimeData;
@@ -40,6 +41,18 @@ void clearStuckHoverIfCursorLeft(QWidget* w);
 
 // Lexical, case/separator-insensitive path key. Does not resolve symlinks or junctions.
 [[nodiscard]] QString pathComparisonKey(const QString& path);
+
+// Whether path is one of roots or lies under one, by pathComparisonKey. Empty paths and roots never match.
+[[nodiscard]] bool isPathAtOrUnder(const QString& path, const QStringList& roots);
+
+// A completed move of a file or folder.
+struct PathMove
+{
+	QString from;
+	QString to;
+};
+// path rebased by the first move from it or from a folder above it; path itself when no move applies.
+[[nodiscard]] QString pathAfterMoves(const QString& path, const std::vector<PathMove>& moves);
 
 // Returns the first Windows-illegal filename character, or a null QChar.
 [[nodiscard]] QChar invalidFilenameChar(const QString& name);

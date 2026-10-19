@@ -617,8 +617,6 @@ void VideoPlayerWindow::setRemovalActions(RemovalAction onDelete, RemovalAction 
 
 void VideoPlayerWindow::performRemoval(const RemovalAction& action)
 {
-	const qint64 positionMs = currentPlaybackPosition();
-	const bool wasPlaying = isPlaybackActive();
 	if (action.remove(_mediaId, _videoPath))
 	{
 		// Cleared so that navigation skips it as it skips a deleted file: a removal may leave the file on disk.
@@ -627,7 +625,7 @@ void VideoPlayerWindow::performRemoval(const RemovalAction& action)
 		leaveRemovedItem();
 	}
 	else if (_player->source().isEmpty()) // released for a file operation that then failed or was cancelled
-		resumeReleasedFile(positionMs, wasPlaying);
+		resumeReleasedFile(_videoPath);
 }
 
 void VideoPlayerWindow::leaveRemovedItem()
@@ -640,11 +638,11 @@ void VideoPlayerWindow::leaveRemovedItem()
 		close();
 }
 
-void VideoPlayerWindow::resumeReleasedFile(qint64 positionMs, bool wasPlaying)
+void VideoPlayerWindow::resumeReleasedFile(const QString& videoPath)
 {
-	loadFile(_videoPath);
-	_positionToRestoreMs = positionMs;
-	setPlaybackActive(wasPlaying);
+	loadFile(videoPath);
+	_positionToRestoreMs = _releasedPositionMs;
+	setPlaybackActive(_releasedWasPlaying);
 }
 
 void VideoPlayerWindow::releaseFilesMatching(const std::function<bool(const QString& path)>& isAffected)
@@ -654,8 +652,23 @@ void VideoPlayerWindow::releaseFilesMatching(const std::function<bool(const QStr
 		if (!isAffected(player->_videoPath))
 			continue;
 
+		player->_releasedPositionMs = player->currentPlaybackPosition();
+		player->_releasedWasPlaying = player->isPlaybackActive();
 		player->exitOscillatingPlayback(false);
 		player->_player->setSource({});
+	}
+}
+
+void VideoPlayerWindow::followMovedFiles(const std::function<bool(const QString& path)>& wasReleased,
+	const std::function<QString(const QString& path)>& newLocation)
+{
+	for (VideoPlayerWindow* player : _instances)
+	{
+		for (QString& path : player->_navigationPaths)
+			path = newLocation(path);
+
+		if (player->_player->source().isEmpty() && wasReleased(player->_videoPath))
+			player->resumeReleasedFile(newLocation(player->_videoPath));
 	}
 }
 

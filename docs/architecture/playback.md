@@ -80,10 +80,17 @@ operation that reports whether the item left the host's list. Without them the k
 After a removal the window moves to the nearest remaining item, or closes when it has none. Frame viewers and the
 relocation preview players install no actions.
 
-An open file cannot be deleted or moved on Windows, so `PathDeletion` first calls `releaseMediaFilesHeldOpen`: every
-player showing an affected file drops its source, and every viewer showing one closes it, an animation stopping on
-its current frame. The windows stay open and do not reopen the file. The window whose own action failed or was
-cancelled is the exception: it reloads its file, a player at its previous position.
+An open file cannot be deleted or moved on Windows, so an operation that deletes or moves media first calls
+`releaseMediaFilesHeldOpen`: every player showing an affected file drops its source, and every viewer showing an
+affected animation closes it, stopping on its current frame. Still images are decoded whole and hold no file.
+
+- **Deletion** (`PathDeletion`): the windows stay open without the file. The window whose own removal action failed or
+  was cancelled reloads its file, a player at its previous position.
+- **Darkroom's moves** (renaming an item or a label, a label removal that relocates storage, import moves and
+  renames): `followMovedMediaFiles` concludes them. Players and viewers rebase the paths they list and reopen a released
+  file at its new location, or where it was when its move failed. `Catalog` moves storage itself, so it reports its moves through
+  storage-move handlers that MainWindow installs on `Library`.
+- **Quickroom's transfers**: the moved files are released and not reopened.
 
 ### Oscillating playback
 

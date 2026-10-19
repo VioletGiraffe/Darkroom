@@ -18,6 +18,7 @@
 #include "Windows/ImportExecution.h"
 #include "Windows/LabelManagement.h"
 #include "Windows/LibraryPlayer.h"
+#include "Windows/OpenFileRelease.h"
 #include "Windows/PathDeletion.h"
 #include "Windows/SourceRelocation.h"
 #include "Theme/Theme.h"
@@ -46,7 +47,6 @@ DISABLE_COMPILER_WARNINGS
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QElapsedTimer>
-#include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFont>
@@ -1257,7 +1257,7 @@ void ImportDialog::renameStagedItem(const MediaId& id)
 		return;
 	}
 
-	if (!QFile::rename(entry.path, newPath))
+	if (!renameReleasingOpenFiles(entry.path, newPath))
 	{
 		QMessageBox::warning(this, tr("Rename"), tr("Could not rename the file (it may be open elsewhere):\n%1").arg(QDir::toNativeSeparators(entry.path)));
 		return;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Core/Catalog.h"
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -11,7 +12,6 @@ RESTORE_COMPILER_WARNINGS
 #include <functional>
 #include <memory>
 
-class Catalog;
 class LibraryState;
 class MetadataStore;
 
@@ -44,6 +44,8 @@ public:
 	[[nodiscard]] bool flushPendingWrites(QString* error = nullptr);
 	[[nodiscard]] QString pendingPersistenceError() const;
 	void setPersistenceFailureHandler(std::function<void()> handler);
+	// Kept across setRoot.
+	void setStorageMoveHandlers(Catalog::StorageMoveHandlers handlers);
 	[[nodiscard]] uint64_t generation() const { return _generation; }
 
 	Library(const Library&) = delete;
@@ -59,6 +61,7 @@ signals:
 
 private:
 	std::function<void()> _persistenceFailureHandler;
+	Catalog::StorageMoveHandlers _storageMoveHandlers;
 	std::unique_ptr<LibraryState> _state;
 	uint64_t _generation = 0;
 };

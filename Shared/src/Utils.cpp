@@ -35,6 +35,7 @@ DISABLE_COMPILER_WARNINGS
 RESTORE_COMPILER_WARNINGS
 #endif
 
+#include <algorithm>
 #include <functional>
 
 void clearStuckHoverIfCursorLeft(QWidget* w)
@@ -178,6 +179,35 @@ QString pathComparisonKey(const QString& path)
 {
 	// Callers that must see through aliases canonicalize their shared root before using this lexical key.
 	return QDir::cleanPath(QDir::fromNativeSeparators(path)).toLower();
+}
+
+bool isPathAtOrUnder(const QString& path, const QStringList& roots)
+{
+	if (path.isEmpty())
+		return false;
+
+	const QString key = pathComparisonKey(path);
+	return std::any_of(roots.cbegin(), roots.cend(), [&key](const QString& root) {
+		if (root.isEmpty())
+			return false;
+		const QString rootKey = pathComparisonKey(root);
+		return key == rootKey || key.startsWith(rootKey + '/');
+	});
+}
+
+QString pathAfterMoves(const QString& path, const std::vector<PathMove>& moves)
+{
+	for (const PathMove& move : moves)
+	{
+		if (!isPathAtOrUnder(path, { move.from }))
+			continue;
+
+		// By segment count: lowercasing can change a key's length.
+		const QStringList segments = QDir::cleanPath(QDir::fromNativeSeparators(path)).split('/');
+		const qsizetype fromDepth = pathComparisonKey(move.from).count('/') + 1;
+		return segments.size() == fromDepth ? move.to : move.to + '/' + segments.mid(fromDepth).join('/');
+	}
+	return path;
 }
 
 QChar invalidFilenameChar(const QString& name)

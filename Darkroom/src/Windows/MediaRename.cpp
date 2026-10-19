@@ -1,5 +1,6 @@
 #include "Windows/MediaRename.h"
 #include "Core/Catalog.h"
+#include "Windows/OpenFileRelease.h"
 #include "Utils.h"
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
@@ -12,6 +13,8 @@ DISABLE_COMPILER_WARNINGS
 #include <QLineEdit>
 #include <QMessageBox>
 RESTORE_COMPILER_WARNINGS
+
+#include <vector>
 
 namespace {
 
@@ -27,47 +30,57 @@ bool caseOnlyRenameAllowed([[maybe_unused]] QWidget* parent, [[maybe_unused]] co
 #endif
 }
 
-[[nodiscard]] QString undoRenameOrDescribeFailure(const QString& currentPath, const QString& originalPath)
+// Moves back newest first. Returns a description of the moves that could not be undone, which stay in moves.
+[[nodiscard]] QString undoCompletedMoves(std::vector<PathMove>& moves)
 {
-	if (QFile::rename(currentPath, originalPath))
-		return {};
-	return "\n\n" + QObject::tr("Additionally, this rename could not be undone:\n%1\n→ %2").arg(currentPath, originalPath);
+	QString failures;
+	std::vector<PathMove> notUndone;
+	for (auto move = moves.crbegin(); move != moves.crend(); ++move)
+	{
+		if (QFile::rename(move->to, move->from))
+			continue;
+		failures += "\n\n" + QObject::tr("Additionally, this rename could not be undone:\n%1\n→ %2").arg(move->to, move->from);
+		notUndone.push_back(*move);
+	}
+	moves = std::move(notUndone);
+	return failures;
 }
 
 // Rename disk objects before the catalog, rolling them back if a later step fails.
 Result renameVideo(Catalog& catalog, const MediaId& oldId, const MediaId& newId,
 	const QString& newName, const QString& newSourcePath, const QString& newFolderPath, QWidget* parent)
 {
-	const QString dialogTitle = QObject::tr("Rename media file");
 	const QString oldFolderPath = catalog.folderForMediaItem(oldId);
 	const QString oldSourcePath = catalog.sourcePathForMediaItem(oldId);
-
 	const bool renameSourceFile = !oldSourcePath.isEmpty() && QFile::exists(oldSourcePath);
-	if (renameSourceFile && !QFile::rename(oldSourcePath, newSourcePath))
-	{
-		QMessageBox::critical(parent, dialogTitle, QObject::tr("Failed to rename the source file:\n%1\n→ %2").arg(oldSourcePath, newSourcePath));
-		return {};
-	}
 
-	if (!QFile::rename(oldFolderPath, newFolderPath))
-	{
-		QString message = QObject::tr("Failed to rename the frame folder:\n%1\n→ %2").arg(oldFolderPath, newFolderPath);
+	const QStringList movingPaths{ oldSourcePath, oldFolderPath };
+	std::vector<PathMove> completedMoves;
+	releaseMediaFilesHeldOpen(movingPaths);
+	const QString error = [&]() -> QString {
 		if (renameSourceFile)
-			message += undoRenameOrDescribeFailure(newSourcePath, oldSourcePath);
-		QMessageBox::critical(parent, dialogTitle, message);
-		return {};
-	}
+		{
+			if (!QFile::rename(oldSourcePath, newSourcePath))
+				return QObject::tr("Failed to rename the source file:\n%1\n→ %2").arg(oldSourcePath, newSourcePath);
+			completedMoves.push_back({ oldSourcePath, newSourcePath });
+		}
 
-	if (!catalog.applyRename(oldId, newId, newSourcePath, newFolderPath))
+		if (!QFile::rename(oldFolderPath, newFolderPath))
+			return QObject::tr("Failed to rename the frame folder:\n%1\n→ %2").arg(oldFolderPath, newFolderPath) + undoCompletedMoves(completedMoves);
+		completedMoves.push_back({ oldFolderPath, newFolderPath });
+
+		if (!catalog.applyRename(oldId, newId, newSourcePath, newFolderPath))
+			return QObject::tr("An item with the same name and file size is already tracked under a different label:\n%1").arg(newSourcePath)
+				+ undoCompletedMoves(completedMoves);
+		return {};
+	}();
+	followMovedMediaFiles(movingPaths, completedMoves);
+
+	if (!error.isEmpty())
 	{
-		QString message = QObject::tr("An item with the same name and file size is already tracked under a different label:\n%1").arg(newSourcePath);
-		message += undoRenameOrDescribeFailure(newFolderPath, oldFolderPath);
-		if (renameSourceFile)
-			message += undoRenameOrDescribeFailure(newSourcePath, oldSourcePath);
-		QMessageBox::critical(parent, dialogTitle, message);
+		QMessageBox::critical(parent, QObject::tr("Rename media file"), error);
 		return {};
 	}
-
 	return { .renamed = true, .oldFolderPath = oldFolderPath, .newFolderPath = newFolderPath, .newName = newName };
 }
 
@@ -152,26 +165,29 @@ Result renameVideoInteractive(Catalog& catalog, const MediaId& id, QWidget* pare
 
 Result renamePhoto(Catalog& catalog, const MediaId& oldId, const QString& newSourcePath, QWidget* parent)
 {
-	const QString title = QObject::tr("Rename photo");
 	const QString oldSourcePath = catalog.sourcePathForMediaItem(oldId);
 	const QString folderAbs     = catalog.folderForMediaItem(oldId);
 
-	if (!QFile::rename(oldSourcePath, newSourcePath))
+	const QStringList movingPaths{ oldSourcePath };
+	std::vector<PathMove> completedMoves;
+	releaseMediaFilesHeldOpen(movingPaths);
+	const QString error = [&]() -> QString {
+		if (!QFile::rename(oldSourcePath, newSourcePath))
+			return QObject::tr("Failed to rename the file:\n%1\n→ %2").arg(oldSourcePath, newSourcePath);
+		completedMoves.push_back({ oldSourcePath, newSourcePath });
+
+		if (!catalog.applyRename(oldId, MediaId::fromFile(newSourcePath), newSourcePath, folderAbs))
+			return QObject::tr("An item with the same name and file size is already tracked in the library:\n%1").arg(newSourcePath)
+				+ undoCompletedMoves(completedMoves);
+		return {};
+	}();
+	followMovedMediaFiles(movingPaths, completedMoves);
+
+	if (!error.isEmpty())
 	{
-		QMessageBox::critical(parent, title, QObject::tr("Failed to rename the file:\n%1\n→ %2").arg(oldSourcePath, newSourcePath));
+		QMessageBox::critical(parent, QObject::tr("Rename photo"), error);
 		return {};
 	}
-
-	const MediaId newId = MediaId::fromFile(newSourcePath);
-
-	if (!catalog.applyRename(oldId, newId, newSourcePath, folderAbs))
-	{
-		QString message = QObject::tr("An item with the same name and file size is already tracked in the library:\n%1").arg(newSourcePath);
-		message += undoRenameOrDescribeFailure(newSourcePath, oldSourcePath);
-		QMessageBox::critical(parent, title, message);
-		return {};
-	}
-
 	return { .renamed = true };
 }
 

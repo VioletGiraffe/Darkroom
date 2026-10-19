@@ -1,6 +1,7 @@
 #include "Windows/ImportExecution.h"
 
 #include "Core/Catalog.h"
+#include "Windows/OpenFileRelease.h"
 
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
@@ -17,6 +18,7 @@ RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 #include <ranges>
+#include <vector>
 
 namespace {
 
@@ -125,6 +127,11 @@ std::vector<Import::PhotoResult> ImportExecution::importPhotosInteractive(
 
 	Catalog::BatchScope batch(catalog);
 
+	const bool movingPhotos = mode == Import::PhotoImportMode::Move;
+	if (movingPhotos)
+		releaseMediaFilesHeldOpen(photoPaths);
+	std::vector<PathMove> completedMoves;
+
 	std::vector<Import::PhotoResult> results;
 	results.reserve(photoPaths.size());
 	QStringList failures;
@@ -136,8 +143,13 @@ std::vector<Import::PhotoResult> ImportExecution::importPhotosInteractive(
 		// Referenced photos have no storage folder from which to derive this label.
 		if (result.status == Import::PhotoStatus::Success && mode == Import::PhotoImportMode::Reference)
 			catalog.addLabel(result.registeredId, labelId);
+		// An identical library file adopted in place of a move stands in for the photo left behind.
+		if (result.status == Import::PhotoStatus::Success && movingPhotos)
+			completedMoves.push_back({ path, catalog.sourcePathForMediaItem(result.registeredId) });
 		results.push_back(result);
 	}
+	if (movingPhotos)
+		followMovedMediaFiles(photoPaths, completedMoves);
 	showImportFailures(dialogParent, QObject::tr("The following photos could not be imported:"), failures);
 	return results;
 }

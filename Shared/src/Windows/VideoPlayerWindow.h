@@ -67,6 +67,9 @@ public:
 	static void closeAll();
 	// Players whose video matches drop their source and stay open without it, see releaseMediaFilesHeldOpen.
 	static void releaseFilesMatching(const std::function<bool(const QString& path)>& isAffected);
+	// Rebases the navigation paths by newLocation; a player whose dropped video wasReleased resumes it there. See followMovedMediaFiles.
+	static void followMovedFiles(const std::function<bool(const QString& path)>& wasReleased,
+		const std::function<QString(const QString& path)>& newLocation);
 
 	// Opens a self-managing player.
 	static VideoPlayerWindow* createPlayerWindow(const QString& videoPath, QWidget* parent, MetadataStoreProvider metadataStore = {});
@@ -87,8 +90,8 @@ private:
 	void performRemoval(const RemovalAction& action);
 	// Next item, else previous, else closes the window.
 	void leaveRemovedItem();
-	// Reloads the current file after releaseFilesMatching.
-	void resumeReleasedFile(qint64 positionMs, bool wasPlaying);
+	// Loads videoPath in the playback state releaseFilesMatching recorded.
+	void resumeReleasedFile(const QString& videoPath);
 	void resizeAndMoveWindow();
 	void togglePlayPause();
 	void toggleFullScreen();
@@ -140,6 +143,9 @@ private:
 	RemovalAction _shiftDeleteKeyAction;
 	// Seek target for when the file being loaded becomes seekable.
 	std::optional<qint64> _positionToRestoreMs;
+	// Recorded by releaseFilesMatching for resumeReleasedFile.
+	qint64 _releasedPositionMs = 0;
+	bool _releasedWasPlaying = false;
 
 	QMediaPlayer* _player = nullptr;
 	QAudioOutput* _audioOutput = nullptr;

@@ -3,6 +3,7 @@
 #include "Core/MediaId.h"
 #include "Utils.h"
 #include "Windows/LibraryPlayer.h"
+#include "Windows/OpenFileRelease.h"
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -21,9 +22,19 @@ namespace {
 
 using SourceRelocation::Mode;
 
+// Players and viewers stay open without a deleted file, and reopen one that could not be deleted.
+[[nodiscard]] bool removeReleasingOpenFile(const QString& path)
+{
+	releaseMediaFilesHeldOpen({ path });
+	const bool removed = QFile::remove(path);
+	if (!removed)
+		followMovedMediaFiles({ path }, {});
+	return removed;
+}
+
 [[nodiscard]] QString copyOrMove(QWidget* dialogParent, const QString& srcPath, const QString& destPath, bool isMove)
 {
-	const bool ok = isMove ? QFile{ srcPath }.rename(destPath) : QFile::copy(srcPath, destPath);
+	const bool ok = isMove ? renameReleasingOpenFiles(srcPath, destPath) : QFile::copy(srcPath, destPath);
 	if (!ok)
 	{
 		QMessageBox::warning(dialogParent, QObject::tr("Error"), QObject::tr("Failed to %1:\n%2\nto:\n%3")
@@ -140,7 +151,7 @@ struct RelocationOutcome
 	switch (collisionDialog.result())
 	{
 	case FileCollisionDialog::Result::Overwrite:
-		if (!QFile::remove(destPath))
+		if (!removeReleasingOpenFile(destPath))
 		{
 			QMessageBox::warning(dialogParent, QObject::tr("Error"), QObject::tr("Failed to overwrite existing file:\n%1").arg(destPath));
 			return { path, false };
@@ -148,7 +159,7 @@ struct RelocationOutcome
 		return { copyOrMove(dialogParent, path, destPath, isMove), false };
 
 	case FileCollisionDialog::Result::SkipAndDelete:
-		if (!QFile::remove(path))
+		if (!removeReleasingOpenFile(path))
 			QMessageBox::warning(dialogParent, QObject::tr("Error"), QObject::tr("Failed to delete duplicate file:\n%1").arg(path));
 		return { {}, false };
 

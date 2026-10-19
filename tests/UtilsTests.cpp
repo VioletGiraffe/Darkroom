@@ -24,3 +24,24 @@ TEST_CASE("listFrameImageFiles: matches every image suffix case-insensitively, e
 	files.sort();
 	REQUIRE(files == QStringList({ "B.JPG", "a.jpg", "c.jpeg", "d.PNG", "e.tif", "f.TIFF" }));
 }
+
+TEST_CASE("isPathAtOrUnder: the root itself and its descendants, case- and separator-insensitively", "[utils]")
+{
+	const QStringList roots{ "C:/Lib/Photos/Cats" };
+	REQUIRE(isPathAtOrUnder("C:/Lib/Photos/Cats", roots));
+	REQUIRE(isPathAtOrUnder("c:\\lib\\photos\\cats\\a.gif", roots));
+	REQUIRE_FALSE(isPathAtOrUnder("C:/Lib/Photos/Catsup/a.gif", roots)); // a sibling sharing the name prefix
+	REQUIRE_FALSE(isPathAtOrUnder("C:/Lib/Photos", roots));
+	REQUIRE_FALSE(isPathAtOrUnder("", roots));
+	REQUIRE_FALSE(isPathAtOrUnder("/x", { "" }));
+}
+
+TEST_CASE("pathAfterMoves: rebases the moved path and its descendants, keeping the descendants' spelling", "[utils]")
+{
+	const std::vector<PathMove> moves{ { "C:/Lib/Photos/Cats", "C:/Lib/Photos/Kittens" }, { "C:/v/clip.mp4", "C:/v/renamed.mp4" } };
+	REQUIRE(pathAfterMoves("C:/Lib/Photos/Cats", moves) == "C:/Lib/Photos/Kittens");
+	REQUIRE(pathAfterMoves("c:/lib/photos/cats/Sub/A.gif", moves) == "C:/Lib/Photos/Kittens/Sub/A.gif");
+	REQUIRE(pathAfterMoves("C:\\v\\clip.mp4", moves) == "C:/v/renamed.mp4");
+	REQUIRE(pathAfterMoves("C:/Lib/Photos/Catsup/a.gif", moves) == "C:/Lib/Photos/Catsup/a.gif");
+	REQUIRE(pathAfterMoves("", moves).isEmpty());
+}

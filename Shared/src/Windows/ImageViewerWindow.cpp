@@ -78,9 +78,36 @@ void ImageViewerWindow::releaseFilesMatching(const std::function<bool(const QStr
 {
 	for (ImageViewerWindow* viewer : _instances)
 	{
-		if (isAffected(viewer->currentPath()))
+		if (viewer->_view->isAnimated() && isAffected(viewer->currentPath()))
+		{
 			viewer->_view->closeFile();
+			viewer->_animationReleased = true;
+		}
 	}
+}
+
+void ImageViewerWindow::followMovedFiles(const std::function<bool(const QString& path)>& wasReleased,
+	const std::function<QString(const QString& path)>& newLocation)
+{
+	for (ImageViewerWindow* viewer : _instances)
+	{
+		const bool reopen = wasReleased(viewer->currentPath());
+		for (QString& path : viewer->_imagePaths)
+			path = newLocation(path);
+
+		viewer->setWindowTitle(QFileInfo{ viewer->currentPath() }.completeBaseName());
+		if (reopen)
+			viewer->resumeReleasedAnimation();
+	}
+}
+
+void ImageViewerWindow::resumeReleasedAnimation()
+{
+	if (!_animationReleased)
+		return;
+
+	_animationReleased = false;
+	_view->displayImage(currentPath(), false);
 }
 
 ImageViewerWindow::ImageViewerWindow(QStringList imagePaths, int startIndex, QWidget* parent)
@@ -187,6 +214,7 @@ void ImageViewerWindow::showImage(int index)
 		return;
 	}
 
+	_animationReleased = false;
 	_index = index;
 	setWindowTitle(QFileInfo{ path }.completeBaseName());
 	_windowIconTimer->start();
@@ -264,12 +292,9 @@ void ImageViewerWindow::copyImageAndFileToClipboard()
 
 void ImageViewerWindow::removeCurrentImage(const std::function<bool(int index)>& remove)
 {
-	const bool wasAnimated = _view->isAnimated();
 	if (!remove(_index))
 	{
-		// Released for a file operation that then failed or was cancelled
-		if (wasAnimated && !_view->isAnimated())
-			_view->displayImage(currentPath(), false); // resumes the animation
+		resumeReleasedAnimation(); // released for a file operation that then failed or was cancelled
 		return;
 	}
 

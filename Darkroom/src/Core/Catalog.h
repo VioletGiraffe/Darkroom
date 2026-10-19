@@ -3,6 +3,7 @@
 #include "Core/LabelId.h"
 #include "Core/MediaId.h"
 #include "Core/MetadataStore.h"  // BatchScope holds a MetadataStore::Writer by value
+#include "Utils.h"
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -11,6 +12,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QList>
 #include <QSet>
 #include <QString>
+#include <QStringList>
 #include <QStringView>
 RESTORE_COMPILER_WARNINGS
 
@@ -179,6 +181,15 @@ public:
 	// Persists a video's completed split; unknown and already-complete ids no-op.
 	void markSplitComplete(const MediaId& id);
 
+	// Called around each move of item storage on disk: a label removal relocating an item, a label rename. Both optional.
+	struct StorageMoveHandlers
+	{
+		// Receives the paths about to move.
+		std::function<void(const QStringList& paths)> beforeMove;
+		// Receives the same paths and the moves that completed; a failed or undone move is absent.
+		std::function<void(const QStringList& paths, const std::vector<PathMove>& completedMoves)> afterMove;
+	};
+
 	Catalog(const Catalog&) = delete;
 	Catalog& operator=(const Catalog&) = delete;
 
@@ -192,6 +203,11 @@ private:
 	[[nodiscard]] const QString& pendingRegistrySaveError() const { return _pendingRegistrySaveError; }
 	void setPersistenceFailureHandler(std::function<void()> handler) { _persistenceFailureHandler = std::move(handler); }
 	void setCatalogChangeHandler(std::function<void()> handler) { _catalogChangeHandler = std::move(handler); }
+	void setStorageMoveHandlers(StorageMoveHandlers handlers) { _storageMoveHandlers = std::move(handlers); }
+	void notifyBeforeStorageMove(const QStringList& paths) const;
+	void notifyAfterStorageMove(const QStringList& paths, const std::vector<PathMove>& completedMoves) const;
+	// A single QFile::rename between the two notifications.
+	[[nodiscard]] bool moveStorage(const QString& from, const QString& to) const;
 	void notifyCatalogChanged();
 	void finishChangeBatch();
 	void ensureBestAndFolderLabels();
@@ -229,6 +245,7 @@ private:
 	QString               _pendingRegistrySaveError;
 	std::function<void()> _persistenceFailureHandler;
 	std::function<void()> _catalogChangeHandler;
+	StorageMoveHandlers   _storageMoveHandlers;
 	int                   _catalogChangeBatchDepth = 0;
 	bool                  _catalogChangePending = false;
 };

@@ -17,6 +17,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QJsonValue>
 #include <QObject>
 #include <QRandomGenerator>
+#include <QScopeGuard>
 RESTORE_COMPILER_WARNINGS
 
 #include <utility>
@@ -89,6 +90,26 @@ void Catalog::notifyCatalogChanged()
 	}
 	if (_catalogChangeHandler)
 		_catalogChangeHandler();
+}
+
+void Catalog::notifyBeforeStorageMove(const QStringList& paths) const
+{
+	if (_storageMoveHandlers.beforeMove)
+		_storageMoveHandlers.beforeMove(paths);
+}
+
+void Catalog::notifyAfterStorageMove(const QStringList& paths, const std::vector<PathMove>& completedMoves) const
+{
+	if (_storageMoveHandlers.afterMove)
+		_storageMoveHandlers.afterMove(paths, completedMoves);
+}
+
+bool Catalog::moveStorage(const QString& from, const QString& to) const
+{
+	notifyBeforeStorageMove({ from });
+	const bool moved = QFile::rename(from, to);
+	notifyAfterStorageMove({ from }, moved ? std::vector<PathMove>{ { from, to } } : std::vector<PathMove>{});
+	return moved;
 }
 
 void Catalog::finishChangeBatch()
@@ -718,7 +739,7 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, LabelId removedLabelId)
 			return;
 		}
 		assert_r(QDir{}.mkpath(destDir));
-		if (!QFile::rename(entryIt->sourcePath, newFilePath))
+		if (!moveStorage(entryIt->sourcePath, newFilePath))
 		{
 			qWarning() << "Catalog: failed to relocate" << entryIt->sourcePath << "to" << newFilePath;
 			return;
@@ -745,7 +766,7 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, LabelId removedLabelId)
 			return;
 		}
 		assert_r(QDir{}.mkpath(destStorageFolder));
-		if (!QFile::rename(entryIt->folder, newFolderAbs))
+		if (!moveStorage(entryIt->folder, newFolderAbs))
 		{
 			qWarning() << "Catalog: failed to relocate" << entryIt->folder << "to" << newFolderAbs;
 			return;
@@ -853,19 +874,41 @@ bool Catalog::renameLabel(LabelId labelId, const QString& newDisplayName, QStrin
 		qWarning() << "Catalog: cannot rename" << oldName << "to" << newName << "- a folder by that name already exists";
 		return fail(QObject::tr("A folder for label '%1' already exists.").arg(newName));
 	}
-	if (haveStorageFolder && !QFile::rename(oldFolder, newFolder))
+	QStringList movingFolders;
+	if (haveStorageFolder)
+		movingFolders.push_back(oldFolder);
+	if (havePhotoDir)
+		movingFolders.push_back(oldPhotoDir);
+	std::vector<PathMove> completedMoves;
+	notifyBeforeStorageMove(movingFolders);
+	const auto notifyAfterMove = qScopeGuard([&] { notifyAfterStorageMove(movingFolders, completedMoves); });
+
+	if (haveStorageFolder)
 	{
-		qWarning() << "Catalog: failed to rename folder" << oldFolder << "to" << newFolder;
-		return fail(QObject::tr("Could not rename the label folder:\n%1").arg(QDir::toNativeSeparators(oldFolder)));
+		if (!QFile::rename(oldFolder, newFolder))
+		{
+			qWarning() << "Catalog: failed to rename folder" << oldFolder << "to" << newFolder;
+			return fail(QObject::tr("Could not rename the label folder:\n%1").arg(QDir::toNativeSeparators(oldFolder)));
+		}
+		completedMoves.push_back({ oldFolder, newFolder });
 	}
-	if (havePhotoDir && !QFile::rename(oldPhotoDir, newPhotoDir))
+	if (havePhotoDir)
 	{
-		qWarning() << "Catalog: failed to rename folder" << oldPhotoDir << "to" << newPhotoDir;
-		QString message = QObject::tr("Could not rename the label's photo folder:\n%1").arg(QDir::toNativeSeparators(oldPhotoDir));
-		// Keep both backing directories under one name.
-		if (haveStorageFolder && !QFile::rename(newFolder, oldFolder))
-			message += "\n\n" + QObject::tr("Additionally, the label folder could not be renamed back and remains at:\n%1").arg(QDir::toNativeSeparators(newFolder));
-		return fail(message);
+		if (!QFile::rename(oldPhotoDir, newPhotoDir))
+		{
+			qWarning() << "Catalog: failed to rename folder" << oldPhotoDir << "to" << newPhotoDir;
+			QString message = QObject::tr("Could not rename the label's photo folder:\n%1").arg(QDir::toNativeSeparators(oldPhotoDir));
+			// Keep both backing directories under one name.
+			if (haveStorageFolder)
+			{
+				if (QFile::rename(newFolder, oldFolder))
+					completedMoves.clear();
+				else
+					message += "\n\n" + QObject::tr("Additionally, the label folder could not be renamed back and remains at:\n%1").arg(QDir::toNativeSeparators(newFolder));
+			}
+			return fail(message);
+		}
+		completedMoves.push_back({ oldPhotoDir, newPhotoDir });
 	}
 
 	// Rewrite paths before rebuilding, including case-drifted entries, or the old folder label would be reseeded.

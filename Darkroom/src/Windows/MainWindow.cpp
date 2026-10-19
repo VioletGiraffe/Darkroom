@@ -8,6 +8,7 @@
 #include "UiComponents/MediaBrowserWidget.h"
 #include "Windows/ImportDialog.h"
 #include "Windows/LogViewerDialog.h"
+#include "Windows/OpenFileRelease.h"
 #include "Windows/SettingsDialog.h"
 #include "Core/MediaId.h"
 #include "Windows/VideoPlayerWindow.h"
@@ -149,6 +150,7 @@ MainWindow::MainWindow(QWidget* parent)
 
 	setupUI();
 	_library.setPersistenceFailureHandler([this] { schedulePersistenceFailureWarning(); });
+	_library.setStorageMoveHandlers({ .beforeMove = releaseMediaFilesHeldOpen, .afterMove = followMovedMediaFiles });
 
 	// restoreSettings() performs the initial grid build after applying the saved filters.
 	QMetaObject::invokeMethod(this, [this] {

@@ -181,6 +181,11 @@ public:
 		catalog.setCatalogChangeHandler(std::move(handler));
 	}
 
+	void setStorageMoveHandlers(Catalog::StorageMoveHandlers handlers)
+	{
+		catalog.setStorageMoveHandlers(std::move(handlers));
+	}
+
 private:
 	friend class Library;
 
@@ -238,6 +243,7 @@ bool Library::setRoot(const QString& root, QString* error)
 		return false;
 	replacement->setPersistenceFailureHandler(_persistenceFailureHandler);
 	replacement->setCatalogChangeHandler([this] { emit catalogChanged(); });
+	replacement->setStorageMoveHandlers(_storageMoveHandlers);
 	_state = std::move(replacement);
 	++_generation;
 	qInfo() << "Library: opened, catalog folder" << QDir::toNativeSeparators(_state->rootFolder);
@@ -298,4 +304,11 @@ void Library::setPersistenceFailureHandler(std::function<void()> handler)
 		_state->setPersistenceFailureHandler(_persistenceFailureHandler);
 	if (_persistenceFailureHandler && !pendingPersistenceError().isEmpty())
 		_persistenceFailureHandler();
+}
+
+void Library::setStorageMoveHandlers(Catalog::StorageMoveHandlers handlers)
+{
+	_storageMoveHandlers = std::move(handlers);
+	if (_state)
+		_state->setStorageMoveHandlers(_storageMoveHandlers);
 }
