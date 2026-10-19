@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792436281983,
+  "lastUpdate": 1792436288591,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -14092,6 +14092,85 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/VioletGiraffe/Darkroom/commit/0ddc86d73837c316cb26532567e0eedb2fa24452"
         },
         "date": 1792436277376,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 15850,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1122,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 28150,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3405.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 2856.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2868.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 406,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 50,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 44,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 12,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "0ddc86d73837c316cb26532567e0eedb2fa24452",
+          "message": "Missing-field-initializer warnings disabled as in the libraries; Qt frameworks are system headers on macOS",
+          "timestamp": "2026-10-19T21:48:11+03:00",
+          "tree_id": "b6120aaacf839aa1ed06254b4089fa9553c17230",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/0ddc86d73837c316cb26532567e0eedb2fa24452"
+        },
+        "date": 1792436286172,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
