@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792372876836,
+  "lastUpdate": 1792425302056,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -13900,6 +13900,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 44.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 12,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "86407095e89c4ec10df386ad1baa912e3653edc6",
+          "message": "Viewer and player report current paths to their hosts, which derive item ids from them, so items renamed while open stay addressable",
+          "timestamp": "2026-10-19T18:45:00+03:00",
+          "tree_id": "12e9bb85ec4b21f55aef62344e113da3489ec89a",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/86407095e89c4ec10df386ad1baa912e3653edc6"
+        },
+        "date": 1792425299254,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 15783,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1122,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 28150,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3404.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 2855.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2868,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 405.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 50,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 44,
             "unit": "KB"
           },
           {
