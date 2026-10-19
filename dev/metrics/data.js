@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792450264166,
+  "lastUpdate": 1792450296508,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -14329,6 +14329,85 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/VioletGiraffe/Darkroom/commit/f349e19a1311e1cdbcc2873261fcbe333f3afed8"
         },
         "date": 1792450261232,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 15889,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1167,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 28156,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3413.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 2870,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2874.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 408,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 50,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 44,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 12,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "d28fa0e1c1d4d65d87112a8de2d4498f4bd6881a",
+          "message": "Quickroom IconTileWidget: proper resizing + cache for the icons",
+          "timestamp": "2026-10-20T01:42:08+03:00",
+          "tree_id": "78d0a2ceb897af4606fce0049728b675f61c7605",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/d28fa0e1c1d4d65d87112a8de2d4498f4bd6881a"
+        },
+        "date": 1792450293479,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
