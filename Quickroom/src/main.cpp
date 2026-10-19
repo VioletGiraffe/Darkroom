@@ -9,6 +9,7 @@
 #include "crashhandler/CCrashHandler.h"
 #include "compiler/compiler_warnings_control.h"
 #include "logger/cloggerinmemory.h"
+#include "timing/profiler.h"
 #include "utility/macro_utils.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
@@ -158,6 +159,12 @@ int main(int argc, char* argv[])
 	AdvancedAssert::setLoggingFunc([](const char* msg) {
 		::memoryLogMessageHandler(QtWarningMsg, QMessageLogContext{}, msg);
 	});
+
+#ifdef PROFILING_ENABLED
+	Profiler::setLoggingFunc([](const char* msg) {
+		::memoryLogMessageHandler(QtInfoMsg, QMessageLogContext{}, msg);
+	});
+#endif
 
 	Q_INIT_RESOURCE(shared);
 

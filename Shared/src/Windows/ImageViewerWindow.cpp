@@ -121,11 +121,8 @@ ImageViewerWindow::ImageViewerWindow(QStringList imagePaths, int startIndex, QWi
 	setCentralWidget(_view);
 	_view->installEventFilter(this);
 
-	const ImageProcessing::ParallelForFn parallelFor = [](size_t count, const std::function<void(size_t)>& body) {
-		cpuThreadPool().parallelFor(count, body);
-	};
-	_view->setImageScaler([parallelFor](QImage& dest, const QImage& source, const QRect& srcRect) {
-		if (!ImageProcessing::resize(dest, source, srcRect, parallelFor))
+	_view->setImageScaler([](QImage& dest, const QImage& source, const QRect& srcRect) {
+		if (!ImageProcessing::resize(dest, source, srcRect, cpuParallelFor))
 			CImageViewerWidget::smoothScaleQt(dest, source, srcRect);
 	});
 

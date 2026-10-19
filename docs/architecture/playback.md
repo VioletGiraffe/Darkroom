@@ -22,8 +22,8 @@ one item, Compare selected for several), passing frame-folder paths.
 
 `ImageViewerWindow` is a self-deleting viewer over qtutils' `CImageViewerWidget`, which owns the pan/zoom view,
 the scaling, and the info overlay; the window supplies the menu bar and the browsing order.
-Scaling goes through `ImageProcessing::resize` and falls back to `CImageViewerWidget::smoothScale` for pixel
-formats the resizer has no view for. Its chunks run on `cpuThreadPool()`, which also runs work on the calling
+Scaling goes through `ImageProcessing::resize` and falls back to `CImageViewerWidget::smoothScaleQt` for pixel
+formats the resizer rejects. Its chunks run on `cpuThreadPool()`, which also runs work on the calling
 thread - the GUI thread is blocked for the duration of a scale either way.
 
 Each viewer opens fullscreen and is parentless, for a taskbar button of its own; a modal caller owns the window

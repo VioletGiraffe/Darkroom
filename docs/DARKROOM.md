@@ -43,7 +43,7 @@ Each is its own include root except where noted:
 
 | Submodule | Supplies here |
 |---|---|
-| `cpputils` | `assert/advanced_assert.h`, `CThreadPool`, interruptible threads, storage-speed detection |
+| `cpputils` | `assert/advanced_assert.h`, `CThreadPool`, interruptible threads, storage-speed detection, `timing/profiler.h` (compiled in when `PROFILING_ENABLED` is defined) |
 | `cpp-template-utils` | header-only: compiler-warning control macros, `macro_utils.h`, hashing |
 | `qtutils` | theme machinery (`CThemeController`, `CBasePalette`, tinted icon engine, `themeicon:/`, style fixups), `CImageViewerWidget`, `CFlowLayout`, natural sort, `CLoggerInMemory`, settings/about dialog bases, message-box helpers |
 | `magic-alignment` (root `src/`) | automatic photo alignment fits for PhotoCompareWindow |

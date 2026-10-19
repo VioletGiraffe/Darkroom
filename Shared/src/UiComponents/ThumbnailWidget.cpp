@@ -1,26 +1,34 @@
 #include "UiComponents/ThumbnailWidget.h"
+#include "Core/CpuThreadPool.h"
 #include "Core/IoThreadPool.h"
 #include "Theme/Theme.h"
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
+#include "timing/profiler.h"
 
 DISABLE_COMPILER_WARNINGS
+#include "resize/qimage_resize.h"
+
 #include <QBuffer>
 #include <QByteArray>
 #include <QColor>
 #include <QFile>
-#include <QImageIOHandler>
 #include <QImageReader>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
-#include <QRunnable>
-#include <QThreadPool>
 #include <QTimer>
 #include <QUrl>
 #include <QWheelEvent>
 RESTORE_COMPILER_WARNINGS
+
+#ifdef PROFILING_ENABLED
+DISABLE_COMPILER_WARNINGS
+#include <QDebug>
+#include <QScopeGuard>
+RESTORE_COMPILER_WARNINGS
+#endif
 
 #include <memory>
 #include <mutex>
@@ -31,6 +39,56 @@ static constexpr int THUMBNAIL_LABEL_HEIGHT = 20;
 
 // Avoid reading cards merely flicked past during scrolling.
 static constexpr int LOAD_DWELL_MS = 100;
+
+#ifdef PROFILING_ENABLED
+// One per load job, released when its decode ends or the job is disarmed.
+// A batch lasts while any job holds a token: its wall time is the time to fill a screenful of thumbnails.
+class LoadBatchToken
+{
+public:
+	LoadBatchToken()
+	{
+		Batch& b = batch();
+		std::lock_guard lock{ b.mutex };
+		if (b.jobsInFlight++ == 0)
+		{
+			b.jobs = 0;
+			b.wall.start();
+		}
+		++b.jobs;
+	}
+
+	~LoadBatchToken()
+	{
+		Batch& b = batch();
+		std::lock_guard lock{ b.mutex };
+		if (--b.jobsInFlight != 0)
+			return;
+
+		qInfo().nospace() << "Thumbnail batch: " << b.jobs << " jobs in " << b.wall.nsElapsed() / 1e6 << " ms";
+		PROFILE_REPORT_COUNTERS();
+		PROFILE_RESET_COUNTERS();
+	}
+
+	LoadBatchToken(const LoadBatchToken&) = delete;
+	LoadBatchToken& operator=(const LoadBatchToken&) = delete;
+
+private:
+	struct Batch
+	{
+		std::mutex mutex;
+		int jobsInFlight = 0;
+		int jobs = 0;
+		CTimeElapsed wall;
+	};
+
+	static Batch& batch()
+	{
+		static Batch instance;
+		return instance;
+	}
+};
+#endif
 
 // Shared lifetime spans I/O and decode. Widget pointers and _disarmed are mutex-protected because the GUI may
 // disarm while a stage runs; the remaining fields are immutable after posting.
@@ -44,109 +102,103 @@ struct ThumbnailWidget::LoadJob {
 	QStringList _paths;
 	QSize _canvasLogical;
 	qreal _dpr = 1.0;
+#ifdef PROFILING_ENABLED
+	std::unique_ptr<LoadBatchToken> _batchToken; // Mutex-protected
+#endif
 };
 
 namespace {
 	// Decode and compose outside the lock; lock only the final widget-state install.
-	struct DecodeStage final : public QRunnable {
-		DecodeStage(std::shared_ptr<ThumbnailWidget::LoadJob> job, std::vector<QByteArray> bytes, QString readError)
-			: _job{ std::move(job) }, _bytes{ std::move(bytes) }, _readError{ std::move(readError) }
+	void decodeStage(const std::shared_ptr<ThumbnailWidget::LoadJob>& jobPtr, std::vector<QByteArray>& bytesPerPath, const QString& readError)
+	{
+#ifdef PROFILING_ENABLED
+		// Declared before the sample: the batch must not end before the sample is counted.
+		const auto releaseBatchToken = qScopeGuard([&] {
+			std::lock_guard lock{ jobPtr->_mutex };
+			jobPtr->_batchToken.reset();
+		});
+#endif
+		PROFILE_SAMPLE("Thumbnail decode");
+		ThumbnailWidget::LoadJob& job = *jobPtr;
+		if (bytesPerPath.empty() || job._canvasLogical.isEmpty() || job._dpr <= 0.0)
+			return;
+
+		const int n = static_cast<int>(bytesPerPath.size());
+		const int slotWidth = (job._canvasLogical.width() - (n - 1) * FOLDER_PREVIEW_GAP) / n;
+		const int slotHeight = job._canvasLogical.height();
+		if (slotWidth <= 0 || slotHeight <= 0)
+			return;
+
+		// Decoded at full resolution: all scaling goes through ImageProcessing::resize, not the reader's own (JPEG DCT reduction, QImage::scaled).
+		struct Fitted { QImage img; QSize logicalSize; };
+		std::vector<Fitted> fitted;
+		fitted.reserve(n);
+		QString firstError = readError;
+		for (QByteArray& bytes : bytesPerPath)
 		{
-		}
+			QBuffer buffer(&bytes);
+			buffer.open(QIODevice::ReadOnly);
+			QImageReader reader(&buffer);  // A format hint would suppress content detection.
+			reader.setAutoTransform(true); // read() returns the image in its displayed orientation
 
-		void run() override {
-			ThumbnailWidget::LoadJob& job = *_job;
-			if (_bytes.empty() || job._canvasLogical.isEmpty() || job._dpr <= 0.0)
-				return;
-
-			const int n = static_cast<int>(_bytes.size());
-			const int slotWidth = (job._canvasLogical.width() - (n - 1) * FOLDER_PREVIEW_GAP) / n;
-			const int slotHeight = job._canvasLogical.height();
-			if (slotWidth <= 0 || slotHeight <= 0)
-				return;
-
-			// Decode near the fitted physical size: cheaper and less aliased than full decode + one large scale.
-			// Fit in EXIF-oriented dimensions, but pass transposed stored dimensions to the reader.
-			struct Fitted { QImage img; QSize logicalSize; };
-			std::vector<Fitted> fitted;
-			fitted.reserve(n);
-			QString firstError = _readError;
-			for (int i = 0; i < n; ++i)
+			const QImage src = reader.read();
+			if (src.isNull())
 			{
-				QByteArray& bytes = _bytes[static_cast<size_t>(i)];
-				QBuffer buffer(&bytes);
-				buffer.open(QIODevice::ReadOnly);
-				QImageReader reader(&buffer);  // A format hint would suppress content detection.
-				reader.setAutoTransform(true);
-
-				const QSize rawSize = reader.size();
-				if (rawSize.isEmpty())
-				{
-					if (firstError.isEmpty())
-						firstError = reader.errorString();
-					continue;
-				}
-
-				const bool swapsWH = reader.transformation().testFlag(QImageIOHandler::TransformationRotate90);
-				const QSize displayedSize = swapsWH ? rawSize.transposed() : rawSize;
-				const QSize logicalSize   = displayedSize.scaled(QSize(slotWidth, slotHeight), Qt::KeepAspectRatio);
-				const QSize physicalSize  = (QSizeF(logicalSize) * job._dpr).toSize();
-				reader.setScaledSize(swapsWH ? physicalSize.transposed() : physicalSize);
-
-				const QImage src = reader.read();
-				if (!src.isNull())
-					fitted.push_back({ src, logicalSize });
-				else if (firstError.isEmpty())
+				if (firstError.isEmpty())
 					firstError = reader.errorString();
+				continue;
 			}
 
-			// An empty result still installs below, clearing any previously shown frame.
-			QImage canvas;
-			if (!fitted.empty())
-			{
-				int totalWidth = (static_cast<int>(fitted.size()) - 1) * FOLDER_PREVIEW_GAP;
-				int totalHeight = 0;
-				for (const Fitted& f : std::as_const(fitted))
-				{
-					totalWidth += f.logicalSize.width();
-					totalHeight = qMax(totalHeight, f.logicalSize.height());
-				}
-
-				canvas = QImage((QSizeF(totalWidth, totalHeight) * job._dpr).toSize(), QImage::Format_ARGB32_Premultiplied);
-				canvas.fill(Qt::transparent);
-				canvas.setDevicePixelRatio(job._dpr);
-
-				QPainter painter(&canvas);
-				painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-				int x = 0;
-				for (const Fitted& f : std::as_const(fitted))
-				{
-					painter.drawImage(QRect(QPoint(x, (totalHeight - f.logicalSize.height()) / 2), f.logicalSize), f.img);
-					x += f.logicalSize.width() + FOLDER_PREVIEW_GAP;
-				}
-			}
-
-			// disarm() shares this lock, so _parent remains valid through the queued invocation.
-			std::lock_guard lock{ job._mutex };
-			if (job._disarmed || !job._target)
-				return;
-			if (!fitted.empty())
-				*job._target = std::move(canvas);
-			else if (job._errorMsg)
-			{
-				assert_r(!firstError.isEmpty());
-				*job._errorMsg = ThumbnailWidget::tr("Failed to load:") + '\n' + firstError;
-			}
-			QMetaObject::invokeMethod(job._parent, [parent = job._parent] {
-				parent->updateGeometry();
-				parent->update();
-			}, Qt::QueuedConnection);
+			const QSize logicalSize = src.size().scaled(QSize(slotWidth, slotHeight), Qt::KeepAspectRatio);
+			const QSize physicalSize = (QSizeF(logicalSize) * job._dpr).toSize();
+			QImage scaled{ physicalSize, src.format() };
+			if (!ImageProcessing::resize(scaled, src, {}, cpuParallelFor))
+				scaled = src.scaled(physicalSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+			fitted.push_back({ std::move(scaled), logicalSize });
 		}
 
-		std::shared_ptr<ThumbnailWidget::LoadJob> _job;
-		std::vector<QByteArray> _bytes;
-		QString _readError;
-	};
+		// An empty result still installs below, clearing any previously shown frame.
+		QImage canvas;
+		if (!fitted.empty())
+		{
+			int totalWidth = (static_cast<int>(fitted.size()) - 1) * FOLDER_PREVIEW_GAP;
+			int totalHeight = 0;
+			for (const Fitted& f : std::as_const(fitted))
+			{
+				totalWidth += f.logicalSize.width();
+				totalHeight = qMax(totalHeight, f.logicalSize.height());
+			}
+
+			canvas = QImage((QSizeF(totalWidth, totalHeight) * job._dpr).toSize(), QImage::Format_ARGB32_Premultiplied);
+			canvas.fill(Qt::transparent);
+			canvas.setDevicePixelRatio(job._dpr);
+
+			QPainter painter(&canvas);
+			painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+			int x = 0;
+			for (const Fitted& f : std::as_const(fitted))
+			{
+				painter.drawImage(QRect(QPoint(x, (totalHeight - f.logicalSize.height()) / 2), f.logicalSize), f.img);
+				x += f.logicalSize.width() + FOLDER_PREVIEW_GAP;
+			}
+		}
+
+		// disarm() shares this lock, so _parent remains valid through the queued invocation.
+		std::lock_guard lock{ job._mutex };
+		if (job._disarmed || !job._target)
+			return;
+		if (!fitted.empty())
+			*job._target = std::move(canvas);
+		else if (job._errorMsg)
+		{
+			assert_r(!firstError.isEmpty());
+			*job._errorMsg = ThumbnailWidget::tr("Failed to load:") + '\n' + firstError;
+		}
+		QMetaObject::invokeMethod(job._parent, [parent = job._parent] {
+			parent->updateGeometry();
+			parent->update();
+		}, Qt::QueuedConnection);
+	}
 
 	// The I/O stage touches only the job, then hands bytes to the CPU pool.
 	void readStage(const std::shared_ptr<ThumbnailWidget::LoadJob>& jobPtr)
@@ -161,16 +213,20 @@ namespace {
 		std::vector<QByteArray> bytes;
 		QString firstReadError;
 		bytes.reserve(job._paths.size());
-		for (const QString& path : std::as_const(job._paths))
 		{
-			QFile file(path);
-			if (file.open(QIODevice::ReadOnly))
-				bytes.push_back(file.readAll());
-			else
+			// Ends before the decode is posted: the batch must not end before the sample is counted.
+			PROFILE_SAMPLE("Thumbnail read");
+			for (const QString& path : std::as_const(job._paths))
 			{
-				bytes.emplace_back();
-				if (firstReadError.isEmpty())
-					firstReadError = file.errorString();
+				QFile file(path);
+				if (file.open(QIODevice::ReadOnly))
+					bytes.push_back(file.readAll());
+				else
+				{
+					bytes.emplace_back();
+					if (firstReadError.isEmpty())
+						firstReadError = file.errorString();
+				}
 			}
 		}
 
@@ -179,7 +235,9 @@ namespace {
 			if (job._disarmed)
 				return;
 		}
-		QThreadPool::globalInstance()->start(new DecodeStage{ jobPtr, std::move(bytes), std::move(firstReadError) });
+		cpuThreadPool().enqueue([jobPtr, bytes = std::move(bytes), readError = std::move(firstReadError)]() mutable {
+			decodeStage(jobPtr, bytes, readError);
+		});
 	}
 
 	// Transparent composite gaps expose the black film base; sprockets occupy the reserved bands.
@@ -316,6 +374,9 @@ void ThumbnailWidget::scheduleRender()
 		? QSize(_maxSize.width(), qMax(1, _maxSize.height() - 2 * filmStripBandHeight(_maxSize.height())))
 		: _maxSize;
 	_job->_dpr = _renderDpr;
+#ifdef PROFILING_ENABLED
+	_job->_batchToken = std::make_unique<LoadBatchToken>();
+#endif
 	// Deliberately untagged: blocking retire() per thumbnail would serialize grid teardown; disarming makes it safe.
 	IoThreadPool::enqueue(_sourcePaths.value(0), [job = _job] { readStage(job); });
 }
@@ -511,6 +572,9 @@ void ThumbnailWidget::disarmAsyncTask()
 		_job->_parent = nullptr;
 		_job->_target = nullptr;
 		_job->_errorMsg = nullptr;
+#ifdef PROFILING_ENABLED
+		_job->_batchToken.reset();
+#endif
 	}
 	_job.reset();
 }

@@ -57,10 +57,13 @@ Actual loading has two stages:
 
 1. File reads go through `Core::IoThreadPool`, which routes fast storage to bounded parallel workers and slow,
    external, network, or unknown storage to a shared serial worker.
-2. CPU decoding runs on the shared compute pool.
+2. CPU decoding runs on `cpuThreadPool()`.
 
-`QImageReader` decodes toward the target size and applies orientation metadata, avoiding a full-resolution decode
-and the aliasing produced by a single large post-decode reduction.
+`QImageReader` decodes at full resolution and applies orientation metadata; `ImageProcessing::resize` then scales to
+the target size, its slices also on `cpuThreadPool()`.
+
+With `PROFILING_ENABLED` defined, each batch of overlapping loads logs its wall time and the read and decode totals:
+the time to fill a screenful of thumbnails.
 
 Cards are initially parentless, so their real screen and device-pixel ratio may not yet be known. Scheduling captures
 the current ratio; painting rechecks it after attachment and reschedules rendering when the context changed.
