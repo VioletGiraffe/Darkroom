@@ -53,6 +53,10 @@ The canonical persisted key combines size with the lowercased filename. Its fold
 contract: changing it would orphan existing records. Name-and-size identity can collide for different bytes, so
 staging and registration treat such collisions explicitly rather than assuming content equality.
 
+Files or folders whose names differ only in letter case are unsupported on every platform: `MediaId` and
+`pathComparisonKey` fold case by design. Case-only media renames are refused on case-sensitive file systems. Qt name
+filters match case-insensitively on all platforms unless `QDir::CaseSensitive` is passed.
+
 Media ids are derived rather than assigned; there is no separate file-to-id registry to synchronize.
 
 ## LabelId
