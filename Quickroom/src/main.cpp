@@ -144,11 +144,11 @@ int main(int argc, char* argv[])
 
 	Style::install();
 
-	// Several paths: the first one wins.
-	openStartupWindow(QDir::fromNativeSeparators(app.arguments().value(1)));
+	// Take the first argument as a path to open, if any
+	openStartupWindow(QDir::fromNativeSeparators(app.arguments().value(1, /*default:*/{})));
 
 	const int result = app.exec();
-	// I/O first: a read completing there hands its decode to the compute pool.
+	// Image reads transition from the IO pool to the CPU pool, so IO has to be shut down first
 	IoThreadPool::finishAllThreads();
 	cpuThreadPool().finishAllThreads();
 	return result;
