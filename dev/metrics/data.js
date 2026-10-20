@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792504398551,
+  "lastUpdate": 1792510139665,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -14754,6 +14754,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .text",
             "value": 2880.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 411,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 50,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 44.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 12,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "a470817c12d93a549314806e5c5c783ec9a4f716",
+          "message": "Quickroom: selected tiles tinted instead of a selection ring around them, tiles 5 px apart; the ring's cell margin, metrics and frame widget removed, both grids' spacing moved to Theme::Metrics, and MediaGrid repolishes only the card on selection changes",
+          "timestamp": "2026-10-20T18:18:04+03:00",
+          "tree_id": "1a664593ece3d5cdc17813ba7dd02d0d553fee4f",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/a470817c12d93a549314806e5c5c783ec9a4f716"
+        },
+        "date": 1792510136816,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 15964,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1479,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 28165,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3422,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 2952,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2879.5,
             "unit": "KB"
           },
           {
