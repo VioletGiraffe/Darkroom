@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792510139665,
+  "lastUpdate": 1792530522895,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -14848,6 +14848,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 44.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 12,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "01193cf7940f8680ca14196bc9f77a438347dba7",
+          "message": "ThumbnailWidget split into presentation and image sources: a variant of value-type sources (ImageFilesSource holding the read/decode pipeline, IconSource replacing Quickroom's IconTileWidget) with renderNow/renderAsync and a cancelling Request; file drag opt-in, layout-sized widgets re-render on resize",
+          "timestamp": "2026-10-20T23:57:05+03:00",
+          "tree_id": "46d48f286f2274ce906296c06dbea895401797d7",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/01193cf7940f8680ca14196bc9f77a438347dba7"
+        },
+        "date": 1792530520054,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 16146,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1355,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 28165,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3432,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 2953.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2887,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 412.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 50.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 45,
             "unit": "KB"
           },
           {
