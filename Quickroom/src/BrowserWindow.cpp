@@ -29,6 +29,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QFile>
+#include <QFileDialog>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
 #include <QGraphicsOpacityEffect>
@@ -43,6 +44,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPointer>
+#include <QPushButton>
 #include <QSettings>
 #include <QShortcut>
 #include <QStandardPaths>
@@ -247,6 +249,14 @@ void BrowserWindow::setupUi()
 		navigateTo(QDir::fromNativeSeparators(_pathEdit->text().trimmed()));
 	});
 	headerLayout->addWidget(_pathEdit, 1);
+
+	auto* browseButton = new QPushButton(tr("Browse..."));
+	browseButton->setFocusPolicy(Qt::NoFocus);
+	connect(browseButton, &QPushButton::clicked, this, [this] {
+		if (const QString folder = QFileDialog::getExistingDirectory(this, tr("Open folder"), _currentPath); !folder.isEmpty())
+			navigateTo(folder);
+	});
+	headerLayout->addWidget(browseButton);
 	headerLayout->addSpacing(8);
 
 	_nameFilter = new NameFilterField();
