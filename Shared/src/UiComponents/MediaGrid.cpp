@@ -48,18 +48,13 @@ void paintDragCountBadge(QPixmap& pixmap, int count)
 	p.drawText(badge, Qt::AlignCenter, QString::number(count));
 }
 
-// A dynamic property change recomputes no stylesheet rule by itself, and the rule cache is per widget: descendants
-// styled through the card's state must be repolished along with it.
+// A dynamic property change recomputes no stylesheet rule by itself.
+// Only the card is repolished, so no stylesheet rule may style a card's descendants by its state.
 void setCardSelected(QWidget& card, bool selected)
 {
 	card.setProperty("selected", selected);
-	QList<QWidget*> widgets = card.findChildren<QWidget*>();
-	widgets.push_back(&card);
-	for (QWidget* w : widgets)
-	{
-		w->style()->unpolish(w);
-		w->style()->polish(w);
-	}
+	card.style()->unpolish(&card);
+	card.style()->polish(&card);
 	card.update();
 }
 
@@ -76,7 +71,7 @@ MediaGrid::MediaGrid(QWidget* parent)
 	setMovement(QListView::Static);
 	setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
 	setSelectionMode(QAbstractItemView::ExtendedSelection);
-	setSpacing(10);
+	setSpacing(Theme::current().metrics.mediaGridSpacing);
 }
 
 void MediaGrid::setDragUrlsProvider(std::function<QList<QUrl>(const QList<QListWidgetItem*>&)> provider)

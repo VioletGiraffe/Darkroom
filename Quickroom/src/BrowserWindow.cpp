@@ -73,31 +73,10 @@ constexpr int DEFAULT_TILE_SIZE = 160;
 constexpr int MIN_TILE_SIZE  = 80;
 constexpr int MAX_TILE_SIZE  = 400;
 constexpr int TILE_SIZE_STEP = 20;
-int selectionRing()
-{
-	return Theme::current().metrics.tileSelectionRing;
-}
 
 int savedTileSize()
 {
 	return qBound(MIN_TILE_SIZE, QSettings{}.value(TILE_SIZE_KEY, DEFAULT_TILE_SIZE).toInt(), MAX_TILE_SIZE);
-}
-
-QSize cellSize(int tile)
-{
-	const int side = tile + 2 * selectionRing();
-	return { side, side };
-}
-
-// A plain QWidget paints no background of its own, so the cell's selection background shows through the margin.
-QWidget* inSelectionFrame(QWidget* tile)
-{
-	auto* frame = new QWidget();
-	auto* layout = new QVBoxLayout(frame);
-	const int ring = selectionRing();
-	layout->setContentsMargins(ring, ring, ring, ring);
-	layout->addWidget(tile);
-	return frame;
 }
 
 // A cut file's tile is drawn faded, as file managers draw theirs.
@@ -278,7 +257,8 @@ void BrowserWindow::setupUi()
 	connect(refreshShortcut, &QShortcut::activated, this, &BrowserWindow::refresh);
 
 	_grid = new MediaGrid();
-	_grid->setObjectName("tileGrid");   // the central sheet rounds this grid's cells to the ring, replacing MediaGrid's own name
+	_grid->setObjectName("tileGrid");   // the central sheet leaves this grid's cells unpainted, replacing MediaGrid's own name
+	_grid->setSpacing(Theme::current().metrics.tileGridSpacing);
 	_grid->setUniformItemSizes(true);
 	_grid->setDragEnabled(true);
 	_grid->setCardFactory([this](QListWidgetItem* item) { return buildTile(item); });
@@ -382,7 +362,7 @@ bool BrowserWindow::listDirectory(const QString& path)
 		_folderWatcher->removePaths(watched);
 	_folderWatcher->addPath(_currentPath);
 
-	const QSize cell = cellSize(_tileSize);
+	const QSize cell{ _tileSize, _tileSize };
 	for (FolderEntry& entry : *entries)
 	{
 		auto* item = new GridEntry(std::move(entry), _sortControl->order());
@@ -492,7 +472,7 @@ void BrowserWindow::refresh()
 		changed = true;
 	}
 
-	const QSize cell = cellSize(_tileSize);
+	const QSize cell{ _tileSize, _tileSize };
 	for (auto& [path, entry] : onDisk)
 	{
 		auto* item = new GridEntry(std::move(entry), _sortControl->order());
@@ -806,10 +786,9 @@ QWidget* BrowserWindow::buildTile(QListWidgetItem* item)
 	const auto onContextMenu = [this, path = entry.path, isFolder = entry.kind == EntryKind::Folder](QWidget* tile, QPoint pos) {
 		showEntryContextMenu(path, isFolder, tile->mapToGlobal(pos));
 	};
-	const auto asCard = [this, &entry](QWidget* tile) {
-		QWidget* card = inSelectionFrame(tile);
-		setCutMark(card, isCut(entry.path));
-		return card;
+	const auto withCutMark = [this, &entry](QWidget* tile) {
+		setCutMark(tile, isCut(entry.path));
+		return tile;
 	};
 
 	if (entry.kind == EntryKind::Image)
@@ -819,7 +798,7 @@ QWidget* BrowserWindow::buildTile(QListWidgetItem* item)
 		thumb->setOnActivatedCallback([this, path = entry.path] { viewImage(path); });
 		thumb->setOnMouseWheelCallback(onWheel);
 		connect(thumb, &QWidget::customContextMenuRequested, this, [thumb, onContextMenu](QPoint pos) { onContextMenu(thumb, pos); });
-		return asCard(thumb);
+		return withCutMark(thumb);
 	}
 
 	auto* tile = new IconTileWidget(_iconProvider.icon(QFileInfo(entry.path)), entry.name, _tileSize, nullptr);
@@ -834,7 +813,7 @@ QWidget* BrowserWindow::buildTile(QListWidgetItem* item)
 		tile->setOnActivatedCallback([this, path = entry.path] { playVideo(path); });
 	tile->setOnMouseWheelCallback(onWheel);
 	connect(tile, &QWidget::customContextMenuRequested, this, [tile, onContextMenu](QPoint pos) { onContextMenu(tile, pos); });
-	return asCard(tile);
+	return withCutMark(tile);
 }
 
 void BrowserWindow::zoomTiles(int steps)
@@ -850,7 +829,7 @@ void BrowserWindow::zoomTiles(int steps)
 
 void BrowserWindow::applyTileSize()
 {
-	const QSize cell = cellSize(_tileSize);
+	const QSize cell{ _tileSize, _tileSize };
 	for (int row = 0, rows = _grid->count(); row < rows; ++row)
 		_grid->item(row)->setSizeHint(cell);
 	_grid->discardAllCards();

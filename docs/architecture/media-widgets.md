@@ -16,7 +16,8 @@ resulting structural refresh may delete the receiving card.
 Cards never originate source-file drags; the owning `MediaGrid` exports the current view selection. Keeping outgoing
 drag at the view preserves native multi-selection behavior while the card remains responsible only for incoming label
 drops. The grid also mirrors each row's selection onto its card as a `selected` dynamic property, which the central
-stylesheet styles; cards hold no selection logic.
+stylesheet styles; cards hold no selection logic. Only the card is repolished on a change, so those rules style the
+card itself, never its descendants.
 
 Photo and video cards share a configured image height but have different fixed widths. Photos are square; a video's
 strip spans the selected number of photo columns including grid gaps. This makes mixed media align on one column grid.

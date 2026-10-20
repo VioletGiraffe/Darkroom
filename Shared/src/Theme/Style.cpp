@@ -104,11 +104,12 @@ constexpr char kLists[] = R"(
 	QListWidget { border: 1px solid %border%; border-radius: %controlRadius%px; background: transparent; outline: none; }
 	QListWidget::item:selected { background-color: %accentBg%; border-radius: %controlRadius%px; }
 
-	/* The grids tint hovered cells themselves, so the platform style's hover highlight never shows under the cards.
-	   The id selectors outrank the generic selected rule above, so the grids restate the selected tint. */
-	QListWidget#mediaGrid::item:hover, QListWidget#tileGrid::item:hover { background-color: %cellHoverBg%; border-radius: %controlRadius%px; }
-	QListWidget#mediaGrid::item:selected, QListWidget#tileGrid::item:selected { background-color: %accentBg%; }
-	QListWidget#tileGrid::item:hover, QListWidget#tileGrid::item:selected { border-radius: %tileCellRadius%px; }
+	/* The grids style hovered cells themselves, so the platform style's hover highlight never shows under the cards.
+	   The id selectors outrank the generic selected rule above.
+	   Quickroom's opaque tiles fill their cells and show their own selection, so its cells paint nothing. */
+	QListWidget#mediaGrid::item:hover { background-color: %cellHoverBg%; border-radius: %controlRadius%px; }
+	QListWidget#mediaGrid::item:selected { background-color: %accentBg%; }
+	QListWidget#tileGrid::item:hover, QListWidget#tileGrid::item:selected { background-color: transparent; }
 )";
 
 constexpr char kScrollBars[] = R"(
@@ -188,7 +189,7 @@ constexpr char kToolTips[] = R"(
 )";
 
 // Per-card stylesheets create a QStyleSheetStyle proxy per widget and make grid rebuilds expensive.
-// "selected" is the dynamic property MediaGrid keeps on each card; Quickroom's card is a frame around the tile.
+// "selected" is the dynamic property MediaGrid keeps on each card; Quickroom's card is the tile itself.
 constexpr char kGridCards[] = R"(
 	QWidget#mediaItemCard { background: transparent; border: 1px solid %borderSubtle%; border-radius: %controlRadius%px; }
 	QWidget#mediaItemCard:hover { border-color: %selectionBg%; border-width: 2px; }
@@ -198,7 +199,7 @@ constexpr char kGridCards[] = R"(
 
 	QWidget#framedThumbnail { background-color: %thumbnailMatte%; border: 1px solid %borderSubtle%; border-radius: %controlRadius%px; padding: 2px; font-size: 9pt; }
 	QWidget#framedThumbnail:hover { border-color: %selectionBg%; border-width: 2px; }
-	QWidget[selected="true"] QWidget#framedThumbnail { border-color: %selectionBg%; }
+	QWidget#framedThumbnail[selected="true"] { background-color: %accentBg%; border-color: %selectionBg%; }
 )";
 
 constexpr char kStarButtons[] = R"(
@@ -243,7 +244,6 @@ QString styleSheetString()
 		{ QStringLiteral("%menuItemRadius%"),           QString::number(m.menuItemRadius) },
 		{ QStringLiteral("%checkboxRadius%"),           QString::number(m.checkboxRadius) },
 		{ QStringLiteral("%thumbnailMatteRadius%"),     QString::number(m.thumbnailMatteRadius) },
-		{ QStringLiteral("%tileCellRadius%"),           QString::number(m.tileCellRadius()) },
 		{ QStringLiteral("%scrollBarThickness%"),       QString::number(m.scrollBarThickness) },
 		{ QStringLiteral("%scrollBarHandleRadius%"),    QString::number(m.scrollBarHandleRadius()) },
 		{ QStringLiteral("%sliderGrooveThickness%"),    QString::number(m.sliderGrooveThickness) },
