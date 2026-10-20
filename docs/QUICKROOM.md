@@ -15,7 +15,7 @@ the coding conventions.
 - `main.cpp` - Darkroom's bootstrap shape minus the library, plus the startup routing below. Its own
   application identity ("Quickroom") keeps its QSettings separate from Darkroom's; the keys in `Settings.h` fall back to
   Darkroom's values until Quickroom stores its own.
-- `BrowserWindow` - the main window: navigation toolbar (back/forward/up, editable path field, `SortControl`),
+- `BrowserWindow` - the main window: navigation header (back/forward/up, editable path field, `SortControl`),
   `MediaGrid` of tiles, status-bar counts. Owns the navigation history. Self-deleting, created through
   `showForFolder`, which resolves the folder to open and can select one entry in it.
 - `FolderListing` - the folder's entries, listed through thin_io: folders and supported media files, without hidden

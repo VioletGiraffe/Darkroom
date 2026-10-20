@@ -15,6 +15,7 @@
 #include "widgets/cpersistenceenabler.h"
 
 DISABLE_COMPILER_WARNINGS
+#include <QAction>
 #include <QClipboard>
 #include <QDateTime>
 #include <QDir>
@@ -26,6 +27,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QFileSystemWatcher>
 #include <QGraphicsOpacityEffect>
 #include <QGuiApplication>
+#include <QHBoxLayout>
 #include <QKeySequence>
 #include <QLineEdit>
 #include <QListWidgetItem>
@@ -41,9 +43,10 @@ DISABLE_COMPILER_WARNINGS
 #include <QStorageInfo>
 #include <QStyle>
 #include <QTimer>
-#include <QToolBar>
+#include <QToolButton>
 #include <QUrl>
 #include <QVBoxLayout>
+#include <QWidget>
 RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
@@ -195,28 +198,43 @@ BrowserWindow::BrowserWindow(const QString& folder)
 
 void BrowserWindow::setupUi()
 {
-	QToolBar* toolbar = addToolBar(tr("Navigation"));
-	toolbar->setMovable(false);
+	auto* header = new QWidget();
+	auto* headerLayout = new QHBoxLayout(header);
+	headerLayout->setContentsMargins(4, 4, 4, 4);
+	headerLayout->setSpacing(4);
 
-	_backAction = toolbar->addAction(style()->standardIcon(QStyle::SP_ArrowBack), tr("Back"), this, &BrowserWindow::goBack);
+	// The actions belong to the window, so their shortcuts work wherever the focus is.
+	const int navigationIconSize = style()->pixelMetric(QStyle::PM_ToolBarIconSize);
+	const auto addNavigationButton = [&](QStyle::StandardPixmap icon, const QString& text, void (BrowserWindow::*navigate)()) {
+		QAction* action = addAction(style()->standardIcon(icon), text, this, navigate);
+		auto* button = new QToolButton();
+		button->setDefaultAction(action);
+		button->setAutoRaise(true);
+		button->setFocusPolicy(Qt::NoFocus);
+		button->setIconSize({ navigationIconSize, navigationIconSize });
+		headerLayout->addWidget(button);
+		return action;
+	};
+	_backAction = addNavigationButton(QStyle::SP_ArrowBack, tr("Back"), &BrowserWindow::goBack);
 	_backAction->setShortcuts(QKeySequence::Back);
-	_forwardAction = toolbar->addAction(style()->standardIcon(QStyle::SP_ArrowForward), tr("Forward"), this, &BrowserWindow::goForward);
+	_forwardAction = addNavigationButton(QStyle::SP_ArrowForward, tr("Forward"), &BrowserWindow::goForward);
 	_forwardAction->setShortcuts(QKeySequence::Forward);
-	_upAction = toolbar->addAction(style()->standardIcon(QStyle::SP_ArrowUp), tr("Up"), this, &BrowserWindow::goUp);
+	_upAction = addNavigationButton(QStyle::SP_ArrowUp, tr("Up"), &BrowserWindow::goUp);
 	_upAction->setShortcut(QKeySequence(Qt::Key_Backspace));
 
 	_pathEdit = new QLineEdit();
 	connect(_pathEdit, &QLineEdit::returnPressed, this, [this] {
 		navigateTo(QDir::fromNativeSeparators(_pathEdit->text().trimmed()));
 	});
-	toolbar->addWidget(_pathEdit);
+	headerLayout->addWidget(_pathEdit, 1);
+	headerLayout->addSpacing(8);
 
 	_sortControl = new SortControl(BROWSER_SORT_SETTINGS_GROUP, {}, /* favoritesEnabled */ false);
 	connect(_sortControl, &SortControl::changed, this, [this] {
 		_grid->sortItems(Qt::AscendingOrder);
 		_grid->ensureVisibleCardsExist();
 	});
-	toolbar->addWidget(_sortControl);
+	headerLayout->addWidget(_sortControl);
 
 	auto* refreshShortcut = new QShortcut(QKeySequence::Refresh, this);
 	connect(refreshShortcut, &QShortcut::activated, this, &BrowserWindow::refresh);
@@ -252,7 +270,14 @@ void BrowserWindow::setupUi()
 			showBackgroundContextMenu(globalPos);
 	});
 	_grid->viewport()->installEventFilter(this);
-	setCentralWidget(_grid);
+
+	auto* central = new QWidget();
+	auto* centralLayout = new QVBoxLayout(central);
+	centralLayout->setContentsMargins(0, 0, 0, 0);
+	centralLayout->setSpacing(0);
+	centralLayout->addWidget(header);
+	centralLayout->addWidget(_grid);
+	setCentralWidget(central);
 	setAcceptDrops(true);
 
 	// Grid-only: the path field keeps its own keys.
