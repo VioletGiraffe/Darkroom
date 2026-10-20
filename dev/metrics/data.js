@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792455075550,
+  "lastUpdate": 1792496432671,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -14532,6 +14532,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 44,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 12,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "234eac415b46d06a600659c78548b68a26b16127",
+          "message": "Sort popup: no system drop shadow around its transparent margin; a press on the sort button only closes it, through WA_NoMouseReplay instead of a reopen timer",
+          "timestamp": "2026-10-20T14:18:06+03:00",
+          "tree_id": "7c083c20cc06638461ab5517a0b46f0314811da9",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/234eac415b46d06a600659c78548b68a26b16127"
+        },
+        "date": 1792496427483,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 15958,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1252,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 28165,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3416,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 2894.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2877,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 407.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 50,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 44.5,
             "unit": "KB"
           },
           {
