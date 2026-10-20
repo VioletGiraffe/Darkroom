@@ -36,7 +36,6 @@ DISABLE_COMPILER_WARNINGS
 #include <QDateTime>
 #include <QDesktopServices>
 #include <QDir>
-#include <QElapsedTimer>
 #include <QFile>
 #include <QHBoxLayout>
 #include <QItemSelectionModel>
@@ -617,9 +616,6 @@ void MediaBrowserWidget::restoreSettings()
 	// The wrapped grid's final geometry is available only after post-show resize events. Build rows then, restore
 	// the persisted position against that layout, and only afterward materialize the cards around it.
 	QMetaObject::invokeMethod(this, [this, scrollAnchorKey] {
-		QElapsedTimer timer;
-		timer.start();
-
 		rebuildGridRows();
 		scrollGridToAnchorKey(scrollAnchorKey);
 		_mediaGrid->ensureVisibleCardsExist();
