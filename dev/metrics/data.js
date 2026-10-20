@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792450296508,
+  "lastUpdate": 1792455075550,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -14443,6 +14443,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 408,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 50,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 44,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 12,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "7cc979a5233d03f8e557bbeead1b8214ce250b8a",
+          "message": "CPU pool sized to logical processors minus one: SMT measurably speeds up thumbnail decoding",
+          "timestamp": "2026-10-20T03:01:48+03:00",
+          "tree_id": "098f0df6a6300cb6e112743306018bf2be2faaf2",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/7cc979a5233d03f8e557bbeead1b8214ce250b8a"
+        },
+        "date": 1792455072730,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 15955,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1173,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 28165,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3414.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 2870,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2876,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 407.5,
             "unit": "KB"
           },
           {
