@@ -6,5 +6,6 @@
 		<file>UI/icon_volume.svg</file>
 		<file>UI/icon_volume_muted.svg</file>
 		<file>UI/icon_sort.svg</file>
+		<file>UI/icon_search.svg</file>
 	</qresource>
 </RCC>

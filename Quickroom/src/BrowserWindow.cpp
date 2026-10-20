@@ -4,6 +4,7 @@
 #include "IconTileWidget.h"
 #include "Theme/Theme.h"
 #include "UiComponents/MediaGrid.h"
+#include "UiComponents/NameFilterField.h"
 #include "UiComponents/SortControl.h"
 #include "UiComponents/ThumbnailWidget.h"
 #include "Windows/ImageViewerWindow.h"
@@ -147,17 +148,29 @@ int sortedInsertionRow(const QListWidget& grid, const GridEntry& entry)
 	return *std::ranges::partition_point(std::views::iota(0, grid.count()), [&](int row) { return *grid.item(row) < entry; });
 }
 
-// Paths of the grid's entries of kind, in listing order.
-QStringList listedPathsOfKind(const QListWidget& grid, EntryKind kind)
+// Paths of the shown entries of kind, in grid order.
+QStringList shownPathsOfKind(const QListWidget& grid, EntryKind kind)
 {
 	QStringList paths;
 	for (int row = 0, rows = grid.count(); row < rows; ++row)
 	{
 		const auto& entry = static_cast<const GridEntry&>(*grid.item(row));
-		if (entry.kind == kind)
+		if (entry.kind == kind && !entry.isHidden())
 			paths.push_back(entry.path);
 	}
 	return paths;
+}
+
+// The first shown item at or after row, else the last shown one before it.
+QListWidgetItem* nearestShownItem(const QListWidget& grid, int row)
+{
+	for (int next = row, rows = grid.count(); next < rows; ++next)
+		if (!grid.item(next)->isHidden())
+			return grid.item(next);
+	for (int previous = row - 1; previous >= 0; --previous)
+		if (!grid.item(previous)->isHidden())
+			return grid.item(previous);
+	return nullptr;
 }
 
 // path itself when it is a folder, else its closest ancestor that is; a filesystem root when none is.
@@ -229,6 +242,14 @@ void BrowserWindow::setupUi()
 	headerLayout->addWidget(_pathEdit, 1);
 	headerLayout->addSpacing(8);
 
+	_nameFilter = new NameFilterField();
+	connect(_nameFilter, &QLineEdit::textChanged, this, &BrowserWindow::applyNameFilter);
+	headerLayout->addWidget(_nameFilter);
+	new QShortcut(QKeySequence::Find, this, [this] {
+		_nameFilter->setFocus();
+		_nameFilter->selectAll();
+	});
+
 	_sortControl = new SortControl(BROWSER_SORT_SETTINGS_GROUP, {}, /* favoritesEnabled */ false);
 	connect(_sortControl, &SortControl::changed, this, [this] {
 		_grid->sortItems(Qt::AscendingOrder);
@@ -243,7 +264,6 @@ void BrowserWindow::setupUi()
 	_grid->setObjectName("tileGrid");   // the central sheet rounds this grid's cells to the ring, replacing MediaGrid's own name
 	_grid->setUniformItemSizes(true);
 	_grid->setDragEnabled(true);
-	_grid->setEmptyMessage(tr("No folders or supported media files here."));
 	_grid->setCardFactory([this](QListWidgetItem* item) { return buildTile(item); });
 	_grid->setDragUrlsProvider([](const QList<QListWidgetItem*>& items) {
 		QList<QUrl> urls;
@@ -336,11 +356,10 @@ bool BrowserWindow::listDirectory(const QString& path)
 	}
 	_grid->sortItems(Qt::AscendingOrder);
 	_grid->scrollToTop();
-	_grid->ensureVisibleCardsExist();
+	applyNameFilter();
 
 	_pathEdit->setText(QDir::toNativeSeparators(_currentPath));
 	setWindowTitle((dir.dirName().isEmpty() ? QDir::toNativeSeparators(_currentPath) : dir.dirName()) + QStringLiteral(" - Quickroom"));
-	updateStatusCounts();
 	QSettings{}.setValue(LAST_FOLDER_KEY, _currentPath);
 	return true;
 }
@@ -447,10 +466,15 @@ void BrowserWindow::refresh()
 		changed = true;
 	}
 
-	if (!changed)
-		return;
+	if (changed)
+		applyNameFilter();
+}
+
+void BrowserWindow::applyNameFilter()
+{
+	_grid->filterRows([this](const QListWidgetItem& item) { return _nameFilter->matches(static_cast<const GridEntry&>(item).name); });
 	_grid->ensureVisibleCardsExist();
-	updateStatusCounts();
+	updateCountsAndEmptyMessage();
 }
 
 void BrowserWindow::updateNavigationActions()
@@ -476,7 +500,7 @@ void BrowserWindow::activateEntry(const QListWidgetItem* item)
 
 void BrowserWindow::viewImage(const QString& path)
 {
-	const QStringList imagePaths = listedPathsOfKind(*_grid, EntryKind::Image);
+	const QStringList imagePaths = shownPathsOfKind(*_grid, EntryKind::Image);
 	const int startIndex = static_cast<int>(imagePaths.indexOf(path));
 	assert_and_return_r(startIndex >= 0, );
 
@@ -497,7 +521,7 @@ void BrowserWindow::playVideo(const QString& path)
 
 	VideoPlayerWindow* const player = VideoPlayerWindow::createPlayerWindow(path, nullptr);
 	FileOperations::installDeleteActions(*player, entryRemover());
-	player->setNavigation(listedPathsOfKind(*_grid, EntryKind::Video), pathSelector());
+	player->setNavigation(shownPathsOfKind(*_grid, EntryKind::Video), pathSelector());
 }
 
 std::function<void(const QString& path)> BrowserWindow::entryRemover()
@@ -672,7 +696,7 @@ void BrowserWindow::selectAndScrollToPath(const QString& path)
 	for (int row = 0, rows = _grid->count(); row < rows; ++row)
 	{
 		QListWidgetItem* item = _grid->item(row);
-		if (static_cast<const GridEntry*>(item)->path != path)
+		if (item->isHidden() || static_cast<const GridEntry*>(item)->path != path)
 			continue;
 		_grid->setCurrentItem(item);
 		_grid->scrollToItem(item);
@@ -708,25 +732,36 @@ void BrowserWindow::removeEntries(const QSet<QString>& paths)
 	if (rowAfterLastRemoved < 0)
 		return;
 
-	if (QListWidgetItem* next = _grid->item(std::min(rowAfterLastRemoved, _grid->count() - 1)))
+	if (QListWidgetItem* next = nearestShownItem(*_grid, rowAfterLastRemoved))
 		_grid->setCurrentItem(next);
 	_grid->ensureVisibleCardsExist();
-	updateStatusCounts();
+	updateCountsAndEmptyMessage();
 }
 
-void BrowserWindow::updateStatusCounts()
+void BrowserWindow::updateCountsAndEmptyMessage()
 {
-	int folders = 0, images = 0, videos = 0;
+	int folders = 0, images = 0, videos = 0, hidden = 0;
 	for (int row = 0, rows = _grid->count(); row < rows; ++row)
 	{
-		switch (static_cast<const GridEntry*>(_grid->item(row))->kind)
+		const auto& entry = static_cast<const GridEntry&>(*_grid->item(row));
+		if (entry.isHidden())
+		{
+			++hidden;
+			continue;
+		}
+		switch (entry.kind)
 		{
 		case EntryKind::Folder: ++folders; break;
 		case EntryKind::Image:  ++images;  break;
 		case EntryKind::Video:  ++videos;  break;
 		}
 	}
-	statusBar()->showMessage(tr("%1 folders, %2 images, %3 videos").arg(folders).arg(images).arg(videos));
+
+	QString counts = tr("%1 folders, %2 images, %3 videos").arg(folders).arg(images).arg(videos);
+	if (hidden > 0)
+		counts += tr(", %1 hidden by filter").arg(hidden);
+	statusBar()->showMessage(counts);
+	_grid->setEmptyMessage(hidden > 0 ? tr("No names match the filter.") : tr("No folders or supported media files here."));
 }
 
 QWidget* BrowserWindow::buildTile(QListWidgetItem* item)

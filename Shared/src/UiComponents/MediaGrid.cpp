@@ -8,7 +8,9 @@ DISABLE_COMPILER_WARNINGS
 #include <QDrag>
 #include <QFont>
 #include <QItemSelection>
+#include <QItemSelectionModel>
 #include <QMimeData>
+#include <QModelIndex>
 #include <QPainter>
 #include <QPixmap>
 #include <QResizeEvent>
@@ -136,6 +138,26 @@ void MediaGrid::discardAllCards()
 		setItemWidget(item(row), nullptr);
 }
 
+void MediaGrid::filterRows(const std::function<bool(const QListWidgetItem&)>& isShown)
+{
+	QItemSelection hiddenSelected;
+	for (int row = 0, rows = count(); row < rows; ++row)
+	{
+		QListWidgetItem* rowItem = item(row);
+		const bool hide = !isShown(*rowItem);
+		rowItem->setHidden(hide);
+		if (hide && rowItem->isSelected())
+		{
+			const QModelIndex index = indexFromItem(rowItem);
+			hiddenSelected.select(index, index);
+		}
+	}
+	selectionModel()->select(hiddenSelected, QItemSelectionModel::Deselect);
+
+	if (const QListWidgetItem* current = currentItem(); current && current->isHidden())
+		selectionModel()->setCurrentIndex({}, QItemSelectionModel::NoUpdate);
+}
+
 void MediaGrid::setEmptyMessage(const QString& message)
 {
 	if (_emptyMessage == message)
@@ -195,6 +217,14 @@ void MediaGrid::selectionChanged(const QItemSelection& selected, const QItemSele
 		for (const QModelIndex& index : delta->indexes())
 			if (QWidget* card = itemWidget(itemFromIndex(index)))
 				setCardSelected(*card, delta == &selected);
+
+	// Select-all and Shift range selections span hidden rows.
+	QItemSelection hiddenSelected;
+	for (const QModelIndex& index : selected.indexes())
+		if (isIndexHidden(index))
+			hiddenSelected.select(index, index);
+	if (!hiddenSelected.isEmpty())
+		selectionModel()->select(hiddenSelected, QItemSelectionModel::Deselect);
 }
 
 void MediaGrid::startDrag(Qt::DropActions /*supportedActions*/)

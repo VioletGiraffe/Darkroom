@@ -85,6 +85,9 @@ Grid population queries the live Catalog model and never reloads persistence or 
 wrapping layout, selection model, keyboard navigation, drag-and-drop, and focus behavior. Replacing it with a plain
 flow layout would require explicit equivalents for all of those capabilities.
 
+Hidden rows are never selected: `MediaGrid` drops them from select-all and range selections, so actions on the
+selection reach only visible items.
+
 Enabling drag on the item view preserves a multi-selection through press-and-move, allowing the whole selection to
 export together. `MediaGrid::startDrag` exports source-file URLs; Catalog knowledge remains in
 `MediaBrowserWidget`, which supplies the URL provider. MainWindow rejects drags originating from this grid in its

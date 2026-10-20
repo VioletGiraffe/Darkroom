@@ -13,8 +13,9 @@ class QResizeEvent;
 class QUrl;
 
 // Icon-mode media grid that exports the selected source URLs by drag and paints an empty message when
-// no item is visible. MediaBrowserWidget supplies the data sources; the view contains no catalog logic.
+// no item is visible. Its owner supplies the data sources; the view contains no catalog logic.
 // Every card carries a "selected" dynamic property mirroring its row, so the central sheet can style the selected state.
+// Hidden rows are never selected, so actions on the selection never reach them.
 class MediaGrid final : public QListWidget {
 public:
 	explicit MediaGrid(QWidget* parent = nullptr);
@@ -34,6 +35,9 @@ public:
 
 	// Drops every card; ensureVisibleCardsExist() rebuilds the ones still on screen.
 	void discardAllCards();
+
+	// Hides the rows isShown rejects and shows the rest. A hidden current row stops being current.
+	void filterRows(const std::function<bool(const QListWidgetItem&)>& isShown);
 
 	void setEmptyMessage(const QString& message);
 

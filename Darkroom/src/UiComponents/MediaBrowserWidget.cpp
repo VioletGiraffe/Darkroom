@@ -4,12 +4,11 @@
 #include "DarkroomSettings.h"
 #include "Shortcuts.h"
 #include "DarkroomShortcuts.h"
-#include "Theme/Theme.h"
-#include "theme/ctintedsvgiconengine.h"
 #include "UiComponents/LabelVisuals.h"
 #include "UiComponents/LabelSidebar.h"
 #include "UiComponents/MediaGrid.h"
 #include "UiComponents/MediaItemWidget.h"
+#include "UiComponents/NameFilterField.h"
 #include "UiComponents/PreviewFrameCountCombo.h"
 #include "UiComponents/SegmentedToggle.h"
 #include "UiComponents/SortControl.h"
@@ -183,16 +182,6 @@ std::vector<MediaId> visibleItemsInViewOrder(const QListWidget* grid, const Cata
 	return items;
 }
 
-// A leading '^' anchors the otherwise substring-based, case-insensitive match.
-bool nameMatchesFilter(const QString& name, const QString& query)
-{
-	if (query.isEmpty())
-		return true;
-	if (query.startsWith('^'))
-		return name.startsWith(query.mid(1), Qt::CaseInsensitive);
-	return name.contains(query, Qt::CaseInsensitive);
-}
-
 } // namespace
 
 struct MediaBrowserWidget::GridViewState
@@ -249,12 +238,7 @@ void MediaBrowserWidget::setupUi()
 	headerLayout->setContentsMargins(0, 4, 4, 4);
 	headerLayout->setSpacing(4);
 
-	_nameFilter = new QLineEdit();
-	_nameFilter->setPlaceholderText(tr("filter by name..."));
-	_nameFilter->setClearButtonEnabled(true);
-	_nameFilter->setMinimumWidth(220);
-	_nameFilter->addAction(tintedSvgIcon(QStringLiteral(":/UI/icon_search.svg"), [] { return Theme::current().palette.textDim; }),
-		QLineEdit::LeadingPosition);
+	_nameFilter = new NameFilterField();
 	connect(_nameFilter, &QLineEdit::textChanged, this, &MediaBrowserWidget::applyNameFilter);
 	headerLayout->addWidget(_nameFilter, 0, Qt::AlignVCenter);
 
@@ -944,15 +928,7 @@ void MediaBrowserWidget::resortMediaGrid()
 
 void MediaBrowserWidget::applyNameFilterToRows()
 {
-	const QString query = _nameFilter->text().trimmed();
-	for (int row = 0; row < _mediaGrid->count(); ++row)
-	{
-		auto* item = static_cast<GridItem*>(_mediaGrid->item(row));
-		const bool hide = !nameMatchesFilter(item->info.name, query);
-		item->setHidden(hide);
-		if (hide)
-			item->setSelected(false);
-	}
+	_mediaGrid->filterRows([this](const QListWidgetItem& item) { return _nameFilter->matches(static_cast<const GridItem&>(item).info.name); });
 	renumberGridCaptions(_mediaGrid);
 }
 

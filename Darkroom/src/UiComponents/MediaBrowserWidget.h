@@ -19,8 +19,8 @@ class LabelSidebar;
 class Library;
 class MediaGrid;
 class MediaItemWidget;
+class NameFilterField;
 class PreviewFrameCountCombo;
-class QLineEdit;
 class QListWidgetItem;
 class QObject;
 class QSplitter;
@@ -113,7 +113,7 @@ private:
 
 	QSplitter*       _splitter = nullptr;
 	LabelSidebar*    _labelSidebar = nullptr;
-	QLineEdit*       _nameFilter = nullptr;
+	NameFilterField* _nameFilter = nullptr;
 	SegmentedToggle* _mediaTypeFilter = nullptr;
 	PreviewFrameCountCombo* _previewFrameCountCombo = nullptr;
 	SortControl*     _sortControl = nullptr;

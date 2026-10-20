@@ -15,6 +15,7 @@ RESTORE_COMPILER_WARNINGS
 #include <vector>
 
 class MediaGrid;
+class NameFilterField;
 class QAction;
 class QDragEnterEvent;
 class QDragMoveEvent;
@@ -59,6 +60,8 @@ private:
 	// A folder that is gone navigates to its nearest existing ancestor.
 	void refresh();
 	void updateNavigationActions();
+	// Call after any change to the grid's rows: new rows start shown.
+	void applyNameFilter();
 
 	void activateEntry(const QListWidgetItem* item);
 	// Opens the viewer browsing all images the grid currently shows.
@@ -66,18 +69,18 @@ private:
 	void playVideo(const QString& path);
 	void showEntryContextMenu(const QString& path, bool isFolder, QPoint globalPos);
 	void showBackgroundContextMenu(QPoint globalPos);
-	// Does nothing when the path is no longer in the grid.
+	// Does nothing when the grid does not show the path.
 	void selectAndScrollToPath(const QString& path);
 	// selectAndScrollToPath, safe to call after this window is gone, as entryRemover.
 	[[nodiscard]] std::function<void(const QString& path)> pathSelector();
 
 	[[nodiscard]] QStringList selectedPaths() const;
 	void deletePaths(const QStringList& paths, PathDeletion::Mode mode);
-	// Drops the entries of paths; the entry that followed the last of them becomes current.
+	// Drops the entries of paths; the shown entry nearest to the last of them becomes current.
 	void removeEntries(const QSet<QString>& paths);
 	// removeEntries for one path, safe to call after this window is gone: viewers and players can outlive it.
 	[[nodiscard]] std::function<void(const QString& path)> entryRemover();
-	void updateStatusCounts();
+	void updateCountsAndEmptyMessage();
 
 	// Copies or moves the files on the clipboard into folder; a cut is moved and taken off the clipboard.
 	void pasteInto(const QString& folder);
@@ -97,6 +100,7 @@ private:
 private:
 	MediaGrid* _grid = nullptr;
 	QLineEdit* _pathEdit = nullptr;
+	NameFilterField* _nameFilter = nullptr;
 	SortControl* _sortControl = nullptr;
 	QAction*   _backAction = nullptr;
 	QAction*   _forwardAction = nullptr;

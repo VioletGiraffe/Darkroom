@@ -15,9 +15,10 @@ the coding conventions.
 - `main.cpp` - Darkroom's bootstrap shape minus the library, plus the startup routing below. Its own
   application identity ("Quickroom") keeps its QSettings separate from Darkroom's; the keys in `Settings.h` fall back to
   Darkroom's values until Quickroom stores its own.
-- `BrowserWindow` - the main window: navigation header (back/forward/up, editable path field, `SortControl`),
-  `MediaGrid` of tiles, status-bar counts. Owns the navigation history. Self-deleting, created through
-  `showForFolder`, which resolves the folder to open and can select one entry in it.
+- `BrowserWindow` - the main window: navigation header (back/forward/up, editable path field, name filter,
+  `SortControl`), `MediaGrid` of tiles, status-bar counts. Owns the navigation history. Self-deleting, created through
+  `showForFolder`, which resolves the folder to open and can select one entry in it. The name filter stays set
+  across navigation.
 - `FolderListing` - the folder's entries, listed through thin_io: folders and supported media files, without hidden
   entries. Also the browser's order: by name or modification time, folders first when ascending and last when
   descending. The viewer and player opened from the command line browse in that order too.
@@ -34,8 +35,8 @@ larger than the tile: the margin is where the view paints the selection backgrou
 follows the `selected` property the grid keeps on every card.
 
 Activation: double-click or Enter. Folders navigate in place (queued: the rebuild would delete the tile whose
-handler is still running); images open `ImageViewerWindow` browsing the folder's images, and videos open
-`VideoPlayerWindow` browsing its videos, each with the browse position reflected back into the grid selection.
+handler is still running); images open `ImageViewerWindow` browsing the images shown, and videos open
+`VideoPlayerWindow` browsing the videos shown, each with the browse position reflected back into the grid selection.
 Neither window gets Darkroom's library features: no Best action, no persisted speed or saved loops, no frame target
 (see [playback.md](architecture/playback.md)).
 
