@@ -137,7 +137,7 @@ preview regeneration go to `FrameExtraction`. The dialog runs inside one `Catalo
 
 ## Logging and diagnostics
 
-`main()` installs the Qt message handler before constructing `QApplication`, capturing early platform and plugin
+`main()` calls Shared's `installMemoryLog` before constructing `QApplication`, capturing early platform and plugin
 diagnostics while chaining to the previous handler so normal stderr output remains. The shared
-`CLoggerInMemory` sink is thread-safe and surfaced by MainWindow's log viewer. It is memory-only and currently
+`CLoggerInMemory` sink is thread-safe and surfaced by the Help menu's bug report dialog. It is memory-only and currently
 unbounded.

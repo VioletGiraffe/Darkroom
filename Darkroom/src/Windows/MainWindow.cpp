@@ -7,7 +7,6 @@
 #include "Windows/IntegrityCheckDialog.h"
 #include "UiComponents/MediaBrowserWidget.h"
 #include "Windows/ImportDialog.h"
-#include "Windows/LogViewerDialog.h"
 #include "Windows/OpenFileRelease.h"
 #include "Windows/SettingsDialog.h"
 #include "Core/MediaId.h"
@@ -18,8 +17,10 @@
 #include "DarkroomShortcuts.h"
 
 #include "appdialogs/caboutdialog.h"
+#include "appdialogs/reportbugdialog.h"
 #include "compiler/compiler_warnings_control.h"
 #include "dialogs/messagedialog.h"
+#include "logger/cloggerinmemory.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 #include "widgets/cpersistenceenabler.h"
 
@@ -39,6 +40,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QSet>
 #include <QSettings>
 #include <QStandardPaths>
+#include <QUrl>
 RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
@@ -246,8 +248,8 @@ void MainWindow::setupMainMenu()
 	toolsMenu->addAction(tr("Re-export all videos"), QKeySequence("Ctrl+Shift+E"), this, &MainWindow::reExportAllVideos);
 
 	QMenu* helpMenu = new QMenu(tr("Help"), menuBar);
-	helpMenu->addAction(tr("Show log..."), this, [this] {
-		LogViewerDialog(this).exec();
+	helpMenu->addAction(tr("Report a bug..."), this, [this] {
+		ReportBugDialog::show(this, loggerInstance<CLoggerInMemory>(), QUrl(IssueTrackerUrl));
 	});
 	helpMenu->addSeparator();
 	helpMenu->addAction(tr("About Darkroom..."), this, [this] {

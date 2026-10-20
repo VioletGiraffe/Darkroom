@@ -3,6 +3,7 @@
 #include "Core/IoThreadPool.h"
 #include "FileOperations.h"
 #include "FolderListing.h"
+#include "MemoryLog.h"
 #include "Theme/Style.h"
 #include "UiComponents/SortControl.h"
 #include "Utils.h"
@@ -10,8 +11,6 @@
 #include "Windows/VideoPlayerWindow.h"
 #include "crashhandler/CCrashHandler.h"
 #include "compiler/compiler_warnings_control.h"
-#include "logger/cloggerinmemory.h"
-#include "timing/profiler.h"
 #include "utility/macro_utils.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -34,33 +33,6 @@ RESTORE_COMPILER_WARNINGS
 #endif
 
 namespace {
-
-QString formatQtMessage(QtMsgType type, const QMessageLogContext& context, const QString& message)
-{
-	const char* level = "Info";
-	switch (type)
-	{
-		case QtDebugMsg:    level = "Debug";    break;
-		case QtInfoMsg:     level = "Info";     break;
-		case QtWarningMsg:  level = "Warning";  break;
-		case QtCriticalMsg: level = "Critical"; break;
-		case QtFatalMsg:    level = "Fatal";    break;
-	}
-
-	QString text = QStringLiteral("[%1] %2").arg(QLatin1String(level), message);
-	if (context.file)
-		text += QStringLiteral(" (%1:%2)").arg(QLatin1String(context.file)).arg(context.line);
-	return text;
-}
-
-QtMessageHandler g_previousMessageHandler = nullptr;
-
-void memoryLogMessageHandler(QtMsgType type, const QMessageLogContext& context, const QString& message)
-{
-	loggerInstance<CLoggerInMemory>().log(formatQtMessage(type, context, message));
-	if (g_previousMessageHandler)
-		g_previousMessageHandler(type, context, message);
-}
 
 // Full paths of the files of kind directly in folder, ordered as the browser lists them.
 QStringList filesInFolder(const QString& folder, EntryKind kind)
@@ -153,18 +125,7 @@ void openStartupWindow(const QString& path)
 
 int main(int argc, char* argv[])
 {
-	// Installed before QApplication so plugin/platform diagnostics emitted during its construction are captured too.
-	g_previousMessageHandler = qInstallMessageHandler(memoryLogMessageHandler);
-
-	AdvancedAssert::setLoggingFunc([](const char* msg) {
-		::memoryLogMessageHandler(QtWarningMsg, QMessageLogContext{}, msg);
-	});
-
-#ifdef PROFILING_ENABLED
-	Profiler::setLoggingFunc([](const char* msg) {
-		::memoryLogMessageHandler(QtInfoMsg, QMessageLogContext{}, msg);
-	});
-#endif
+	installMemoryLog();
 
 	Q_INIT_RESOURCE(shared);
 

@@ -95,6 +95,8 @@ void forEachFolder(const QString& root, F&& callback)
 // False means only that folderPath is not an existing directory; the handoff itself is best-effort.
 [[nodiscard]] bool openFolderInFileManager(const QString& folderPath);
 
+constexpr const char* IssueTrackerUrl = "https://github.com/VioletGiraffe/Darkroom/issues";
+
 void reportMissingFile(QWidget* parent, const QString& path);
 
 namespace Ffmpeg { struct SplitResult; }
