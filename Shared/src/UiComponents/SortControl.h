@@ -3,7 +3,6 @@
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
-#include <QElapsedTimer>
 #include <QPushButton>
 #include <QString>
 RESTORE_COMPILER_WARNINGS
@@ -43,7 +42,4 @@ private:
 	const QString _settingsGroup;
 	const bool _favoritesEnabled;
 	SortOrder _order;
-
-	// Distinguishes the replayed dismissing click from a later request to reopen.
-	QElapsedTimer _sincePopoverClosed;
 };

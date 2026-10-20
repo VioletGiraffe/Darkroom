@@ -6,10 +6,10 @@
 
 DISABLE_COMPILER_WARNINGS
 #include <QCheckBox>
-#include <QCloseEvent>
 #include <QFrame>
 #include <QGraphicsDropShadowEffect>
 #include <QLabel>
+#include <QMouseEvent>
 #include <QScreen>
 #include <QSettings>
 #include <QVBoxLayout>
@@ -24,22 +24,19 @@ const QString SORT_BY_KEY         = "/sortBy";
 const QString SORT_DESCENDING_KEY = "/sortDescending";
 const QString FAVORITES_FIRST_KEY = "/favoritesFirst";
 
-constexpr int PopoverReopenGuardMs = 100;
-
 class SortPopover final : public QWidget
 {
 public:
-	SortPopover(QWidget* parent, const SortOrder& order, bool favoritesEnabled,
-	            std::function<void(const SortOrder& order)> onChanged,
-	            std::function<void()> onClosed)
-		: QWidget(parent, Qt::Popup | Qt::FramelessWindowHint), _onChanged(std::move(onChanged)), _onClosed(std::move(onClosed))
+	// NoDropShadowWindowHint: the system shadow outlines the whole window, transparent margin included.
+	SortPopover(QWidget* parent, const SortOrder& order, bool favoritesEnabled, std::function<void(const SortOrder& order)> onChanged)
+		: QWidget(parent, Qt::Popup | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint), _onChanged(std::move(onChanged))
 	{
 		setAttribute(Qt::WA_DeleteOnClose);
 		setAttribute(Qt::WA_TranslucentBackground);
 
 		const Theme::Theme& t = Theme::current();
 
-		auto* card = new QFrame(this);
+		auto* card = _card = new QFrame(this);
 		card->setObjectName("sortPopoverCard");
 		card->setStyleSheet(QStringLiteral(
 			"QFrame#sortPopoverCard { background-color: palette(window); border: 1px solid %1; border-radius: %2px; }")
@@ -94,6 +91,7 @@ public:
 
 	void popupBelow(QWidget* anchor)
 	{
+		_anchor = anchor;
 		adjustSize();
 		const QPoint topLeft = anchor->mapToGlobal(QPoint(0, 0));
 		int x = topLeft.x() + anchor->width() - width() + MARGIN;
@@ -108,17 +106,21 @@ public:
 	}
 
 protected:
-	void closeEvent(QCloseEvent* e) override
+	// Receives every press while open, outside ones included: a popup grabs the mouse.
+	void mousePressEvent(QMouseEvent* e) override
 	{
-		if (_onClosed)
-			_onClosed();
-		QWidget::closeEvent(e);
+		e->accept();
+		// Qt replays a dismissing press to the widget under it: on the anchor, that would reopen this popup.
+		if (_anchor->rect().contains(_anchor->mapFromGlobal(e->globalPosition().toPoint())))
+			setAttribute(Qt::WA_NoMouseReplay);
+		// The transparent margin counts as outside.
+		if (!_card->geometry().contains(e->position().toPoint()))
+			close();
 	}
 
 private:
 	static constexpr int MARGIN = 22;
 	static constexpr int GAP    = 3;
-	// Transparent popup area must not overlap the anchor or it intercepts the dismissing click.
 	static constexpr int TOP_MARGIN = GAP;
 
 	static QLabel* makeSectionLabel(const QString& text, const Theme::Theme& t)
@@ -139,7 +141,8 @@ private:
 	}
 
 	std::function<void(const SortOrder&)> _onChanged;
-	std::function<void()> _onClosed;
+	QWidget*         _anchor    = nullptr;
+	QFrame*          _card      = nullptr;
 	SegmentedToggle* _field     = nullptr;
 	SegmentedToggle* _direction = nullptr;
 	QCheckBox*       _favorites = nullptr; // null without favoritesEnabled
@@ -177,10 +180,6 @@ void SortControl::updateFace()
 
 void SortControl::openPopover()
 {
-	// Qt replays the outside click that closes a popup; do not let it reopen the popup.
-	if (_sincePopoverClosed.isValid() && _sincePopoverClosed.elapsed() < PopoverReopenGuardMs)
-		return;
-
 	auto* pop = new SortPopover(this, _order, _favoritesEnabled,
 		[this](const SortOrder& order) {
 			_order = order;
@@ -191,9 +190,6 @@ void SortControl::openPopover()
 				s.setValue(_settingsGroup + FAVORITES_FIRST_KEY, _order.favoritesFirst);
 			updateFace();
 			emit changed();
-		},
-		[this] {
-			_sincePopoverClosed.restart();
 		});
 
 	pop->popupBelow(this);
