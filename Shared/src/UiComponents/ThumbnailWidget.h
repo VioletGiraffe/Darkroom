@@ -7,7 +7,10 @@
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
+#include <QByteArray>
+#include <QIcon>
 #include <QImage>
+#include <QPixmap>
 #include <QWidget>
 RESTORE_COMPILER_WARNINGS
 
@@ -36,6 +39,10 @@ public:
 	void setSource(Source source);
 
 	void setCaption(const QString& caption);
+
+	// Maps each result's file type to the icon drawn at the right end of the caption band; a null icon draws none.
+	using FileTypeIconLookup = QIcon (*)(const QByteArray& fileType);
+	void setFileTypeIconLookup(FileTypeIconLookup lookup);
 
 	// Ctrl+wheel emits signed steps and is consumed; plain wheel propagates to the surrounding view.
 	void setOnMouseWheelCallback(std::function<void(int steps)> handler);
@@ -80,6 +87,10 @@ private:
 	QImage _image;
 	QString _errorMessage;
 	bool _nothingToShow = false;
+
+	FileTypeIconLookup _fileTypeIconLookup = nullptr;
+	QIcon _fileTypeIcon;
+	QPixmap _fileTypePixmap; // _fileTypeIcon at a native size for the current pixel ratio
 
 	QSize _renderedBox; // empty: nothing requested yet
 	qreal _renderedDpr = 0.0;

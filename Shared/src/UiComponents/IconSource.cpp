@@ -48,15 +48,15 @@ static QPixmap scaledIconPixmap(const QIcon& icon, const QSize& logicalBox, qrea
 	return result;
 }
 
-IconSource::IconSource(QIcon icon)
-	: _icon{ std::move(icon) }
+IconSource::IconSource(QIcon icon, QByteArray fileType)
+	: _icon{ std::move(icon) }, _fileType{ std::move(fileType) }
 {
 }
 
 std::optional<ImageSource::Result> IconSource::renderNow(QSize box, qreal dpr) const
 {
 	const int iconSide = std::min(box.width(), box.height()) * 3 / 5;
-	return ImageSource::Result{ .image = scaledIconPixmap(_icon, QSize(iconSide, iconSide), dpr).toImage() };
+	return ImageSource::Result{ .image = scaledIconPixmap(_icon, QSize(iconSide, iconSide), dpr).toImage(), .fileType = _fileType };
 }
 
 ImageSource::Request IconSource::renderAsync(QSize /*box*/, qreal /*dpr*/, QObject* /*context*/, std::function<void(ImageSource::Result)> /*done*/) const

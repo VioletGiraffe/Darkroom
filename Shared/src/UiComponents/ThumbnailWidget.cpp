@@ -12,18 +12,41 @@ DISABLE_COMPILER_WARNINGS
 #include <QTimer>
 #include <QUrl>
 #include <QWheelEvent>
+#include <QtMath>
 RESTORE_COMPILER_WARNINGS
 
+#include <cmath>
 #include <optional>
 #include <utility>
 #include <variant>
 
 static constexpr int THUMBNAIL_LABEL_HEIGHT = 20;
+static constexpr int FILE_TYPE_ICON_SIDE = 16; // logical; the native size drawn is the largest that fits
+static constexpr int FILE_TYPE_ICON_GAP = 3;
 
 // Avoid reading cards merely flicked past during scrolling.
 static constexpr int LOAD_DWELL_MS = 100;
 
 namespace {
+	// The largest of the icon's native sizes within side logical pixels, unscaled: scaling blurs hand-tuned pixels.
+	// Null when every native size is larger.
+	QPixmap nativeIconPixmap(const QIcon& icon, int side, qreal dpr)
+	{
+		const int deviceSide = qFloor(side * dpr);
+		QSize best;
+		for (const QSize& size : icon.availableSizes())
+		{
+			if (size.width() <= deviceSide && size.height() <= deviceSide && size.width() > best.width())
+				best = size;
+		}
+		if (best.isEmpty())
+			return {};
+
+		QPixmap pixmap = icon.pixmap(best, 1.0);
+		pixmap.setDevicePixelRatio(dpr);
+		return pixmap;
+	}
+
 	// Transparent composite gaps expose the black film base; sprockets occupy the reserved bands.
 	void paintFilmBase(QPainter& painter, const QRect& imageArea)
 	{
@@ -75,6 +98,8 @@ void ThumbnailWidget::setSource(Source source)
 	_image = {};
 	_errorMessage.clear();
 	_nothingToShow = false;
+	_fileTypeIcon = {};
+	_fileTypePixmap = {};
 	_renderedBox = {};
 	_renderedDpr = 0.0;
 	updateGeometry();
@@ -88,6 +113,11 @@ void ThumbnailWidget::setCaption(const QString& caption)
 
 	_caption = caption;
 	update();
+}
+
+void ThumbnailWidget::setFileTypeIconLookup(FileTypeIconLookup lookup)
+{
+	_fileTypeIconLookup = lookup;
 }
 
 QSize ThumbnailWidget::currentImageArea() const
@@ -169,6 +199,8 @@ void ThumbnailWidget::applyResult(ImageSource::Result result)
 	_nothingToShow = result.image.isNull() && result.error.isEmpty();
 	_image = std::move(result.image);
 	_errorMessage = result.error.isEmpty() ? QString{} : tr("Failed to load:") + '\n' + result.error;
+	_fileTypeIcon = _fileTypeIconLookup ? _fileTypeIconLookup(result.fileType) : QIcon{};
+	_fileTypePixmap = {};
 }
 
 void ThumbnailWidget::setOnMouseWheelCallback(std::function<void(int)> handler)
@@ -306,7 +338,21 @@ void ThumbnailWidget::paintEvent(QPaintEvent*)
 
 	if (!_caption.isEmpty())
 	{
-		const QRect labelRect(content.left() + 2, content.bottom() - THUMBNAIL_LABEL_HEIGHT + 1, content.width() - 4, THUMBNAIL_LABEL_HEIGHT);
+		QRect labelRect(content.left() + 2, content.bottom() - THUMBNAIL_LABEL_HEIGHT + 1, content.width() - 4, THUMBNAIL_LABEL_HEIGHT);
+		if (!_fileTypeIcon.isNull())
+		{
+			const qreal dpr = devicePixelRatioF();
+			if (_fileTypePixmap.isNull() || !qFuzzyCompare(_fileTypePixmap.devicePixelRatio(), dpr))
+				_fileTypePixmap = nativeIconPixmap(_fileTypeIcon, FILE_TYPE_ICON_SIDE, dpr);
+			if (!_fileTypePixmap.isNull())
+			{
+				// Whole device pixels keep the native pixels 1:1.
+				const qreal x = std::floor((labelRect.right() + 1) * dpr - _fileTypePixmap.width()) / dpr;
+				const qreal y = std::round((labelRect.top() + (labelRect.height() - _fileTypePixmap.deviceIndependentSize().height()) / 2) * dpr) / dpr;
+				painter.drawPixmap(QPointF(x, y), _fileTypePixmap);
+				labelRect.setRight(static_cast<int>(x) - FILE_TYPE_ICON_GAP);
+			}
+		}
 		painter.drawText(labelRect, Qt::AlignVCenter | Qt::AlignHCenter, painter.fontMetrics().elidedText(_caption, Qt::ElideMiddle, labelRect.width()));
 	}
 }

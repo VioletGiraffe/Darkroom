@@ -27,11 +27,14 @@ the coding conventions.
   standalone viewer: deletion, the file clipboard, and copy/move through the `file-operations` engine.
 
 Every tile is a `ThumbnailWidget`: images through a single-file `ImageFilesSource` (the FrameViewerWindow pattern),
-folders and videos through `IconSource` with the native file icon. Lazy dwell-loading, async decode, and Ctrl+wheel zoom are shared behavior,
-and `MediaGrid`'s card factory materializes tiles on demand. The grid drives drag and drop - a multi-selection exports
-all selected paths as file URLs - so tiles offer no single-file drag of their own. Each tile is its row's card and fills the
-cell; the view paints no cell background, and the tile shows selection itself through the `selected` property
-the grid keeps on every card.
+folders and videos through `IconSource` with the native file icon. Lazy dwell-loading, async decode, and Ctrl+wheel
+zoom are shared behavior, and `MediaGrid`'s card factory materializes tiles on demand. The grid drives drag and drop -
+a multi-selection exports all selected paths as file URLs - so tiles offer no single-file drag of their own. Each tile
+is its row's card and fills the cell; the view paints no cell background, and the tile shows selection itself through
+the `selected` property the grid keeps on every card.
+
+A file tile's caption is its name without the extension, followed by the file type's icon from `FileTypeIcons`: for
+images the format detected from the decoded data, so a misnamed file shows its real type; for videos the suffix.
 
 Activation: double-click or Enter. Folders navigate in place (queued: the rebuild would delete the tile whose
 handler is still running); images open `ImageViewerWindow` browsing the images shown, and videos open

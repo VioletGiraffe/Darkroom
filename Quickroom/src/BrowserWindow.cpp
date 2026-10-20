@@ -1,5 +1,6 @@
 #include "BrowserWindow.h"
 #include "FileOperations.h"
+#include "FileTypeIcons.h"
 #include "FolderListing.h"
 #include "SettingsDialog.h"
 #include "Theme/Theme.h"
@@ -159,6 +160,15 @@ QListWidgetItem* nearestShownItem(const QListWidget& grid, int row)
 		if (!grid.item(previous)->isHidden())
 			return grid.item(previous);
 	return nullptr;
+}
+
+// A file's name without its extension: the tile's type icon stands in for it. A name that is all extension stays whole.
+QString tileCaption(const FolderEntry& entry)
+{
+	if (entry.kind == EntryKind::Folder)
+		return entry.name;
+	const QString baseName = QFileInfo(entry.name).completeBaseName();
+	return baseName.isEmpty() ? entry.name : baseName;
 }
 
 // path itself when it is a folder, else its closest ancestor that is; a filesystem root when none is.
@@ -783,12 +793,14 @@ void BrowserWindow::updateCountsAndEmptyMessage()
 QWidget* BrowserWindow::buildTile(QListWidgetItem* item)
 {
 	const auto& entry = static_cast<const GridEntry&>(*item);
+	const QFileInfo fileInfo(entry.path);
+	const QByteArray videoType = entry.kind == EntryKind::Video ? fileInfo.suffix().toLower().toLatin1() : QByteArray{};
 	ThumbnailWidget::Source source = entry.kind == EntryKind::Image
 		? ThumbnailWidget::Source{ ImageFilesSource{ QStringList{ entry.path } } }
-		: ThumbnailWidget::Source{ IconSource{ _iconProvider.icon(QFileInfo(entry.path)) } };
+		: ThumbnailWidget::Source{ IconSource{ _iconProvider.icon(fileInfo), videoType } };
 
 	// No drag of its own: the grid drags the whole selection.
-	auto* tile = new ThumbnailWidget(std::move(source), entry.name, {}, nullptr);
+	auto* tile = new ThumbnailWidget(std::move(source), tileCaption(entry), {}, nullptr);
 	tile->setFixedSize(_tileSize, _tileSize);
 	switch (entry.kind)
 	{
@@ -801,6 +813,7 @@ QWidget* BrowserWindow::buildTile(QListWidgetItem* item)
 	case EntryKind::Image: tile->setOnActivatedCallback([this, path = entry.path] { viewImage(path); }); break;
 	case EntryKind::Video: tile->setOnActivatedCallback([this, path = entry.path] { playVideo(path); }); break;
 	}
+	tile->setFileTypeIconLookup(&FileTypeIcons::forType);
 	tile->setOnMouseWheelCallback([this](int steps) { zoomTiles(steps); });
 	tile->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(tile, &QWidget::customContextMenuRequested, this, [this, tile, path = entry.path, isFolder = entry.kind == EntryKind::Folder](QPoint pos) {

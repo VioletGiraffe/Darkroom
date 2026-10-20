@@ -2,5 +2,21 @@
 <RCC version="1.0">
 	<qresource prefix="/">
 		<file>quickroom.svg</file>
+		<file>filetypes/avi.ico</file>
+		<file>filetypes/bmp.ico</file>
+		<file>filetypes/flv.ico</file>
+		<file>filetypes/gif.ico</file>
+		<file>filetypes/jpg.ico</file>
+		<file>filetypes/mkv.ico</file>
+		<file>filetypes/mov.ico</file>
+		<file>filetypes/mp4.ico</file>
+		<file>filetypes/mpg.ico</file>
+		<file>filetypes/mts.ico</file>
+		<file>filetypes/png.ico</file>
+		<file>filetypes/svg.ico</file>
+		<file>filetypes/tiff.ico</file>
+		<file>filetypes/webm.ico</file>
+		<file>filetypes/webp.ico</file>
+		<file>filetypes/wmv.ico</file>
 	</qresource>
 </RCC>

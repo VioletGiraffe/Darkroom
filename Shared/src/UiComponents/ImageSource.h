@@ -3,6 +3,7 @@
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
+#include <QByteArray>
 #include <QImage>
 #include <QString>
 RESTORE_COMPILER_WARNINGS
@@ -22,8 +23,9 @@ class QObject;
 namespace ImageSource {
 
 struct Result {
-	QImage image;   // null with an empty error: nothing to show
-	QString error;  // non-empty: why there is no image
+	QImage image;        // null with an empty error: nothing to show
+	QString error;       // non-empty: why there is no image
+	QByteArray fileType; // detected from the data for decoded images, given by the caller otherwise; empty when unknown
 };
 
 // Shared by an asynchronous render's stages, on any thread, and its Request.

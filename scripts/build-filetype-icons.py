@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Generates Quickroom's per-file-type shell icons: one .ico per image and video format.
+"""Generates Quickroom's per-file-type icons: one .ico per image and video format.
 
-Windows draws these wherever Quickroom owns a type, so a file's format has to be readable at a glance in a
-crowded list. One design carries that: a coloured body, a cream landscape, and an ink band across it holding
-the extension as a condensed wordmark. Two bodies distinguish the families - PAPER for images, and FILM,
-which is wider and carries a sprocket run down both edges. Each entry in TYPES names the body it uses.
+Windows draws these wherever Quickroom owns a type, and Quickroom's tile captions draw them at native sizes, so a
+file's format has to be readable at a glance in a crowded list. One design carries that: a coloured body, a cream
+landscape, and an ink band across it holding the extension as a condensed wordmark. Two bodies distinguish the
+families - PAPER for images, and FILM, which is wider and carries a sprocket run down both edges. Each entry in TYPES
+names the body it uses.
 
 What the script is arranged around:
   16px is the critical size. The design was hand-tuned there and every other size derives from it by
@@ -21,7 +22,8 @@ Adding a format:
   Look at the label at 16 and 20: where a full-height stem touches the band edge, add a GLYPH_CHOICES spec.
   Judge the colour on rendered icons beside the others, not by colour distance: CIE76 rated JPG/MKV the
     closest pair here, and by eye they are not close at all.
-  Mirror the suffix in Utils.cpp's lists and in installer.iss.
+  Mirror the suffix in Utils.cpp's lists, in installer.iss and in Quickroom's FileTypeIcons.h; list the icon in
+    quickroom.qrc.
 
 Two tiers, split at VECTOR_FROM:
   Below it the wordmark is hand-drawn in GLYPHS, a pixel per cell, so no edge is ever antialiased.

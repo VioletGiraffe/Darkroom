@@ -115,12 +115,15 @@ namespace {
 		std::vector<Fitted> fitted;
 		fitted.reserve(n);
 		QString firstError = readError;
+		QByteArray firstFormat;
 		for (QByteArray& bytes : bytesPerPath)
 		{
 			QBuffer buffer(&bytes);
 			buffer.open(QIODevice::ReadOnly);
 			QImageReader reader(&buffer);  // A format hint would suppress content detection.
 			reader.setAutoTransform(true); // read() returns the image in its displayed orientation
+			if (firstFormat.isEmpty())
+				firstFormat = reader.format();
 
 			const QImage src = [&] {
 				PROFILE_SAMPLE("Thumbnail image decode");
@@ -147,7 +150,7 @@ namespace {
 		if (fitted.empty())
 		{
 			assert_r(!firstError.isEmpty());
-			job._delivery.deliver({ .error = firstError }, jobPtr);
+			job._delivery.deliver({ .error = firstError, .fileType = firstFormat }, jobPtr);
 			return;
 		}
 
@@ -173,7 +176,7 @@ namespace {
 			}
 		}
 
-		job._delivery.deliver({ .image = std::move(canvas) }, jobPtr);
+		job._delivery.deliver({ .image = std::move(canvas), .fileType = firstFormat }, jobPtr);
 	}
 
 	// The I/O stage touches only the job, then hands bytes to the CPU pool.

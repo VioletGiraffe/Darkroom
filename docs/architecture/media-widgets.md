@@ -38,6 +38,9 @@ where the pixels come from.
 - Asynchronous results arrive on the GUI thread through a `Delivery`. The returned `Request` cancels on destruction or
   replacement, and pending stages skip their work once cancelled.
 - A source states whether its image gets the matte's rounded corners.
+- A result carries the file's type: detected from the data for decoded images, given by the caller otherwise. An
+  optional caller-supplied lookup maps it to an icon at the right end of the caption band, drawn at one of the icon's
+  native sizes on whole device pixels: scaling would blur hand-tuned pixels.
 - `ImageFilesSource` tiles image files side by side. `IconSource` (Quickroom's folders and videos) draws a file icon,
   synchronously and without rounded corners.
 
