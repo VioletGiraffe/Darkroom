@@ -121,9 +121,10 @@ ImageViewerWindow::ImageViewerWindow(QStringList imagePaths, int startIndex, QWi
 	setCentralWidget(_view);
 	_view->installEventFilter(this);
 
-	_view->setImageScaler([](QImage& dest, const QImage& source, const QRect& srcRect) {
-		if (!ImageProcessing::resize(dest, source, srcRect, cpuParallelFor))
-			CImageViewerWidget::smoothScaleQt(dest, source, srcRect);
+	_view->setImageScaler([](QImage& dest, const QImage& source, const QRect& srcRect, Qt::TransformationMode mode) {
+		const auto kernel = mode == Qt::FastTransformation ? ImageProcessing::ResizeKernel::NearestNeighbor : ImageProcessing::ResizeKernel::Auto;
+		if (!ImageProcessing::resize(dest, source, srcRect, cpuParallelFor, kernel))
+			CImageViewerWidget::scaleWithQt(dest, source, srcRect, mode);
 	});
 
 	// The image as the window icon tells several open viewers apart in the taskbar. Restarted per image, so
