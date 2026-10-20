@@ -1,8 +1,10 @@
 #include "BrowserWindow.h"
 #include "FileOperations.h"
+#include "FolderListing.h"
 #include "IconTileWidget.h"
 #include "Theme/Theme.h"
 #include "UiComponents/MediaGrid.h"
+#include "UiComponents/SortControl.h"
 #include "UiComponents/ThumbnailWidget.h"
 #include "Windows/ImageViewerWindow.h"
 #include "Windows/OpenFileRelease.h"
@@ -10,7 +12,6 @@
 #include "Utils.h"
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
-#include "utils/naturalsorting/cnaturalsorterqcollator.h"
 #include "widgets/cpersistenceenabler.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -46,9 +47,10 @@ DISABLE_COMPILER_WARNINGS
 RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
-#include <memory>
+#include <optional>
 #include <ranges>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -122,53 +124,19 @@ QString resolveStartFolder(const QString& requested)
 	return QDir::homePath();
 }
 
-enum class EntryKind { Folder, Image, Video };
-
-class GridEntry final : public QListWidgetItem {
+class GridEntry final : public QListWidgetItem, public FolderEntry {
 public:
-	QString path;
-	QString name;
-	EntryKind kind = EntryKind::Folder;
-	// size and lastModified detect a file rewritten in place, whose tile is then stale.
-	qint64 size = 0;
-	QDateTime lastModified;
+	GridEntry(FolderEntry entry, const SortOrder& order) : FolderEntry{ std::move(entry) }, _order{ &order } {}
 
-	// Folders first, then natural name order.
 	bool operator<(const QListWidgetItem& other) const override
 	{
-		const auto& b = static_cast<const GridEntry&>(other);
-		if ((kind == EntryKind::Folder) != (b.kind == EntryKind::Folder))
-			return kind == EntryKind::Folder;
-		return NaturalSort::lessCaseInsensitive(name, b.name);
+		return precedesInOrder(*this, static_cast<const GridEntry&>(other), *_order);
 	}
+
+private:
+	// Not shared: each browser window has its own sort control.
+	const SortOrder* _order;
 };
-
-// The browser's entries for dir: folders and supported media files, unsorted.
-std::vector<std::unique_ptr<GridEntry>> listedEntries(const QDir& dir)
-{
-	std::vector<std::unique_ptr<GridEntry>> entries;
-	for (const QFileInfo& info : dir.entryInfoList(QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot, QDir::Unsorted))
-	{
-		EntryKind kind;
-		if (info.isDir())
-			kind = EntryKind::Folder;
-		else if (isSupportedImageFile(info.filePath()))
-			kind = EntryKind::Image;
-		else if (isSupportedVideoFile(info.filePath()))
-			kind = EntryKind::Video;
-		else
-			continue;
-
-		auto entry = std::make_unique<GridEntry>();
-		entry->path = info.absoluteFilePath();
-		entry->name = info.fileName();
-		entry->kind = kind;
-		entry->size = info.size();
-		entry->lastModified = info.lastModified();
-		entries.push_back(std::move(entry));
-	}
-	return entries;
-}
 
 // The row that keeps the sorted grid sorted with entry inserted.
 int sortedInsertionRow(const QListWidget& grid, const GridEntry& entry)
@@ -243,6 +211,13 @@ void BrowserWindow::setupUi()
 	});
 	toolbar->addWidget(_pathEdit);
 
+	_sortControl = new SortControl(BROWSER_SORT_SETTINGS_GROUP, {}, /* favoritesEnabled */ false);
+	connect(_sortControl, &SortControl::changed, this, [this] {
+		_grid->sortItems(Qt::AscendingOrder);
+		_grid->ensureVisibleCardsExist();
+	});
+	toolbar->addWidget(_sortControl);
+
 	auto* refreshShortcut = new QShortcut(QKeySequence::Refresh, this);
 	connect(refreshShortcut, &QShortcut::activated, this, &BrowserWindow::refresh);
 
@@ -316,7 +291,8 @@ void BrowserWindow::setupUi()
 bool BrowserWindow::listDirectory(const QString& path)
 {
 	const QDir dir(path);
-	if (!dir.exists())
+	std::optional<std::vector<FolderEntry>> entries = listFolder(dir.absolutePath());
+	if (!entries)
 		return false;
 
 	_grid->clear();
@@ -327,10 +303,11 @@ bool BrowserWindow::listDirectory(const QString& path)
 	_folderWatcher->addPath(_currentPath);
 
 	const QSize cell = cellSize(_tileSize);
-	for (std::unique_ptr<GridEntry>& entry : listedEntries(dir))
+	for (FolderEntry& entry : *entries)
 	{
-		entry->setSizeHint(cell);
-		_grid->addItem(entry.release());
+		auto* item = new GridEntry(std::move(entry), _sortControl->order());
+		item->setSizeHint(cell);
+		_grid->addItem(item);
 	}
 	_grid->sortItems(Qt::AscendingOrder);
 	_grid->scrollToTop();
@@ -385,50 +362,63 @@ void BrowserWindow::goUp()
 
 void BrowserWindow::refresh()
 {
-	const QDir dir(_currentPath);
-	if (!dir.exists())
+	if (!QDir(_currentPath).exists())
 	{
 		navigateTo(resolveStartFolder(nearestExistingFolder(_currentPath)));
 		return;
 	}
 
-	std::unordered_map<QString, std::unique_ptr<GridEntry>> onDisk;
-	for (std::unique_ptr<GridEntry>& entry : listedEntries(dir))
+	std::optional<std::vector<FolderEntry>> listing = listFolder(_currentPath);
+	if (!listing)
+		return;
+
+	std::unordered_map<QString, FolderEntry> onDisk;
+	for (FolderEntry& entry : *listing)
 	{
-		QString path = entry->path;
+		QString path = entry.path;
 		onDisk.emplace(std::move(path), std::move(entry));
 	}
 
 	// Afterwards onDisk holds only the entries the grid lacks.
 	bool changed = false;
+	bool datesChanged = false;
 	for (int row = _grid->count() - 1; row >= 0; --row)
 	{
 		auto* shown = static_cast<GridEntry*>(_grid->item(row));
 		const auto found = onDisk.find(shown->path);
-		if (found == onDisk.end() || found->second->kind != shown->kind)
+		if (found == onDisk.end() || found->second.kind != shown->kind)
 		{
 			delete _grid->takeItem(row);
 			changed = true;
 			continue;
 		}
 
-		const GridEntry& current = *found->second;
+		const FolderEntry& current = found->second;
+		// A file rewritten in place needs a new tile.
 		if (shown->kind != EntryKind::Folder && (current.size != shown->size || current.lastModified != shown->lastModified))
 		{
-			shown->size = current.size;
-			shown->lastModified = current.lastModified;
 			_grid->removeItemWidget(shown);
 			changed = true;
 		}
+		datesChanged = datesChanged || current.lastModified != shown->lastModified;
+		shown->size = current.size;
+		shown->lastModified = current.lastModified;
 		onDisk.erase(found);
+	}
+
+	// Before the insertions below: they require a sorted grid.
+	if (datesChanged && _sortControl->order().sortBy == SortBy::Date)
+	{
+		_grid->sortItems(Qt::AscendingOrder);
+		changed = true;
 	}
 
 	const QSize cell = cellSize(_tileSize);
 	for (auto& [path, entry] : onDisk)
 	{
-		entry->setSizeHint(cell);
-		const int row = sortedInsertionRow(*_grid, *entry);
-		_grid->insertItem(row, entry.release());
+		auto* item = new GridEntry(std::move(entry), _sortControl->order());
+		item->setSizeHint(cell);
+		_grid->insertItem(sortedInsertionRow(*_grid, *item), item);
 		changed = true;
 	}
 

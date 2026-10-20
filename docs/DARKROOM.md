@@ -48,7 +48,7 @@ Each is its own include root except where noted:
 | `qtutils` | theme machinery (`CThemeController`, `CBasePalette`, tinted icon engine, `themeicon:/`, style fixups), `CImageViewerWidget`, `CFlowLayout`, natural sort, `CLoggerInMemory`, settings/about dialog bases, message-box helpers |
 | `magic-alignment` (root `src/`) | automatic photo alignment fits for PhotoCompareWindow |
 | `image-processing` | SIMD image resize for ImageViewerWindow and Quickroom's icon tiles; has its own tests and a resize-comparison tool |
-| `thin_io` (root `src/`) | native filesystem access for `file-operations` |
+| `thin_io` (root `src/`) | native filesystem access for `file-operations` and Quickroom's folder listing |
 | `file-operations` | Quickroom only: the copy/move engine and its progress and decision dialogs; has its own tests |
 
 Link order matters on GNU ld: a library precedes the ones it uses. The `LIBS` comments in each `.pro` state the order.

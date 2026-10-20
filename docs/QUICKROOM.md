@@ -15,10 +15,12 @@ the coding conventions.
 - `main.cpp` - Darkroom's bootstrap shape minus the library, plus the startup routing below. Its own
   application identity ("Quickroom") keeps its QSettings separate from Darkroom's; the keys in `Settings.h` fall back to
   Darkroom's values until Quickroom stores its own.
-- `BrowserWindow` - the main window: navigation toolbar (back/forward/up + editable path field), `MediaGrid`
-  of tiles, status-bar counts. Owns the navigation history and the folder listing: folders first in natural
-  name order, unsupported files not shown. Self-deleting, created through `showForFolder`, which resolves the
-  folder to open and can select one entry in it.
+- `BrowserWindow` - the main window: navigation toolbar (back/forward/up, editable path field, `SortControl`),
+  `MediaGrid` of tiles, status-bar counts. Owns the navigation history. Self-deleting, created through
+  `showForFolder`, which resolves the folder to open and can select one entry in it.
+- `FolderListing` - the folder's entries, listed through thin_io: folders and supported media files, without hidden
+  entries. Also the browser's order: by name or modification time, folders first when ascending and last when
+  descending. The viewer and player opened from the command line browse in that order too.
 - `IconTileWidget` - tile for entries without an image preview (folders, videos): native file icon + caption,
   styled via the shared `framedThumbnail` QSS rule.
 - `FileOperations` - file operations with Quickroom's confirmation policy, shared by the browser and the
@@ -61,7 +63,7 @@ appear without F5. A refresh compares the listing with the grid: unchanged entri
 rewritten in place gets a new one. When the shown folder disappears, the browser moves to its nearest existing
 ancestor.
 
-Browser state (last folder, tile size, window geometry) persists under `browser/*` settings keys.
+Browser state (last folder, tile size, sort order, window geometry) persists under `browser/*` settings keys.
 
 ## Startup
 

@@ -60,6 +60,8 @@ SOURCES += $$files(src/*.cpp, true)
 # The copy/move engine and its dialogs; not config.pri, which would reset QT and the build settings.
 include(../file-operations/fileoperations/fileoperations.pri)
 include(../file-operations/fileoperationsui/fileoperationsui.pri)
+# Folder listing through thin_io
+include(../file-operations/directoryscan/directoryscan.pri)
 
 RESOURCES += res/quickroom.qrc
 

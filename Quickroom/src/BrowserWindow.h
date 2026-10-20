@@ -23,6 +23,7 @@ class QFileSystemWatcher;
 class QLineEdit;
 class QListWidgetItem;
 class QTimer;
+class SortControl;
 
 // Quickroom's main window: a filesystem browser showing folders and media items as a thumbnail grid.
 // Double-click opens folders in place, images in ImageViewerWindow, videos in VideoPlayerWindow.
@@ -47,7 +48,7 @@ private:
 
 	void setupUi();
 
-	// Lists path into the grid and watches it; false and no state change when path is not an existing directory.
+	// Lists path into the grid and watches it; false and no state change when path cannot be listed.
 	bool listDirectory(const QString& path);
 	// listDirectory plus a history push; a failed listing reverts the path edit.
 	void navigateTo(const QString& path);
@@ -96,6 +97,7 @@ private:
 private:
 	MediaGrid* _grid = nullptr;
 	QLineEdit* _pathEdit = nullptr;
+	SortControl* _sortControl = nullptr;
 	QAction*   _backAction = nullptr;
 	QAction*   _forwardAction = nullptr;
 	QAction*   _upAction = nullptr;

@@ -2,7 +2,9 @@
 #include "Core/CpuThreadPool.h"
 #include "Core/IoThreadPool.h"
 #include "FileOperations.h"
+#include "FolderListing.h"
 #include "Theme/Style.h"
+#include "UiComponents/SortControl.h"
 #include "Utils.h"
 #include "Windows/ImageViewerWindow.h"
 #include "Windows/VideoPlayerWindow.h"
@@ -11,7 +13,6 @@
 #include "logger/cloggerinmemory.h"
 #include "timing/profiler.h"
 #include "utility/macro_utils.h"
-#include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QApplication>
@@ -26,6 +27,7 @@ RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 #include <utility>
+#include <vector>
 
 #ifndef QUICKROOM_VERSION
 #error "QUICKROOM_VERSION is not defined; set it in Quickroom.pro"
@@ -60,28 +62,26 @@ void memoryLogMessageHandler(QtMsgType type, const QMessageLogContext& context, 
 		g_previousMessageHandler(type, context, message);
 }
 
-// Full paths of the files directly in folder that isSupported accepts, ordered as the browser lists them.
-QStringList filesInFolder(const QString& folder, bool (*isSupported)(const QString& filePath))
+// Full paths of the files of kind directly in folder, ordered as the browser lists them.
+QStringList filesInFolder(const QString& folder, EntryKind kind)
 {
-	const QDir dir(folder);
-	QStringList names;
-	for (const QString& name : dir.entryList(QDir::Files, QDir::Unsorted))
-		if (isSupported(name))
-			names.push_back(name);
+	std::vector<FolderEntry> entries = listFolder(folder).value_or(std::vector<FolderEntry>{});
+	std::erase_if(entries, [kind](const FolderEntry& entry) { return entry.kind != kind; });
 
-	std::sort(names.begin(), names.end(), NaturalSort::lessCaseInsensitive);
+	const SortOrder order = SortControl::savedOrder(BROWSER_SORT_SETTINGS_GROUP, {}, /* favoritesEnabled */ false);
+	std::ranges::sort(entries, [&order](const FolderEntry& a, const FolderEntry& b) { return precedesInOrder(a, b, order); });
 
 	QStringList paths;
-	paths.reserve(names.size());
-	for (const QString& name : std::as_const(names))
-		paths.push_back(dir.absoluteFilePath(name));
+	paths.reserve(static_cast<qsizetype>(entries.size()));
+	for (const FolderEntry& entry : entries)
+		paths.push_back(entry.path);
 	return paths;
 }
 
 // Opens the viewer on path, browsing the images beside it. False when the image cannot be shown at all.
 bool showImageViewer(const QString& path)
 {
-	QStringList images = filesInFolder(QFileInfo(path).absolutePath(), isSupportedImageFile);
+	QStringList images = filesInFolder(QFileInfo(path).absolutePath(), EntryKind::Image);
 
 	// pathComparisonKey, not ==: the command line may spell the path with different case or separators.
 	const QString startKey = pathComparisonKey(path);
@@ -138,7 +138,7 @@ void openStartupWindow(const QString& path)
 		{
 			VideoPlayerWindow* const player = VideoPlayerWindow::createPlayerWindow(info.absoluteFilePath(), nullptr);
 			FileOperations::installDeleteActions(*player);
-			player->setNavigation(filesInFolder(info.absolutePath(), isSupportedVideoFile), {});
+			player->setNavigation(filesInFolder(info.absolutePath(), EntryKind::Video), {});
 			return;
 		}
 	}
