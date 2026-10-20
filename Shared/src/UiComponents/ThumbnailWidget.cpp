@@ -141,7 +141,10 @@ namespace {
 			QImageReader reader(&buffer);  // A format hint would suppress content detection.
 			reader.setAutoTransform(true); // read() returns the image in its displayed orientation
 
-			const QImage src = reader.read();
+			const QImage src = [&] {
+				PROFILE_SAMPLE("Thumbnail image decode");
+				return reader.read();
+			}();
 			if (src.isNull())
 			{
 				if (firstError.isEmpty())
@@ -152,8 +155,11 @@ namespace {
 			const QSize logicalSize = src.size().scaled(QSize(slotWidth, slotHeight), Qt::KeepAspectRatio);
 			const QSize physicalSize = (QSizeF(logicalSize) * job._dpr).toSize();
 			QImage scaled{ physicalSize, src.format() };
-			if (!ImageProcessing::resize(scaled, src, {}, cpuParallelFor))
-				scaled = src.scaled(physicalSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+			{
+				PROFILE_SAMPLE("Thumbnail resize");
+				if (!ImageProcessing::resize(scaled, src, {}, cpuParallelFor))
+					scaled = src.scaled(physicalSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+			}
 			fitted.push_back({ std::move(scaled), logicalSize });
 		}
 
