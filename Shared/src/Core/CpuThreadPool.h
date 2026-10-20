@@ -5,8 +5,10 @@
 #include <cstddef>
 #include <functional>
 
-// The process-wide pool for CPU-bound background work, one thread short of the physical core count because
-// parallelFor() also runs work on the calling thread. Disk reads belong in IoThreadPool, which routes them by storage speed.
+// The process-wide pool for CPU-bound background work, one thread short of the logical processor count because
+// parallelFor() also runs work on the calling thread.
+// Logical, not physical: SMT speeds up scalar work such as image decoding.
+// Disk reads belong in IoThreadPool, which routes them by storage speed.
 [[nodiscard]] CThreadPool& cpuThreadPool();
 
 // cpuThreadPool().parallelFor() as a plain function, matching ImageProcessing::ParallelForFn

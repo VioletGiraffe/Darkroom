@@ -6,7 +6,7 @@
 
 CThreadPool& cpuThreadPool()
 {
-	static CThreadPool pool{ std::max(CpuCount::get().physicalCoreCount() - 1, 1u), "cpu" };
+	static CThreadPool pool{ std::max(CpuCount::get().logicalProcessorCount() - 1, 1u), "cpu" };
 	return pool;
 }
 
