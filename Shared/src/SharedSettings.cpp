@@ -9,8 +9,18 @@ RESTORE_COMPILER_WARNINGS
 
 QVariant readSharedSetting(const char* key, const QVariant& defaultValue)
 {
+	return QSettings{ QCoreApplication::organizationName(), DarkroomApplicationName }.value(key, defaultValue);
+}
+
+void writeSharedSetting(const char* key, const QVariant& value)
+{
+	QSettings{ QCoreApplication::organizationName(), DarkroomApplicationName }.setValue(key, value);
+}
+
+QVariant readSettingOrDarkroomDefault(const char* key, const QVariant& defaultValue)
+{
 	if (const QSettings own; own.contains(key))
 		return own.value(key);
 
-	return QSettings{ QCoreApplication::organizationName(), DarkroomApplicationName }.value(key, defaultValue);
+	return readSharedSetting(key, defaultValue);
 }

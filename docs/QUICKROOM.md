@@ -13,10 +13,10 @@ the coding conventions.
 `Quickroom/src/` holds the Quickroom-only code:
 
 - `main.cpp` - Darkroom's bootstrap shape minus the library, plus the startup routing below. Its own
-  application identity ("Quickroom") keeps its QSettings separate from Darkroom's; the keys in `Settings.h` fall back to
-  Darkroom's values until Quickroom stores its own.
+  application identity ("Quickroom") keeps its QSettings separate from Darkroom's; see
+  [settings-and-theme.md](architecture/settings-and-theme.md) for the settings that follow Darkroom's.
 - `BrowserWindow` - the main window: navigation header (back/forward/up, editable path field, name filter,
-  `SortControl`), `MediaGrid` of tiles, status-bar counts. Owns the navigation history. Self-deleting, created through
+  `SortControl`), `MediaGrid` of tiles, status-bar counts, main menu. Owns the navigation history. Self-deleting, created through
   `showForFolder`, which resolves the folder to open and can select one entry in it. The name filter stays set
   across navigation.
 - `FolderListing` - the folder's entries, listed through thin_io: folders and supported media files, without hidden
@@ -24,6 +24,7 @@ the coding conventions.
   descending. The viewer and player opened from the command line browse in that order too.
 - `IconTileWidget` - tile for entries without an image preview (folders, videos): native file icon + caption,
   styled via the shared `framedThumbnail` QSS rule.
+- `SettingsDialog` - Quickroom's own: ffmpeg path, theming, the video player's frame extraction format.
 - `FileOperations` - file operations with Quickroom's confirmation policy, shared by the browser and the
   standalone viewer: deletion, the file clipboard, and copy/move through the `file-operations` engine.
 

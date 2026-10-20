@@ -2,6 +2,7 @@
 #include "FileOperations.h"
 #include "FolderListing.h"
 #include "IconTileWidget.h"
+#include "SettingsDialog.h"
 #include "Theme/Theme.h"
 #include "UiComponents/MediaGrid.h"
 #include "UiComponents/NameFilterField.h"
@@ -11,12 +12,16 @@
 #include "Windows/OpenFileRelease.h"
 #include "Windows/VideoPlayerWindow.h"
 #include "Utils.h"
+#include "appdialogs/caboutdialog.h"
+#include "appdialogs/reportbugdialog.h"
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
+#include "logger/cloggerinmemory.h"
 #include "widgets/cpersistenceenabler.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QAction>
+#include <QApplication>
 #include <QClipboard>
 #include <QDateTime>
 #include <QDir>
@@ -33,6 +38,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QLineEdit>
 #include <QListWidgetItem>
 #include <QMenu>
+#include <QMenuBar>
 #include <QMetaObject>
 #include <QMimeData>
 #include <QMouseEvent>
@@ -202,6 +208,7 @@ BrowserWindow::BrowserWindow(const QString& folder)
 	: _tileSize{ savedTileSize() }
 {
 	setupUi();
+	setupMainMenu();
 
 	resize(1200, 800);
 	enablePersistence(this, "browser/window", CPersistenceEnabler::Delayed{ true }, CPersistenceEnabler::SetDefaultSize{ false });
@@ -330,6 +337,24 @@ void BrowserWindow::setupUi()
 	connect(_folderWatcher, &QFileSystemWatcher::directoryChanged, this, [this] {
 		if (!_refreshDebounce->isActive())
 			_refreshDebounce->start();
+	});
+}
+
+void BrowserWindow::setupMainMenu()
+{
+	QMenu* fileMenu = menuBar()->addMenu(tr("File"));
+	fileMenu->addAction(tr("Settings..."), QKeySequence("Ctrl+Alt+P"), this, [this] { SettingsDialog(this).exec(); });
+	fileMenu->addSeparator();
+	// Closes every window: video players are top-level and outlive the browser.
+	fileMenu->addAction(tr("Exit"), QKeySequence("Ctrl+Q"), this, &QApplication::closeAllWindows);
+
+	QMenu* helpMenu = menuBar()->addMenu(tr("Help"));
+	helpMenu->addAction(tr("Report a bug..."), this, [this] {
+		ReportBugDialog::show(this, loggerInstance<CLoggerInMemory>(), QUrl(IssueTrackerUrl));
+	});
+	helpMenu->addSeparator();
+	helpMenu->addAction(tr("About Quickroom..."), this, [this] {
+		CAboutDialog(QApplication::applicationVersion(), this).exec();
 	});
 }
 

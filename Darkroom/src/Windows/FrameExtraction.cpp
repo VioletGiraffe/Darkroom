@@ -28,8 +28,8 @@ namespace {
 Ffmpeg::SplitOptions configuredSplitOptions()
 {
 	return {
-		.tiff = readSharedSetting(Settings::UseTiff, Defaults::UseTiff).toBool(),
-		.jpegQuality = readSharedSetting(Settings::JpegQuality, Defaults::JpegQuality).toInt(),
+		.tiff = readSettingOrDarkroomDefault(Settings::UseTiff, Defaults::UseTiff).toBool(),
+		.jpegQuality = readSettingOrDarkroomDefault(Settings::JpegQuality, Defaults::JpegQuality).toInt(),
 		.frameStep = QSettings{}.value(Settings::FrameStep, Defaults::FrameStep).toInt(),
 	};
 }

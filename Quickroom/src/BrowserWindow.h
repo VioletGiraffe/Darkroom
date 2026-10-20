@@ -48,6 +48,7 @@ private:
 	explicit BrowserWindow(const QString& folder);
 
 	void setupUi();
+	void setupMainMenu();
 
 	// Lists path into the grid and watches it; false and no state change when path cannot be listed.
 	bool listDirectory(const QString& path);

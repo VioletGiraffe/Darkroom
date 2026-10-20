@@ -6,8 +6,10 @@
 
 `QSettings` keys and defaults are matching `Settings::Foo` and `Defaults::Foo` constants:
 
-- `Settings.h` holds the keys both apps read. Each app keeps its own store; reads go through `readSharedSetting`,
-  which falls back to Darkroom's store while the app's own store lacks the key.
+- `Settings.h` holds the keys both apps read, of two kinds:
+  - shared (the ffmpeg path): one value in Darkroom's store, through `readSharedSetting` / `writeSharedSetting`;
+  - each app's own: read through `readSettingOrDarkroomDefault`, so Quickroom follows Darkroom's value until it
+    stores its own.
 - `DarkroomSettings.h` holds Darkroom's app-wide keys. A few have no UI and are edited in the settings file; the
   header marks them.
 - Narrow settings used by one implementation remain local to that owner.
@@ -18,7 +20,8 @@
 `MetadataStore`; runtime library paths come from an owned or borrowed `Library`. MainWindow's library workflow is
 the sole owner of the last-successful-root and recent-library settings.
 
-`SettingsDialog` excludes library selection, which belongs to the Library menu. Most changes persist on acceptance.
+Each app has its own `SettingsDialog`. Darkroom's excludes library selection, which belongs to the Library menu.
+Most changes persist on acceptance.
 The theming choices - color scheme and one theme per polarity - apply and persist immediately as a live preview;
 rejecting the dialog restores all three.
 

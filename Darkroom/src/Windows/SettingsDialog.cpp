@@ -119,8 +119,7 @@ GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent
 
 void GeneralSettingsPage::acceptSettings()
 {
-	QSettings s;
-	s.setValue(Settings::FfmpegPath, _ffmpegPath->text().trimmed());
+	writeSharedSetting(Settings::FfmpegPath, _ffmpegPath->text().trimmed());
 }
 
 void GeneralSettingsPage::rejectSettings()
@@ -135,8 +134,8 @@ EncodingSettingsPage::EncodingSettingsPage(QWidget* parent) : CSettingsPage(pare
 {
 	setWindowTitle(tr("Encoding"));
 
-	const bool useTiff  = readSharedSetting(Settings::UseTiff,     Defaults::UseTiff).toBool();
-	const int  quality  = readSharedSetting(Settings::JpegQuality, Defaults::JpegQuality).toInt();
+	const bool useTiff  = readSettingOrDarkroomDefault(Settings::UseTiff,     Defaults::UseTiff).toBool();
+	const int  quality  = readSettingOrDarkroomDefault(Settings::JpegQuality, Defaults::JpegQuality).toInt();
 	const int  step     = QSettings{}.value(Settings::FrameStep,   Defaults::FrameStep).toInt();
 
 	_formatToggle = new SegmentedToggle({ tr("JPEG"), tr("TIFF") }, this);
