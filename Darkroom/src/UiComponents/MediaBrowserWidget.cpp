@@ -94,16 +94,7 @@ ItemInfo itemInfoFor(Catalog& catalog, const MediaId& id, bool isBest, bool sort
 // Sort mode is shared by every item in a sort and set immediately before sortItems().
 class GridItem final : public QListWidgetItem {
 public:
-	static int sortBy;
-	static bool descending;
-	static bool favoritesFirst;
-
-	static void setSortMode(const SortControl* control)
-	{
-		sortBy = control->sortBy();
-		descending = control->descending();
-		favoritesFirst = control->favoritesFirst();
-	}
+	static inline SortOrder order;
 
 	MediaId mediaId;
 	ItemInfo info;
@@ -113,20 +104,16 @@ public:
 	bool operator<(const QListWidgetItem& other) const override
 	{
 		const ItemInfo& b = static_cast<const GridItem&>(other).info;
-		if (favoritesFirst && info.isBest != b.isBest)
+		if (order.favoritesFirst && info.isBest != b.isBest)
 			return info.isBest;
-		if (sortBy == SortBy::Date)
-			return descending ? b.date < info.date : info.date < b.date;
+		if (order.sortBy == SortBy::Date)
+			return order.descending ? b.date < info.date : info.date < b.date;
 
-		return descending
+		return order.descending
 			? NaturalSort::lessCaseInsensitive(b.name, info.name)
 			: NaturalSort::lessCaseInsensitive(info.name, b.name);
 	}
 };
-
-int GridItem::sortBy = SortBy::Name;
-bool GridItem::descending = false;
-bool GridItem::favoritesFirst = false;
 
 QString gridCaption(int displayNumber, const QString& name)
 {
@@ -299,7 +286,7 @@ void MediaBrowserWidget::setupUi()
 	});
 	headerLayout->addWidget(_previewFrameCountCombo, 0, Qt::AlignVCenter);
 
-	_sortControl = new SortControl();
+	_sortControl = new SortControl(QStringLiteral("mainWindow"), SortOrder{ .sortBy = SortBy::Date, .descending = true }, /* favoritesEnabled */ true);
 	connect(_sortControl, &SortControl::changed, this, &MediaBrowserWidget::resortMediaGrid);
 	headerLayout->addWidget(_sortControl, 0, Qt::AlignVCenter);
 
@@ -821,8 +808,8 @@ void MediaBrowserWidget::rebuildGridRows()
 	Catalog& catalog = _library.catalog();
 	const QSet<MediaId> bestSet = catalog.mediaItemsForLabel(Catalog::BestLabelId);
 
-	GridItem::setSortMode(_sortControl);
-	const bool sortByDate = GridItem::sortBy == SortBy::Date;
+	GridItem::order = _sortControl->order();
+	const bool sortByDate = GridItem::order.sortBy == SortBy::Date;
 
 	const std::vector<MediaId> mediaItems = mediaItemsMatchingFilters();
 
@@ -941,8 +928,8 @@ void MediaBrowserWidget::resortMediaGrid()
 	Catalog& catalog = _library.catalog();
 	const QSet<MediaId> bestSet = catalog.mediaItemsForLabel(Catalog::BestLabelId);
 
-	GridItem::setSortMode(_sortControl);
-	const bool sortByDate = GridItem::sortBy == SortBy::Date;
+	GridItem::order = _sortControl->order();
+	const bool sortByDate = GridItem::order.sortBy == SortBy::Date;
 
 	for (int row = 0; row < count; ++row)
 	{

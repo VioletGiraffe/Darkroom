@@ -7,6 +7,5 @@
 		<file>UI/icon_search.svg</file>
 		<file>UI/icon_columns.svg</file>
 		<file>UI/icon_grid.svg</file>
-		<file>UI/icon_sort.svg</file>
 	</qresource>
 </RCC>
