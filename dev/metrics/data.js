@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792496432671,
+  "lastUpdate": 1792500697003,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -14601,6 +14601,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 407.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 50,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 44.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 12,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "afb4cfc7449701a1350e1a0010955273b6048b7a",
+          "message": "Bugfix: MediaGrid no longer selects hidden rows; Quickroom: name filter in the browser, the filter field moved to Shared as NameFilterField",
+          "timestamp": "2026-10-20T15:42:25+03:00",
+          "tree_id": "9d226d9bf936a3fcace622d76139a639ab91495b",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/afb4cfc7449701a1350e1a0010955273b6048b7a"
+        },
+        "date": 1792500694723,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 15997,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1308,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 28165,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3418.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 2904,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2878,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 409,
             "unit": "KB"
           },
           {
