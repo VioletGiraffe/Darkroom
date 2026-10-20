@@ -25,7 +25,21 @@ Each row therefore carries an explicit media-type-specific size hint; the grid c
 
 ## ThumbnailWidget
 
-`ThumbnailWidget` is the shared image renderer beneath media cards and standalone frame thumbnails.
+`ThumbnailWidget` presents an image in a matte beneath media cards, standalone frame thumbnails and Quickroom's tiles,
+with optional frame, caption and film-strip treatment. A source produces the image, so the widget is independent of
+where the pixels come from.
+
+### Image sources
+
+- The widget holds its source by value in `ThumbnailWidget::Source`, a variant of value types sharing the members listed
+  in `ImageSource.h`.
+- `renderNow` answers on the GUI thread when the image is cheap to produce there. Otherwise the widget waits out the
+  load dwell and calls `renderAsync`, so cheap sources skip the dwell without the widget telling sources apart.
+- Asynchronous results arrive on the GUI thread through a `Delivery`. The returned `Request` cancels on destruction or
+  replacement, and pending stages skip their work once cancelled.
+- A source states whether its image gets the matte's rounded corners.
+- `ImageFilesSource` tiles image files side by side. `IconSource` (Quickroom's folders and videos) draws a file icon,
+  synchronously and without rounded corners.
 
 ### Sizing and rendering
 
@@ -33,28 +47,32 @@ Target image-area dimensions are maximum bounds. A loaded image that fits is pai
 resize may temporarily scale it. This makes incorrect layout calculations visible as clipping instead of silently
 hiding them behind permanent resampling.
 
-An empty composite input is a valid final state. The widget reserves its configured canvas and paints a no-preview
-placeholder without scheduling any load, so broken or preview-less items still have reachable cards.
+The image area is a configured canvas (cards) or follows the widget's size. A size or pixel-ratio change re-renders,
+keeping the old image until the new one arrives.
+
+A source with nothing to show is a valid final state: `ImageFilesSource` without paths answers `renderNow` with an empty
+result and the widget paints a no-preview placeholder, so broken or preview-less items still have reachable cards.
 
 Dynamic size hints return the loaded image's tight bounds. Browser and staging grids use fixed hints because row
-geometry must be known before asynchronous loading and because photo/video widths differ. Optional framing and
-film-strip treatment change presentation without changing the shared load path.
+geometry must be known before asynchronous loading and because photo/video widths differ. Layout-sized widgets use
+fixed hints too: a hint following the image would resize the widget, which re-renders the image. Framing and the film
+strip do not involve the source; the film strip only shrinks the requested box by its bands.
 
 Thumbnail pixels are explicitly clipped to the rounded matte; stylesheet border radius alone cannot clip child
 painting.
 
 ### Loading
 
-Composite thumbnails schedule no I/O at construction. First paint starts a short dwell and loading proceeds only if
-the widget remains visible, preventing off-screen materialization and fast scrolling from reading images that never
-need presentation.
+Nothing renders at construction. Rendering is decided at paint time, so only shown widgets load. For asynchronous
+sources, first paint starts a short dwell and loading proceeds only if the widget remains visible, preventing
+off-screen materialization and fast scrolling from reading images that never need presentation.
 
 For video cards, preview-directory enumeration and fallback to the full frame folder occur before asynchronous image
 loading and currently run on the GUI thread. Lazy card materialization bounds this work to nearby rows, but slow or
 unavailable storage can still delay card creation; investigations must not assume the complete thumbnail path is
 background-only.
 
-Actual loading has two stages:
+`ImageFilesSource` loads in two stages:
 
 1. File reads go through `Core::IoThreadPool`, which routes fast storage to bounded parallel workers and slow,
    external, network, or unknown storage to a shared serial worker.
@@ -66,14 +84,14 @@ the target size, its slices also on `cpuThreadPool()`.
 With `PROFILING_ENABLED` defined, each batch of overlapping loads logs its wall time and the read and decode totals:
 the time to fill a screenful of thumbnails.
 
-Cards are initially parentless, so their real screen and device-pixel ratio may not yet be known. Scheduling captures
-the current ratio; painting rechecks it after attachment and reschedules rendering when the context changed.
+Cards are initially parentless, so their real screen and device-pixel ratio may not yet be known. Deciding at paint
+time renders for the ratio of the screen the widget is shown on.
 
 ### Dragging standalone frames
 
-The standalone-frame constructor supplies a source-file URL drag by default. The composite constructor supplies no
-drag payload. `ThumbnailWidget` delegates gesture recognition to `DragGestureHelper`, keeping frame viewers and
-cards free of duplicated pointer-threshold mechanics.
+A source-file URL drag is opt-in through `setDragFilePath`: frame viewers and the compare window offer one, grid cards
+do not. `ThumbnailWidget` delegates gesture recognition to `DragGestureHelper`, keeping frame viewers and cards free of
+duplicated pointer-threshold mechanics.
 
 ## Drag helpers
 

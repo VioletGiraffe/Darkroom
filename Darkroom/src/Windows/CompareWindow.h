@@ -18,9 +18,6 @@ class CompareWindow final : public QWidget {
 public:
 	explicit CompareWindow(const QStringList& folderPaths, QWidget* parent = nullptr);
 
-protected:
-	void resizeEvent(QResizeEvent* event) override;
-
 private:
 	void startFrameLoadTimer();
 	void loadCurrentFrame();

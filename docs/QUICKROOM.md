@@ -22,16 +22,14 @@ the coding conventions.
 - `FolderListing` - the folder's entries, listed through thin_io: folders and supported media files, without hidden
   entries. Also the browser's order: by name or modification time, folders first when ascending and last when
   descending. The viewer and player opened from the command line browse in that order too.
-- `IconTileWidget` - tile for entries without an image preview (folders, videos): native file icon + caption,
-  styled via the shared `framedThumbnail` QSS rule.
 - `SettingsDialog` - Quickroom's own: ffmpeg path, theming, the video player's frame extraction format.
 - `FileOperations` - file operations with Quickroom's confirmation policy, shared by the browser and the
   standalone viewer: deletion, the file clipboard, and copy/move through the `file-operations` engine.
 
-Image tiles are `ThumbnailWidget`s (single-file constructor - the FrameViewerWindow pattern), so lazy
-dwell-loading, async decode, and Ctrl+wheel zoom are shared behavior, and `MediaGrid`'s card factory
-materializes tiles on demand. The grid drives drag and drop - a multi-selection exports all selected paths as
-file URLs - so the image tiles' own single-file drag is disabled. Each tile is its row's card and fills the
+Every tile is a `ThumbnailWidget`: images through a single-file `ImageFilesSource` (the FrameViewerWindow pattern),
+folders and videos through `IconSource` with the native file icon. Lazy dwell-loading, async decode, and Ctrl+wheel zoom are shared behavior,
+and `MediaGrid`'s card factory materializes tiles on demand. The grid drives drag and drop - a multi-selection exports
+all selected paths as file URLs - so tiles offer no single-file drag of their own. Each tile is its row's card and fills the
 cell; the view paints no cell background, and the tile shows selection itself through the `selected` property
 the grid keeps on every card.
 

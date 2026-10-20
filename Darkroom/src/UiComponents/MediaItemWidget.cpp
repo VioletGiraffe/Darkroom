@@ -1,4 +1,5 @@
 #include "UiComponents/MediaItemWidget.h"
+#include "UiComponents/ImageFilesSource.h"
 #include "UiComponents/LabelMimeType.h"
 #include "UiComponents/ThumbnailWidget.h"
 #include "Theme/Theme.h"
@@ -210,8 +211,8 @@ MediaItemWidget::MediaItemWidget(
 	layout->setContentsMargins(0, 0, 0, 0);
 	layout->setSpacing(CARD_FOOTER_SPACING);
 
-	_thumb = new ThumbnailWidget(
-		previewPaths, QString(), this, maxImageSize, dynamicSizeHint, /*framed*/ false, /*filmStrip*/ _filmStrip);
+	_thumb = new ThumbnailWidget(ImageFilesSource{ previewPaths }, QString(),
+		{ .canvasSize = maxImageSize, .dynamicSizeHint = dynamicSizeHint, .framed = false, .filmStrip = _filmStrip }, this);
 	_thumb->installEventFilter(this);
 
 	_framesReadyBadge = new FramesReadyBadge(_thumb);

@@ -24,7 +24,7 @@ public:
 private:
 	void refreshDisplay();
 	void showInstruction(const QString& text);
-	void showThumbnailContextMenu(const QPoint& pos);
+	void showThumbnailContextMenu(ThumbnailWidget& thumbnail, const QString& path, const QPoint& pos);
 	void zoomThumbnails(int steps);
 
 private:

@@ -1,5 +1,6 @@
 #include "Windows/CompareWindow.h"
 #include "Windows/ImageViewerWindow.h"
+#include "UiComponents/ImageFilesSource.h"
 #include "UiComponents/ThumbnailWidget.h"
 #include "Utils.h"
 #include "assert/advanced_assert.h"
@@ -40,11 +41,14 @@ CompareWindow::CompareWindow(const QStringList& folderPaths, QWidget* parent) : 
 	QHBoxLayout* thumbnailRow = new QHBoxLayout();
 	for (int i = 0; i < folderPaths.size(); ++i)
 	{
-		_thumbnailWidgets.push_back(new ThumbnailWidget(QString{}, QString{}, 0, this));
+		// A size hint following the image would resize the pane, which re-renders the image.
+		_thumbnailWidgets.push_back(new ThumbnailWidget(ImageFilesSource{ QStringList{} }, QString{}, { .dynamicSizeHint = false }, this));
 		// A pane shows one folder's frame at the slider position, so the viewer browses that folder from there.
-		// It only fires for a pane that has a frame loaded, so the slider position is in range for that folder.
+		// A folder with fewer frames has no frame there.
 		_thumbnailWidgets.back()->setOnActivatedCallback([this, i] {
-			ImageViewerWindow::showForImages(_folderFrames[static_cast<size_t>(i)], _slider->value(), this);
+			const QStringList& frames = _folderFrames[static_cast<size_t>(i)];
+			if (_slider->value() < frames.size())
+				ImageViewerWindow::showForImages(frames, _slider->value(), this);
 		});
 		thumbnailRow->addWidget(_thumbnailWidgets.back());
 	}
@@ -75,18 +79,12 @@ CompareWindow::CompareWindow(const QStringList& folderPaths, QWidget* parent) : 
 		_frameLabel->setText(tr("Frame: %1 / %2").arg(value + 1).arg(maxFrameCount));
 		startFrameLoadTimer();
 	});
+	loadCurrentFrame();
 
 	QShortcut* escShortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
 	connect(escShortcut, &QShortcut::activated, this, &CompareWindow::close);
 
 	enablePersistence(this, "compareWindow/window", CPersistenceEnabler::Delayed{ true }, CPersistenceEnabler::SetDefaultSize{ false });
-}
-
-void CompareWindow::resizeEvent(QResizeEvent* event)
-{
-	QWidget::resizeEvent(event);
-	if (_debounceTimer)
-		startFrameLoadTimer();
 }
 
 void CompareWindow::startFrameLoadTimer()
@@ -98,21 +96,14 @@ void CompareWindow::loadCurrentFrame()
 {
 	const int frameIndex = _slider->value();
 
-	QStringList paths;
-	paths.reserve(_folderFrames.size());
-
 	assert_r(_thumbnailWidgets.size() == _folderFrames.size());
 
 	for (size_t i = 0; i < _thumbnailWidgets.size(); ++i)
 	{
 		ThumbnailWidget* widget = _thumbnailWidgets[i];
-		if (frameIndex < _folderFrames[i].size())
-		{
-			const QString framePath = _folderFrames[i][frameIndex];
-			QString caption = QFileInfo(framePath).fileName();
-			widget->loadFrame(framePath, caption);
-		}
-		else
-			widget->loadFrame(QString{}, QString{});
+		const QString framePath = frameIndex < _folderFrames[i].size() ? _folderFrames[i][frameIndex] : QString{};
+		widget->setSource(ImageFilesSource{ framePath.isEmpty() ? QStringList{} : QStringList{ framePath } });
+		widget->setCaption(framePath.isEmpty() ? QString{} : QFileInfo(framePath).fileName());
+		widget->setDragFilePath(framePath);
 	}
 }

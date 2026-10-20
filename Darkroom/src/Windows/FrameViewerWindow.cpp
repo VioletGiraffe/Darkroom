@@ -2,6 +2,7 @@
 #include "Windows/ImageViewerWindow.h"
 #include "Theme/Style.h"
 #include "Theme/Theme.h"
+#include "UiComponents/ImageFilesSource.h"
 #include "UiComponents/ThumbnailWidget.h"
 #include "Utils.h"
 #include "compiler/compiler_warnings_control.h"
@@ -128,8 +129,13 @@ void FrameViewerWindow::refreshDisplay()
 	for (int index = 0; index < _imagePaths.size(); ++index)
 	{
 		const QString& filePath = _imagePaths.at(index);
-		auto* thumbnail = new ThumbnailWidget(filePath, QFileInfo{ filePath }.completeBaseName(), _thumbnailSize, _thumbnailContainer);
-		connect(thumbnail, &ThumbnailWidget::customContextMenuRequested, this, &FrameViewerWindow::showThumbnailContextMenu);
+		auto* thumbnail = new ThumbnailWidget(ImageFilesSource{ QStringList{ filePath } }, QFileInfo{ filePath }.completeBaseName(), {}, _thumbnailContainer);
+		thumbnail->setFixedSize(_thumbnailSize, _thumbnailSize);
+		thumbnail->setDragFilePath(filePath);
+		thumbnail->setContextMenuPolicy(Qt::CustomContextMenu);
+		connect(thumbnail, &ThumbnailWidget::customContextMenuRequested, this, [this, thumbnail, filePath](const QPoint& pos) {
+			showThumbnailContextMenu(*thumbnail, filePath, pos);
+		});
 		thumbnail->setOnMouseWheelCallback([this](int steps) { zoomThumbnails(steps); });
 		thumbnail->setOnActivatedCallback([this, index] {
 			ImageViewerWindow::showForImages(_imagePaths, index, this);
@@ -160,21 +166,17 @@ void FrameViewerWindow::zoomThumbnails(int steps)
 	_refreshDebounceTimer->start();
 }
 
-void FrameViewerWindow::showThumbnailContextMenu(const QPoint& pos)
+void FrameViewerWindow::showThumbnailContextMenu(ThumbnailWidget& thumbnail, const QString& path, const QPoint& pos)
 {
-	auto* senderWidget = dynamic_cast<ThumbnailWidget*>(sender());
-	if (!senderWidget)
-		return;
-
 	QMenu menu;
-	menu.addAction(revealInFileManagerActionText(), [senderWidget, this] {
-		if (const QString path = senderWidget->filePath(); !revealInFileManager(path))
+	menu.addAction(revealInFileManagerActionText(), [path, this] {
+		if (!revealInFileManager(path))
 			reportMissingFile(this, path);
 	});
-	menu.addAction(tr("Copy file path"), [senderWidget] {
-		QApplication::clipboard()->setText(QDir::toNativeSeparators(senderWidget->filePath()));
+	menu.addAction(tr("Copy file path"), [path] {
+		QApplication::clipboard()->setText(QDir::toNativeSeparators(path));
 	});
-	menu.exec(senderWidget->mapToGlobal(pos));
+	menu.exec(thumbnail.mapToGlobal(pos));
 
-	clearStuckHoverIfCursorLeft(senderWidget);
+	clearStuckHoverIfCursorLeft(&thumbnail);
 }

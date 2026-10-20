@@ -136,7 +136,7 @@ workflow ownership, rename transactions, integrity-check ownership, and diagnost
 
 ### [Media cards and thumbnails](architecture/media-widgets.md)
 
-`MediaItemWidget`, `ThumbnailWidget`, label-drop and drag behavior, asynchronous read/decode ownership, rendering
+`MediaItemWidget`, `ThumbnailWidget` and its image sources, label-drop and drag behavior, asynchronous read/decode ownership, rendering
 invariants, and card geometry controls.
 
 ### [Frame viewing, playback, and photo comparison](architecture/playback.md)

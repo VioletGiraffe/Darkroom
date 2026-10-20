@@ -1,9 +1,10 @@
 #include "BrowserWindow.h"
 #include "FileOperations.h"
 #include "FolderListing.h"
-#include "IconTileWidget.h"
 #include "SettingsDialog.h"
 #include "Theme/Theme.h"
+#include "UiComponents/IconSource.h"
+#include "UiComponents/ImageFilesSource.h"
 #include "UiComponents/MediaGrid.h"
 #include "UiComponents/NameFilterField.h"
 #include "UiComponents/SortControl.h"
@@ -782,38 +783,31 @@ void BrowserWindow::updateCountsAndEmptyMessage()
 QWidget* BrowserWindow::buildTile(QListWidgetItem* item)
 {
 	const auto& entry = static_cast<const GridEntry&>(*item);
-	const auto onWheel = [this](int steps) { zoomTiles(steps); };
-	const auto onContextMenu = [this, path = entry.path, isFolder = entry.kind == EntryKind::Folder](QWidget* tile, QPoint pos) {
-		showEntryContextMenu(path, isFolder, tile->mapToGlobal(pos));
-	};
-	const auto withCutMark = [this, &entry](QWidget* tile) {
-		setCutMark(tile, isCut(entry.path));
-		return tile;
-	};
+	ThumbnailWidget::Source source = entry.kind == EntryKind::Image
+		? ThumbnailWidget::Source{ ImageFilesSource{ QStringList{ entry.path } } }
+		: ThumbnailWidget::Source{ IconSource{ _iconProvider.icon(QFileInfo(entry.path)) } };
 
-	if (entry.kind == EntryKind::Image)
+	// No drag of its own: the grid drags the whole selection.
+	auto* tile = new ThumbnailWidget(std::move(source), entry.name, {}, nullptr);
+	tile->setFixedSize(_tileSize, _tileSize);
+	switch (entry.kind)
 	{
-		auto* thumb = new ThumbnailWidget(entry.path, entry.name, _tileSize, nullptr);
-		thumb->disableDragGesture();   // the grid drags the whole selection
-		thumb->setOnActivatedCallback([this, path = entry.path] { viewImage(path); });
-		thumb->setOnMouseWheelCallback(onWheel);
-		connect(thumb, &QWidget::customContextMenuRequested, this, [thumb, onContextMenu](QPoint pos) { onContextMenu(thumb, pos); });
-		return withCutMark(thumb);
-	}
-
-	auto* tile = new IconTileWidget(_iconProvider.icon(QFileInfo(entry.path)), entry.name, _tileSize, nullptr);
-	if (entry.kind == EntryKind::Folder)
-	{
+	case EntryKind::Folder:
 		// Queued: navigating rebuilds the grid, which would delete this tile mid-handler.
 		tile->setOnActivatedCallback([this, path = entry.path] {
 			QMetaObject::invokeMethod(this, [this, path] { navigateTo(path); }, Qt::QueuedConnection);
 		});
+		break;
+	case EntryKind::Image: tile->setOnActivatedCallback([this, path = entry.path] { viewImage(path); }); break;
+	case EntryKind::Video: tile->setOnActivatedCallback([this, path = entry.path] { playVideo(path); }); break;
 	}
-	else
-		tile->setOnActivatedCallback([this, path = entry.path] { playVideo(path); });
-	tile->setOnMouseWheelCallback(onWheel);
-	connect(tile, &QWidget::customContextMenuRequested, this, [tile, onContextMenu](QPoint pos) { onContextMenu(tile, pos); });
-	return withCutMark(tile);
+	tile->setOnMouseWheelCallback([this](int steps) { zoomTiles(steps); });
+	tile->setContextMenuPolicy(Qt::CustomContextMenu);
+	connect(tile, &QWidget::customContextMenuRequested, this, [this, tile, path = entry.path, isFolder = entry.kind == EntryKind::Folder](QPoint pos) {
+		showEntryContextMenu(path, isFolder, tile->mapToGlobal(pos));
+	});
+	setCutMark(tile, isCut(entry.path));
+	return tile;
 }
 
 void BrowserWindow::zoomTiles(int steps)
