@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792621508583,
+  "lastUpdate": 1792621692813,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -15603,6 +15603,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Lines of code (Quickroom)",
             "value": 1395,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 28990,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3475,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 3500,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2911,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 422.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 57,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 47,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 12.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "669f31f6dd5e0a9d38ab07683e268db6b6cc2cdf",
+          "message": "Installer adds \"Browse with Quickroom\" to the context menu of folders, folder backgrounds and drives",
+          "timestamp": "2026-10-22T01:21:18+03:00",
+          "tree_id": "0cfe8384b953442ad0d0dd3c9f202cfe4c5724c9",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/669f31f6dd5e0a9d38ab07683e268db6b6cc2cdf"
+        },
+        "date": 1792621690350,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 16258,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1400,
             "unit": "LOC"
           },
           {
