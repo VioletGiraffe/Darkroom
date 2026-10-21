@@ -27,7 +27,10 @@ public:
 	bool operator==(const MediaId& other) const;
 
 private:
-	QString _name;       // original file name, kept for display; identity compares it case-insensitively
+	MediaId(QString name, qint64 size);
+
+	QString _name;       // original file name, kept for display
+	QString _matchName;  // _name case-folded once: equality, hash() and key() use it
 	qint64  _size = -1;  // -1 == invalid (no such file)
 };
 
