@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792610354398,
+  "lastUpdate": 1792616220681,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -15396,6 +15396,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .data",
             "value": 56.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 46.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 12.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "fea158388b04a831d5fdac8fbb4e9b7516756890",
+          "message": "Frame folder names derived from the identity's basename, extension and size instead of a hash; hashing moved to rapidhash\n\nFrame folders of items imported earlier keep their old names; the catalog stores their paths, so they keep working, but isTrackedUnderLabel no longer matches them.",
+          "timestamp": "2026-10-21T23:45:27+03:00",
+          "tree_id": "a00e9f7985bf2a3fbe7cd464e428e0573fe9199d",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/fea158388b04a831d5fdac8fbb4e9b7516756890"
+        },
+        "date": 1792616217692,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 16259,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1395,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 28926,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3471,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 3498.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2908,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 422,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 57,
             "unit": "KB"
           },
           {
