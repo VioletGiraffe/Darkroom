@@ -1,19 +1,23 @@
 #define MyAppName "Darkroom"
-#define MyAppPublisher "VioletGiraffe"
 #define MyAppExeName "Darkroom.exe"
 #define QuickroomName "Quickroom"
 #define QuickroomExeName "Quickroom.exe"
 #define IconDir "filetypes"
 #define VCRedistExeName "vc_redist.x64.exe"
-; Version is read from the built exe (which gets it from VERSION in Darkroom.pro) - single source of truth
-#define MyAppVersion GetVersionNumbersString(AddBackslash(SourcePath) + "dist\" + MyAppExeName)
+; Version, publisher and copyright are read from the built exe: Darkroom.pro is their single source of truth
+#define MyAppExePath AddBackslash(SourcePath) + "dist\" + MyAppExeName
+#define MyAppVersion GetVersionNumbersString(MyAppExePath)
 
 [Setup]
 ; Fixed install identity: must never change, or upgrades stop finding existing installs
 AppId={{E39F5C26-279C-4902-A64A-7560BF1D159F}
 AppName={#MyAppName}
-AppPublisher={#MyAppPublisher}
+AppPublisher={#GetFileCompany(MyAppExePath)}
 AppVersion={#MyAppVersion}
+AppCopyright={#GetFileCopyright(MyAppExePath)}
+; Setup.exe's own file version, which does not default to AppVersion
+VersionInfoVersion={#MyAppVersion}
+SetupIconFile={#SourcePath}\Darkroom\res\darkroom.ico
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes

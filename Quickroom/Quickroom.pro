@@ -7,6 +7,8 @@ DEFINES += QUICKROOM_VERSION=$$VERSION
 !versionAtLeast(QT_VERSION, 6.8.0): error("Quickroom requires Qt 6.8 or newer.")
 
 QMAKE_TARGET_PRODUCT     = Quickroom
+# FileDescription: the name Task Manager and Open With display
+QMAKE_TARGET_DESCRIPTION = Quickroom
 QMAKE_TARGET_COMPANY     = VioletGiraffe
 QMAKE_TARGET_COPYRIGHT   = Copyright (C) 2026 VioletGiraffe
 

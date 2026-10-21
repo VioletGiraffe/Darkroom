@@ -7,6 +7,8 @@ DEFINES += DARKROOM_VERSION=$$VERSION
 !versionAtLeast(QT_VERSION, 6.8.0): error("Darkroom requires Qt 6.8 or newer.")
 
 QMAKE_TARGET_PRODUCT     = Darkroom
+# FileDescription: the name Task Manager and Open With display
+QMAKE_TARGET_DESCRIPTION = Darkroom
 QMAKE_TARGET_COMPANY     = VioletGiraffe
 QMAKE_TARGET_COPYRIGHT   = Copyright (C) 2026 VioletGiraffe
 
