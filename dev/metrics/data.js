@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792585459440,
+  "lastUpdate": 1792596598283,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -15134,6 +15134,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Lines of code (libs)",
             "value": 28509,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3461,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 3490.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2902.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 419.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 55.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 46,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 12.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "9dd2def2f873d765b17b089ae5f3916fa84e4f20",
+          "message": "LabelRowDelegate: the All-row icon blitted 1:1 without antialiasing at a device-pixel-snapped position; ThumbnailWidget uses the snap helper from qtutils",
+          "timestamp": "2026-10-21T18:19:34+03:00",
+          "tree_id": "2d232d309a370248322505e0cfaa669bcf157aa0",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/9dd2def2f873d765b17b089ae5f3916fa84e4f20"
+        },
+        "date": 1792596595539,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 16222,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1395,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 28523,
             "unit": "LOC"
           },
           {
