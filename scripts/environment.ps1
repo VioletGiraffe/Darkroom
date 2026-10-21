@@ -73,6 +73,6 @@ function Invoke-MSBuild([string]$solution, [string[]]$targets, [string]$configur
 	$properties = "/p:Configuration=$configuration"
 	if ($platformToolset) { $properties += ";PlatformToolset=$platformToolset" }
 	# msbuild, not nmake: it also rebuilds what the compiler command line changed for, such as the Qt include paths
-	msbuild (Join-Path $repositoryRoot $solution) "/t:$($targets -join ';')" /nologo /m /v:minimal $properties
+	msbuild (Join-Path $repositoryRoot $solution) "/t:$($targets -join ';')" /nologo /m /v:minimal /clp:Summary $properties
 	if ($LASTEXITCODE -ne 0) { exit 1 }
 }
