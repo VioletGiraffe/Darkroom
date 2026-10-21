@@ -47,6 +47,19 @@ namespace
 	};
 }
 
+TEST_CASE("frameFolderName: derived from the identity's fields alone", "[catalog]")
+{
+	// Names folders on disk: these values pin the scheme
+	CHECK(Catalog::frameFolderName("clip", MediaId::fromNameAndSize("clip.mp4", 734003200)) == "clip_mp4_734003200");
+	CHECK(Catalog::frameFolderName("clip", MediaId::fromNameAndSize("clip", 5)) == "clip__5");
+	CHECK(Catalog::frameFolderName("", MediaId::fromNameAndSize(".mp4", 5)) == "_mp4_5");
+
+	// Identities differing in extension, size, or only where an underscore replaces the dot
+	CHECK(Catalog::frameFolderName("clip", MediaId::fromNameAndSize("clip.mp4", 5)) != Catalog::frameFolderName("clip", MediaId::fromNameAndSize("clip.mov", 5)));
+	CHECK(Catalog::frameFolderName("clip", MediaId::fromNameAndSize("clip.mp4", 5)) != Catalog::frameFolderName("clip", MediaId::fromNameAndSize("clip.mp4", 6)));
+	CHECK(Catalog::frameFolderName("a_b", MediaId::fromNameAndSize("a_b", 5)) != Catalog::frameFolderName("a", MediaId::fromNameAndSize("a.b", 5)));
+}
+
 TEST_CASE("Library forwards coalesced Catalog change notifications", "[catalog]")
 {
 	LibraryFixture f;

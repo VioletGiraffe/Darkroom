@@ -17,7 +17,7 @@ class FrameViewerWindow final : public QWidget {
 public:
 	explicit FrameViewerWindow(QWidget* parent = nullptr);
 
-	// Empty title uses a generic fallback; folder leaves are never displayed because they contain identity hashes.
+	// Empty title uses a generic fallback; folder leaves are never displayed because they carry an identity suffix.
 	void showForFolder(const QString& folderPath, const QString& title = {});
 	[[nodiscard]] const QString& currentFolder() const { return _folderPath; }
 

@@ -1,7 +1,7 @@
 #include "Core/MediaId.h"
 
 #include "compiler/compiler_warnings_control.h"
-#include "hash/wheathash.hpp"
+#include "hash/rapidhash.hpp"
 
 DISABLE_COMPILER_WARNINGS
 #include <QFileInfo>
@@ -42,7 +42,7 @@ QString MediaId::key() const
 uint64_t MediaId::hash() const
 {
 	const QString k = key();
-	return ::wheathash64(k.data(), k.size() * sizeof(QChar));
+	return ::rapidhash64(k.data(), k.size() * sizeof(QChar));
 }
 
 bool MediaId::operator==(const MediaId& other) const

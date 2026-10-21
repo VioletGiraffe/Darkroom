@@ -75,9 +75,10 @@ public:
 	// Empty for an unknown id.
 	[[nodiscard]] QString folderForMediaItem(const MediaId& id) const;
 	[[nodiscard]] QString sourcePathForMediaItem(const MediaId& id) const;
-	// Source basename used for display and sorting; never exposes a video frame-folder hash suffix.
+	// Source basename used for display and sorting; never exposes a video frame-folder identity suffix.
 	[[nodiscard]] QString displayName(const MediaId& id) const;
-	// Adds an identity hash so even an empty, reserved, or trailing-dot basename yields a valid unique leaf.
+	// Appends the identity's extension and byte size, so even an empty, reserved, or trailing-dot basename yields a valid unique leaf.
+	// Names folders on disk: a scheme change mismatches the folders of existing items.
 	[[nodiscard]] static QString frameFolderName(const QString& baseName, const MediaId& id);
 	// Pure path join; frameFolder need not exist.
 	[[nodiscard]] static QString previewDirFor(const QString& frameFolder);

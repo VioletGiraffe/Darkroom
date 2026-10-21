@@ -422,7 +422,8 @@ QString Catalog::displayName(const MediaId& id) const
 
 QString Catalog::frameFolderName(const QString& baseName, const MediaId& id)
 {
-	return baseName + "_" + QString::number(id.hash(), 36);
+	// The separator stays when the extension is empty: "a_b" without an extension must not match "a.b"
+	return baseName + "_" + QFileInfo(id.name()).suffix() + "_" + QString::number(id.size());
 }
 
 QString Catalog::previewDirFor(const QString& frameFolder)

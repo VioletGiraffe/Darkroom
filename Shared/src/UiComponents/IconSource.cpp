@@ -1,7 +1,7 @@
 #include "UiComponents/IconSource.h"
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
-#include "hash/wheathash.hpp"
+#include "hash/rapidhash.hpp"
 
 DISABLE_COMPILER_WARNINGS
 #include "resize/qimage_resize.h"
@@ -33,7 +33,7 @@ static QPixmap scaledIconPixmap(const QIcon& icon, const QSize& logicalBox, qrea
 		return result;
 	}
 
-	const uint64_t contentHash = wheathash64(native.constBits(), static_cast<uint64_t>(native.sizeInBytes()));
+	const uint64_t contentHash = rapidhash64(native.constBits(), static_cast<size_t>(native.sizeInBytes()));
 	const QString key = QStringLiteral("IconTile_%1_%2_%3_%4x%5@%6")
 		.arg(contentHash).arg(static_cast<int>(native.format())).arg(native.width()).arg(targetSize.width()).arg(targetSize.height()).arg(dpr);
 	QPixmap result;
