@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792621692813,
+  "lastUpdate": 1792622950372,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -15672,6 +15672,85 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/VioletGiraffe/Darkroom/commit/669f31f6dd5e0a9d38ab07683e268db6b6cc2cdf"
         },
         "date": 1792621690350,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 16258,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1400,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 28990,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3475,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 3500,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2911,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 422.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 57,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 47,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 12.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "36edf54bba89704125a94d480c6ce6ae3c117f7e",
+          "message": "Exes carry a FileDescription; Setup.exe takes its version, publisher, copyright and icon from Darkroom.exe",
+          "timestamp": "2026-10-22T01:40:45+03:00",
+          "tree_id": "b7f7cad0089a7c920b7ed0f106bb4872d7e8eb68",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/36edf54bba89704125a94d480c6ce6ae3c117f7e"
+        },
+        "date": 1792622947809,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
