@@ -79,7 +79,7 @@ background-only.
 
 1. File reads go through `Core::IoThreadPool`, which routes fast storage to bounded parallel workers and slow,
    external, network, or unknown storage to a shared serial worker.
-2. CPU decoding runs on `cpuThreadPool()`.
+2. CPU decoding runs on `cpuThreadPool()`, a card's frames in parallel.
 
 `QImageReader` decodes at full resolution and applies orientation metadata; `ImageProcessing::resize` then scales to
 the target size, its slices also on `cpuThreadPool()`.

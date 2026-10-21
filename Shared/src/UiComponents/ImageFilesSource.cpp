@@ -114,19 +114,24 @@ namespace {
 		if (slotWidth <= 0 || slotHeight <= 0)
 			return;
 
+		struct DecodedFrame {
+			QImage fitted;
+			QString error;
+			QByteArray format;
+		};
+
 		// Decoded at full resolution: all scaling goes through ImageProcessing::resize, not the reader's own (JPEG DCT reduction, QImage::scaled).
-		std::vector<QImage> fitted;
-		fitted.reserve(n);
-		QString firstError = readError;
-		QByteArray firstFormat;
-		for (QByteArray& bytes : bytesPerPath)
-		{
-			QBuffer buffer(&bytes);
+		std::vector<DecodedFrame> frames(bytesPerPath.size());
+		cpuParallelFor(frames.size(), [&](size_t i) {
+			if (job._delivery.isCancelled())
+				return;
+
+			DecodedFrame& frame = frames[i];
+			QBuffer buffer(&bytesPerPath[i]);
 			buffer.open(QIODevice::ReadOnly);
 			QImageReader reader(&buffer);  // A format hint would suppress content detection.
 			reader.setAutoTransform(true); // read() returns the image in its displayed orientation
-			if (firstFormat.isEmpty())
-				firstFormat = reader.format();
+			frame.format = reader.format();
 
 			const QImage src = [&] {
 				PROFILE_SAMPLE("Thumbnail image decode");
@@ -134,20 +139,39 @@ namespace {
 			}();
 			if (src.isNull())
 			{
-				if (firstError.isEmpty())
-					firstError = reader.errorString();
-				continue;
+				frame.error = reader.errorString();
+				return;
 			}
 
 			// At least 1 px: an extreme aspect ratio fits the slot at zero width or height
 			const QSize sizePx = src.size().scaled(QSize(slotWidth, slotHeight), Qt::KeepAspectRatio).expandedTo({ 1, 1 });
-			QImage scaled{ sizePx, src.format() };
+			frame.fitted = QImage{ sizePx, src.format() };
 			{
 				PROFILE_SAMPLE("Thumbnail resize");
-				if (!ImageProcessing::resize(scaled, src, {}, cpuParallelFor))
-					scaled = src.scaled(sizePx, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+				if (!ImageProcessing::resize(frame.fitted, src, {}, cpuParallelFor))
+					frame.fitted = src.scaled(sizePx, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
 			}
-			fitted.push_back(std::move(scaled));
+		});
+
+		// A frame skipped on cancellation has neither an image nor an error
+		if (job._delivery.isCancelled())
+			return;
+
+		std::vector<QImage> fitted;
+		fitted.reserve(n);
+		QString firstError = readError;
+		QByteArray firstFormat;
+		for (DecodedFrame& frame : frames)
+		{
+			if (firstFormat.isEmpty())
+				firstFormat = frame.format;
+			if (frame.fitted.isNull())
+			{
+				if (firstError.isEmpty())
+					firstError = frame.error;
+			}
+			else
+				fitted.push_back(std::move(frame.fitted));
 		}
 
 		if (fitted.empty())
