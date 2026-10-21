@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792596598283,
+  "lastUpdate": 1792608241301,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -15238,6 +15238,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .data",
             "value": 55.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 46,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 12.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "6a1b5066e3eb817704b9a49eb4e9d03ae4aa1fe4",
+          "message": "ImageFilesSource: orientation applied after the resize, at thumbnail size, not to the full-resolution decode",
+          "timestamp": "2026-10-21T21:30:24+03:00",
+          "tree_id": "8804197d5779918a3f981f915ee7cb67b5d429b4",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/6a1b5066e3eb817704b9a49eb4e9d03ae4aa1fe4"
+        },
+        "date": 1792608239465,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 16254,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1395,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 28523,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3463.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 3493,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2903.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 420.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 56,
             "unit": "KB"
           },
           {
