@@ -84,9 +84,10 @@ struct ItemInfo
 	QString name;
 };
 
-ItemInfo itemInfoFor(Catalog& catalog, const MediaId& id, bool isBest, bool sortByDate)
+ItemInfo itemInfoFor(Catalog& catalog, const MediaId& id, bool sortByDate)
 {
 	const QString name = catalog.displayName(id);
+	const bool isBest = catalog.mediaItemHasLabel(id, Catalog::BestLabelId);
 	return { isBest, sortByDate ? getSourceFileDate(catalog.sourcePathForMediaItem(id), catalog.folderForMediaItem(id)) : QDateTime{}, name };
 }
 
@@ -790,7 +791,6 @@ void MediaBrowserWidget::rebuildGridRows()
 	updateCardCanvasSizes();
 
 	Catalog& catalog = _library.catalog();
-	const QSet<MediaId> bestSet = catalog.mediaItemsForLabel(Catalog::BestLabelId);
 
 	GridItem::order = _sortControl->order();
 	const bool sortByDate = GridItem::order.sortBy == SortBy::Date;
@@ -807,7 +807,7 @@ void MediaBrowserWidget::rebuildGridRows()
 	{
 		auto* item = new GridItem();
 		item->mediaId = id;
-		item->info = itemInfoFor(catalog, id, bestSet.contains(id), sortByDate);
+		item->info = itemInfoFor(catalog, id, sortByDate);
 		item->setSizeHint(catalog.mediaType(id) == Catalog::MediaType::Photo ? photoCardHint : videoCardHint);
 		_mediaGrid->addItem(item);
 	}
@@ -910,7 +910,6 @@ void MediaBrowserWidget::resortMediaGrid()
 		return;
 
 	Catalog& catalog = _library.catalog();
-	const QSet<MediaId> bestSet = catalog.mediaItemsForLabel(Catalog::BestLabelId);
 
 	GridItem::order = _sortControl->order();
 	const bool sortByDate = GridItem::order.sortBy == SortBy::Date;
@@ -918,7 +917,7 @@ void MediaBrowserWidget::resortMediaGrid()
 	for (int row = 0; row < count; ++row)
 	{
 		auto* item = static_cast<GridItem*>(_mediaGrid->item(row));
-		item->info = itemInfoFor(catalog, item->mediaId, bestSet.contains(item->mediaId), sortByDate);
+		item->info = itemInfoFor(catalog, item->mediaId, sortByDate);
 	}
 
 	_mediaGrid->sortItems(Qt::AscendingOrder);
