@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792531904752,
+  "lastUpdate": 1792583916906,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -15016,6 +15016,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .reloc",
             "value": 12,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "e146ce8180c7de195d3c915ea98305a8a96fa5fc",
+          "message": "PhotoCompareWindow: image quality improved by resizing each mipmap level directly from the source size, using the kernel from image-processing (no more chained downscales)",
+          "timestamp": "2026-10-21T14:47:37+03:00",
+          "tree_id": "2ed5e9584a2c3623da1fb0b586328fa6767678d1",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/e146ce8180c7de195d3c915ea98305a8a96fa5fc"
+        },
+        "date": 1792583914373,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 16208,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1395,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 28509,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3461,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 3488.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2902.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 419.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 55.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 46,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 12.5,
             "unit": "KB"
           }
         ]
