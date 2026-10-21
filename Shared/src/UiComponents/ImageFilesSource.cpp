@@ -202,6 +202,8 @@ namespace {
 			image = QImage{ totalWidth, totalHeight, QImage::Format_ARGB32_Premultiplied };
 			image.fill(Qt::transparent);
 			QPainter painter(&image); // ends before the pixel ratio is set
+			// Frames never overlap on the transparent canvas: Source equals SourceOver and copies instead of blending
+			painter.setCompositionMode(QPainter::CompositionMode_Source);
 			int x = 0;
 			for (const QImage& img : std::as_const(fitted))
 			{
