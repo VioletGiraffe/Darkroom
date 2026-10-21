@@ -38,7 +38,7 @@ Makefiles, IDE state, `bin/`, and `build/` are not sources of truth.
 
 ### Submodules
 
-Six git submodules build as static libraries; `file-operations` is compiled from sources by the project using it.
+The git submodules build as static libraries; `file-operations` builds two, the engine and its dialogs.
 Each is its own include root except where noted:
 
 | Submodule | Supplies here |

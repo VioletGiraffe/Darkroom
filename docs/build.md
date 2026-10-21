@@ -34,8 +34,8 @@ CI and local builds run the same scripts in `scripts/`; the `.bat` files start t
 - `Shared/` builds a static library both apps link.
 - qmake does not pass a static library's `LIBS` on: a library `Shared` starts using must be added to both apps' `LIBS`
   and to their `depends` in `Darkroom.pro`.
-- Quickroom also compiles the `file-operations` engine, dialogs and `directoryscan` through that submodule's `.pri`
-  manifests, and links `thin_io` for them.
+- Quickroom links the `file-operations` libraries through that submodule's `libraries/fileoperationsui.pri`, which
+  adds their dependencies and include paths.
 
 The tests do not link `Shared`: `tests/tests.pro` compiles the sources under test directly, so the tests build even when
 the rest of the apps' code does not. It takes the model half of `Core/` (`Catalog`, `CatalogIntegrity`, `Library` from

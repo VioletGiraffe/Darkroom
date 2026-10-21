@@ -45,7 +45,6 @@ INCLUDEPATH += \
 	../qtutils \
 	../cpputils \
 	../cpp-template-utils \
-	../file-operations \
 	../image-processing \
 	../thin_io/src
 
@@ -57,12 +56,6 @@ HEADERS += $$files(src/*.h, true)
 
 SOURCES += $$files(src/*.cpp, true)
 
-# The copy/move engine and its dialogs; not config.pri, which would reset QT and the build settings.
-include(../file-operations/fileoperations/fileoperations.pri)
-include(../file-operations/fileoperationsui/fileoperationsui.pri)
-# Folder listing through thin_io
-include(../file-operations/directoryscan/directoryscan.pri)
-
 RESOURCES += res/quickroom.qrc
 
 ###################################################
@@ -70,7 +63,9 @@ RESOURCES += res/quickroom.qrc
 ###################################################
 
 # GNU ld resolves left to right: shared before the libraries it uses
-LIBS += -L$${DESTDIR} -lshared -lqtutils -lcpputils -limage-processing -lthin_io
+LIBS += -L$${DESTDIR} -lshared -lqtutils -lcpputils -limage-processing
+# The copy/move engine, its dialogs and folder listing, with their dependencies
+include(../file-operations/libraries/fileoperationsui.pri)
 include(../cpputils/dependencies.pri)
 
 ###################################################
