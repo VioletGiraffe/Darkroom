@@ -11,8 +11,10 @@ DISABLE_COMPILER_WARNINGS
 #include <QBuffer>
 #include <QByteArray>
 #include <QFile>
+#include <QImageIOHandler>
 #include <QImageReader>
 #include <QPainter>
+#include <QTransform>
 #include <QtMath>
 RESTORE_COMPILER_WARNINGS
 
@@ -129,8 +131,7 @@ namespace {
 			DecodedFrame& frame = frames[i];
 			QBuffer buffer(&bytesPerPath[i]);
 			buffer.open(QIODevice::ReadOnly);
-			QImageReader reader(&buffer);  // A format hint would suppress content detection.
-			reader.setAutoTransform(true); // read() returns the image in its displayed orientation
+			QImageReader reader(&buffer); // A format hint would suppress content detection.
 			frame.format = reader.format();
 
 			const QImage src = [&] {
@@ -143,14 +144,29 @@ namespace {
 				return;
 			}
 
+			// src is as stored: the orientation is applied after the resize, at thumbnail size
+			const QImageIOHandler::Transformations orientation = reader.transformation();
+			const bool rotates90 = orientation.testFlag(QImageIOHandler::TransformationRotate90);
+
 			// At least 1 px: an extreme aspect ratio fits the slot at zero width or height
-			const QSize sizePx = src.size().scaled(QSize(slotWidth, slotHeight), Qt::KeepAspectRatio).expandedTo({ 1, 1 });
+			const QSize orientedSizePx = (rotates90 ? src.size().transposed() : src.size()).scaled(QSize(slotWidth, slotHeight), Qt::KeepAspectRatio).expandedTo({ 1, 1 });
+			const QSize sizePx = rotates90 ? orientedSizePx.transposed() : orientedSizePx;
 			frame.fitted = QImage{ sizePx, src.format() };
 			{
 				PROFILE_SAMPLE("Thumbnail resize");
 				if (!ImageProcessing::resize(frame.fitted, src, {}, cpuParallelFor))
 					frame.fitted = src.scaled(sizePx, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
 			}
+
+			// The transformation flags compose as flips first, then the 90-degree turn
+			Qt::Orientations flips;
+			if (orientation.testFlag(QImageIOHandler::TransformationMirror))
+				flips |= Qt::Horizontal;
+			if (orientation.testFlag(QImageIOHandler::TransformationFlip))
+				flips |= Qt::Vertical;
+			frame.fitted.flip(flips);
+			if (rotates90)
+				frame.fitted = frame.fitted.transformed(QTransform{}.rotate(90));
 		});
 
 		// A frame skipped on cancellation has neither an image nor an error
