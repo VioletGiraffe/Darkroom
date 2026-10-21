@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792608241301,
+  "lastUpdate": 1792610354398,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -15322,6 +15322,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 46,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 12.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "d535699fa1a73cfa3bd769a54eb3f1d59b146a29",
+          "message": "IoThreadPool::parallelForAsync, routed like enqueue; ImageFilesSource reads a card's files through it, in parallel on fast storage",
+          "timestamp": "2026-10-21T22:10:35+03:00",
+          "tree_id": "53b61051e086d6471178ccfe31efc983af175810",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/d535699fa1a73cfa3bd769a54eb3f1d59b146a29"
+        },
+        "date": 1792610349166,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 16259,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1395,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 28523,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3470.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 3498.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2908.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 421.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 56.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 46.5,
             "unit": "KB"
           },
           {
