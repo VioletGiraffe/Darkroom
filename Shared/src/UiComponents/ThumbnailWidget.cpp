@@ -10,6 +10,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QPainter>
 #include <QPainterPath>
 #include <QTimer>
+#include <QTransform>
 #include <QUrl>
 #include <QWheelEvent>
 #include <QtMath>
@@ -28,6 +29,15 @@ static constexpr int FILE_TYPE_ICON_GAP = 3;
 static constexpr int LOAD_DWELL_MS = 100;
 
 namespace {
+	// The nearest logical point on a whole device pixel of the painted surface.
+	// Rounded through the device transform: at a fractional pixel ratio the widget's own origin need not be on one.
+	QPointF snappedToDevicePixel(const QPainter& painter, QPointF logical)
+	{
+		const QTransform& toDevice = painter.deviceTransform();
+		const QPointF device = toDevice.map(logical);
+		return toDevice.inverted().map(QPointF(std::round(device.x()), std::round(device.y())));
+	}
+
 	// The largest of the icon's native sizes within side logical pixels, unscaled: scaling blurs hand-tuned pixels.
 	// Null when every native size is larger.
 	QPixmap nativeIconPixmap(const QIcon& icon, int side, qreal dpr)
@@ -295,10 +305,12 @@ void ThumbnailWidget::paintEvent(QPaintEvent*)
 	if (!_image.isNull())
 	{
 		// Blit 1:1 so sizing mistakes remain visible; only transient oversize during rerender scales down.
-		const QSize imageLogical = _image.deviceIndependentSize().toSize();
+		const QSizeF imageLogical = _image.deviceIndependentSize();
 		const bool fits = imageLogical.width() <= imageArea.width() && imageLogical.height() <= imageArea.height();
-		QRect r(QPoint(0, 0), fits ? imageLogical : imageLogical.scaled(imageArea.size(), Qt::KeepAspectRatio));
-		r.moveCenter(imageArea.center());
+		QRectF r(QPointF(0, 0), fits ? imageLogical : imageLogical.scaled(imageArea.size(), Qt::KeepAspectRatio));
+		r.moveCenter(QRectF(imageArea).center());
+		if (fits)
+			r.moveTopLeft(snappedToDevicePixel(painter, r.topLeft()));
 
 		const auto blit = [&] {
 			if (fits)
@@ -319,7 +331,7 @@ void ThumbnailWidget::paintEvent(QPaintEvent*)
 			painter.save();
 			QPainterPath roundedImage;
 			const int matteRadius = Theme::current().metrics.thumbnailMatteRadius;
-			roundedImage.addRoundedRect(QRectF(r), matteRadius, matteRadius);
+			roundedImage.addRoundedRect(r, matteRadius, matteRadius);
 			painter.setRenderHint(QPainter::Antialiasing);
 			painter.setClipPath(roundedImage);
 			blit();
@@ -347,10 +359,11 @@ void ThumbnailWidget::paintEvent(QPaintEvent*)
 			if (!_fileTypePixmap.isNull())
 			{
 				// Whole device pixels keep the native pixels 1:1.
-				const qreal x = std::floor((labelRect.right() + 1) * dpr - _fileTypePixmap.width()) / dpr;
-				const qreal y = std::round((labelRect.top() + (labelRect.height() - _fileTypePixmap.deviceIndependentSize().height()) / 2) * dpr) / dpr;
-				painter.drawPixmap(QPointF(x, y), _fileTypePixmap);
-				labelRect.setRight(static_cast<int>(x) - FILE_TYPE_ICON_GAP);
+				const QSizeF iconLogical = _fileTypePixmap.deviceIndependentSize();
+				const QPointF iconPos = snappedToDevicePixel(painter,
+					QPointF(labelRect.right() + 1 - iconLogical.width(), labelRect.top() + (labelRect.height() - iconLogical.height()) / 2));
+				painter.drawPixmap(iconPos, _fileTypePixmap);
+				labelRect.setRight(qFloor(iconPos.x()) - FILE_TYPE_ICON_GAP);
 			}
 		}
 		painter.drawText(labelRect, Qt::AlignVCenter | Qt::AlignHCenter, painter.fontMetrics().elidedText(_caption, Qt::ElideMiddle, labelRect.width()));

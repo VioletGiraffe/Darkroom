@@ -13,6 +13,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QFile>
 #include <QImageReader>
 #include <QPainter>
+#include <QtMath>
 RESTORE_COMPILER_WARNINGS
 
 #ifdef PROFILING_ENABLED
@@ -27,7 +28,7 @@ RESTORE_COMPILER_WARNINGS
 #include <utility>
 #include <vector>
 
-static constexpr int FOLDER_PREVIEW_GAP = 2;
+static constexpr int FOLDER_PREVIEW_GAP = 2; // logical px
 
 #ifdef PROFILING_ENABLED
 // One per load job, released when its decode ends or a stage finds the job cancelled.
@@ -104,15 +105,17 @@ namespace {
 		if (job._delivery.isCancelled() || bytesPerPath.empty() || job._canvasLogical.isEmpty() || job._dpr <= 0.0)
 			return;
 
+		// Laid out in device pixels, so every image lands 1:1 on whole canvas pixels.
+		// Floored: the delivered logical size must not exceed the box.
 		const int n = static_cast<int>(bytesPerPath.size());
-		const int slotWidth = (job._canvasLogical.width() - (n - 1) * FOLDER_PREVIEW_GAP) / n;
-		const int slotHeight = job._canvasLogical.height();
+		const int gapPx = qRound(FOLDER_PREVIEW_GAP * job._dpr);
+		const int slotWidth = (qFloor(job._canvasLogical.width() * job._dpr) - (n - 1) * gapPx) / n;
+		const int slotHeight = qFloor(job._canvasLogical.height() * job._dpr);
 		if (slotWidth <= 0 || slotHeight <= 0)
 			return;
 
 		// Decoded at full resolution: all scaling goes through ImageProcessing::resize, not the reader's own (JPEG DCT reduction, QImage::scaled).
-		struct Fitted { QImage img; QSize logicalSize; };
-		std::vector<Fitted> fitted;
+		std::vector<QImage> fitted;
 		fitted.reserve(n);
 		QString firstError = readError;
 		QByteArray firstFormat;
@@ -136,15 +139,15 @@ namespace {
 				continue;
 			}
 
-			const QSize logicalSize = src.size().scaled(QSize(slotWidth, slotHeight), Qt::KeepAspectRatio);
-			const QSize physicalSize = (QSizeF(logicalSize) * job._dpr).toSize();
-			QImage scaled{ physicalSize, src.format() };
+			// At least 1 px: an extreme aspect ratio fits the slot at zero width or height
+			const QSize sizePx = src.size().scaled(QSize(slotWidth, slotHeight), Qt::KeepAspectRatio).expandedTo({ 1, 1 });
+			QImage scaled{ sizePx, src.format() };
 			{
 				PROFILE_SAMPLE("Thumbnail resize");
 				if (!ImageProcessing::resize(scaled, src, {}, cpuParallelFor))
-					scaled = src.scaled(physicalSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+					scaled = src.scaled(sizePx, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
 			}
-			fitted.push_back({ std::move(scaled), logicalSize });
+			fitted.push_back(std::move(scaled));
 		}
 
 		if (fitted.empty())
@@ -154,29 +157,37 @@ namespace {
 			return;
 		}
 
-		int totalWidth = (static_cast<int>(fitted.size()) - 1) * FOLDER_PREVIEW_GAP;
-		int totalHeight = 0;
-		for (const Fitted& f : std::as_const(fitted))
+		QImage image;
+		if (fitted.size() == 1)
 		{
-			totalWidth += f.logicalSize.width();
-			totalHeight = qMax(totalHeight, f.logicalSize.height());
+			// Blitted on every paint: kept in a format the raster engine blends without per-pixel conversion
+			image = std::move(fitted.front());
+			if (image.format() != QImage::Format_RGB32 && image.format() != QImage::Format_ARGB32_Premultiplied)
+				image.convertTo(QImage::Format_ARGB32_Premultiplied);
 		}
-
-		QImage canvas((QSizeF(totalWidth, totalHeight) * job._dpr).toSize(), QImage::Format_ARGB32_Premultiplied);
-		canvas.fill(Qt::transparent);
-		canvas.setDevicePixelRatio(job._dpr);
+		else
 		{
-			QPainter painter(&canvas); // ends before the canvas is delivered
-			painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-			int x = 0;
-			for (const Fitted& f : std::as_const(fitted))
+			int totalWidth = (static_cast<int>(fitted.size()) - 1) * gapPx;
+			int totalHeight = 0;
+			for (const QImage& img : std::as_const(fitted))
 			{
-				painter.drawImage(QRect(QPoint(x, (totalHeight - f.logicalSize.height()) / 2), f.logicalSize), f.img);
-				x += f.logicalSize.width() + FOLDER_PREVIEW_GAP;
+				totalWidth += img.width();
+				totalHeight = qMax(totalHeight, img.height());
+			}
+
+			image = QImage{ totalWidth, totalHeight, QImage::Format_ARGB32_Premultiplied };
+			image.fill(Qt::transparent);
+			QPainter painter(&image); // ends before the pixel ratio is set
+			int x = 0;
+			for (const QImage& img : std::as_const(fitted))
+			{
+				painter.drawImage(QPoint(x, (totalHeight - img.height()) / 2), img);
+				x += img.width() + gapPx;
 			}
 		}
+		image.setDevicePixelRatio(job._dpr);
 
-		job._delivery.deliver({ .image = std::move(canvas), .fileType = firstFormat }, jobPtr);
+		job._delivery.deliver({ .image = std::move(image), .fileType = firstFormat }, jobPtr);
 	}
 
 	// The I/O stage touches only the job, then hands bytes to the CPU pool.
