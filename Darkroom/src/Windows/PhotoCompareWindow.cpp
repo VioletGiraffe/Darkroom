@@ -1,5 +1,6 @@
 #include "Windows/PhotoCompareWindow.h"
 #include "Core/Catalog.h"
+#include "Core/CpuThreadPool.h"
 #include "Core/IoThreadPool.h"
 #include "Core/Library.h"
 #include "MagicAlignment.h"
@@ -16,6 +17,8 @@
 #include "widgets/cpersistenceenabler.h"
 
 DISABLE_COMPILER_WARNINGS
+#include "resize/qimage_resize.h"
+
 #include <QApplication>
 #include <QBuffer>
 #include <QCheckBox>
@@ -844,24 +847,30 @@ const QImage& PhotoCompareWindow::imageForScale(Photo& photo, double effectiveSc
 {
 	// Select mipmaps in physical pixels; logical scale alone is too coarse on HiDPI.
 	const double pickScale = effectiveScale * devicePixelRatio;
+	const int minSide = std::min(photo.image.width(), photo.image.height());
 	int level = 0;
 	double levelScale = 1.0;
-	while (levelScale * 0.5 >= pickScale && level < 16)
+	while (levelScale * 0.5 >= pickScale && minSide > (1 << level))
 	{
 		levelScale *= 0.5;
 		++level;
 	}
-	while (static_cast<int>(photo.mipmaps.size()) < level)
+	residualScale = effectiveScale / levelScale;
+	if (level == 0)
+		return photo.image;
+
+	if (photo.mipmaps.size() < static_cast<size_t>(level))
+		photo.mipmaps.resize(static_cast<size_t>(level));
+
+	QImage& mip = photo.mipmaps[static_cast<size_t>(level - 1)];
+	if (mip.isNull())
 	{
-		const QImage& prev = photo.mipmaps.empty() ? photo.image : photo.mipmaps.back();
-		if (prev.width() <= 1 || prev.height() <= 1)
-			break;
-		photo.mipmaps.push_back(prev.scaled((prev.width() + 1) / 2, (prev.height() + 1) / 2,
-		                                    Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
+		const int roundUp = (1 << level) - 1;
+		mip = QImage{ (photo.image.width() + roundUp) >> level, (photo.image.height() + roundUp) >> level, photo.image.format() };
+		if (!ImageProcessing::resize(mip, photo.image, {}, cpuParallelFor))
+			mip = photo.image.scaled(mip.size(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
 	}
-	level = std::min(level, static_cast<int>(photo.mipmaps.size()));
-	residualScale = effectiveScale * std::pow(2.0, level);
-	return level == 0 ? photo.image : photo.mipmaps[level - 1];
+	return mip;
 }
 
 void PhotoCompareWindow::zoomView(double factor, const QPointF& widgetAnchor)

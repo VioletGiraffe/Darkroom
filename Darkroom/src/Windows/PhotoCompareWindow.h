@@ -68,7 +68,7 @@ private:
 	{
 		QImage image;
 		QString filePath;
-		std::vector<QImage> mipmaps;  // [k] is scaled by 2^-(k+1), built lazily
+		std::vector<QImage> mipmaps;  // [k] is scaled by 2^-(k+1) from image; null until first drawn
 		double alignScale = 1.0;
 		double alignRotation = 0.0;  // radians
 		QPointF alignOffset;
