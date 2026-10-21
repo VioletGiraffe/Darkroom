@@ -31,6 +31,7 @@ static constexpr int LOAD_DWELL_MS = 100;
 namespace {
 	// The nearest logical point on a whole device pixel of the painted surface.
 	// Rounded through the device transform: at a fractional pixel ratio the widget's own origin need not be on one.
+	// Tidiness only: as of Qt 6.11.2 the raster engine rounds a fractional image origin itself and this snapping does not affect the rendering, as long as SmoothPixmapTransform is off.
 	QPointF snappedToDevicePixel(const QPainter& painter, QPointF logical)
 	{
 		const QTransform& toDevice = painter.deviceTransform();
@@ -358,7 +359,6 @@ void ThumbnailWidget::paintEvent(QPaintEvent*)
 				_fileTypePixmap = nativeIconPixmap(_fileTypeIcon, FILE_TYPE_ICON_SIDE, dpr);
 			if (!_fileTypePixmap.isNull())
 			{
-				// Whole device pixels keep the native pixels 1:1.
 				const QSizeF iconLogical = _fileTypePixmap.deviceIndependentSize();
 				const QPointF iconPos = snappedToDevicePixel(painter,
 					QPointF(labelRect.right() + 1 - iconLogical.width(), labelRect.top() + (labelRect.height() - iconLogical.height()) / 2));
