@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792616220681,
+  "lastUpdate": 1792619129301,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -15480,6 +15480,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 46.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 12.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "91abf994d9a3c9bcae81d05dfd09ad97f553915d",
+          "message": "MediaBrowserWidget: Best status looked up per item, no more building QSet<MediaId> on every grid rebuild and resort",
+          "timestamp": "2026-10-22T00:35:57+03:00",
+          "tree_id": "43f021aacc2f76eb19ada361ba3350d71be1aaf3",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/91abf994d9a3c9bcae81d05dfd09ad97f553915d"
+        },
+        "date": 1792619124719,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 16258,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1395,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 28926,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3475,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 3498.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2911,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 422.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 57,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 47,
             "unit": "KB"
           },
           {
