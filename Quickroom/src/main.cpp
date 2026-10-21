@@ -145,7 +145,13 @@ int main(int argc, char* argv[])
 	Style::install();
 
 	// Take the first argument as a path to open, if any
-	openStartupWindow(QDir::fromNativeSeparators(app.arguments().value(1, /*default:*/{})));
+	QString startupPath = app.arguments().value(1, /*default:*/{});
+#ifdef Q_OS_WIN
+	// Windows argv parsing reads \" as an escaped quote: a quoted drive root "C:\" arrives as C:"
+	if (startupPath.endsWith('"'))
+		startupPath.back() = '\\';
+#endif
+	openStartupWindow(QDir::fromNativeSeparators(startupPath));
 
 	const int result = app.exec();
 	// Image reads transition from the IO pool to the CPU pool, so IO has to be shut down first

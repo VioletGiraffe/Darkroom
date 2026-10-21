@@ -74,6 +74,7 @@ behavior, and catalog-integrity verdicts.
   single source. `AppId` is fixed: changing it makes an upgrade install beside the old copy. The `[Registry]` section
   registers Quickroom as an eligible handler per supported type under a distinct ProgID each, so every type keeps its
   own icon; Windows forbids claiming the default handler programmatically, so the finish page offers an opt-in
-  checkbox that opens Settings for the user to choose.
+  checkbox that opens Settings for the user to choose. It also adds "Browse with Quickroom" to the context menu of
+  folders, folder backgrounds and drives.
 - **macOS:** `scripts/create_dmg.sh <Qt dir>` runs `macdeployqt` on both already-built release bundles and packages
   them into one `Darkroom.dmg`. It treats macdeployqt's `ERROR` output as failure, since the tool exits 0 regardless.

@@ -121,6 +121,17 @@ Root: HKA; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueNa
 #emit ProgIdEntries("flv", "Flash Video", "flv")
 #emit SuffixEntries("flv", "flv")
 
+; "Browse with Quickroom" in the classic context menu; Windows 11 shows it under "Show more options".
+#define BrowseVerbEntries(str ClassKey) \
+  'Root: HKA; Subkey: "Software\Classes\' + ClassKey + '\shell\' + QuickroomName + '"; ValueType: string; ValueName: ""; ValueData: "Browse with ' + QuickroomName + '"; Flags: uninsdeletekey' + NewLine + \
+  'Root: HKA; Subkey: "Software\Classes\' + ClassKey + '\shell\' + QuickroomName + '"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\' + QuickroomExeName + ',0"' + NewLine + \
+  'Root: HKA; Subkey: "Software\Classes\' + ClassKey + '\shell\' + QuickroomName + '\command"; ValueType: string; ValueName: ""; ValueData: """{app}\' + QuickroomExeName + '"" ""%V"""'
+
+; Directory\Background: the empty space inside an open folder.
+#emit BrowseVerbEntries("Directory")
+#emit BrowseVerbEntries("Directory\Background")
+#emit BrowseVerbEntries("Drive")
+
 ; Deliberately no Applications\Quickroom.exe entry, in either form:
 ;   registered - a second, identical-looking Quickroom appears in the Open With dialog. Choosing it sets
 ;     UserChoice to the application, and an application has one icon for every type it opens.
