@@ -2,6 +2,7 @@
 #include "Theme/Theme.h"
 #include "compiler/compiler_warnings_control.h"
 #include "theme/ctintedsvgiconengine.h"
+#include "utils/painterutils.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QPainter>
@@ -140,7 +141,11 @@ void LabelRowDelegate::paint(QPainter* p, const QStyleOptionViewItem& option, co
 	}
 
 	if (isAll)
-		p->drawPixmap(QPointF(swatchX, cy - ICON / 2.0), allRowIcon(t.palette.textDim, iconDpr(opt)));
+	{
+		// A 1:1 blit: rendered at the device size, placed on a whole device pixel, not antialiased
+		p->setRenderHint(QPainter::Antialiasing, false);
+		p->drawPixmap(snappedToDevicePixel(*p, QPointF(swatchX, cy - ICON / 2.0)), allRowIcon(t.palette.textDim, iconDpr(opt)));
+	}
 	else if (swatch.isValid())
 	{
 		p->setPen(Qt::NoPen);

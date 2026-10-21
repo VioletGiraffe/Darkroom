@@ -2,6 +2,7 @@
 #include "Theme/Theme.h"
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
+#include "utils/painterutils.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QColor>
@@ -10,13 +11,11 @@ DISABLE_COMPILER_WARNINGS
 #include <QPainter>
 #include <QPainterPath>
 #include <QTimer>
-#include <QTransform>
 #include <QUrl>
 #include <QWheelEvent>
 #include <QtMath>
 RESTORE_COMPILER_WARNINGS
 
-#include <cmath>
 #include <optional>
 #include <utility>
 #include <variant>
@@ -29,16 +28,6 @@ static constexpr int FILE_TYPE_ICON_GAP = 3;
 static constexpr int LOAD_DWELL_MS = 100;
 
 namespace {
-	// The nearest logical point on a whole device pixel of the painted surface.
-	// Rounded through the device transform: at a fractional pixel ratio the widget's own origin need not be on one.
-	// Tidiness only: as of Qt 6.11.2 the raster engine rounds a fractional image origin itself and this snapping does not affect the rendering, as long as SmoothPixmapTransform is off.
-	QPointF snappedToDevicePixel(const QPainter& painter, QPointF logical)
-	{
-		const QTransform& toDevice = painter.deviceTransform();
-		const QPointF device = toDevice.map(logical);
-		return toDevice.inverted().map(QPointF(std::round(device.x()), std::round(device.y())));
-	}
-
 	// The largest of the icon's native sizes within side logical pixels, unscaled: scaling blurs hand-tuned pixels.
 	// Null when every native size is larger.
 	QPixmap nativeIconPixmap(const QIcon& icon, int side, qreal dpr)
