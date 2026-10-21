@@ -14,7 +14,8 @@ RESTORE_COMPILER_WARNINGS
 #include <algorithm>
 #include <utility>
 
-// Sized as QIcon::paint sizes it, but downscaled smoothly: native icons are often much larger than the tile (256 px on Windows).
+// Sized as QIcon::paint sizes it, but downscaled smoothly: Windows file icons arrive at native sizes up to 256 px.
+// Other platforms' file icon engines return the requested size, skipping the resize: see qtutils docs/qt-icon-quirks.md.
 // Keyed by pixel content: QFileIconProvider returns a distinct QIcon per file, even for identical icons.
 static QPixmap scaledIconPixmap(const QIcon& icon, const QSize& logicalBox, qreal dpr)
 {
