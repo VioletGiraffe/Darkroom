@@ -16,7 +16,7 @@ class QMenu;
 class QTimer;
 
 // Single-image viewer over the shared CImageViewerWidget, browsing a fixed list of sibling images.
-// Controls are the menu bar and its shortcuts, plus the widget's own mouse zoom and pan.
+// Controls are the menu bar and its shortcuts, the wheel for browsing, plus the widget's own mouse zoom and pan.
 class ImageViewerWindow final : public QMainWindow
 {
 public:
@@ -59,6 +59,7 @@ public:
 
 protected:
 	bool eventFilter(QObject* watched, QEvent* event) override;
+	void wheelEvent(QWheelEvent* event) override;
 
 private:
 	ImageViewerWindow(QStringList imagePaths, int startIndex, QWidget* parent);
@@ -85,6 +86,8 @@ private:
 	int _index = 0;
 	// Only an animated image holds its file open, so only an animation is released.
 	bool _animationReleased = false;
+	// Touchpads and high-resolution wheels split a notch across several events.
+	int _pendingWheelDelta = 0;
 
 	std::function<void(const QString& path)> _onImageChanged;
 	std::function<bool()> _exitFullScreenHandler;

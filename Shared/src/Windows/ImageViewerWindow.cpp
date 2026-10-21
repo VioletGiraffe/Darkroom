@@ -22,8 +22,10 @@ DISABLE_COMPILER_WARNINGS
 #include <QMouseEvent>
 #include <QTimer>
 #include <QUrl>
+#include <QWheelEvent>
 RESTORE_COMPILER_WARNINGS
 
+#include <cstdlib>
 #include <functional>
 #include <utility>
 
@@ -235,6 +237,25 @@ bool ImageViewerWindow::eventFilter(QObject* watched, QEvent* event)
 	}
 
 	return QMainWindow::eventFilter(watched, event);
+}
+
+void ImageViewerWindow::wheelEvent(QWheelEvent* event)
+{
+	// Ctrl+wheel is the view's zoom, also when the view has no image to zoom and passes it up.
+	// Momentum events are ignored: a trackpad flick must not keep browsing after the fingers lift.
+	if (event->modifiers().testFlag(Qt::ControlModifier) || event->phase() == Qt::ScrollMomentum)
+	{
+		QMainWindow::wheelEvent(event);
+		return;
+	}
+
+	_pendingWheelDelta += event->angleDelta().y();
+	if (std::abs(_pendingWheelDelta) >= QWheelEvent::DefaultDeltasPerStep)
+	{
+		showImage(adjacentIndex(_pendingWheelDelta < 0 ? Direction::Next : Direction::Previous));
+		_pendingWheelDelta = 0;
+	}
+	event->accept();
 }
 
 void ImageViewerWindow::toggleFullScreen()
