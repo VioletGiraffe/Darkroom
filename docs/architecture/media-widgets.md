@@ -78,7 +78,7 @@ background-only.
 `ImageFilesSource` loads in two stages:
 
 1. File reads go through `Core::IoThreadPool`, which routes fast storage to bounded parallel workers and slow,
-   external, network, or unknown storage to a shared serial worker.
+   external, network, or unknown storage to a shared serial worker. On fast storage a card's files are read in parallel.
 2. CPU decoding runs on `cpuThreadPool()`, a card's frames in parallel.
 
 `QImageReader` decodes at full resolution; `ImageProcessing::resize` then scales to the target size, its slices also on

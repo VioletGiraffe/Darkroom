@@ -25,6 +25,7 @@ DISABLE_COMPILER_WARNINGS
 RESTORE_COMPILER_WARNINGS
 #endif
 
+#include <algorithm>
 #include <memory>
 #include <mutex>
 #include <utility>
@@ -83,12 +84,15 @@ private:
 #endif
 
 namespace {
-	// Shared lifetime spans I/O, decode and the Request; immutable after posting except the token and the delivery's own state.
+	// Shared lifetime spans I/O, decode and the Request.
+	// Immutable after posting except the token, the delivery's own state, and the read results, each slot written by its own read.
 	struct LoadJob {
 		LoadJob(QObject* context, std::function<void(ImageSource::Result)> done) : _delivery{ context, std::move(done) } {}
 
 		ImageSource::Delivery _delivery;
 		QStringList _paths;
+		std::vector<QByteArray> _bytesPerPath;
+		std::vector<QString> _readErrorPerPath;
 		QSize _canvasLogical;
 		qreal _dpr = 1.0;
 #ifdef PROFILING_ENABLED
@@ -232,36 +236,30 @@ namespace {
 		job._delivery.deliver({ .image = std::move(image), .fileType = firstFormat }, jobPtr);
 	}
 
-	// The I/O stage touches only the job, then hands bytes to the CPU pool.
-	void readStage(const std::shared_ptr<LoadJob>& jobPtr)
+	void readStage(LoadJob& job, size_t index)
 	{
-		const LoadJob& job = *jobPtr;
 		if (job._delivery.isCancelled())
 			return;
 
-		std::vector<QByteArray> bytes;
-		QString firstReadError;
-		bytes.reserve(job._paths.size());
-		{
-			// Ends before the decode is posted: the batch must not end before the sample is counted.
-			PROFILE_SAMPLE("Thumbnail read");
-			for (const QString& path : std::as_const(job._paths))
-			{
-				QFile file(path);
-				if (file.open(QIODevice::ReadOnly))
-					bytes.push_back(file.readAll());
-				else
-				{
-					bytes.emplace_back();
-					if (firstReadError.isEmpty())
-						firstReadError = file.errorString();
-				}
-			}
-		}
+		PROFILE_SAMPLE("Thumbnail read");
+		QFile file(job._paths[static_cast<qsizetype>(index)]);
+		if (file.open(QIODevice::ReadOnly))
+			job._bytesPerPath[index] = file.readAll();
+		else
+			job._readErrorPerPath[index] = file.errorString();
+	}
 
+	// Only called once every read has returned: their samples are counted before the decode can end the batch.
+	void postDecode(const std::shared_ptr<LoadJob>& jobPtr)
+	{
+		LoadJob& job = *jobPtr;
 		if (job._delivery.isCancelled())
 			return;
-		cpuThreadPool().enqueue([jobPtr, bytes = std::move(bytes), readError = std::move(firstReadError)]() mutable {
+
+		const auto firstReadError = std::ranges::find_if(job._readErrorPerPath, [](const QString& error) { return !error.isEmpty(); });
+		QString readError = firstReadError != job._readErrorPerPath.end() ? *firstReadError : QString{};
+		// Moved out of the job: the Request keeps the job alive past delivery
+		cpuThreadPool().enqueue([jobPtr, bytes = std::move(job._bytesPerPath), readError = std::move(readError)]() mutable {
 			decodeStage(jobPtr, bytes, readError);
 		});
 	}
@@ -286,13 +284,15 @@ ImageSource::Request ImageFilesSource::renderAsync(QSize box, qreal dpr, QObject
 
 	auto job = std::make_shared<LoadJob>(context, std::move(done));
 	job->_paths = _paths;
+	job->_bytesPerPath.resize(_paths.size());
+	job->_readErrorPerPath.resize(_paths.size());
 	job->_canvasLogical = box;
 	job->_dpr = dpr;
 #ifdef PROFILING_ENABLED
 	job->_batchToken = std::make_unique<LoadBatchToken>();
 #endif
 	ImageSource::Request request{ std::shared_ptr<ImageSource::Delivery>{ job, &job->_delivery } };
-	// Deliberately untagged: blocking retire() per thumbnail would serialize grid teardown; cancelling makes it safe.
-	IoThreadPool::enqueue(_paths.front(), [job = std::move(job)] { readStage(job); });
+	// A card's files share one storage device: the first path routes all of them
+	IoThreadPool::parallelForAsync(_paths.front(), _paths.size(), [job](size_t index) { readStage(*job, index); }, [job] { postDecode(job); });
 	return request;
 }
