@@ -97,7 +97,7 @@ void ImageViewerWindow::followMovedFiles(const std::function<bool(const QString&
 		for (QString& path : viewer->_imagePaths)
 			path = newLocation(path);
 
-		viewer->setWindowTitle(QFileInfo{ viewer->currentImagePath() }.completeBaseName());
+		viewer->updateTitleAndCaption();
 		if (reopen)
 			viewer->resumeReleasedAnimation();
 	}
@@ -216,7 +216,7 @@ void ImageViewerWindow::showImage(int index)
 
 	_animationReleased = false;
 	_index = index;
-	setWindowTitle(QFileInfo{ path }.completeBaseName());
+	updateTitleAndCaption();
 	_windowIconTimer->start();
 	_previousAction->setEnabled(adjacentIndex(Direction::Previous) >= 0);
 	_nextAction->setEnabled(adjacentIndex(Direction::Next) >= 0);
@@ -225,6 +225,13 @@ void ImageViewerWindow::showImage(int index)
 
 	if (_onImageChanged)
 		_onImageChanged(path);
+}
+
+void ImageViewerWindow::updateTitleAndCaption()
+{
+	const QFileInfo file{ currentImagePath() };
+	setWindowTitle(file.completeBaseName());
+	_view->setInfoStripCaption(QStringLiteral("%1/%2 • %3").arg(_index + 1).arg(_imagePaths.size()).arg(file.fileName()));
 }
 
 bool ImageViewerWindow::eventFilter(QObject* watched, QEvent* event)
@@ -317,15 +324,18 @@ void ImageViewerWindow::removeCurrentImage(const std::function<bool(const QStrin
 		return;
 	}
 
-	// Cleared so that browsing skips it as it skips a deleted file: a removal may leave the file on disk.
-	_imagePaths[_index].clear();
-
 	int remaining = adjacentIndex(Direction::Next);
 	if (remaining < 0)
 		remaining = adjacentIndex(Direction::Previous);
 
-	if (remaining >= 0)
-		showImage(remaining);
-	else
+	if (remaining < 0)
+	{
 		close();
+		return;
+	}
+
+	// Erased, not skipped: a removal may leave the file on disk, and the caption counts only the images left.
+	_imagePaths.removeAt(_index);
+	_index = remaining > _index ? remaining - 1 : remaining; // in range even if showImage fails
+	showImage(_index);
 }

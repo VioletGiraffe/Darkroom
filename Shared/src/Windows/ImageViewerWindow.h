@@ -70,6 +70,7 @@ private:
 	void buildMenus();
 	// Leaves the view untouched when the image cannot be loaded.
 	void showImage(int index);
+	void updateTitleAndCaption();
 	// Skips paths that have left the disk; -1 when the list ends first.
 	[[nodiscard]] int adjacentIndex(Direction direction) const;
 	void toggleFullScreen();

@@ -34,6 +34,7 @@ fullscreen and decides whether that switch still happens. A caller can also inst
 add its own actions to the Image menu, which the viewer keeps current for the image shown: MediaBrowserWidget adds
 Best. Alone among the windows here it persists no geometry.
 Copy puts both the image and its file on the clipboard, for apps that paste pixels and for those that take files.
+The info strip shows the image's position in the list and its file name in the center.
 The current image becomes the window icon after a delay, so several open viewers stay distinguishable in the
 taskbar without an icon being scaled for every image browsed past.
 
