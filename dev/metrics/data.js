@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792782407159,
+  "lastUpdate": 1792787297403,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -16897,6 +16897,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .data",
             "value": 63,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 48.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 13.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "38f8f136b0f4fae10b5cf48880de754194654eff",
+          "message": "Remove from library moves a video's frame folder (frames and preview) to the Trash, keeping the source file; the integrity check's Remove goes through the same workflow",
+          "timestamp": "2026-10-23T23:17:20+03:00",
+          "tree_id": "b2d9c95491f8d3267e44b5eb2125a9a6440946f8",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/38f8f136b0f4fae10b5cf48880de754194654eff"
+        },
+        "date": 1792787295101,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 16968,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1400,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 29707,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3699.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 3653,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 3096,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 452.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 64,
             "unit": "KB"
           },
           {
