@@ -14,6 +14,7 @@
 #include "DarkroomSettings.h"
 #include "Shortcuts.h"
 #include "DarkroomShortcuts.h"
+#include "Windows/FrameExtraction.h"
 #include "Windows/ImageViewerWindow.h"
 #include "Windows/ImportExecution.h"
 #include "Windows/LabelManagement.h"
@@ -31,7 +32,6 @@
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
 #include "dialogs/messagedialog.h"
-#include "threading/cinterruptablethread.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 #include "widgets/cpersistenceenabler.h"
 
@@ -62,7 +62,6 @@ DISABLE_COMPILER_WARNINGS
 #include <QMenu>
 #include <QMessageBox>
 #include <QMimeData>
-#include <QProgressDialog>
 #include <QPushButton>
 #include <QSet>
 #include <QSettings>
@@ -74,7 +73,6 @@ DISABLE_COMPILER_WARNINGS
 RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
-#include <atomic>
 
 namespace {
 
@@ -89,8 +87,6 @@ constexpr int STAGED_CARD_IMAGE_HEIGHT_STEP = 20;
 
 constexpr int LABEL_LIST_MAX_WIDTH = 300;
 
-// Each ffmpeg process is internally threaded; keep concurrent processes low.
-constexpr int PREVIEW_EXTRACTION_CONCURRENCY = 2;
 constexpr int TEMP_PREVIEW_DELETE_TIMEOUT_MS = 1000;
 constexpr int TEMP_PREVIEW_DELETE_RETRY_MS = 20;
 
@@ -120,56 +116,6 @@ bool removeTempPreviewDirWithRetry(const QString& path)
 			return false;
 		QThread::msleep(TEMP_PREVIEW_DELETE_RETRY_MS);
 	}
-}
-
-std::vector<Ffmpeg::PreviewResult> generatePreviewFramesInteractively(
-	const std::vector<Ffmpeg::PreviewJob>& jobs, int frameCount, QWidget* parent)
-{
-	if (jobs.empty())
-		return {};
-
-	QProgressDialog progress(QObject::tr("Examining video %1/%2...").arg(0).arg(jobs.size()), QObject::tr("Cancel"),
-		0, static_cast<int>(jobs.size()), parent);
-	progress.setWindowTitle(QObject::tr("Staging"));
-	progress.setModal(true);
-	progress.setMinimumDuration(0);
-	// Keep the dialog open until cancelled ffmpeg processes have been reaped.
-	progress.setAutoClose(false);
-	progress.setAutoReset(false);
-
-	// results is written by this worker and read only after join().
-	std::vector<Ffmpeg::PreviewResult> results;
-	CInterruptableThread previewThread{ "preview-extraction" };
-
-	QObject::connect(&progress, &QProgressDialog::canceled, parent, [&] {
-		previewThread.requestCancellation();
-		progress.setLabelText(QObject::tr("Cancelling..."));
-	});
-
-	previewThread.start([&](const std::atomic<bool>& cancelled) {
-		results = Ffmpeg::generatePreviewFrames(jobs, frameCount, PREVIEW_EXTRACTION_CONCURRENCY, cancelled,
-			[&](int done, int total, Ffmpeg::Phase phase) {
-				QMetaObject::invokeMethod(&progress, [&progress, &previewThread, done, total, phase] {
-					if (previewThread.cancellationRequested())
-						return;
-					if (phase == Ffmpeg::Phase::Probing)
-					{
-						progress.setLabelText(QObject::tr("Examining video %1/%2...").arg(done).arg(total));
-						return;
-					}
-					progress.setValue(done);
-					progress.setLabelText(QObject::tr("Generating preview %1/%2...").arg(done).arg(total));
-				}, Qt::QueuedConnection);
-			});
-		QMetaObject::invokeMethod(&progress, [&progress] { progress.accept(); }, Qt::QueuedConnection);
-	});
-
-	progress.exec();
-
-	// Cover completion, Cancel, Esc, and window close before joining the worker.
-	previewThread.requestCancellation();
-	previewThread.join();
-	return results;
 }
 
 // suggestedLabelName preserves the dropped folder hierarchy as hyphen-joined components.
@@ -819,7 +765,8 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 	for (const QString& path : videoPaths)
 		jobs.push_back({ path, uniqueTempPreviewDir() });
 
-	const std::vector<Ffmpeg::PreviewResult> results = generatePreviewFramesInteractively(jobs, extractionFrameCount, this);
+	const std::vector<Ffmpeg::PreviewResult> results =
+		FrameExtraction::generatePreviewFramesInteractively(jobs, extractionFrameCount, tr("Staging"), this);
 
 	for (size_t i = 0; i < jobs.size(); ++i)
 	{
@@ -924,7 +871,8 @@ void ImportDialog::regenerateInsufficientStagedVideoPreviews(int frameCount)
 		jobIds.push_back(it.key());
 	}
 
-	const std::vector<Ffmpeg::PreviewResult> results = generatePreviewFramesInteractively(jobs, frameCount, this);
+	const std::vector<Ffmpeg::PreviewResult> results =
+		FrameExtraction::generatePreviewFramesInteractively(jobs, frameCount, tr("Staging"), this);
 	for (size_t i = 0; i < results.size(); ++i)
 	{
 		auto staged = _staged.find(jobIds[i]);

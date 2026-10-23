@@ -365,6 +365,8 @@ void reportFfmpegFailure(QWidget* parent, const Ffmpeg::SplitResult& result, con
 	case Status::NoFrames:
 		QMessageBox::warning(parent, QObject::tr("Warning"), QObject::tr("No frames were extracted from:\n%1").arg(videoFilePath));
 		break;
+	case Status::Cancelled:
+		break;
 	}
 }
 

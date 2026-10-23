@@ -11,6 +11,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QStringList>
 RESTORE_COMPILER_WARNINGS
 
+#include <algorithm>
 #include <vector>
 
 namespace {
@@ -66,15 +67,11 @@ void startDurationProbe(QProcess& probe, const QString& videoFilePath)
 	probe.start(ffmpegPath(), { "-i", QDir::toNativeSeparators(videoFilePath) });
 }
 
-qint64 parseProbedDurationMs(QProcess& probe, const std::atomic<bool>& cancelled)
+// -1 until ffmpeg's stderr carries the input's Duration banner.
+qint64 parseDurationMs(const QString& ffmpegStderr)
 {
-	if (!probe.waitForStarted())
-		return -1;
-	waitForFinishedOrKill(probe, 30000, cancelled);
-
-	const QString stderrOutput = probe.readAllStandardError();
 	static const QRegularExpression re(R"(Duration:\s*(\d+):(\d+):(\d+\.\d+))");
-	const QRegularExpressionMatch match = re.match(stderrOutput);
+	const QRegularExpressionMatch match = re.match(ffmpegStderr);
 	if (!match.hasMatch())
 		return -1;
 
@@ -82,6 +79,14 @@ qint64 parseProbedDurationMs(QProcess& probe, const std::atomic<bool>& cancelled
 	const qint64 minutes = match.captured(2).toLongLong();
 	const double seconds = match.captured(3).toDouble();
 	return hours * 3600000 + minutes * 60000 + static_cast<qint64>(seconds * 1000);
+}
+
+qint64 parseProbedDurationMs(QProcess& probe, const std::atomic<bool>& cancelled)
+{
+	if (!probe.waitForStarted())
+		return -1;
+	waitForFinishedOrKill(probe, 30000, cancelled);
+	return parseDurationMs(probe.readAllStandardError());
 }
 
 // Mirrors pickEvenlySpacedFrames' 10%-90% sampling window in the time domain.
@@ -246,7 +251,8 @@ PreviewResult generatePreviewFrames(const QString& videoFilePath, const QString&
 	return generatePreviewFrames({ PreviewJob{ videoFilePath, destinationFolder } }, frameCount, /*maxConcurrentProcesses*/ 1, neverCancelled).front();
 }
 
-SplitResult splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder, const SplitOptions& options)
+SplitResult splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder, const SplitOptions& options,
+	const std::atomic<bool>& cancelled, const std::function<void(double)>& onProgress)
 {
 	SplitResult result;
 
@@ -269,7 +275,8 @@ SplitResult splitVideoIntoFrames(const QString& videoFilePath, const QString& ou
 	const QString outputPattern = outputFolder + "/%04d_" + baseName + (options.tiff ? ".tif" : ".jpg");
 
 	QStringList arguments;
-	arguments << "-i" << QDir::toNativeSeparators(videoFilePath)
+	arguments << "-nostats" << "-progress" << "pipe:1" // machine-readable progress on stdout
+		<< "-i" << QDir::toNativeSeparators(videoFilePath)
 		<< "-an" << "-sn" << "-dn" // No audio, no subtitles, no data
 		<< "-y"; // Overwrite output files without asking
 
@@ -303,19 +310,36 @@ SplitResult splitVideoIntoFrames(const QString& videoFilePath, const QString& ou
 		return result;
 	}
 
-	if (!process.waitForFinished(300000))
+	// The total comes from the input's Duration banner on stderr, the position from -progress's out_time_us on stdout.
+	static const QRegularExpression outTimeUs(R"(out_time_us=(\d+))");
+	QString errorOutput;
+	qint64 durationMs = -1;
+	qint64 doneMs = 0;
+	constexpr int sliceMs = 100;
+	while (!process.waitForFinished(sliceMs) && process.state() != QProcess::NotRunning)
 	{
-		process.kill();
-		process.waitForFinished();  // reap the killed process rather than leaving it orphaned
-		cleanupAfterFailure();
-		result.status = SplitResult::Status::TimedOut;
-		return result;
+		if (cancelled)
+		{
+			process.kill();
+			process.waitForFinished();  // reap the killed process rather than leaving it orphaned
+			cleanupAfterFailure();
+			result.status = SplitResult::Status::Cancelled;
+			return result;
+		}
+
+		errorOutput += QString::fromUtf8(process.readAllStandardError());
+		if (durationMs <= 0)
+			durationMs = parseDurationMs(errorOutput);
+		for (const QRegularExpressionMatch& match : outTimeUs.globalMatch(QString::fromLatin1(process.readAllStandardOutput())))
+			doneMs = std::max(doneMs, match.captured(1).toLongLong() / 1000);
+		if (onProgress)
+			onProgress(durationMs > 0 ? std::clamp(static_cast<double>(doneMs) / static_cast<double>(durationMs), 0.0, 1.0) : -1.0);
 	}
 
-	if (process.exitCode() != 0)
+	if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0)
 	{
 		result.exitCode    = process.exitCode();
-		result.errorOutput = process.readAllStandardError() + "\n" + process.readAllStandardOutput();
+		result.errorOutput = errorOutput + QString::fromUtf8(process.readAllStandardError());
 		cleanupAfterFailure();
 		result.status = SplitResult::Status::ExtractionFailed;
 		return result;

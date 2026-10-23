@@ -8,6 +8,7 @@
 
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
+#include "threading/cinterruptablethread.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QApplication>
@@ -16,11 +17,14 @@ DISABLE_COMPILER_WARNINGS
 #include <QFileInfo>
 #include <QMessageBox>
 #include <QObject>
+#include <QProgressDialog>
 #include <QScopeGuard>
 #include <QSettings>
 #include <QUuid>
 RESTORE_COMPILER_WARNINGS
 
+#include <atomic>
+#include <functional>
 #include <vector>
 
 namespace {
@@ -34,15 +38,21 @@ Ffmpeg::SplitOptions configuredSplitOptions()
 	};
 }
 
-bool extractFramesOrReport(const QString& videoFilePath, const QString& outputFolder, QWidget* dialogParent)
+// Each ffmpeg process is internally threaded; keep concurrent processes low.
+constexpr int PREVIEW_EXTRACTION_CONCURRENCY = 2;
+
+FrameExtraction::Outcome extractFramesOrReport(const QString& videoFilePath, const QString& outputFolder,
+	const std::atomic<bool>& cancelled, const std::function<void(double)>& onProgress, QWidget* dialogParent)
 {
 	const Ffmpeg::SplitResult result =
-		Ffmpeg::splitVideoIntoFrames(videoFilePath, outputFolder, configuredSplitOptions());
+		Ffmpeg::splitVideoIntoFrames(videoFilePath, outputFolder, configuredSplitOptions(), cancelled, onProgress);
 	if (result.ok())
-		return true;
+		return FrameExtraction::Outcome::Done;
+	if (result.status == Ffmpeg::SplitResult::Status::Cancelled)
+		return FrameExtraction::Outcome::Cancelled;
 
 	reportFfmpegFailure(dialogParent, result, videoFilePath, outputFolder);
-	return false;
+	return FrameExtraction::Outcome::Failed;
 }
 
 bool regeneratePreviewFromRealFrames(const QString& folderPath, int previewFrameCount)
@@ -66,22 +76,6 @@ bool regeneratePreviewFromRealFrames(const QString& folderPath, int previewFrame
 	return anyCopied;
 }
 
-bool regeneratePreviewFromSource(Catalog& catalog, const MediaId& id, const QString& folderPath, int previewFrameCount)
-{
-	const QString source = catalog.sourcePathForMediaItem(id);
-	if (!QFile::exists(source))
-		return false;
-
-	const QString previewDirPath = Catalog::previewDirFor(folderPath);
-	if (!QDir{}.mkpath(previewDirPath))
-		assert_and_return_unconditional_r("Failed to create preview folder " + previewDirPath.toStdString(), false);
-
-	const Ffmpeg::PreviewResult result =
-		Ffmpeg::generatePreviewFrames(source, previewDirPath, previewFrameCount);
-	catalog.setDurationMs(id, result.durationMs);
-	return result.ok();
-}
-
 } // namespace
 
 bool FrameExtraction::ensureFramesExtracted(
@@ -93,18 +87,24 @@ bool FrameExtraction::ensureFramesExtracted(
 	if (catalog.isSplitIntoFrames(id))
 		return true;
 
-	return reextractVideoFrames(
-		catalog, id, PreviewHandling::PreserveExisting, previewFrameCount, dialogParent);
+	return reextractVideoFrames(catalog, { id }, PreviewHandling::PreserveExisting, previewFrameCount, dialogParent).front()
+		== Outcome::Done;
 }
 
-bool FrameExtraction::reextractVideoFrames(Catalog& catalog, const MediaId& id,
-	PreviewHandling previewHandling, int previewFrameCount, QWidget* dialogParent)
+namespace {
+
+// Replaces one video's frame folder transactionally and marks the catalog complete only after the new folder commits.
+FrameExtraction::Outcome reextractOneVideo(Catalog& catalog, const MediaId& id, FrameExtraction::PreviewHandling previewHandling,
+	int previewFrameCount, const std::atomic<bool>& cancelled, const std::function<void(double)>& onProgress, QWidget* dialogParent)
 {
-	assert_and_return_r(catalog.containsMediaItem(id), false);
-	assert_and_return_r(catalog.mediaType(id) == Catalog::MediaType::Video, false);
+	using FrameExtraction::Outcome;
+	using FrameExtraction::PreviewHandling;
+
+	assert_and_return_r(catalog.containsMediaItem(id), Outcome::Failed);
+	assert_and_return_r(catalog.mediaType(id) == Catalog::MediaType::Video, Outcome::Failed);
 	const QString videoFilePath = catalog.sourcePathForMediaItem(id);
 	const QString outputFolder = catalog.folderForMediaItem(id);
-	assert_and_return_r(!outputFolder.isEmpty(), false);  // QDir("") addresses the working directory
+	assert_and_return_r(!outputFolder.isEmpty(), Outcome::Failed);  // QDir("") addresses the working directory
 	const bool hadExistingFolder = QDir(outputFolder).exists();
 	const QString preservedFolder = hadExistingFolder
 		? QFileInfo(outputFolder).dir().filePath(".darkroom-resplit-" + QUuid::createUuid().toString(QUuid::Id128))
@@ -114,7 +114,7 @@ bool FrameExtraction::reextractVideoFrames(Catalog& catalog, const MediaId& id,
 	{
 		QMessageBox::critical(dialogParent, QObject::tr("Error"),
 			QObject::tr("Failed to preserve the existing frame folder before replacing it:\n%1").arg(outputFolder));
-		return false;
+		return Outcome::Failed;
 	}
 
 	// Until commit, every exit restores the previous folder with same-filesystem renames.
@@ -136,8 +136,9 @@ bool FrameExtraction::reextractVideoFrames(Catalog& catalog, const MediaId& id,
 		}
 	});
 
-	if (!extractFramesOrReport(videoFilePath, outputFolder, dialogParent))
-		return false;
+	if (const Outcome extraction = extractFramesOrReport(videoFilePath, outputFolder, cancelled, onProgress, dialogParent);
+		extraction != Outcome::Done)
+		return extraction;
 
 	const QString preservedPreviewDir = Catalog::previewDirFor(preservedFolder);
 	const bool preservePreview = previewHandling == PreviewHandling::PreserveExisting
@@ -149,7 +150,7 @@ bool FrameExtraction::reextractVideoFrames(Catalog& catalog, const MediaId& id,
 			QMessageBox::critical(dialogParent, QObject::tr("Error"),
 				QObject::tr("Failed to carry the existing preview into the new frame folder.\n\nPreserved folder:\n%1\n\nNew folder:\n%2")
 					.arg(preservedFolder).arg(outputFolder));
-			return false;
+			return Outcome::Failed;
 		}
 	}
 	else
@@ -168,39 +169,157 @@ bool FrameExtraction::reextractVideoFrames(Catalog& catalog, const MediaId& id,
 			QObject::tr("The new frames are ready, but the previous frame folder could not be completely removed:\n%1")
 				.arg(preservedFolder));
 	}
-	return true;
+	return Outcome::Done;
 }
 
-bool FrameExtraction::regeneratePreview(Catalog& catalog, const MediaId& id, int previewFrameCount)
+// The video folder of a tracked video; empty, with an assertion, otherwise.
+QString trackedVideoFolder(const Catalog& catalog, const MediaId& id)
 {
-	assert_and_return_r(catalog.containsMediaItem(id), false);
-	assert_and_return_r(catalog.mediaType(id) == Catalog::MediaType::Video, false);
+	assert_and_return_r(catalog.containsMediaItem(id), {});
+	assert_and_return_r(catalog.mediaType(id) == Catalog::MediaType::Video, {});
 	const QString folder = catalog.folderForMediaItem(id);
-	assert_and_return_r(!folder.isEmpty(), false);  // QDir("") addresses the working directory
+	assert_r(!folder.isEmpty());  // QDir("") addresses the working directory
+	return folder;
+}
 
-	// Real frames are authoritative even if the stored split state disagrees.
-	if (regeneratePreviewFromRealFrames(folder, previewFrameCount))
+// Generates the previews of ids[i] for each i in indices from their source videos, recording each result in outcomes[i].
+// onGenerated runs for each success. A video whose source is missing fails without a job.
+void generatePreviewsFromSources(Catalog& catalog, const std::vector<MediaId>& ids, const std::vector<size_t>& indices,
+	int previewFrameCount, const QString& title, QWidget* dialogParent, std::vector<FrameExtraction::Outcome>& outcomes,
+	const std::function<void(const MediaId&)>& onGenerated)
+{
+	using FrameExtraction::Outcome;
+
+	std::vector<Ffmpeg::PreviewJob> jobs;
+	std::vector<size_t> jobIndices;
+	for (const size_t i : indices)
 	{
-		catalog.markSplitComplete(id);
-		return true;
+		const QString source = catalog.sourcePathForMediaItem(ids[i]);
+		if (!QFile::exists(source))
+		{
+			outcomes[i] = Outcome::Failed;
+			continue;
+		}
+		jobs.push_back({ source, Catalog::previewDirFor(catalog.folderForMediaItem(ids[i])) });
+		jobIndices.push_back(i);
 	}
-	return regeneratePreviewFromSource(catalog, id, folder, previewFrameCount);
+
+	const std::vector<Ffmpeg::PreviewResult> results =
+		FrameExtraction::generatePreviewFramesInteractively(jobs, previewFrameCount, title, dialogParent);
+
+	// Opened only after the runner: a BatchScope must not span its event loop.
+	Catalog::BatchScope batch(catalog);
+	for (size_t k = 0; k < results.size(); ++k)
+	{
+		const size_t i = jobIndices[k];
+		catalog.setDurationMs(ids[i], results[k].durationMs);
+		if (results[k].ok())
+		{
+			onGenerated(ids[i]);
+			outcomes[i] = Outcome::Done;
+		}
+		else
+			outcomes[i] = results[k].status == Ffmpeg::PreviewResult::Status::Cancelled ? Outcome::Cancelled : Outcome::Failed;
+	}
 }
 
-bool FrameExtraction::keepPreviewOnly(Catalog& catalog, const MediaId& id, int previewFrameCount)
+} // namespace
+
+std::vector<FrameExtraction::Outcome> FrameExtraction::reextractVideoFrames(Catalog& catalog, const std::vector<MediaId>& ids,
+	PreviewHandling previewHandling, int previewFrameCount, QWidget* dialogParent)
 {
-	assert_and_return_r(catalog.containsMediaItem(id), false);
-	assert_and_return_r(catalog.mediaType(id) == Catalog::MediaType::Video, false);
-	const QString folder = catalog.folderForMediaItem(id);
-	assert_and_return_r(!folder.isEmpty(), false);  // QDir("") addresses the working directory
-	assert_and_return_r(listFrameImageFiles(QDir(folder)).isEmpty(), false);
+	if (ids.empty())
+		return {};
 
-	if (listFrameImageFiles(QDir(Catalog::previewDirFor(folder))).isEmpty()
-		&& !regeneratePreviewFromSource(catalog, id, folder, previewFrameCount))
-		return false;
+	constexpr int stepsPerVideo = 100;
+	QProgressDialog progress(QString{}, QObject::tr("Cancel"), 0, static_cast<int>(ids.size()) * stepsPerVideo, dialogParent);
+	progress.setWindowTitle(QObject::tr("Extracting frames"));
+	progress.setModal(true);
+	progress.setMinimumDuration(0);
+	progress.setAutoClose(false);
+	progress.setAutoReset(false);
 
-	catalog.markPreviewOnly(id);
-	return true;
+	std::atomic<bool> cancelled = false;
+	QObject::connect(&progress, &QProgressDialog::canceled, &progress, [&cancelled] { cancelled = true; });
+	progress.show();
+
+	std::vector<Outcome> outcomes(ids.size(), Outcome::Cancelled);
+	for (size_t i = 0; i < ids.size() && !cancelled; ++i)
+	{
+		const int videoStart = static_cast<int>(i) * stepsPerVideo;
+		progress.setLabelText(QObject::tr("Extracting frames of video %1 of %2:\n%3").arg(i + 1).arg(ids.size()).arg(catalog.displayName(ids[i])));
+		progress.setValue(videoStart);
+		QApplication::processEvents();
+
+		outcomes[i] = reextractOneVideo(catalog, ids[i], previewHandling, previewFrameCount, cancelled,
+			[&progress, videoStart](double fractionDone) {
+				if (fractionDone >= 0)
+					progress.setValue(videoStart + static_cast<int>(fractionDone * stepsPerVideo));
+				// Explicit: a modal setValue processes events only when the value changes.
+				QApplication::processEvents();
+			}, &progress);
+	}
+	return outcomes;
+}
+
+std::vector<FrameExtraction::Outcome> FrameExtraction::regeneratePreviews(Catalog& catalog, const std::vector<MediaId>& ids,
+	int previewFrameCount, QWidget* dialogParent)
+{
+	std::vector<Outcome> outcomes(ids.size(), Outcome::Failed);
+	std::vector<size_t> needSource;
+	{
+		Catalog::BatchScope batch(catalog);
+		for (size_t i = 0; i < ids.size(); ++i)
+		{
+			const QString folder = trackedVideoFolder(catalog, ids[i]);
+			if (folder.isEmpty())
+				continue;
+			// Real frames are authoritative even if the stored split state disagrees.
+			if (regeneratePreviewFromRealFrames(folder, previewFrameCount))
+			{
+				catalog.markSplitComplete(ids[i]);
+				outcomes[i] = Outcome::Done;
+			}
+			else
+				needSource.push_back(i);
+		}
+	}
+
+	generatePreviewsFromSources(catalog, ids, needSource, previewFrameCount, QObject::tr("Regenerating previews"), dialogParent,
+		outcomes, [](const MediaId&) {});
+	return outcomes;
+}
+
+std::vector<FrameExtraction::Outcome> FrameExtraction::keepPreviewOnly(Catalog& catalog, const std::vector<MediaId>& ids,
+	int previewFrameCount, QWidget* dialogParent)
+{
+	std::vector<Outcome> outcomes(ids.size(), Outcome::Failed);
+	std::vector<size_t> needSource;
+	{
+		Catalog::BatchScope batch(catalog);
+		for (size_t i = 0; i < ids.size(); ++i)
+		{
+			const QString folder = trackedVideoFolder(catalog, ids[i]);
+			if (folder.isEmpty())
+				continue;
+			const bool hasRealFrames = !listFrameImageFiles(QDir(folder)).isEmpty();
+			assert_r(!hasRealFrames);
+			if (hasRealFrames)
+				continue;
+
+			if (listFrameImageFiles(QDir(Catalog::previewDirFor(folder))).isEmpty())
+			{
+				needSource.push_back(i);
+				continue;
+			}
+			catalog.markPreviewOnly(ids[i]);
+			outcomes[i] = Outcome::Done;
+		}
+	}
+
+	generatePreviewsFromSources(catalog, ids, needSource, previewFrameCount, QObject::tr("Generating previews"), dialogParent,
+		outcomes, [&catalog](const MediaId& id) { catalog.markPreviewOnly(id); });
+	return outcomes;
 }
 
 bool FrameExtraction::reextractAllVideoFramesInteractive(
@@ -227,21 +346,56 @@ bool FrameExtraction::reextractAllVideoFramesInteractive(
 		return false;
 	}
 
-	Catalog::BatchScope batch(catalog);
-
-	QMessageBox progressBox(dialogParent);
-	progressBox.setWindowTitle(QObject::tr("Re-extracting frames"));
-	progressBox.setStandardButtons(QMessageBox::NoButton);
-	progressBox.setModal(true);
-	progressBox.show();
-
-	for (size_t i = 0, total = toReextract.size(); i < total; ++i)
-	{
-		progressBox.setText(QObject::tr("Re-extracting frames of video %1/%2...").arg(i + 1).arg(total));
-		QApplication::processEvents();
-
-		static_cast<void>(reextractVideoFrames(
-			catalog, toReextract[i], PreviewHandling::Regenerate, previewFrameCount, dialogParent));
-	}
+	static_cast<void>(reextractVideoFrames(catalog, toReextract, PreviewHandling::Regenerate, previewFrameCount, dialogParent));
 	return true;
+}
+
+std::vector<Ffmpeg::PreviewResult> FrameExtraction::generatePreviewFramesInteractively(
+	const std::vector<Ffmpeg::PreviewJob>& jobs, int frameCount, const QString& title, QWidget* parent)
+{
+	if (jobs.empty())
+		return {};
+
+	QProgressDialog progress(QObject::tr("Examining video %1/%2...").arg(0).arg(jobs.size()), QObject::tr("Cancel"),
+		0, static_cast<int>(jobs.size()), parent);
+	progress.setWindowTitle(title);
+	progress.setModal(true);
+	progress.setMinimumDuration(0);
+	// Keep the dialog open until cancelled ffmpeg processes have been reaped.
+	progress.setAutoClose(false);
+	progress.setAutoReset(false);
+
+	// results is written by this worker and read only after join().
+	std::vector<Ffmpeg::PreviewResult> results;
+	CInterruptableThread previewThread{ "preview-extraction" };
+
+	QObject::connect(&progress, &QProgressDialog::canceled, parent, [&] {
+		previewThread.requestCancellation();
+		progress.setLabelText(QObject::tr("Cancelling..."));
+	});
+
+	previewThread.start([&](const std::atomic<bool>& cancelled) {
+		results = Ffmpeg::generatePreviewFrames(jobs, frameCount, PREVIEW_EXTRACTION_CONCURRENCY, cancelled,
+			[&](int done, int total, Ffmpeg::Phase phase) {
+				QMetaObject::invokeMethod(&progress, [&progress, &previewThread, done, total, phase] {
+					if (previewThread.cancellationRequested())
+						return;
+					if (phase == Ffmpeg::Phase::Probing)
+					{
+						progress.setLabelText(QObject::tr("Examining video %1/%2...").arg(done).arg(total));
+						return;
+					}
+					progress.setValue(done);
+					progress.setLabelText(QObject::tr("Generating preview %1/%2...").arg(done).arg(total));
+				}, Qt::QueuedConnection);
+			});
+		QMetaObject::invokeMethod(&progress, [&progress] { progress.accept(); }, Qt::QueuedConnection);
+	});
+
+	progress.exec();
+
+	// Cover completion, Cancel, Esc, and window close before joining the worker.
+	previewThread.requestCancellation();
+	previewThread.join();
+	return results;
 }

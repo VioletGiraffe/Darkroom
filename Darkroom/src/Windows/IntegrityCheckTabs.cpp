@@ -2,6 +2,7 @@
 #include "Theme/Theme.h"
 #include "Utils.h"
 
+#include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
@@ -28,8 +29,21 @@ RESTORE_COMPILER_WARNINGS
 #include <utility>
 
 using CatalogIntegrity::MediaIssue;
+using FrameExtraction::Outcome;
 
 namespace {
+
+// Adapts a per-row action to the batch form EachSpec::act takes.
+[[nodiscard]] std::function<std::vector<Outcome>(const std::vector<int>&)> perFinding(std::function<bool(int finding)> act)
+{
+	return [act = std::move(act)](const std::vector<int>& findings) {
+		std::vector<Outcome> outcomes;
+		outcomes.reserve(findings.size());
+		for (const int f : findings)
+			outcomes.push_back(act(f) ? Outcome::Done : Outcome::Failed);
+		return outcomes;
+	};
+}
 
 constexpr int FindingRole = Qt::UserRole;
 constexpr int MaxInitialColumnWidth = 360;
@@ -160,7 +174,7 @@ void IntegrityCheckTabs::buildUntrackedPhotos()
 		});
 
 	addEachAction(tab, QObject::tr("Add to catalog"), {}, [](int) { return true; }, {
-		.act = [this](int f) { return _callbacks.adoptPhotoRequested(_report.untrackedPhotos[f].filePath); },
+		.act = perFinding([this](int f) { return _callbacks.adoptPhotoRequested(_report.untrackedPhotos[f].filePath); }),
 		.outcome = QObject::tr("Added to catalog"),
 		.doneFmt = QObject::tr("Added %1 photo(s) to the catalog."),
 		.failedFmt = QObject::tr("%1 could not be added - a file with the same name and size is already tracked elsewhere."),
@@ -214,7 +228,7 @@ void IntegrityCheckTabs::buildVideos()
 
 	addEachAction(tab, QObject::tr("Re-extract frames"), QObject::tr("Extract every frame and the preview again from the source video"),
 		[this](int f) { return canReextractFrames(_report.issues[f]); }, {
-		.act = [this](int f) { return _callbacks.reextractFramesRequested(_report.issues[f].id); },
+		.act = [this](const std::vector<int>& findings) { return _callbacks.reextractFramesRequested(videoIds(findings)); },
 		.outcome = QObject::tr("Frames re-extracted"),
 		.doneFmt = QObject::tr("Re-extracted the frames of %1 video(s)."),
 		.failedFmt = QObject::tr("%1 could not be re-extracted - see the error dialogs for details."),
@@ -224,21 +238,21 @@ void IntegrityCheckTabs::buildVideos()
 	addEachAction(tab, QObject::tr("Keep preview only"),
 		QObject::tr("Go back to preview-only: frames are extracted again the first time they are viewed"),
 		[this](int f) { return canKeepPreviewOnly(_report.issues[f]); }, {
-		.act = [this](int f) { return _callbacks.keepPreviewOnlyRequested(_report.issues[f].id); },
+		.act = [this](const std::vector<int>& findings) { return _callbacks.keepPreviewOnlyRequested(videoIds(findings)); },
 		.outcome = QObject::tr("Kept as preview only"),
 		.doneFmt = QObject::tr("Kept %1 video(s) as preview only."),
 		.failedFmt = QObject::tr("%1 could not get a preview - the source may be unavailable."),
 	});
 
 	addEachAction(tab, QObject::tr("Regenerate preview"), {}, [this](int f) { return canRegeneratePreview(_report.issues[f]); }, {
-		.act = [this](int f) { return _callbacks.regeneratePreviewRequested(_report.issues[f].id); },
+		.act = [this](const std::vector<int>& findings) { return _callbacks.regeneratePreviewRequested(videoIds(findings)); },
 		.outcome = QObject::tr("Preview regenerated"),
 		.doneFmt = QObject::tr("Regenerated %1 preview(s)."),
 		.failedFmt = QObject::tr("%1 could not be regenerated - the source may be unavailable."),
 	});
 
 	addEachAction(tab, QObject::tr("Mark as fully split"), {}, [this](int f) { return canMarkSplit(_report.issues[f]); }, {
-		.act = [this](int f) { return _callbacks.markSplitRequested(_report.issues[f].id); },
+		.act = perFinding([this](int f) { return _callbacks.markSplitRequested(_report.issues[f].id); }),
 		.outcome = QObject::tr("Marked as fully split"),
 		.doneFmt = QObject::tr("Marked %1 video(s) as fully split."),
 		.failedFmt = QObject::tr("%1 could not be updated."),
@@ -247,7 +261,7 @@ void IntegrityCheckTabs::buildVideos()
 
 	addEachAction(tab, QObject::tr("Remove"), QObject::tr("Forget the entry; frame folders and source files on disk are not touched"),
 		[](int) { return true; }, {
-		.act = [this](int f) { return _callbacks.removeEntryRequested(_report.issues[f].id); },
+		.act = perFinding([this](int f) { return _callbacks.removeEntryRequested(_report.issues[f].id); }),
 		.outcome = QObject::tr("Removed from catalog"),
 		.doneFmt = QObject::tr("Removed %1 video(s) from the catalog."),
 		.failedFmt = QObject::tr("%1 could not be removed."),
@@ -287,7 +301,7 @@ void IntegrityCheckTabs::buildMissingPhotos()
 
 	addEachAction(tab, QObject::tr("Remove"), QObject::tr("Forget the entry; any file still on disk is not touched"),
 		[](int) { return true; }, {
-		.act = [this](int f) { return _callbacks.removeEntryRequested(_report.photoIssues[f].id); },
+		.act = perFinding([this](int f) { return _callbacks.removeEntryRequested(_report.photoIssues[f].id); }),
 		.outcome = QObject::tr("Removed from catalog"),
 		.doneFmt = QObject::tr("Removed %1 photo(s) from the catalog."),
 		.failedFmt = QObject::tr("%1 could not be removed."),
@@ -312,7 +326,7 @@ void IntegrityCheckTabs::buildInvalidLabels()
 		});
 
 	addEachAction(tab, QObject::tr("Drop invalid references"), {}, [](int) { return true; }, {
-		.act = [this](int f) { return _callbacks.removeInvalidLabelReferencesRequested(_report.danglingLabelIssues[f].id); },
+		.act = perFinding([this](int f) { return _callbacks.removeInvalidLabelReferencesRequested(_report.danglingLabelIssues[f].id); }),
 		.outcome = QObject::tr("Invalid label references dropped"),
 		.doneFmt = QObject::tr("Cleaned %1 item(s)."),
 		.failedFmt = QObject::tr("%1 item(s) could not be updated."),
@@ -437,25 +451,51 @@ void IntegrityCheckTabs::runEach(Tab& tab, const std::vector<int>& findings, con
 		&& QMessageBox::question(_dialog, _dialog->windowTitle(), spec.confirmFmt.arg(count)) != QMessageBox::Yes)
 		return;
 
-	int done = 0, failed = 0;
-	QApplication::setOverrideCursor(Qt::WaitCursor);
+	int done = 0, failed = 0, cancelled = 0;
 	{
 		std::optional<Catalog::BatchScope> batch;
 		if (spec.quick)
-			batch.emplace(_catalog);
-		for (const int f : findings)
 		{
-			if (!spec.act(f))
+			QApplication::setOverrideCursor(Qt::WaitCursor);
+			batch.emplace(_catalog);
+		}
+
+		// Long actions show their own progress dialog.
+		const std::vector<Outcome> outcomes = spec.act(findings);
+		assert_r(outcomes.size() == findings.size());
+		for (size_t k = 0; k < std::min(outcomes.size(), findings.size()); ++k)
+		{
+			switch (outcomes[k])
 			{
+			case Outcome::Done:
+				++done;
+				settle(tab, findings[k], spec.outcome);
+				break;
+			case Outcome::Failed:
 				++failed;
-				continue;
+				break;
+			case Outcome::Cancelled:
+				++cancelled;
+				break;
 			}
-			++done;
-			settle(tab, f, spec.outcome);
 		}
 	}
-	QApplication::restoreOverrideCursor();
-	reportResult(spec.doneFmt.arg(done), failed ? spec.failedFmt.arg(failed) : QString{});
+	if (spec.quick)
+		QApplication::restoreOverrideCursor();
+
+	QString doneText = spec.doneFmt.arg(done);
+	if (cancelled)
+		doneText += ' ' + QObject::tr("%1 cancelled.").arg(cancelled);
+	reportResult(doneText, failed ? spec.failedFmt.arg(failed) : QString{});
+}
+
+std::vector<MediaId> IntegrityCheckTabs::videoIds(const std::vector<int>& findings) const
+{
+	std::vector<MediaId> ids;
+	ids.reserve(findings.size());
+	for (const int f : findings)
+		ids.push_back(_report.issues[f].id);
+	return ids;
 }
 
 void IntegrityCheckTabs::locate(Tab& tab, const std::vector<int>& findings, const LocateSpec& spec)

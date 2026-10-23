@@ -569,15 +569,15 @@ void MainWindow::checkCatalogIntegrity()
 			const QString labelDir = QFileInfo(filePath).absolutePath();
 			return catalog.addPhoto(MediaId::fromFile(filePath), filePath, labelDir, /*referenced=*/false);
 		},
-		.reextractFramesRequested = [this](const MediaId& id) {
-			return FrameExtraction::reextractVideoFrames(libraryCatalog(), id,
+		.reextractFramesRequested = [this](const std::vector<MediaId>& ids) {
+			return FrameExtraction::reextractVideoFrames(libraryCatalog(), ids,
 				FrameExtraction::PreviewHandling::Regenerate, _mediaBrowser->previewFrameCount(), this);
 		},
-		.regeneratePreviewRequested = [this](const MediaId& id) {
-			return FrameExtraction::regeneratePreview(libraryCatalog(), id, _mediaBrowser->previewFrameCount());
+		.regeneratePreviewRequested = [this](const std::vector<MediaId>& ids) {
+			return FrameExtraction::regeneratePreviews(libraryCatalog(), ids, _mediaBrowser->previewFrameCount(), this);
 		},
-		.keepPreviewOnlyRequested = [this](const MediaId& id) {
-			return FrameExtraction::keepPreviewOnly(libraryCatalog(), id, _mediaBrowser->previewFrameCount());
+		.keepPreviewOnlyRequested = [this](const std::vector<MediaId>& ids) {
+			return FrameExtraction::keepPreviewOnly(libraryCatalog(), ids, _mediaBrowser->previewFrameCount(), this);
 		},
 		.markSplitRequested = [this](const MediaId& id) {
 			libraryCatalog().markSplitComplete(id);

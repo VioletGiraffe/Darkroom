@@ -67,9 +67,10 @@ struct SplitResult
 		SourceMissing,
 		FolderCreateFailed,
 		StartFailed,
-		TimedOut,
+		TimedOut,  // single-frame extraction only
 		ExtractionFailed,
 		NoFrames,
+		Cancelled,
 	};
 
 	Status  status     = Status::Ok;
@@ -79,8 +80,10 @@ struct SplitResult
 	[[nodiscard]] bool ok() const { return status == Status::Ok; }
 };
 
-// Blocking full-resolution extraction. Failure removes the entire partial output folder.
-[[nodiscard]] SplitResult splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder, const SplitOptions& options);
+// Full-resolution extraction, blocking the calling thread. onProgress runs on it about every 100 ms with the fraction
+// done, negative while the duration is unknown. Failure and cancellation remove the entire partial output folder.
+[[nodiscard]] SplitResult splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder, const SplitOptions& options,
+	const std::atomic<bool>& cancelled, const std::function<void(double fractionDone)>& onProgress);
 
 // Blocking single-frame extraction. ".tif" selects TIFF; other extensions select JPEG. The destination must
 // not exist; ffmpeg refuses to overwrite it. Failure may leave a partial output file.

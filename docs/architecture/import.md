@@ -12,6 +12,10 @@ video as not yet split; an explicit frame-viewing action pays for the full extra
 `Catalog::markSplitComplete` only after the candidate is ready to commit. Failure rolls back to the previous
 folder. Old and new frame sets therefore coexist during extraction; minimizing peak disk usage is not a design goal.
 
+A batch extracts one video at a time on the GUI thread behind a cancellable progress dialog: ffmpeg already
+parallelizes a single extraction. The process is polled, which keeps the dialog live, and cancelling rolls back the
+current video.
+
 `PreviewHandling` defines what the replacement transaction does with the permanent preview:
 
 - **`PreserveExisting`** moves the imported preview into the successful first full split.
@@ -71,7 +75,8 @@ obtained while choosing frame timestamps.
 
 Batch generation runs a bounded number of ffmpeg subprocesses concurrently and is cancellable. Cancellation stops
 in-flight work, starts no new jobs, preserves completed results, and reports unfinished jobs as cancelled. The caller
-removes partial output.
+removes partial output. `FrameExtraction::generatePreviewFramesInteractively` runs a batch on a worker thread behind a
+cancellable progress dialog; staging and the integrity repairs both use it.
 
 Once imported, `preview/` is a permanent store separate from real extracted frames. Full extraction does not rewrite
 it. Integrity scanning reports missing real frames only for items marked as fully split, so a preview-only video is a

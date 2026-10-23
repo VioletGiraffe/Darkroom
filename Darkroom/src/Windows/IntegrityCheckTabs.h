@@ -59,10 +59,10 @@ private:
 		std::vector<QStringList> done;            // per finding: outcomes of repairs so far
 	};
 
-	// A per-row action.
+	// An action with an outcome per row.
 	struct EachSpec
 	{
-		std::function<bool(int finding)> act;
+		std::function<std::vector<FrameExtraction::Outcome>(const std::vector<int>& findings)> act;  // one outcome per finding, in order
 		QString outcome;     // shown in Resolved
 		QString doneFmt;
 		QString failedFmt;
@@ -107,6 +107,8 @@ private:
 
 	void showStatus(const QString& text);
 	void reportResult(const QString& doneText, const QString& failureText);
+
+	[[nodiscard]] std::vector<MediaId> videoIds(const std::vector<int>& findings) const;
 
 	[[nodiscard]] QString browseForSourceVideo(const QString& hint) const;
 	[[nodiscard]] QString browseForSourcePhoto(const QString& hint) const;

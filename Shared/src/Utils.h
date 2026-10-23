@@ -105,7 +105,7 @@ void reportMissingFile(QWidget* parent, const QString& path);
 
 namespace Ffmpeg { struct SplitResult; }
 
-// Presents a failed split/extract result; no-op on Ok.
+// Presents a failed split/extract result; no-op on Ok and Cancelled.
 void reportFfmpegFailure(QWidget* parent, const Ffmpeg::SplitResult& result, const QString& videoFilePath, const QString& outputTarget);
 
 // Configured ffmpeg path when valid, otherwise autoDetectedFfmpegPath(). Empty is safe to pass to QProcess.
