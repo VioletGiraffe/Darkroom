@@ -569,7 +569,7 @@ void MainWindow::checkCatalogIntegrity()
 			const QString labelDir = QFileInfo(filePath).absolutePath();
 			return catalog.addPhoto(MediaId::fromFile(filePath), filePath, labelDir, /*referenced=*/false);
 		},
-		.reimportRequested = [this](const MediaId& id) {
+		.reextractFramesRequested = [this](const MediaId& id) {
 			return FrameExtraction::reextractVideoFrames(libraryCatalog(), id,
 				FrameExtraction::PreviewHandling::Regenerate, _mediaBrowser->previewFrameCount(), this);
 		},

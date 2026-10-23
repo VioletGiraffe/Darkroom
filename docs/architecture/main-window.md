@@ -129,14 +129,15 @@ the same Catalog operation. Missing sources are refused.
 ## Integrity check
 
 MainWindow owns the Tools menu's catalog integrity workflow. `CatalogIntegrity::scan` produces the report on the GUI
-thread, behind a modal progress box; `IntegrityCheckDialog` presents it, with `IntegrityCheckSections` building the
-per-finding rows and recovery buttons. Every button calls back into MainWindow, which routes to the owner of the
-operation: registration, adoption, locate (a rename to the found path), entry removal, and dangling-label cleanup go
-to `Catalog`; re-extraction, preview regeneration and the return to preview-only go to `FrameExtraction`. A repaired
-video row is re-checked with `CatalogIntegrity::inspectVideo` and rebuilt while problems remain. The dialog runs
-inside one `Catalog::ChangeBatchScope` (not a `BatchScope`: the dialog pumps events), and the browser refreshes once
-when it closes with changes. Quick blanket actions (locate, remove, adopt, label cleanup) each persist in one
-`BatchScope`; actions that may run ffmpeg persist per item.
+thread, behind a modal progress box; `IntegrityCheckDialog` presents it, with `IntegrityCheckTabs` showing one table
+tab per finding category plus a Resolved tab. Actions apply to the selected rows they fit, so one path serves a single
+row and thousands. Every action calls back into MainWindow, which routes to the owner of the operation:
+registration, adoption, locate (a rename to the found path), entry removal, and dangling-label cleanup go to
+`Catalog`; re-extraction, preview regeneration and the return to preview-only go to `FrameExtraction`. A fixed row
+moves to Resolved; a repaired video is re-checked with `CatalogIntegrity::inspectVideo` and stays while problems
+remain. The dialog runs inside one `Catalog::ChangeBatchScope` (not a `BatchScope`: the dialog pumps events), and
+the browser refreshes once when it closes with changes. Quick actions (locate, remove, adopt, label cleanup) persist
+once per action in a `BatchScope`; actions that may run ffmpeg persist per item.
 
 ## Logging and diagnostics
 

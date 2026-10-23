@@ -12,10 +12,10 @@ RESTORE_COMPILER_WARNINGS
 #include <functional>
 #include <memory>
 
-// Presents CatalogIntegrity findings and per-row/batch recovery actions. MainWindow supplies all callbacks
-// that mutate the catalog or disk; the dialog only batches their persistence. Section UI lives in IntegrityCheckSections.
+// Presents CatalogIntegrity findings and recovery actions. MainWindow supplies all callbacks that mutate the catalog
+// or disk; the dialog only batches their persistence. Tab UI lives in IntegrityCheckTabs.
 
-class IntegrityCheckSections;
+class IntegrityCheckTabs;
 
 class IntegrityCheckDialog final : public QDialog
 {
@@ -24,7 +24,7 @@ public:
 	{
 		std::function<bool(const QString& folderPath, const QString& sourcePath)> registerRequested;
 		std::function<bool(const QString& filePath)> adoptPhotoRequested;
-		std::function<bool(const MediaId& id)> reimportRequested;
+		std::function<bool(const MediaId& id)> reextractFramesRequested;
 		std::function<bool(const MediaId& id)> regeneratePreviewRequested;
 		std::function<bool(const MediaId& id)> keepPreviewOnlyRequested;
 		std::function<bool(const MediaId& id)> markSplitRequested;
@@ -40,10 +40,9 @@ public:
 	static bool scanAndShowUi(Catalog& catalog, const QString& rootFolder, Callbacks callbacks, QWidget* parent);
 
 private:
-	IntegrityCheckDialog(Catalog& catalog, const CatalogIntegrity::IntegrityReport& report, Callbacks callbacks, QWidget* parent);
+	IntegrityCheckDialog(Catalog& catalog, CatalogIntegrity::IntegrityReport report, Callbacks callbacks, QWidget* parent);
 	~IntegrityCheckDialog() override;
 
 	Callbacks _callbacks;
-	// Button callbacks in the section widgets borrow this state.
-	std::unique_ptr<IntegrityCheckSections> _sections;
+	std::unique_ptr<IntegrityCheckTabs> _tabs;  // borrows _callbacks
 };
