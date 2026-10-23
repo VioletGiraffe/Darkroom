@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792716839528,
+  "lastUpdate": 1792716860749,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -16018,6 +16018,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .text",
             "value": 2914,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 423,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 57,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 47,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 12.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "0448f1fdf84997c24f54ae2d216a59b5da7623f3",
+          "message": "Catalog stores paths under the library root as root-relative, converting old absolute ones on load, so the library can move",
+          "timestamp": "2026-10-23T03:40:36+03:00",
+          "tree_id": "aa423a9220adc169636fa9ee583073e23aa3a78a",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/0448f1fdf84997c24f54ae2d216a59b5da7623f3"
+        },
+        "date": 1792716857249,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 16344,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1400,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 29006,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3480,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 3501,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2915.5,
             "unit": "KB"
           },
           {
