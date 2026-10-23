@@ -30,6 +30,8 @@ public:
 		std::function<bool(const QString& filePath)> adoptPhotoRequested;
 		// Returns the paths that are gone afterwards.
 		std::function<QSet<QString>(const QStringList& paths)> trashRequested;
+		// Opens the Import dialog with paths staged; returns when it closes.
+		std::function<void(const QStringList& paths)> importRequested;
 		// The ffmpeg actions take a batch and return an outcome per id, in order.
 		std::function<std::vector<FrameExtraction::Outcome>(const std::vector<MediaId>& ids)> reextractFramesRequested;
 		std::function<std::vector<FrameExtraction::Outcome>(const std::vector<MediaId>& ids)> regeneratePreviewRequested;

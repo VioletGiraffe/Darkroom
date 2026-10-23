@@ -9,10 +9,12 @@
 DISABLE_COMPILER_WARNINGS
 #include <QDir>
 #include <QFileInfo>
+#include <QRegularExpression>
 #include <QSet>
 #include <QStringList>
 RESTORE_COMPILER_WARNINGS
 
+#include <algorithm>
 #include <optional>
 #include <utility>
 
@@ -44,6 +46,18 @@ namespace {
 	return info.isDir() && !info.isSymLink() && !info.isJunction();
 }
 
+// Empty unless the folder holds a preview of frame images, or real frames named the way extraction names them.
+[[nodiscard]] std::optional<UntrackedFolder> asDarkroomFrameFolder(const QString& folder)
+{
+	static const QRegularExpression extractedFrameName(QStringLiteral(R"(^\d{4,}_)"));
+	const bool realFramesPresent = std::ranges::any_of(listFrameImageFiles(QDir(folder)),
+		[](const QString& name) { return extractedFrameName.match(name).hasMatch(); });
+	const bool previewPresent = !listFrameImageFiles(QDir(Catalog::previewDirFor(folder))).isEmpty();
+	if (!realFramesPresent && !previewPresent)
+		return std::nullopt;
+	return UntrackedFolder{ folder, realFramesPresent, previewPresent };
+}
+
 // Reports every file and folder under the root that the catalog's layout does not account for.
 class LayoutWalk
 {
@@ -52,15 +66,17 @@ public:
 	void run() { walkFolder(_root, Role::Root); }
 
 private:
-	enum class Role { Root, Storage, PhotosRoot, PhotoLabel, FrameFolder, Preview, Known };
+	enum class Role { Root, Storage, PhotosRoot, PhotoLabel, FrameFolder, Preview, Known, Unknown };
 
 	void walkFolder(const QString& folder, Role role);
-	// Empty when the child folder is not part of the layout.
-	[[nodiscard]] std::optional<Role> roleOfChildFolder(const QString& folder, Role role, const QFileInfo& child) const;
+	[[nodiscard]] Role roleOfChildFolder(const QString& folder, Role role, const QFileInfo& child) const;
 	[[nodiscard]] QFileInfoList entriesOf(const QString& folder, bool atRoot);
 	// Adds folder and every folder between it and the root; folders outside the root are skipped.
 	void addKnownFolder(const QString& folder);
-	[[nodiscard]] size_t adoptableCount() const { return _report.untracked.size() + _report.untrackedPhotos.size(); }
+	[[nodiscard]] size_t untrackedMediaCount() const
+	{
+		return _report.untracked.size() + _report.untrackedPhotos.size() + _report.untrackedVideos.size();
+	}
 
 	const QString& _root;
 	IntegrityReport& _report;
@@ -127,7 +143,7 @@ QFileInfoList LayoutWalk::entriesOf(const QString& folder, bool atRoot)
 	return entries;
 }
 
-std::optional<LayoutWalk::Role> LayoutWalk::roleOfChildFolder(const QString& folder, Role role, const QFileInfo& child) const
+LayoutWalk::Role LayoutWalk::roleOfChildFolder(const QString& folder, Role role, const QFileInfo& child) const
 {
 	const QString key = pathComparisonKey(child.filePath());
 	switch (role)
@@ -147,14 +163,15 @@ std::optional<LayoutWalk::Role> LayoutWalk::roleOfChildFolder(const QString& fol
 	case Role::PhotoLabel:
 	case Role::Preview:
 	case Role::Known:
+	case Role::Unknown:
 		break;
 	}
-	return _knownFolders.contains(key) ? std::optional{ Role::Known } : std::nullopt;
+	return _knownFolders.contains(key) ? Role::Known : Role::Unknown;
 }
 
 void LayoutWalk::walkFolder(const QString& folder, Role role)
 {
-	const size_t adoptableBefore = adoptableCount();
+	const size_t mediaBefore = untrackedMediaCount();
 	const size_t unknownBefore = _report.unknownItems.size();
 
 	for (const QFileInfo& info : entriesOf(folder, role == Role::Root))
@@ -163,34 +180,41 @@ void LayoutWalk::walkFolder(const QString& folder, Role role)
 		if (_knownFiles.contains(pathComparisonKey(path)))
 			continue;
 
-		if (!isRealFolder(info))
+		if (!info.isDir())
 		{
 			if ((role == Role::FrameFolder || role == Role::Preview) && isFrameImageFile(info.fileName()))
 				continue;
-			if (role == Role::PhotoLabel && isSupportedImageFile(path))
-				_report.untrackedPhotos.push_back({ path, QFileInfo(folder).fileName() });
+			if (isSupportedImageFile(path))
+				_report.untrackedPhotos.push_back({ path, role == Role::PhotoLabel ? QFileInfo(folder).fileName() : QString{} });
+			else if (isSupportedVideoFile(path))
+				_report.untrackedVideos.push_back({ path });
 			else
-				_report.unknownItems.push_back({ path, info.isDir() });
+				_report.unknownItems.push_back({ path, false });
 			continue;
 		}
-
-		if (const std::optional<Role> childRole = roleOfChildFolder(folder, role, info))
+		if (!isRealFolder(info))
 		{
-			walkFolder(path, *childRole);
+			_report.unknownItems.push_back({ path, true });
 			continue;
 		}
 
-		const bool realFramesPresent = role == Role::Storage && !listFrameImageFiles(QDir(path)).isEmpty();
-		const bool previewPresent = role == Role::Storage && !listFrameImageFiles(QDir(Catalog::previewDirFor(path))).isEmpty();
-		if (realFramesPresent || previewPresent)
-			_report.untracked.push_back({ path, realFramesPresent, previewPresent });
-		else
-			_report.unknownItems.push_back({ path, true });
+		const Role childRole = roleOfChildFolder(folder, role, info);
+		// Frame folders live only directly in a storage folder.
+		if (childRole == Role::Unknown && role == Role::Storage)
+		{
+			if (const std::optional<UntrackedFolder> untracked = asDarkroomFrameFolder(path))
+			{
+				_report.untracked.push_back(*untracked);
+				continue;
+			}
+		}
+		walkFolder(path, childRole);
 	}
 
-	// An unaccounted-for label folder holding nothing adoptable is reported whole.
-	if ((role == Role::Storage || role == Role::PhotoLabel) && !_knownFolders.contains(pathComparisonKey(folder))
-		&& adoptableCount() == adoptableBefore)
+	// An unaccounted-for folder holding no untracked media is reported whole.
+	const bool unaccounted = role == Role::Unknown
+		|| ((role == Role::Storage || role == Role::PhotoLabel) && !_knownFolders.contains(pathComparisonKey(folder)));
+	if (unaccounted && untrackedMediaCount() == mediaBefore)
 	{
 		_report.unknownItems.resize(unknownBefore);
 		_report.unknownItems.push_back({ folder, true });

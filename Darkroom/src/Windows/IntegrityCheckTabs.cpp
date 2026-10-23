@@ -16,6 +16,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QHeaderView>
 #include <QItemSelectionModel>
 #include <QLabel>
+#include <QMenu>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSet>
@@ -123,6 +124,7 @@ IntegrityCheckTabs::IntegrityCheckTabs(Catalog& catalog, CatalogIntegrity::Integ
 {
 	buildUntrackedFolders();
 	buildUntrackedPhotos();
+	buildUntrackedVideos();
 	buildUnknownItems();
 	buildVideos();
 	buildMissingPhotos();
@@ -166,6 +168,7 @@ void IntegrityCheckTabs::buildUntrackedFolders()
 		});
 
 	addMoveToTrashAction(tab, [this](int f) { return _report.untracked[f].folderPath; });
+	addRevealContextMenu(tab, [this](int f) { return _report.untracked[f].folderPath; });
 }
 
 void IntegrityCheckTabs::buildUntrackedPhotos()
@@ -173,14 +176,16 @@ void IntegrityCheckTabs::buildUntrackedPhotos()
 	if (_report.untrackedPhotos.empty())
 		return;
 
-	Tab& tab = addTab(QObject::tr("Untracked photos"), QObject::tr("Image files under Photos that are not in the catalog."),
-		{ QObject::tr("File"), QObject::tr("Label") }, _report.untrackedPhotos.size(),
+	Tab& tab = addTab(QObject::tr("Untracked photos"), QObject::tr("Images in the library that are not in the catalog."),
+		{ QObject::tr("File"), QObject::tr("Label"), QObject::tr("Path") }, _report.untrackedPhotos.size(),
 		[this](int f, const QStringList&) {
 			const CatalogIntegrity::UntrackedPhoto& photo = _report.untrackedPhotos[f];
-			return std::vector<Cell>{ { QFileInfo(photo.filePath).fileName(), QDir::toNativeSeparators(photo.filePath) }, { photo.labelName, {} } };
+			const QString path = QDir::toNativeSeparators(photo.filePath);
+			return std::vector<Cell>{ { QFileInfo(path).fileName(), path }, { photo.labelName, {} }, { path, path } };
 		});
 
-	addEachAction(tab, QObject::tr("Add to catalog"), {}, [](int) { return true; }, {
+	addEachAction(tab, QObject::tr("Add to catalog"), QObject::tr("Track a photo under Photos in place, under its folder's label"),
+		[this](int f) { return !_report.untrackedPhotos[f].labelName.isEmpty(); }, {
 		.act = perFinding([this](int f) { return _callbacks.adoptPhotoRequested(_report.untrackedPhotos[f].filePath); }),
 		.outcome = QObject::tr("Added to catalog"),
 		.doneFmt = QObject::tr("Added %1 photo(s) to the catalog."),
@@ -188,7 +193,27 @@ void IntegrityCheckTabs::buildUntrackedPhotos()
 		.quick = true,
 	});
 
+	addImportAction(tab, [this](int f) { return _report.untrackedPhotos[f].labelName.isEmpty(); },
+		[this](int f) { return _report.untrackedPhotos[f].filePath; });
 	addMoveToTrashAction(tab, [this](int f) { return _report.untrackedPhotos[f].filePath; });
+	addRevealContextMenu(tab, [this](int f) { return _report.untrackedPhotos[f].filePath; });
+}
+
+void IntegrityCheckTabs::buildUntrackedVideos()
+{
+	if (_report.untrackedVideos.empty())
+		return;
+
+	Tab& tab = addTab(QObject::tr("Untracked videos"), QObject::tr("Video files in the library that are not in the catalog."),
+		{ QObject::tr("File"), QObject::tr("Path") }, _report.untrackedVideos.size(),
+		[this](int f, const QStringList&) {
+			const QString path = QDir::toNativeSeparators(_report.untrackedVideos[f].filePath);
+			return std::vector<Cell>{ { QFileInfo(path).fileName(), path }, { path, path } };
+		});
+
+	addImportAction(tab, [](int) { return true; }, [this](int f) { return _report.untrackedVideos[f].filePath; });
+	addMoveToTrashAction(tab, [this](int f) { return _report.untrackedVideos[f].filePath; });
+	addRevealContextMenu(tab, [this](int f) { return _report.untrackedVideos[f].filePath; });
 }
 
 void IntegrityCheckTabs::buildUnknownItems()
@@ -197,7 +222,7 @@ void IntegrityCheckTabs::buildUnknownItems()
 		return;
 
 	Tab& tab = addTab(QObject::tr("Unknown items"),
-		QObject::tr("Files and folders in the library that the catalog does not account for. A folder is listed as a whole."),
+		QObject::tr("Other files and folders in the library that the catalog does not account for. A folder without media is listed as a whole."),
 		{ QObject::tr("Name"), QObject::tr("Type"), QObject::tr("Path") }, _report.unknownItems.size(),
 		[this](int f, const QStringList&) {
 			const CatalogIntegrity::UnknownItem& item = _report.unknownItems[f];
@@ -206,10 +231,8 @@ void IntegrityCheckTabs::buildUnknownItems()
 			                          { path, path } };
 		});
 
-	addAction(tab, revealInFileManagerActionText(), {}, [](int) { return true; }, /*singleRowOnly=*/true,
-		[this](const std::vector<int>& findings) { static_cast<void>(revealInFileManager(_report.unknownItems[findings.front()].path)); });
-
 	addMoveToTrashAction(tab, [this](int f) { return _report.unknownItems[f].path; });
+	addRevealContextMenu(tab, [this](int f) { return _report.unknownItems[f].path; });
 }
 
 void IntegrityCheckTabs::buildVideos()
@@ -464,6 +487,49 @@ void IntegrityCheckTabs::addMoveToTrashAction(Tab& tab, std::function<QString(in
 		.doneFmt = QObject::tr("Moved %1 item(s) to the Trash."),
 		.failedFmt = QObject::tr("%1 could not be removed."),
 		.confirmFmt = QObject::tr("Move %1 items to the Trash?"),
+	});
+}
+
+void IntegrityCheckTabs::addImportAction(Tab& tab, std::function<bool(int finding)> applies, std::function<QString(int finding)> pathOf)
+{
+	addEachAction(tab, QObject::tr("Import..."), QObject::tr("Open the Import dialog with these files staged"), std::move(applies), {
+		.act = [this, pathOf = std::move(pathOf)](const std::vector<int>& findings) {
+			QStringList paths;
+			for (const int f : findings)
+				paths.push_back(pathOf(f));
+			_callbacks.importRequested(paths);
+
+			QSet<QString> trackedSources;
+			for (const Catalog::Entry& entry : _catalog.mediaItems())
+				trackedSources.insert(pathComparisonKey(entry.sourcePath));
+
+			// A file moved into the library is gone from its old path.
+			std::vector<Outcome> outcomes;
+			outcomes.reserve(findings.size());
+			for (const QString& path : std::as_const(paths))
+				outcomes.push_back(trackedSources.contains(pathComparisonKey(path)) || !QFileInfo::exists(path) ? Outcome::Done : Outcome::Cancelled);
+			return outcomes;
+		},
+		.outcome = QObject::tr("Imported"),
+		.doneFmt = QObject::tr("Imported %1 file(s)."),
+	});
+}
+
+void IntegrityCheckTabs::addRevealContextMenu(Tab& tab, std::function<QString(int finding)> pathOf)
+{
+	tab.view->setContextMenuPolicy(Qt::CustomContextMenu);
+	QObject::connect(tab.view, &QWidget::customContextMenuRequested, tab.view, [this, &tab, pathOf = std::move(pathOf)](const QPoint& pos) {
+		const QModelIndex index = tab.view->indexAt(pos);
+		if (!index.isValid())
+			return;
+
+		const QString path = pathOf(index.siblingAtColumn(0).data(FindingRole).toInt());
+		QMenu menu(tab.view);
+		menu.addAction(revealInFileManagerActionText(), tab.view, [this, path] {
+			if (!revealInFileManager(path))
+				reportMissingFile(_dialog, path);
+		});
+		menu.exec(tab.view->viewport()->mapToGlobal(pos));
 	});
 }
 

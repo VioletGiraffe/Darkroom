@@ -573,6 +573,7 @@ void MainWindow::checkCatalogIntegrity()
 		.trashRequested = [this](const QStringList& paths) {
 			return PathDeletion::removePathsInteractive(paths, PathDeletion::Mode::Trash, this);
 		},
+		.importRequested = [this](const QStringList& paths) { openImportDialog(paths); },
 		.reextractFramesRequested = [this](const std::vector<MediaId>& ids) {
 			return FrameExtraction::reextractVideoFrames(libraryCatalog(), ids,
 				FrameExtraction::PreviewHandling::Regenerate, _mediaBrowser->previewFrameCount(), this);

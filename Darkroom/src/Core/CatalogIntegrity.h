@@ -16,7 +16,7 @@ class Catalog;
 // Read-only catalog consistency and disk reconciliation scan. Resolution belongs to Catalog/MainWindow.
 namespace CatalogIntegrity {
 
-// Unclaimed folder of frames and/or a preview inside a storage folder.
+// Unclaimed folder inside a storage folder, shaped like the frame folders Darkroom extracts.
 struct UntrackedFolder
 {
 	QString folderPath;
@@ -24,14 +24,19 @@ struct UntrackedFolder
 	bool    previewPresent    = false;
 };
 
-// Unclaimed image already inside <root>/Photos/<label>.
+// Unclaimed image outside any untracked folder.
 struct UntrackedPhoto
 {
 	QString filePath;
-	QString labelName;
+	QString labelName;  // empty outside <root>/Photos/<label>
 };
 
-// Any other file or folder under the root that the catalog does not account for; a folder is reported whole.
+struct UntrackedVideo
+{
+	QString filePath;
+};
+
+// Any other file or folder under the root that the catalog does not account for; a folder holding no media is reported whole.
 struct UnknownItem
 {
 	QString path;
@@ -75,14 +80,15 @@ struct IntegrityReport
 {
 	std::vector<UntrackedFolder>    untracked;
 	std::vector<UntrackedPhoto>     untrackedPhotos;
+	std::vector<UntrackedVideo>     untrackedVideos;
 	std::vector<UnknownItem>        unknownItems;
 	std::vector<MediaIssue>         issues;
 	std::vector<PhotoIssue>         photoIssues;
 	std::vector<DanglingLabelIssue> danglingLabelIssues;
 	[[nodiscard]] bool isEmpty() const
 	{
-		return untracked.empty() && untrackedPhotos.empty() && unknownItems.empty() && issues.empty() && photoIssues.empty()
-			&& danglingLabelIssues.empty();
+		return untracked.empty() && untrackedPhotos.empty() && untrackedVideos.empty() && unknownItems.empty() && issues.empty()
+			&& photoIssues.empty() && danglingLabelIssues.empty();
 	}
 };
 

@@ -82,6 +82,7 @@ private:
 
 	void buildUntrackedFolders();
 	void buildUntrackedPhotos();
+	void buildUntrackedVideos();
 	void buildUnknownItems();
 	void buildVideos();
 	void buildMissingPhotos();
@@ -94,6 +95,9 @@ private:
 	               bool singleRowOnly, std::function<void(const std::vector<int>& findings)> run);
 	void addEachAction(Tab& tab, const QString& label, const QString& toolTip, std::function<bool(int finding)> applies, EachSpec spec);
 	void addMoveToTrashAction(Tab& tab, std::function<QString(int finding)> pathOf);
+	// A row is done once its file is tracked or gone; otherwise it counts as cancelled.
+	void addImportAction(Tab& tab, std::function<bool(int finding)> applies, std::function<QString(int finding)> pathOf);
+	void addRevealContextMenu(Tab& tab, std::function<QString(int finding)> pathOf);
 
 	// Sorted by row.
 	[[nodiscard]] std::vector<int> selectedFindings(const Tab& tab) const;

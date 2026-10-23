@@ -106,10 +106,11 @@ transient, and item count is not authorization to discard identity, color, or fu
 
 ## Integrity checking
 
-`CatalogIntegrity` compares the authoritative catalog with disk only on explicit request. It detects unclaimed frame
-folders and owned photos, any other file or folder under the root that the catalog's layout does not account for,
-broken tracked video products, missing photo sources, and stored label ids absent from the registry. Metadata files
-that the OS or a sync client recreates after deletion are ignored. Normal refresh never performs this scan.
+`CatalogIntegrity` compares the authoritative catalog with disk only on explicit request. It detects unclaimed
+Darkroom-shaped frame folders, untracked images and videos anywhere under the root, any other file or folder the
+catalog's layout does not account for, broken tracked video products, missing photo sources, and stored label ids
+absent from the registry. Metadata files that the OS or a sync client recreates after deletion are ignored. Normal
+refresh never performs this scan.
 
 The scanner reasons over the public Catalog model and filesystem without mutating either. Resolution remains in the
 components that own the affected catalog or disk operation. The detailed media-state verdict grid belongs beside

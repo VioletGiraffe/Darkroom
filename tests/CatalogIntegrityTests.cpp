@@ -8,6 +8,7 @@
 
 #include <QDir>
 #include <QFileInfo>
+#include <QHash>
 #include <QJsonArray>
 #include <QSet>
 #include <QTemporaryDir>
@@ -140,6 +141,7 @@ TEST_CASE("scan: each video verdict is reported, a healthy video is not", "[inte
 	REQUIRE(report.photoIssues.empty());
 	REQUIRE(report.untracked.empty());
 	REQUIRE(report.untrackedPhotos.empty());
+	REQUIRE(report.untrackedVideos.empty());
 	REQUIRE(report.unknownItems.empty());
 }
 
@@ -207,21 +209,34 @@ TEST_CASE("scan: everything the layout does not account for surfaces; adoptable 
 	f.putFrame(Catalog::previewDirFor(keptFolder));
 	REQUIRE(catalog.createLabel("Empty") != LabelId::None);
 
-	// Unclaimed folders with frames or with a preview only, in an unlabeled storage folder -> untracked.
+	// Darkroom-shaped unclaimed folders, with extracted frames or with a preview only, in an unlabeled storage folder -> untracked.
 	const QString orphan = f.root + "/Stray/Orphan";
-	f.putFrame(orphan);
+	f.putFrame(orphan, "0001_Orphan.jpg");
 	const QString previewOnly = f.root + "/Stray/PreviewOnly";
 	f.putFrame(Catalog::previewDirFor(previewOnly));
 
-	// Beside them, a folder with no frames -> unknown by itself.
+	// Beside them, a folder of ordinary images -> each image is an untracked photo.
+	const QString holiday = f.root + "/Stray/Pictures/holiday.jpg";
+	f.putFrame(QFileInfo(holiday).path(), QFileInfo(holiday).fileName());
+
+	// A folder with no media -> unknown as a whole.
 	const QString frameless = f.root + "/Stray/Frameless";
 	REQUIRE(QDir{}.mkpath(frameless));
 	writeTextFile(frameless + "/notes.txt", "x");
 
-	// An unlabeled storage folder with nothing adoptable -> one unknown item.
+	// An unlabeled storage folder with no media anywhere inside -> one unknown item.
 	const QString junkFolder = f.root + "/Junk";
 	REQUIRE(QDir{}.mkpath(junkFolder + "/Nested"));
 	writeTextFile(junkFolder + "/Nested/notes.txt", "x");
+
+	// Videos in a label folder and deep in an unknown folder -> untracked videos; the unknown folder's other files are listed individually.
+	const QString strayVideo = f.root + "/Kept/stray.mp4";
+	writeTextFile(strayVideo, "x");
+	const QString inboxVideo = f.root + "/Inbox/Sub/clip.mov";
+	REQUIRE(QDir{}.mkpath(QFileInfo(inboxVideo).path()));
+	writeTextFile(inboxVideo, "x");
+	const QString inboxNotes = f.root + "/Inbox/readme.txt";
+	writeTextFile(inboxNotes, "x");
 
 	// Strays inside known folders, including a hidden-on-Unix leftover -> unknown.
 	const QString strayInFrames = keptFolder + "/ffmpeg.log";
@@ -264,9 +279,18 @@ TEST_CASE("scan: everything the layout does not account for surfaces; adoptable 
 		REQUIRE(folder.previewPresent == !isOrphan);
 	}
 
-	REQUIRE(report.untrackedPhotos.size() == 1u);
-	REQUIRE(pathComparisonKey(report.untrackedPhotos.front().filePath) == pathComparisonKey(loose));
-	REQUIRE(report.untrackedPhotos.front().labelName == "Alpha");
+	// Only a photo under Photos/<label> carries a label.
+	QHash<QString, QString> labelByPhoto;
+	for (const CatalogIntegrity::UntrackedPhoto& photo : report.untrackedPhotos)
+		labelByPhoto.insert(pathComparisonKey(photo.filePath), photo.labelName);
+	REQUIRE(report.untrackedPhotos.size() == 2u);
+	REQUIRE(labelByPhoto == QHash<QString, QString>{ { pathComparisonKey(loose), "Alpha" }, { pathComparisonKey(holiday), {} } });
+
+	QSet<QString> videoKeys;
+	for (const CatalogIntegrity::UntrackedVideo& video : report.untrackedVideos)
+		videoKeys.insert(pathComparisonKey(video.filePath));
+	REQUIRE(report.untrackedVideos.size() == 2u);
+	REQUIRE(videoKeys == QSet<QString>{ pathComparisonKey(strayVideo), pathComparisonKey(inboxVideo) });
 
 	QSet<QString> unknownKeys;
 	for (const CatalogIntegrity::UnknownItem& item : report.unknownItems)
@@ -275,7 +299,8 @@ TEST_CASE("scan: everything the layout does not account for surfaces; adoptable 
 		REQUIRE(item.isFolder == QFileInfo(item.path).isDir());
 	}
 	QSet<QString> expectedKeys;
-	for (const QString& path : { frameless, junkFolder, strayInFrames, strayInPreview, resplitLeftover, strayRootFile, photoNotes, unlabeledPhotos })
+	for (const QString& path : { frameless, junkFolder, inboxNotes, strayInFrames, strayInPreview, resplitLeftover, strayRootFile, photoNotes,
+	                             unlabeledPhotos })
 		expectedKeys.insert(pathComparisonKey(path));
 	REQUIRE(unknownKeys == expectedKeys);
 	REQUIRE(report.unknownItems.size() == static_cast<size_t>(expectedKeys.size()));
