@@ -40,7 +40,7 @@ private:
 	void saveSettings();
 	void restoreSettings();
 
-	void reExportAllVideos();
+	void reextractAllVideoFrames();
 	void openImportDialog(const QStringList& initialStaging = {});
 	void scanForUntrackedFiles();
 	void checkCatalogIntegrity();

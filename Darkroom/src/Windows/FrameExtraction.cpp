@@ -203,44 +203,45 @@ bool FrameExtraction::keepPreviewOnly(Catalog& catalog, const MediaId& id, int p
 	return true;
 }
 
-bool FrameExtraction::reExportAllVideosInteractive(
+bool FrameExtraction::reextractAllVideoFramesInteractive(
 	Catalog& catalog, int previewFrameCount, QWidget* dialogParent)
 {
-	if (QMessageBox::question(dialogParent, QObject::tr("Re-export all videos"),
-			QObject::tr("This will delete and re-export all video frame folders where the source video is still available.\n\n"
+	if (QMessageBox::question(dialogParent, QObject::tr("Re-extract frames of all videos"),
+			QObject::tr("This will extract every frame of every video whose source is still available - including videos that "
+				"so far have only a preview - replacing their frame folders and previews.\n\n"
 				"This applies to all videos in the library.\n\nContinue?"),
 			QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
 		return false;
 
-	std::vector<MediaId> toReExport;
+	std::vector<MediaId> toReextract;
 	for (const auto& [id, entry] : catalog.mediaItems().asKeyValueRange())
 	{
 		if (entry.type == Catalog::MediaType::Video && !entry.sourcePath.isEmpty() && QFile::exists(entry.sourcePath))
-			toReExport.push_back(id);
+			toReextract.push_back(id);
 	}
 
-	if (toReExport.empty())
+	if (toReextract.empty())
 	{
-		QMessageBox::information(dialogParent, QObject::tr("Re-export all videos"),
-			QObject::tr("No folders with an available source video were found."));
+		QMessageBox::information(dialogParent, QObject::tr("Re-extract frames of all videos"),
+			QObject::tr("No videos with an available source were found."));
 		return false;
 	}
 
 	Catalog::BatchScope batch(catalog);
 
 	QMessageBox progressBox(dialogParent);
-	progressBox.setWindowTitle(QObject::tr("Re-exporting"));
+	progressBox.setWindowTitle(QObject::tr("Re-extracting frames"));
 	progressBox.setStandardButtons(QMessageBox::NoButton);
 	progressBox.setModal(true);
 	progressBox.show();
 
-	for (size_t i = 0, total = toReExport.size(); i < total; ++i)
+	for (size_t i = 0, total = toReextract.size(); i < total; ++i)
 	{
-		progressBox.setText(QObject::tr("Re-exporting video %1/%2...").arg(i + 1).arg(total));
+		progressBox.setText(QObject::tr("Re-extracting frames of video %1/%2...").arg(i + 1).arg(total));
 		QApplication::processEvents();
 
 		static_cast<void>(reextractVideoFrames(
-			catalog, toReExport[i], PreviewHandling::Regenerate, previewFrameCount, dialogParent));
+			catalog, toReextract[i], PreviewHandling::Regenerate, previewFrameCount, dialogParent));
 	}
 	return true;
 }

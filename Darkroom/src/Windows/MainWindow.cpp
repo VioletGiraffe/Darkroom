@@ -245,7 +245,7 @@ void MainWindow::setupMainMenu()
 	toolsMenu->addAction(tr("Restart all videos"), QKeySequence("Shift+R"), this, &VideoPlayerWindow::restartAll);
 	toolsMenu->addAction(tr("Close all videos"),   QKeySequence("Shift+W"), this, &VideoPlayerWindow::closeAll);
 	toolsMenu->addSeparator();
-	toolsMenu->addAction(tr("Re-export all videos"), QKeySequence("Ctrl+Shift+E"), this, &MainWindow::reExportAllVideos);
+	toolsMenu->addAction(tr("Re-extract frames of all videos"), QKeySequence("Ctrl+Shift+E"), this, &MainWindow::reextractAllVideoFrames);
 
 	QMenu* helpMenu = new QMenu(tr("Help"), menuBar);
 	helpMenu->addAction(tr("Report a bug..."), this, [this] {
@@ -479,7 +479,7 @@ void MainWindow::updateEditActions()
 	_renameAction->setEnabled(selected.size() == 1);
 }
 
-void MainWindow::reExportAllVideos()
+void MainWindow::reextractAllVideoFrames()
 {
 	if (_isProcessing)
 	{
@@ -490,7 +490,7 @@ void MainWindow::reExportAllVideos()
 	_isProcessing = true;
 	const auto processingGuard = qScopeGuard([this] { _isProcessing = false; });
 
-	if (FrameExtraction::reExportAllVideosInteractive(
+	if (FrameExtraction::reextractAllVideoFramesInteractive(
 			libraryCatalog(), _mediaBrowser->previewFrameCount(), this))
 		_mediaBrowser->refreshLibraryView();
 }

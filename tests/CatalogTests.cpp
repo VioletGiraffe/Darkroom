@@ -108,8 +108,7 @@ TEST_CASE("addMediaItem: collision and re-registration rules", "[catalog]")
 	// A case-variant of the same name is the same id - still a collision.
 	REQUIRE_FALSE(catalog.addMediaItem(MediaId::fromNameAndSize("CLIP.MP4", 1000), outsideLibraryPath("other/CLIP.MP4"), f.root + "/Beta/CLIP", true));
 
-	// Re-registration at the same folder is not a collision: it updates the entry (the re-export /
-	// on-demand split flow).
+	// Re-registration at the same folder is not a collision: it updates the entry (an import overwriting the video's folder).
 	REQUIRE(catalog.addMediaItem(id, outsideLibraryPath("videos/Clip.mp4"), f.root + "/Alpha/Clip", false, 5000));
 	REQUIRE_FALSE(catalog.isSplitIntoFrames(id));
 	REQUIRE(catalog.durationMsForMediaItem(id) == 5000);

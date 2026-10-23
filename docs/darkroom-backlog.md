@@ -12,7 +12,7 @@
   - migrating existing libraries with scattered sources
   - whether Copy/Move to a chosen folder (`anySourceDir`) survives
   - Delete and Rename of referenced items: both act on the external file today, for photos too
-  - failure UX for a missing referenced source: frame extraction, re-export and ghost re-import need it
+  - failure UX for a missing referenced source: frame extraction, re-extraction and ghost re-import need it
   - integrity-scan drift kinds: referenced source missing, owned source outside the library
   - name collisions for sources moving into the library; photo import already auto-renames
 - **Portable libraries:** label-to-folder matching is case-insensitive (`ordinaryLabelIdByName`, the `renameLabel` path

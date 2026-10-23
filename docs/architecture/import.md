@@ -5,7 +5,7 @@
 ## On-demand full-frame extraction
 
 `FrameExtraction` owns first-time full-frame extraction, transactional frame-folder replacement, preview repair,
-and the video-only Re-export all workflow. Import deliberately creates only a permanent preview and registers the
+and the video-only re-extract-all workflow. Import deliberately creates only a permanent preview and registers the
 video as not yet split; an explicit frame-viewing action pays for the full extraction later.
 
 `FrameExtraction::reextractVideoFrames` builds a replacement beside the current frame set and publishes
@@ -15,10 +15,10 @@ folder. Old and new frame sets therefore coexist during extraction; minimizing p
 `PreviewHandling` defines what the replacement transaction does with the permanent preview:
 
 - **`PreserveExisting`** moves the imported preview into the successful first full split.
-- **`Regenerate`** creates a fresh preview for explicit re-export and integrity repair. Preservation also falls
+- **`Regenerate`** creates a fresh preview for explicit re-extraction and integrity repair. Preservation also falls
   back to regeneration if no existing preview is available.
 
-Re-export applies only to videos: a photo has no frame set, and its storage directory may be shared by every photo
+Re-extraction applies only to videos: a photo has no frame set, and its storage directory may be shared by every photo
 under a label. Import's overwrite-conflict path does not use frame replacement because the existing directory may
 belong to an unrelated stale item; it prepares a fresh import instead.
 

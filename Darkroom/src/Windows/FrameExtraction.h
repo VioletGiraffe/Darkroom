@@ -31,5 +31,5 @@ namespace FrameExtraction
 	[[nodiscard]] bool keepPreviewOnly(Catalog& catalog, const MediaId& id, int previewFrameCount);
 
 	// Returns true after a confirmed non-empty batch, even when individual videos fail.
-	[[nodiscard]] bool reExportAllVideosInteractive(Catalog& catalog, int previewFrameCount, QWidget* dialogParent);
+	[[nodiscard]] bool reextractAllVideoFramesInteractive(Catalog& catalog, int previewFrameCount, QWidget* dialogParent);
 }
