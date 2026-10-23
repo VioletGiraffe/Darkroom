@@ -18,6 +18,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QLabel>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QSet>
 #include <QStandardItemModel>
 #include <QTableView>
 #include <QTabWidget>
@@ -122,6 +123,7 @@ IntegrityCheckTabs::IntegrityCheckTabs(Catalog& catalog, CatalogIntegrity::Integ
 {
 	buildUntrackedFolders();
 	buildUntrackedPhotos();
+	buildUnknownItems();
 	buildVideos();
 	buildMissingPhotos();
 	buildInvalidLabels();
@@ -134,11 +136,14 @@ void IntegrityCheckTabs::buildUntrackedFolders()
 	if (_report.untracked.empty())
 		return;
 
-	Tab& tab = addTab(QObject::tr("Untracked folders"), QObject::tr("Frame folders on disk that no catalog entry claims."),
-		{ QObject::tr("Folder"), QObject::tr("Path") }, _report.untracked.size(),
+	Tab& tab = addTab(QObject::tr("Untracked folders"), QObject::tr("Folders of frames or previews that no catalog entry claims."),
+		{ QObject::tr("Folder"), QObject::tr("Contents"), QObject::tr("Path") }, _report.untracked.size(),
 		[this](int f, const QStringList&) {
-			const QString path = QDir::toNativeSeparators(_report.untracked[f].folderPath);
-			return std::vector<Cell>{ { QFileInfo(path).fileName(), path }, { path, path } };
+			const CatalogIntegrity::UntrackedFolder& folder = _report.untracked[f];
+			const QString path = QDir::toNativeSeparators(folder.folderPath);
+			const QString contents = !folder.realFramesPresent ? QObject::tr("preview only")
+				: folder.previewPresent ? QObject::tr("frames and preview") : QObject::tr("frames, no preview");
+			return std::vector<Cell>{ { QFileInfo(path).fileName(), path }, { contents, {} }, { path, path } };
 		});
 
 	// Name alone cannot safely identify the source video, so each folder is registered with a picked file.
@@ -146,11 +151,11 @@ void IntegrityCheckTabs::buildUntrackedFolders()
 		[](int) { return true; }, /*singleRowOnly=*/true,
 		[this, &tab](const std::vector<int>& findings) {
 			const int f = findings.front();
-			const QString& folderPath = _report.untracked[f].folderPath;
-			const QString picked = browseForSourceVideo(folderPath);
+			const CatalogIntegrity::UntrackedFolder& folder = _report.untracked[f];
+			const QString picked = browseForSourceVideo(folder.folderPath);
 			if (picked.isEmpty())
 				return;
-			if (!_callbacks.registerRequested(folderPath, picked))
+			if (!_callbacks.registerRequested(folder.folderPath, picked, folder.realFramesPresent))
 			{
 				reportResult({}, QObject::tr("Could not register - that file's identity is already tracked under a different folder."));
 				return;
@@ -159,6 +164,8 @@ void IntegrityCheckTabs::buildUntrackedFolders()
 			settle(tab, f, outcome);
 			showStatus(outcome);
 		});
+
+	addMoveToTrashAction(tab, [this](int f) { return _report.untracked[f].folderPath; });
 }
 
 void IntegrityCheckTabs::buildUntrackedPhotos()
@@ -180,6 +187,29 @@ void IntegrityCheckTabs::buildUntrackedPhotos()
 		.failedFmt = QObject::tr("%1 could not be added - a file with the same name and size is already tracked elsewhere."),
 		.quick = true,
 	});
+
+	addMoveToTrashAction(tab, [this](int f) { return _report.untrackedPhotos[f].filePath; });
+}
+
+void IntegrityCheckTabs::buildUnknownItems()
+{
+	if (_report.unknownItems.empty())
+		return;
+
+	Tab& tab = addTab(QObject::tr("Unknown items"),
+		QObject::tr("Files and folders in the library that the catalog does not account for. A folder is listed as a whole."),
+		{ QObject::tr("Name"), QObject::tr("Type"), QObject::tr("Path") }, _report.unknownItems.size(),
+		[this](int f, const QStringList&) {
+			const CatalogIntegrity::UnknownItem& item = _report.unknownItems[f];
+			const QString path = QDir::toNativeSeparators(item.path);
+			return std::vector<Cell>{ { QFileInfo(path).fileName(), path }, { item.isFolder ? QObject::tr("Folder") : QObject::tr("File"), {} },
+			                          { path, path } };
+		});
+
+	addAction(tab, revealInFileManagerActionText(), {}, [](int) { return true; }, /*singleRowOnly=*/true,
+		[this](const std::vector<int>& findings) { static_cast<void>(revealInFileManager(_report.unknownItems[findings.front()].path)); });
+
+	addMoveToTrashAction(tab, [this](int f) { return _report.unknownItems[f].path; });
 }
 
 void IntegrityCheckTabs::buildVideos()
@@ -413,6 +443,28 @@ void IntegrityCheckTabs::addEachAction(Tab& tab, const QString& label, const QSt
 {
 	addAction(tab, label, toolTip, std::move(applies), /*singleRowOnly=*/false,
 		[this, &tab, spec = std::move(spec)](const std::vector<int>& findings) { runEach(tab, findings, spec); });
+}
+
+void IntegrityCheckTabs::addMoveToTrashAction(Tab& tab, std::function<QString(int finding)> pathOf)
+{
+	addEachAction(tab, QObject::tr("Move to Trash"), {}, [](int) { return true; }, {
+		.act = [this, pathOf = std::move(pathOf)](const std::vector<int>& findings) {
+			QStringList paths;
+			for (const int f : findings)
+				paths.push_back(pathOf(f));
+			const QSet<QString> removed = _callbacks.trashRequested(paths);
+
+			std::vector<Outcome> outcomes;
+			outcomes.reserve(findings.size());
+			for (const QString& path : std::as_const(paths))
+				outcomes.push_back(removed.contains(path) ? Outcome::Done : Outcome::Failed);
+			return outcomes;
+		},
+		.outcome = QObject::tr("Moved to Trash"),
+		.doneFmt = QObject::tr("Moved %1 item(s) to the Trash."),
+		.failedFmt = QObject::tr("%1 could not be removed."),
+		.confirmFmt = QObject::tr("Move %1 items to the Trash?"),
+	});
 }
 
 std::vector<int> IntegrityCheckTabs::selectedFindings(const Tab& tab) const

@@ -82,6 +82,7 @@ private:
 
 	void buildUntrackedFolders();
 	void buildUntrackedPhotos();
+	void buildUnknownItems();
 	void buildVideos();
 	void buildMissingPhotos();
 	void buildInvalidLabels();
@@ -92,6 +93,7 @@ private:
 	void addAction(Tab& tab, const QString& label, const QString& toolTip, std::function<bool(int finding)> applies,
 	               bool singleRowOnly, std::function<void(const std::vector<int>& findings)> run);
 	void addEachAction(Tab& tab, const QString& label, const QString& toolTip, std::function<bool(int finding)> applies, EachSpec spec);
+	void addMoveToTrashAction(Tab& tab, std::function<QString(int finding)> pathOf);
 
 	// Sorted by row.
 	[[nodiscard]] std::vector<int> selectedFindings(const Tab& tab) const;

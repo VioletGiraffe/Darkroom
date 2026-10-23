@@ -3,7 +3,7 @@
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
-// forEachFolder uses QDir in this header; QDir also supplies QString and QStringList.
+// Several declarations take QDir; QDir also supplies QString and QStringList.
 #include <QDir>
 RESTORE_COMPILER_WARNINGS
 
@@ -64,23 +64,12 @@ struct PathMove
 
 // Name-sorted frame image filenames directly in dir. Suffix matching is case-insensitive.
 [[nodiscard]] QStringList listFrameImageFiles(const QDir& dir);
+// Whether listFrameImageFiles would list a file of this name.
+[[nodiscard]] bool isFrameImageFile(const QString& fileName);
 
 // Full paths accepted by filterPredicate, recursively or among immediate children. Order is filesystem-defined.
 [[nodiscard]] QStringList collectFilesInDirectory(const QString& directory, bool recursive,
                                                   const std::function<bool(const QString&)>& filterPredicate);
-
-// Visits every (storageFolder, folderPath) pair under root, in storage-folder-name order.
-template <typename F>
-void forEachFolder(const QString& root, F&& callback)
-{
-	const QDir rootDir(root);
-	for (const QString& storageFolder : rootDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name))
-	{
-		const QDir storageDir(rootDir.filePath(storageFolder));
-		for (const QString& folder : storageDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name))
-			callback(storageFolder, storageDir.filePath(folder));
-	}
-}
 
 // Parses the first yyyyMMddHHmmss of a trailing digit run; extra sub-second digits are ignored. The caller
 // removes any extension. Returns an invalid QDateTime when the suffix is absent or invalid.

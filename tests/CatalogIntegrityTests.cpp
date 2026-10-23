@@ -9,6 +9,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QJsonArray>
+#include <QSet>
 #include <QTemporaryDir>
 
 namespace
@@ -38,8 +39,7 @@ namespace
 			writeTextFile(dir + '/' + name, "x");
 		}
 
-		// Registers a video with frame folder <root>/<label>/<base>. Its source lives under <root>/sources
-		// (a files-only dir the two-level untracked walk never descends into), created iff sourcePresent.
+		// Registers a video with frame folder <root>/<label>/<base>. Its source lives under <root>/sources, created iff sourcePresent.
 		MediaId addVideo(const QString& name, qint64 size, const QString& label, bool splitComplete, bool sourcePresent)
 		{
 			REQUIRE(QDir{}.mkpath(frameFolder(name, label)));
@@ -140,6 +140,7 @@ TEST_CASE("scan: each video verdict is reported, a healthy video is not", "[inte
 	REQUIRE(report.photoIssues.empty());
 	REQUIRE(report.untracked.empty());
 	REQUIRE(report.untrackedPhotos.empty());
+	REQUIRE(report.unknownItems.empty());
 }
 
 TEST_CASE("inspectVideo: a split video whose frames are gone is healthy once marked preview-only", "[integrity]")
@@ -194,26 +195,49 @@ TEST_CASE("scan: a photo with a missing source is flagged, owned vs referenced",
 	REQUIRE(report.untrackedPhotos.empty());  // the present photo is claimed; the missing ones aren't on disk
 }
 
-TEST_CASE("scan: untracked frame folders and loose photos surface; claimed and frame-less ones don't", "[integrity]")
+TEST_CASE("scan: everything the layout does not account for surfaces; adoptable items get their own categories", "[integrity]")
 {
 	IntegrityFixture f;
 	Catalog& catalog = f.catalog();
 
-	// A claimed, healthy video -> not untracked.
+	// A claimed, healthy video and an empty label folder -> nothing to report.
 	f.addVideo("kept.mp4", 1, "Kept", true, true);
-	f.putFrame(f.frameFolder("kept.mp4", "Kept"));
-	f.putFrame(Catalog::previewDirFor(f.frameFolder("kept.mp4", "Kept")));
+	const QString keptFolder = f.frameFolder("kept.mp4", "Kept");
+	f.putFrame(keptFolder);
+	f.putFrame(Catalog::previewDirFor(keptFolder));
+	REQUIRE(catalog.createLabel("Empty") != LabelId::None);
 
-	// An unclaimed, frame-bearing folder -> untracked (a video the catalog is missing).
+	// Unclaimed folders with frames or with a preview only, in an unlabeled storage folder -> untracked.
 	const QString orphan = f.root + "/Stray/Orphan";
 	f.putFrame(orphan);
+	const QString previewOnly = f.root + "/Stray/PreviewOnly";
+	f.putFrame(Catalog::previewDirFor(previewOnly));
 
-	// An unclaimed folder with no frames -> junk, not a missing video.
+	// Beside them, a folder with no frames -> unknown by itself.
 	const QString frameless = f.root + "/Stray/Frameless";
 	REQUIRE(QDir{}.mkpath(frameless));
 	writeTextFile(frameless + "/notes.txt", "x");
 
-	// Under Photos/<label>: one claimed owned photo and one loose image file.
+	// An unlabeled storage folder with nothing adoptable -> one unknown item.
+	const QString junkFolder = f.root + "/Junk";
+	REQUIRE(QDir{}.mkpath(junkFolder + "/Nested"));
+	writeTextFile(junkFolder + "/Nested/notes.txt", "x");
+
+	// Strays inside known folders, including a hidden-on-Unix leftover -> unknown.
+	const QString strayInFrames = keptFolder + "/ffmpeg.log";
+	writeTextFile(strayInFrames, "x");
+	const QString strayInPreview = Catalog::previewDirFor(keptFolder) + "/notes.txt";
+	writeTextFile(strayInPreview, "x");
+	const QString resplitLeftover = f.root + "/Kept/.darkroom-resplit-0123";
+	REQUIRE(QDir{}.mkpath(resplitLeftover));
+	const QString strayRootFile = f.root + "/catalog.json.tmp";
+	writeTextFile(strayRootFile, "x");
+
+	// OS metadata -> ignored.
+	writeTextFile(f.root + "/Kept/Thumbs.db", "x");
+	writeTextFile(keptFolder + "/.DS_Store", "x");
+
+	// Under Photos: a claimed photo, a loose image, a non-image, and an unlabeled folder with no images.
 	const QString photosAlpha = f.root + "/Photos/Alpha";
 	REQUIRE(QDir{}.mkpath(photosAlpha));
 	const QString trackedPhoto = photosAlpha + "/tracked.png";
@@ -221,15 +245,40 @@ TEST_CASE("scan: untracked frame folders and loose photos surface; claimed and f
 	REQUIRE(catalog.addPhoto(MediaId::fromFile(trackedPhoto), trackedPhoto, photosAlpha, false));
 	const QString loose = photosAlpha + "/loose.png";
 	writeTextFile(loose, "x");
+	const QString photoNotes = photosAlpha + "/notes.txt";
+	writeTextFile(photoNotes, "x");
+	const QString unlabeledPhotos = f.root + "/Photos/Unlabeled";
+	REQUIRE(QDir{}.mkpath(unlabeledPhotos));
+	writeTextFile(unlabeledPhotos + "/readme.txt", "x");
 
 	const CatalogIntegrity::IntegrityReport report = CatalogIntegrity::scan(catalog, f.root);
 
-	REQUIRE(report.untracked.size() == 1u);
-	REQUIRE(pathComparisonKey(report.untracked.front().folderPath) == pathComparisonKey(orphan));
+	REQUIRE(report.issues.empty());
+
+	REQUIRE(report.untracked.size() == 2u);
+	for (const CatalogIntegrity::UntrackedFolder& folder : report.untracked)
+	{
+		const bool isOrphan = pathComparisonKey(folder.folderPath) == pathComparisonKey(orphan);
+		REQUIRE((isOrphan || pathComparisonKey(folder.folderPath) == pathComparisonKey(previewOnly)));
+		REQUIRE(folder.realFramesPresent == isOrphan);
+		REQUIRE(folder.previewPresent == !isOrphan);
+	}
 
 	REQUIRE(report.untrackedPhotos.size() == 1u);
 	REQUIRE(pathComparisonKey(report.untrackedPhotos.front().filePath) == pathComparisonKey(loose));
 	REQUIRE(report.untrackedPhotos.front().labelName == "Alpha");
+
+	QSet<QString> unknownKeys;
+	for (const CatalogIntegrity::UnknownItem& item : report.unknownItems)
+	{
+		unknownKeys.insert(pathComparisonKey(item.path));
+		REQUIRE(item.isFolder == QFileInfo(item.path).isDir());
+	}
+	QSet<QString> expectedKeys;
+	for (const QString& path : { frameless, junkFolder, strayInFrames, strayInPreview, resplitLeftover, strayRootFile, photoNotes, unlabeledPhotos })
+		expectedKeys.insert(pathComparisonKey(path));
+	REQUIRE(unknownKeys == expectedKeys);
+	REQUIRE(report.unknownItems.size() == static_cast<size_t>(expectedKeys.size()));
 }
 
 TEST_CASE("scan: dangling label references are reported, repairable, and rejected by normal mutation", "[integrity]")

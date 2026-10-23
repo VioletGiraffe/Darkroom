@@ -228,6 +228,11 @@ bool Library::holdsLibrary(const QString& folder)
 	return QFileInfo::exists(metadataFilePath(normalized)) || QFileInfo::exists(labelRegistryFilePath(normalized));
 }
 
+QStringList Library::persistenceFilePaths(const QString& root)
+{
+	return { metadataFilePath(root), labelRegistryFilePath(root) };
+}
+
 bool Library::setRoot(const QString& root, QString* error)
 {
 	QString currentSaveError;

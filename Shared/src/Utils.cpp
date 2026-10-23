@@ -228,9 +228,16 @@ QChar invalidFilenameChar(const QString& name)
 	return {};
 }
 
+static const QStringList FRAME_IMAGE_SUFFIXES { "jpg", "jpeg", "tif", "tiff", "png" };
+
+bool isFrameImageFile(const QString& fileName)
+{
+	return FRAME_IMAGE_SUFFIXES.contains(QFileInfo(fileName).suffix(), Qt::CaseInsensitive);
+}
+
 QStringList listFrameImageFiles(const QDir& dir)
 {
-	static const QStringList frameImageGlobs { "*.jpg", "*.jpeg", "*.tif", "*.tiff", "*.png" };
+	static const QStringList frameImageGlobs = suffixesToGlobs(FRAME_IMAGE_SUFFIXES).split(' ');
 	return dir.entryList(frameImageGlobs, QDir::Files, QDir::Name);
 }
 

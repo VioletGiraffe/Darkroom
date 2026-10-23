@@ -6,6 +6,7 @@
 DISABLE_COMPILER_WARNINGS
 #include <QObject>
 #include <QString>
+#include <QStringList>
 RESTORE_COMPILER_WARNINGS
 
 #include <stdint.h>
@@ -30,6 +31,8 @@ public:
 
 	// Distinguishes "create here" from adopting an existing library; setRoot() accepts either.
 	[[nodiscard]] static bool holdsLibrary(const QString& folder);
+	// The library's own persistence files under a normalized root.
+	[[nodiscard]] static QStringList persistenceFilePaths(const QString& root);
 
 	// Accessors below assert until the first successful setRoot().
 	[[nodiscard]] bool isLoaded() const { return _state != nullptr; }

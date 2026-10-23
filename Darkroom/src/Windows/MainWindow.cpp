@@ -8,6 +8,7 @@
 #include "UiComponents/MediaBrowserWidget.h"
 #include "Windows/ImportDialog.h"
 #include "Windows/OpenFileRelease.h"
+#include "Windows/PathDeletion.h"
 #include "Windows/SettingsDialog.h"
 #include "Core/MediaId.h"
 #include "Windows/VideoPlayerWindow.h"
@@ -561,13 +562,16 @@ void MainWindow::scanForUntrackedFiles()
 void MainWindow::checkCatalogIntegrity()
 {
 	IntegrityCheckDialog::Callbacks callbacks{
-		.registerRequested = [this](const QString& folderPath, const QString& sourcePath) {
-			return libraryCatalog().addMediaItem(MediaId::fromFile(sourcePath), sourcePath, folderPath, /*splitIntoFrames=*/true);
+		.registerRequested = [this](const QString& folderPath, const QString& sourcePath, bool splitIntoFrames) {
+			return libraryCatalog().addMediaItem(MediaId::fromFile(sourcePath), sourcePath, folderPath, splitIntoFrames);
 		},
 		.adoptPhotoRequested = [this](const QString& filePath) {
 			Catalog& catalog = libraryCatalog();
 			const QString labelDir = QFileInfo(filePath).absolutePath();
 			return catalog.addPhoto(MediaId::fromFile(filePath), filePath, labelDir, /*referenced=*/false);
+		},
+		.trashRequested = [this](const QStringList& paths) {
+			return PathDeletion::removePathsInteractive(paths, PathDeletion::Mode::Trash, this);
 		},
 		.reextractFramesRequested = [this](const std::vector<MediaId>& ids) {
 			return FrameExtraction::reextractVideoFrames(libraryCatalog(), ids,

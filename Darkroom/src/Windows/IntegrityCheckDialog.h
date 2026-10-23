@@ -8,6 +8,8 @@
 
 DISABLE_COMPILER_WARNINGS
 #include <QDialog>
+#include <QSet>
+#include <QStringList>
 RESTORE_COMPILER_WARNINGS
 
 #include <functional>
@@ -24,8 +26,10 @@ class IntegrityCheckDialog final : public QDialog
 public:
 	struct Callbacks
 	{
-		std::function<bool(const QString& folderPath, const QString& sourcePath)> registerRequested;
+		std::function<bool(const QString& folderPath, const QString& sourcePath, bool splitIntoFrames)> registerRequested;
 		std::function<bool(const QString& filePath)> adoptPhotoRequested;
+		// Returns the paths that are gone afterwards.
+		std::function<QSet<QString>(const QStringList& paths)> trashRequested;
 		// The ffmpeg actions take a batch and return an outcome per id, in order.
 		std::function<std::vector<FrameExtraction::Outcome>(const std::vector<MediaId>& ids)> reextractFramesRequested;
 		std::function<std::vector<FrameExtraction::Outcome>(const std::vector<MediaId>& ids)> regeneratePreviewRequested;
