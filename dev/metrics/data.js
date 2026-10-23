@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792759838757,
+  "lastUpdate": 1792760253824,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -16428,6 +16428,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 46.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 13,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "6091b984df893e89448b3bdebc94ffd8a564b895",
+          "message": "Frame and preview extraction show a cancellable progress dialog everywhere: previews run in parallel on a worker thread, full extraction polls ffmpeg's progress; the 5-minute extraction timeout is gone",
+          "timestamp": "2026-10-23T15:48:11+03:00",
+          "tree_id": "50232a14146aab4799b9d4e25edc76cd96d34750",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/6091b984df893e89448b3bdebc94ffd8a564b895"
+        },
+        "date": 1792760249436,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 16625,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1400,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 29006,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3505.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 3501,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2921.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 442,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 57,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 47,
             "unit": "KB"
           },
           {
