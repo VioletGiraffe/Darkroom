@@ -104,14 +104,15 @@ ImportDialog's staged-card menus.
 delete interaction. Catalog owns validation, backing paths, relocation, persistence, and change publication. The
 Import dialog reuses the same label-creation workflow when materializing provisionals.
 
-`MediaItemManagement` owns confirmation and execution for physical Delete and catalog-only Remove. User-requested
-physical deletion moves files and frame folders to the platform Trash first. Trash failures are gathered into one
-explicit, default-cancelled offer of permanent deletion; a lone failure also shows Qt's available system diagnostic.
+`MediaItemManagement` owns confirmation and execution for Delete and Remove from library. Delete trashes the item's
+files, a video's source included; Remove trashes only a video's frame folder, which holds derived data alone. Both
+move paths to the platform Trash first. Trash failures are gathered into one explicit, default-cancelled offer of
+permanent deletion; a lone failure also shows Qt's available system diagnostic.
 The filesystem step is `PathDeletion`, which knows nothing of the catalog and is shared with Quickroom.
 For videos, the source is attempted only after the frame folder is gone. Catalog records are removed only after all
 of an item's required paths are gone. Catalog removal refreshes the browser through `catalogChanged`; workflow
 results carry only effects that blanket invalidation cannot express, notably frame-folder changes needed to
-synchronize MainWindow's persistent viewer. Remove from library leaves disk content untracked by design.
+synchronize MainWindow's persistent viewer.
 
 ## Renaming media
 
@@ -132,13 +133,14 @@ MainWindow owns the Tools menu's catalog integrity workflow. `CatalogIntegrity::
 thread, behind a modal progress box; `IntegrityCheckDialog` presents it, with `IntegrityCheckTabs` showing one table
 tab per finding category plus a Resolved tab. Actions apply to the selected rows they fit, so one path serves a single
 row and thousands. Every action calls back into MainWindow, which routes to the owner of the operation:
-registration, adoption, locate (a rename to the found path), entry removal, and dangling-label cleanup go to
-`Catalog`; re-extraction, preview regeneration and the return to preview-only go to `FrameExtraction`; importing
-untracked media opens the Import dialog; moving untracked items to the Trash goes to `PathDeletion`. A fixed row
+registration, adoption, locate (a rename to the found path), and dangling-label cleanup go to `Catalog`; entry
+removal is Remove from library; re-extraction, preview regeneration and the return to preview-only go to
+`FrameExtraction`; importing untracked media opens the Import dialog; moving untracked items to the Trash goes to
+`PathDeletion`. A fixed row
 moves to Resolved; a repaired video is re-checked with `CatalogIntegrity::inspectVideo` and stays while problems
 remain. The dialog runs inside one `Catalog::ChangeBatchScope` (not a `BatchScope`: the dialog pumps events), and the
-browser refreshes once when it closes with changes. Quick actions (locate, remove, adopt, label cleanup) persist once
-per action in a `BatchScope`; actions that may run ffmpeg persist per item.
+browser refreshes once when it closes with changes. Quick actions (locate, adopt, label cleanup) persist once per
+action in a `BatchScope`; actions that may run ffmpeg persist per item.
 
 ## Logging and diagnostics
 

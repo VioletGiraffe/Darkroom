@@ -40,7 +40,8 @@ public:
 		// Locate callbacks preserve storage and may refuse an identity collision.
 		// Returns the video's id for the new source, or an invalid id when refused.
 		std::function<MediaId(const MediaId& id, const QString& newSourcePath)> locateSourceRequested;
-		std::function<bool(const MediaId& id)> removeEntryRequested;
+		// Remove from library: reports its own failures; an id still in the catalog afterwards was not removed.
+		std::function<void(const std::vector<MediaId>& ids)> removeEntriesRequested;
 		std::function<bool(const MediaId& id, const QString& newSourcePath)> locatePhotoRequested;
 		std::function<bool(const MediaId& id)> removeInvalidLabelReferencesRequested;
 	};

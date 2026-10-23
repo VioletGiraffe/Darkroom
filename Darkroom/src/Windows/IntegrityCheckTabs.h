@@ -115,6 +115,7 @@ private:
 	void reportResult(const QString& doneText, const QString& failureText);
 
 	[[nodiscard]] std::vector<MediaId> videoIds(const std::vector<int>& findings) const;
+	[[nodiscard]] std::vector<FrameExtraction::Outcome> removeEntries(const std::vector<int>& findings, const std::function<MediaId(int finding)>& idOf);
 
 	[[nodiscard]] QString browseForSourceVideo(const QString& hint) const;
 	[[nodiscard]] QString browseForSourcePhoto(const QString& hint) const;

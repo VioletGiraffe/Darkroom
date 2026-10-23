@@ -512,19 +512,27 @@ void MediaBrowserWidget::showMediaItemContextMenu(const MediaId& id, const QPoin
 	menu.exec(globalPos);
 }
 
+void MediaBrowserWidget::removeMediaItemsFromLibrary(const std::vector<MediaId>& ids)
+{
+	syncViewsAfterRemoval(MediaItemManagement::removeItemsFromLibrary(_library.catalog(), ids, window()));
+}
+
 void MediaBrowserWidget::deleteMediaItemsInteractive(const std::vector<MediaId>& selection)
 {
-	const MediaItemManagement::DeleteResult result =
-		MediaItemManagement::deleteItemsInteractive(_library.catalog(), selection, window());
-	if (result.storageRefreshRequired)
-		refreshLibraryView();
-	for (const QString& folderPath : result.affectedFrameFolders)
-		emit frameFolderPathChanged(folderPath, {}, {});
+	syncViewsAfterRemoval(MediaItemManagement::deleteItemsInteractive(_library.catalog(), selection, window()));
 }
 
 void MediaBrowserWidget::removeMediaItemsFromLibraryInteractive(const std::vector<MediaId>& selection)
 {
-	MediaItemManagement::removeItemsFromLibraryInteractive(_library.catalog(), selection, window());
+	syncViewsAfterRemoval(MediaItemManagement::removeItemsFromLibraryInteractive(_library.catalog(), selection, window()));
+}
+
+void MediaBrowserWidget::syncViewsAfterRemoval(const MediaItemManagement::RemovalResult& result)
+{
+	if (result.storageRefreshRequired)
+		refreshLibraryView();
+	for (const QString& folderPath : result.affectedFrameFolders)
+		emit frameFolderPathChanged(folderPath, {}, {});
 }
 
 bool MediaBrowserWidget::deleteMediaItemAndReportGone(const MediaId& id)

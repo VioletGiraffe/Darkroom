@@ -14,6 +14,107 @@ RESTORE_COMPILER_WARNINGS
 #include <algorithm>
 #include <vector>
 
+namespace {
+
+enum class SourceFiles { Keep, Trash };
+
+// A video's frame folder always goes to Trash; a photo's folder is shared by siblings and is never touched.
+MediaItemManagement::RemovalResult removeItems(
+	Catalog& catalog, const std::vector<MediaId>& items, SourceFiles sourceFiles, QWidget* dialogParent)
+{
+	Catalog::ChangeBatchScope catalogChanges(catalog);
+	const bool trashSources = sourceFiles == SourceFiles::Trash;
+
+	struct ItemPaths
+	{
+		MediaId id;
+		bool isPhoto;
+		QString sourcePath;
+		QString frameFolder; // empty for a photo
+	};
+	std::vector<ItemPaths> itemPaths;
+	QStringList photoFilesAndFrameFolders;
+	for (const MediaId& id : items)
+	{
+		const bool isPhoto = catalog.mediaType(id) == Catalog::MediaType::Photo;
+		itemPaths.push_back({ id, isPhoto, catalog.sourcePathForMediaItem(id), isPhoto ? QString() : catalog.folderForMediaItem(id) });
+		if (!isPhoto || trashSources)
+			photoFilesAndFrameFolders.push_back(isPhoto ? itemPaths.back().sourcePath : itemPaths.back().frameFolder);
+	}
+	QSet<QString> removedPaths = PathDeletion::removePathsInteractive(photoFilesAndFrameFolders, PathDeletion::Mode::Trash, dialogParent);
+
+	if (trashSources)
+	{
+		// A video's source file is attempted only once its frame folder is gone.
+		QStringList videoSourceFiles;
+		for (const ItemPaths& item : itemPaths)
+		{
+			if (!item.isPhoto && removedPaths.contains(item.frameFolder))
+				videoSourceFiles.push_back(item.sourcePath);
+		}
+		removedPaths.unite(PathDeletion::removePathsInteractive(videoSourceFiles, PathDeletion::Mode::Trash, dialogParent));
+	}
+
+	MediaItemManagement::RemovalResult result;
+	QStringList failedItems;
+	{
+		Catalog::BatchScope batch(catalog);
+		for (const ItemPaths& item : itemPaths)
+		{
+			QStringList failedParts;
+			if (item.isPhoto)
+			{
+				if (trashSources && !removedPaths.contains(item.sourcePath))
+				{
+					failedParts << (item.sourcePath.isEmpty()
+						? QObject::tr("• Photo file path is missing.")
+						: QObject::tr("• Photo file: %1").arg(item.sourcePath));
+				}
+			}
+			else
+			{
+				if (!item.frameFolder.isEmpty())
+					result.affectedFrameFolders << item.frameFolder;
+
+				if (!removedPaths.contains(item.frameFolder))
+				{
+					failedParts << (item.frameFolder.isEmpty()
+						? QObject::tr("• Frame folder path is missing.")
+						: QObject::tr("• Frame folder: %1").arg(item.frameFolder));
+					if (trashSources && !item.sourcePath.isEmpty())
+						failedParts << QObject::tr("• Source file not attempted: %1").arg(item.sourcePath);
+				}
+				else if (trashSources && !item.sourcePath.isEmpty() && !removedPaths.contains(item.sourcePath))
+				{
+					failedParts << QObject::tr("• Source file: %1").arg(item.sourcePath);
+				}
+			}
+
+			if (failedParts.empty())
+			{
+				catalog.removeMediaItem(item.id);
+				result.removedItems.push_back(item.id);
+			}
+			else
+			{
+				result.storageRefreshRequired = true;
+				failedItems << QObject::tr("%1:\n%2").arg(item.id.name(), failedParts.join("\n"));
+			}
+		}
+	}
+
+	if (!failedItems.empty())
+	{
+		MessageDialog::notice(dialogParent, trashSources ? QObject::tr("Delete incomplete") : QObject::tr("Remove incomplete"),
+			trashSources ? QObject::tr("Some items could not be fully deleted. Their catalog records were kept:")
+			             : QObject::tr("Some frame folders could not be moved to Trash. Their catalog records were kept:"),
+			failedItems.join("\n\n"), QMessageBox::Critical);
+	}
+	return result;
+}
+
+} // namespace
+
 QString MediaItemManagement::itemDisplayName(const Catalog& catalog, const MediaId& id)
 {
 	return catalog.mediaType(id) == Catalog::MediaType::Photo ? id.name() : catalog.displayName(id);
@@ -30,7 +131,7 @@ QString MediaItemManagement::bulletedItemNameList(const Catalog& catalog, const 
 	return list;
 }
 
-MediaItemManagement::DeleteResult MediaItemManagement::deleteItemsInteractive(
+MediaItemManagement::RemovalResult MediaItemManagement::deleteItemsInteractive(
 	Catalog& catalog, const std::vector<MediaId>& selection, QWidget* dialogParent)
 {
 	if (selection.empty())
@@ -78,97 +179,14 @@ MediaItemManagement::DeleteResult MediaItemManagement::deleteItemsInteractive(
 			QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
 		return {};
 
-	Catalog::ChangeBatchScope catalogChanges(catalog);
-
-	struct ItemPaths
-	{
-		MediaId id;
-		bool isPhoto;
-		QString sourcePath;
-		QString frameFolder; // empty for a photo
-	};
-	std::vector<ItemPaths> items;
-	QStringList photoFilesAndFrameFolders;
-	for (const MediaId& id : selection)
-	{
-		// Photo folders are shared by siblings and must never be deleted here.
-		const bool isPhoto = catalog.mediaType(id) == Catalog::MediaType::Photo;
-		items.push_back({ id, isPhoto, catalog.sourcePathForMediaItem(id), isPhoto ? QString() : catalog.folderForMediaItem(id) });
-		photoFilesAndFrameFolders.push_back(isPhoto ? items.back().sourcePath : items.back().frameFolder);
-	}
-	QSet<QString> removedPaths = PathDeletion::removePathsInteractive(photoFilesAndFrameFolders, PathDeletion::Mode::Trash, dialogParent);
-
-	// A video's source file is attempted only once its frame folder is gone.
-	QStringList videoSourceFiles;
-	for (const ItemPaths& item : items)
-	{
-		if (!item.isPhoto && removedPaths.contains(item.frameFolder))
-			videoSourceFiles.push_back(item.sourcePath);
-	}
-	removedPaths.unite(PathDeletion::removePathsInteractive(videoSourceFiles, PathDeletion::Mode::Trash, dialogParent));
-
-	DeleteResult result;
-	QStringList failedItems;
-	{
-		Catalog::BatchScope batch(catalog);
-		for (const ItemPaths& item : items)
-		{
-			QStringList failedParts;
-			if (item.isPhoto)
-			{
-				if (!removedPaths.contains(item.sourcePath))
-				{
-					failedParts << (item.sourcePath.isEmpty()
-						? QObject::tr("• Photo file path is missing.")
-						: QObject::tr("• Photo file: %1").arg(item.sourcePath));
-				}
-			}
-			else
-			{
-				if (!item.frameFolder.isEmpty())
-					result.affectedFrameFolders << item.frameFolder;
-
-				if (!removedPaths.contains(item.frameFolder))
-				{
-					failedParts << (item.frameFolder.isEmpty()
-						? QObject::tr("• Frame folder path is missing.")
-						: QObject::tr("• Frame folder: %1").arg(item.frameFolder));
-					if (!item.sourcePath.isEmpty())
-						failedParts << QObject::tr("• Source file not attempted: %1").arg(item.sourcePath);
-				}
-				else if (!item.sourcePath.isEmpty() && !removedPaths.contains(item.sourcePath))
-				{
-					failedParts << QObject::tr("• Source file: %1").arg(item.sourcePath);
-				}
-			}
-
-			if (failedParts.empty())
-			{
-				catalog.removeMediaItem(item.id);
-				result.deletedItems.push_back(item.id);
-			}
-			else
-			{
-				result.storageRefreshRequired = true;
-				failedItems << QObject::tr("%1:\n%2").arg(item.id.name(), failedParts.join("\n"));
-			}
-		}
-	}
-
-	if (!failedItems.empty())
-	{
-		MessageDialog::notice(dialogParent, QObject::tr("Delete incomplete"),
-			QObject::tr("Some items could not be fully deleted. Their catalog records were kept:"),
-			failedItems.join("\n\n"), QMessageBox::Critical);
-	}
-	return result;
+	return removeItems(catalog, selection, SourceFiles::Trash, dialogParent);
 }
 
-void MediaItemManagement::removeItemsFromLibraryInteractive(
+MediaItemManagement::RemovalResult MediaItemManagement::removeItemsFromLibraryInteractive(
 	Catalog& catalog, const std::vector<MediaId>& selection, QWidget* dialogParent)
 {
 	if (selection.empty())
-		return;
+		return {};
 
 	QString message;
 	if (selection.size() == 1)
@@ -186,14 +204,20 @@ void MediaItemManagement::removeItemsFromLibraryInteractive(
 		message = QObject::tr("This will remove %1 items from the library:\n").arg(selection.size());
 		message += bulletedItemNameList(catalog, selection);
 	}
-	message += "\n\n" + QObject::tr("No files will be deleted, but labels and other catalog metadata will be discarded. Continue?");
+	const bool anyVideo = std::ranges::any_of(selection, [&catalog](const MediaId& id) { return catalog.mediaType(id) == Catalog::MediaType::Video; });
+	message += "\n\n" + (anyVideo
+		? QObject::tr("Video frames and previews will be moved to Trash. Source files are kept, but labels and other catalog metadata will be discarded. Continue?")
+		: QObject::tr("No files will be deleted, but labels and other catalog metadata will be discarded. Continue?"));
 
 	if (QMessageBox::question(dialogParent, QObject::tr("Remove from library"), message,
 			QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
-		return;
+		return {};
 
-	Catalog::ChangeBatchScope catalogChanges(catalog);
-	Catalog::BatchScope batch(catalog);
-	for (const MediaId& id : selection)
-		catalog.removeMediaItem(id);
+	return removeItemsFromLibrary(catalog, selection, dialogParent);
+}
+
+MediaItemManagement::RemovalResult MediaItemManagement::removeItemsFromLibrary(
+	Catalog& catalog, const std::vector<MediaId>& items, QWidget* dialogParent)
+{
+	return removeItems(catalog, items, SourceFiles::Keep, dialogParent);
 }

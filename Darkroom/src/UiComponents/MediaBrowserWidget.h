@@ -14,6 +14,8 @@ RESTORE_COMPILER_WARNINGS
 #include <optional>
 #include <vector>
 
+namespace MediaItemManagement { struct RemovalResult; }
+
 class QAction;
 class LabelSidebar;
 class Library;
@@ -54,6 +56,8 @@ public:
 	void deleteSelectedMediaItemsInteractive();
 	void removeSelectedMediaItemsFromLibraryInteractive();
 	void renameSelectedMediaItemInteractive();
+	// Remove from library without the confirmation.
+	void removeMediaItemsFromLibrary(const std::vector<MediaId>& ids);
 
 signals:
 	void selectionChanged();
@@ -78,6 +82,7 @@ private:
 	// The two workflows above for one item, as the viewer and player removal actions: true when it left the catalog.
 	[[nodiscard]] bool deleteMediaItemAndReportGone(const MediaId& id);
 	[[nodiscard]] bool untrackMediaItemAndReportGone(const MediaId& id);
+	void syncViewsAfterRemoval(const MediaItemManagement::RemovalResult& result);
 	void renameMediaItemInteractive(const MediaId& id);
 	void toggleBest(const MediaId& id);
 	void zoomCards(int steps);

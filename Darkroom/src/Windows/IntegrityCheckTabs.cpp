@@ -312,14 +312,13 @@ void IntegrityCheckTabs::buildVideos()
 		.quick = true,
 	});
 
-	addEachAction(tab, QObject::tr("Remove"), QObject::tr("Forget the entry; frame folders and source files on disk are not touched"),
+	addEachAction(tab, QObject::tr("Remove"), QObject::tr("Forget the entry and move its frames and preview to Trash; the source file is not touched"),
 		[](int) { return true; }, {
-		.act = perFinding([this](int f) { return _callbacks.removeEntryRequested(_report.issues[f].id); }),
+		.act = [this](const std::vector<int>& findings) { return removeEntries(findings, [this](int f) { return _report.issues[f].id; }); },
 		.outcome = QObject::tr("Removed from catalog"),
 		.doneFmt = QObject::tr("Removed %1 video(s) from the catalog."),
-		.failedFmt = QObject::tr("%1 could not be removed."),
-		.confirmFmt = QObject::tr("Remove %1 video entries from the catalog? Frame folders and source files on disk are not touched."),
-		.quick = true,
+		.failedFmt = QObject::tr("%1 could not be removed - see the error dialogs for details."),
+		.confirmFmt = QObject::tr("Remove %1 videos from the catalog and move their frames and previews to Trash? Source files are not touched."),
 	});
 }
 
@@ -354,12 +353,11 @@ void IntegrityCheckTabs::buildMissingPhotos()
 
 	addEachAction(tab, QObject::tr("Remove"), QObject::tr("Forget the entry; any file still on disk is not touched"),
 		[](int) { return true; }, {
-		.act = perFinding([this](int f) { return _callbacks.removeEntryRequested(_report.photoIssues[f].id); }),
+		.act = [this](const std::vector<int>& findings) { return removeEntries(findings, [this](int f) { return _report.photoIssues[f].id; }); },
 		.outcome = QObject::tr("Removed from catalog"),
 		.doneFmt = QObject::tr("Removed %1 photo(s) from the catalog."),
 		.failedFmt = QObject::tr("%1 could not be removed."),
 		.confirmFmt = QObject::tr("Remove %1 missing-photo entries from the catalog? Any files still on disk are not touched."),
-		.quick = true,
 	});
 }
 
@@ -613,6 +611,21 @@ std::vector<MediaId> IntegrityCheckTabs::videoIds(const std::vector<int>& findin
 	for (const int f : findings)
 		ids.push_back(_report.issues[f].id);
 	return ids;
+}
+
+std::vector<Outcome> IntegrityCheckTabs::removeEntries(const std::vector<int>& findings, const std::function<MediaId(int finding)>& idOf)
+{
+	std::vector<MediaId> ids;
+	ids.reserve(findings.size());
+	for (const int f : findings)
+		ids.push_back(idOf(f));
+	_callbacks.removeEntriesRequested(ids);
+
+	std::vector<Outcome> outcomes;
+	outcomes.reserve(ids.size());
+	for (const MediaId& id : ids)
+		outcomes.push_back(_catalog.containsMediaItem(id) ? Outcome::Failed : Outcome::Done);
+	return outcomes;
 }
 
 void IntegrityCheckTabs::locate(Tab& tab, const std::vector<int>& findings, const LocateSpec& spec)

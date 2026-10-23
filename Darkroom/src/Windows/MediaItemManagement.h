@@ -21,16 +21,20 @@ namespace MediaItemManagement
 	// Bulleted itemDisplayName lines for a message box, in the given order, capped with an "... and N more" line.
 	[[nodiscard]] QString bulletedItemNameList(const Catalog& catalog, const std::vector<MediaId>& items);
 
-	struct DeleteResult
+	struct RemovalResult
 	{
-		// Items whose filesystem deletion completed and whose Catalog records were removed, in selection order.
-		std::vector<MediaId> deletedItems;
-		// A failed deletion can partially alter storage without changing the Catalog.
+		// Items whose filesystem removal completed and whose Catalog records were removed, in selection order.
+		std::vector<MediaId> removedItems;
+		// A failed removal can partially alter storage without changing the Catalog.
 		bool storageRefreshRequired = false;
 		QStringList affectedFrameFolders;
 	};
 
-	[[nodiscard]] DeleteResult deleteItemsInteractive(
+	// Moves each video's frame folder and source file, and each photo's file, to Trash.
+	[[nodiscard]] RemovalResult deleteItemsInteractive(
 		Catalog& catalog, const std::vector<MediaId>& selection, QWidget* dialogParent);
-	void removeItemsFromLibraryInteractive(Catalog& catalog, const std::vector<MediaId>& selection, QWidget* dialogParent);
+	// Moves each video's frame folder to Trash; source files are kept.
+	[[nodiscard]] RemovalResult removeItemsFromLibraryInteractive(Catalog& catalog, const std::vector<MediaId>& selection, QWidget* dialogParent);
+	// removeItemsFromLibraryInteractive without the confirmation.
+	[[nodiscard]] RemovalResult removeItemsFromLibrary(Catalog& catalog, const std::vector<MediaId>& items, QWidget* dialogParent);
 }

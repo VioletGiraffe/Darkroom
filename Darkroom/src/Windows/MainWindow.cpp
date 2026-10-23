@@ -593,10 +593,7 @@ void MainWindow::checkCatalogIntegrity()
 			const MediaId newId = MediaId::fromFile(newSourcePath);
 			return catalog.applyRename(id, newId, newSourcePath, catalog.folderForMediaItem(id)) ? newId : MediaId{};
 		},
-		.removeEntryRequested = [this](const MediaId& id) {
-			libraryCatalog().removeMediaItem(id);
-			return true;
-		},
+		.removeEntriesRequested = [this](const std::vector<MediaId>& ids) { _mediaBrowser->removeMediaItemsFromLibrary(ids); },
 		.locatePhotoRequested = [this](const MediaId& id, const QString& newSourcePath) {
 			return libraryCatalog().applyRename(id, MediaId::fromFile(newSourcePath), newSourcePath, /*newFolderAbs=*/QString{});
 		},
