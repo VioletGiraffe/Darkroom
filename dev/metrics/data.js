@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792787297403,
+  "lastUpdate": 1792788989989,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -16981,6 +16981,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 48.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 13.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "a761605446954a3d1ae4389faae63f25bac8a559",
+          "message": "Folder previews' concurrent file reads no longer detach the job's shared path list: LoadJob's posted fields are const",
+          "timestamp": "2026-10-23T23:43:55+03:00",
+          "tree_id": "2b17c9e1449f51fb69df4b898ad095492b0e8d1a",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/a761605446954a3d1ae4389faae63f25bac8a559"
+        },
+        "date": 1792788987390,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 16970,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1400,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 29707,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3697.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 3653,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 3095,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 452,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 64,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 48,
             "unit": "KB"
           },
           {
