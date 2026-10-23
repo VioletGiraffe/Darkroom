@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792773333941,
+  "lastUpdate": 1792782407159,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -16823,6 +16823,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 48,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 13.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "ab807eea741eb2dc198f21d5f660e9a7677cc1c7",
+          "message": "Integrity check splits untracked library content into Darkroom-shaped frame folders, photos, videos and other items; untracked photos and videos can be imported, and every row has a reveal-in-file-manager context menu",
+          "timestamp": "2026-10-23T21:56:09+03:00",
+          "tree_id": "5482ca2b5805b19a618b688773e63c10d672872e",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/ab807eea741eb2dc198f21d5f660e9a7677cc1c7"
+        },
+        "date": 1792782404317,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 16930,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1400,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 29707,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3696,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 3653,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 3094.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 451.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 63,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 48.5,
             "unit": "KB"
           },
           {
