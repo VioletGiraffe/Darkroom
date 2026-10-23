@@ -112,6 +112,13 @@ constexpr char kLists[] = R"(
 	QListWidget#tileGrid::item:hover, QListWidget#tileGrid::item:selected { background-color: transparent; }
 )";
 
+// Explicit selection colours: QWindows11Style otherwise fills selected cells with a faint fixed colour.
+constexpr char kTables[] = R"(
+	/* outline: none suppresses the focus rect on the current cell. */
+	QTableView { outline: none; }
+	QTableView::item:selected { background-color: %selectionBg%; color: %selectionFg%; }
+)";
+
 constexpr char kScrollBars[] = R"(
 	QScrollBar:vertical { border: none; background: transparent; width: %scrollBarThickness%px; margin: 0; }
 	QScrollBar::handle:vertical { background: %textDim%; border-radius: %scrollBarHandleRadius%px; min-height: 24px; }
@@ -214,7 +221,7 @@ QString styleSheetString()
 	const Theme::Theme& t = Theme::current();
 
 	QString sheet;
-	for (const char* section : { kButtons, kTextInputs, kComboBoxes, kMenus, kMenuBar, kLists, kScrollBars,
+	for (const char* section : { kButtons, kTextInputs, kComboBoxes, kMenus, kMenuBar, kLists, kTables, kScrollBars,
 	                             kSliders, kCheckBoxes, kGroupBoxes, kSplitters, kToolTips, kGridCards, kStarButtons })
 		sheet += QLatin1String(section);
 	sheet += t.qssFragment; // last, so a theme's rules win equal-specificity ties; tokens work here too

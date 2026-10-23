@@ -64,7 +64,6 @@ public:
 	view->setSelectionBehavior(QAbstractItemView::SelectRows);
 	view->setSelectionMode(QAbstractItemView::ExtendedSelection);
 	view->setEditTriggers(QAbstractItemView::NoEditTriggers);
-	view->setAlternatingRowColors(true);
 	view->setWordWrap(false);
 	view->setTextElideMode(Qt::ElideMiddle);
 	view->verticalHeader()->hide();
