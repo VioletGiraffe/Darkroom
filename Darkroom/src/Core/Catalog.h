@@ -182,6 +182,8 @@ public:
 
 	// Persists a video's completed split; unknown and already-complete ids no-op.
 	void markSplitComplete(const MediaId& id);
+	// Returns a video to preview-only, so viewing its frames extracts them again; unknown ids, photos and preview-only videos no-op.
+	void markPreviewOnly(const MediaId& id);
 
 	// Called around each move of item storage on disk: a label removal relocating an item, a label rename. Both optional.
 	struct StorageMoveHandlers

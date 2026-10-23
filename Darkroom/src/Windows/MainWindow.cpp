@@ -576,13 +576,17 @@ void MainWindow::checkCatalogIntegrity()
 		.regeneratePreviewRequested = [this](const MediaId& id) {
 			return FrameExtraction::regeneratePreview(libraryCatalog(), id, _mediaBrowser->previewFrameCount());
 		},
+		.keepPreviewOnlyRequested = [this](const MediaId& id) {
+			return FrameExtraction::keepPreviewOnly(libraryCatalog(), id, _mediaBrowser->previewFrameCount());
+		},
 		.markSplitRequested = [this](const MediaId& id) {
 			libraryCatalog().markSplitComplete(id);
 			return true;
 		},
 		.locateSourceRequested = [this](const MediaId& id, const QString& newSourcePath) {
 			Catalog& catalog = libraryCatalog();
-			return catalog.applyRename(id, MediaId::fromFile(newSourcePath), newSourcePath, catalog.folderForMediaItem(id));
+			const MediaId newId = MediaId::fromFile(newSourcePath);
+			return catalog.applyRename(id, newId, newSourcePath, catalog.folderForMediaItem(id)) ? newId : MediaId{};
 		},
 		.removeEntryRequested = [this](const MediaId& id) {
 			libraryCatalog().removeMediaItem(id);

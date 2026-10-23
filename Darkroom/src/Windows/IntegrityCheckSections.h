@@ -31,7 +31,7 @@ struct ResolvableRow
 	QLabel*                   statusLabel = nullptr;
 	std::vector<QPushButton*> buttons;
 	bool                      closed = false;
-	std::function<void()>     onClosed;
+	std::function<void()>     onStateChanged;  // after closing or rebuilding
 	std::function<void()>     reorderSection;
 
 	void close(const QString& status, bool resolved = true);
@@ -46,7 +46,16 @@ public:
 
 private:
 	struct AdoptRow        { ResolvableRow* row; QString filePath; };
-	struct VideoRow        { ResolvableRow* row; MediaId id; bool canReimport; bool canRegenerate; bool sourceMissing; };
+	struct VideoRow
+	{
+		ResolvableRow* row;
+		QHBoxLayout*   layout;
+		MediaId        id;
+		bool           canReimport = false;
+		bool           canRegenerate = false;
+		bool           canKeepPreviewOnly = false;
+		bool           sourceMissing = false;
+	};
 	struct MissingPhotoRow { ResolvableRow* row; MediaId id; bool referenced; };
 	struct DanglingLabelRow { ResolvableRow* row; MediaId id; };
 
@@ -55,6 +64,18 @@ private:
 	void buildVideoIssues(const CatalogIntegrity::IntegrityReport& report);
 	void buildMissingPhotos(const CatalogIntegrity::IntegrityReport& report);
 	void buildDanglingLabelIssues(const CatalogIntegrity::IntegrityReport& report);
+
+	// Replaces the row's status and buttons with those for issue; resolvedNote, when set, tells what was just done.
+	void populateVideoRow(VideoRow& v, const CatalogIntegrity::MediaIssue& issue, const QString& resolvedNote);
+	void wireVideoAction(QPushButton* button, VideoRow& v, const QString& successText, const QString& failureText,
+	                     std::function<bool()> action);
+	bool relocateVideo(VideoRow& v, const QString& newSourcePath);
+
+	// Closes the row on success.
+	template <class Row>
+	static bool resolveRow(Row& r, const QString& successText, const std::function<bool()>& action);
+	// A repair can leave other problems: the row closes only once its video is healthy or gone, and is rebuilt otherwise.
+	bool resolveRow(VideoRow& v, const QString& successText, const std::function<bool()>& action);
 
 	std::pair<QHBoxLayout*, ResolvableRow*> addRow(const QString& statusText);
 	static QPushButton* addRowButton(QHBoxLayout* rowLayout, ResolvableRow* row, const QString& text);
@@ -70,7 +91,7 @@ private:
 	QString browseForSourcePhoto(const QString& hint) const;
 
 	template <class Row, class Applies, class Act>
-	static std::pair<int, int> runBlanket(std::vector<Row>& rows, Applies applies, Act act, const QString& successText);
+	std::pair<int, int> runBlanket(std::vector<Row>& rows, Applies applies, Act act, const QString& successText);
 	// Persists the catalog once for the whole loop. Only for quick actions that pump no events: long runs flush per row so a crash keeps finished rows.
 	template <class Row, class Applies, class Act>
 	std::pair<int, int> runBatchedBlanket(std::vector<Row>& rows, Applies applies, Act act, const QString& successText);
@@ -87,7 +108,7 @@ private:
 	template <class Row>
 	void confirmAndRemoveAll(std::vector<Row>& rows, const QString& title, const QString& questionFmt, const QString& doneFmt);
 
-	Catalog& _catalog;  // Only for persistence batching; mutations go through _callbacks.
+	Catalog& _catalog;  // For re-checking rows and batching persistence; mutations go through _callbacks.
 	IntegrityCheckDialog::Callbacks& _callbacks;
 	QWidget*     _dialog;
 	QWidget*     _content;
@@ -97,7 +118,7 @@ private:
 
 	std::deque<ResolvableRow>     _rows;  // Handlers retain row pointers; deque preserves their addresses.
 	std::vector<AdoptRow>         _untrackedPhotoRows;
-	std::vector<VideoRow>         _videoRows;
+	std::vector<VideoRow>         _videoRows;  // Reserved before filling: handlers retain references into it.
 	std::vector<MissingPhotoRow>  _missingPhotoRows;
 	std::vector<DanglingLabelRow> _danglingLabelRows;
 };
@@ -111,8 +132,8 @@ inline void ResolvableRow::close(const QString& status, bool resolved)
 	closed = true;
 	if (reorderSection)
 		reorderSection();
-	if (onClosed)
-		onClosed();
+	if (onStateChanged)
+		onStateChanged();
 }
 
 inline bool ResolvableRow::tryResolve(const QString& successText, const std::function<bool()>& action)
@@ -183,7 +204,7 @@ inline void IntegrityCheckSections::buildUntrackedPhotos(const CatalogIntegrity:
 
 		QPushButton* addButton  = addRowButton(rowLayout, row, QObject::tr("Add to catalog"));
 		QPushButton* skipButton = addRowButton(rowLayout, row, QObject::tr("Skip"));
-		row->onClosed = refreshBlanket;
+		row->onStateChanged = refreshBlanket;
 
 		const QString filePath = p.filePath;
 
@@ -211,101 +232,52 @@ inline void IntegrityCheckSections::buildVideoIssues(const CatalogIntegrity::Int
 		return;
 
 	QHBoxLayout* header = addSectionHeader(QObject::tr("<b>Videos</b> - tracked, but the source, frames or preview are missing on disk"));
-	QPushButton* locateAllButton     = new QPushButton(QObject::tr("Locate all..."), _content);
-	QPushButton* reimportAllButton   = new QPushButton(QObject::tr("Re-import all"), _content);
-	QPushButton* regenerateAllButton = new QPushButton(QObject::tr("Regenerate all previews"), _content);
-	QPushButton* removeAllButton     = new QPushButton(QObject::tr("Remove all"), _content);
+	QPushButton* locateAllButton      = new QPushButton(QObject::tr("Locate all..."), _content);
+	QPushButton* reimportAllButton    = new QPushButton(QObject::tr("Re-import all"), _content);
+	QPushButton* keepPreviewAllButton = new QPushButton(QObject::tr("Keep all as preview only"), _content);
+	QPushButton* regenerateAllButton  = new QPushButton(QObject::tr("Regenerate all previews"), _content);
+	QPushButton* removeAllButton      = new QPushButton(QObject::tr("Remove all"), _content);
+	keepPreviewAllButton->setToolTip(QObject::tr("Videos whose extracted frames are gone go back to preview-only: "
+	                                             "frames are extracted again the first time they are viewed"));
 	header->addWidget(locateAllButton);
 	header->addWidget(reimportAllButton);
+	header->addWidget(keepPreviewAllButton);
 	header->addWidget(regenerateAllButton);
 	header->addWidget(removeAllButton);
 
-	const auto refreshBlanket = [this, locateAllButton, reimportAllButton, regenerateAllButton, removeAllButton] {
-		bool anyOpen = false, anyLocate = false, anyReimport = false, anyRegenerate = false;
+	const auto refreshBlanket = [this, locateAllButton, reimportAllButton, keepPreviewAllButton, regenerateAllButton, removeAllButton] {
+		bool anyOpen = false, anyLocate = false, anyReimport = false, anyKeepPreview = false, anyRegenerate = false;
 		for (const VideoRow& v : _videoRows)
 		{
 			if (v.row->closed)
 				continue;
 			anyOpen = true;
-			anyLocate     = anyLocate     || v.sourceMissing;
-			anyReimport   = anyReimport   || v.canReimport;
-			anyRegenerate = anyRegenerate || v.canRegenerate;
+			anyLocate      = anyLocate      || v.sourceMissing;
+			anyReimport    = anyReimport    || v.canReimport;
+			anyKeepPreview = anyKeepPreview || v.canKeepPreviewOnly;
+			anyRegenerate  = anyRegenerate  || v.canRegenerate;
 		}
 		locateAllButton->setEnabled(anyLocate);
 		reimportAllButton->setEnabled(anyReimport);
+		keepPreviewAllButton->setEnabled(anyKeepPreview);
 		regenerateAllButton->setEnabled(anyRegenerate);
 		removeAllButton->setEnabled(anyOpen);
 	};
 
+	_videoRows.reserve(report.issues.size());
 	for (const CatalogIntegrity::MediaIssue& issue : report.issues)
 	{
-		// Integrity verdicts are orthogonal, so report every applicable problem.
-		QStringList problems;
-		if (issue.extractedFramesMissing())
-			problems << QObject::tr("extracted frames are gone");
-		if (issue.previewMissing())
-			problems << (issue.realFramesPresent ? QObject::tr("no preview - the card renders the full-size frames instead")
-			                                     : QObject::tr("no preview - the card has no image to show"));
-		if (issue.splitFlagStale())
-			problems << QObject::tr("marked not-yet-split, but frames exist");
-		if (issue.sourceMissing())
-			problems << (issue.sourcePath.isEmpty() ? QObject::tr("no source recorded")
-			                                        : QObject::tr("source missing: %1").arg(issue.sourcePath));
-		const QString status = QFileInfo(issue.folder).fileName() + "<br>" + problems.join(QStringLiteral("; "));
-
-		const auto [rowLayout, row] = addRow(status);
-
-		const MediaId id = issue.id;
-		const QString recordedSource = issue.sourcePath;
-
-		const bool canReimport   = issue.extractedFramesMissing() && issue.sourcePresent;
-		const bool canRegenerate = issue.previewMissing() && !issue.extractedFramesMissing() && (issue.realFramesPresent || issue.sourcePresent);
-		const bool canMarkSplit  = issue.splitFlagStale() && !issue.previewMissing();
-		const bool canLocate     = issue.sourceMissing();
-
-		QPushButton* locateButton     = canLocate     ? addRowButton(rowLayout, row, QObject::tr("Locate source...")) : nullptr;
-		QPushButton* reimportButton   = canReimport   ? addRowButton(rowLayout, row, QObject::tr("Re-import")) : nullptr;
-		QPushButton* regenerateButton = canRegenerate ? addRowButton(rowLayout, row, QObject::tr("Regenerate preview")) : nullptr;
-		QPushButton* markSplitButton  = canMarkSplit  ? addRowButton(rowLayout, row, QObject::tr("Mark as fully split")) : nullptr;
-		QPushButton* removeButton     = addRowButton(rowLayout, row, QObject::tr("Remove"));
-		QPushButton* skipButton       = addRowButton(rowLayout, row, QObject::tr("Skip"));
-		row->onClosed = refreshBlanket;
-
-		if (locateButton)
-			wireBrowse(locateButton, row,
-				[this, recordedSource] { return browseForSourceVideo(recordedSource); },
-				[this, id](const QString& picked) { return _callbacks.locateSourceRequested(id, picked); },
-				QObject::tr("Relocated to %1"),
-				QObject::tr("Could not relocate - that file's identity is already tracked as a different item."));
-
-		if (reimportButton)
-			wireAction(reimportButton, row, QObject::tr("Re-imported."),
-				QObject::tr("Re-import failed - see the error dialog for details."),
-				[this, id] { return _callbacks.reimportRequested(id); });
-
-		if (regenerateButton)
-			wireAction(regenerateButton, row, QObject::tr("Preview regenerated."),
-				QObject::tr("Could not regenerate the preview - the source may be unavailable."),
-				[this, id] { return _callbacks.regeneratePreviewRequested(id); });
-
-		if (markSplitButton)
-			wireAction(markSplitButton, row, QObject::tr("Marked as fully split."), QObject::tr("Could not update the entry."),
-				[this, id] { return _callbacks.markSplitRequested(id); });
-
-		wireAction(removeButton, row, QObject::tr("Removed from catalog."), QObject::tr("Could not remove."),
-			[this, id] { return _callbacks.removeEntryRequested(id); });
-
-		wireSkip(skipButton, row);
-		_videoRows.push_back({ row, id, canReimport, canRegenerate, canLocate });
+		const auto [rowLayout, row] = addRow({});
+		row->onStateChanged = refreshBlanket;
+		populateVideoRow(_videoRows.emplace_back(VideoRow{ .row = row, .layout = rowLayout }), issue, {});
 	}
 
-	QObject::connect(locateAllButton, &QPushButton::clicked, locateAllButton, [this, refreshBlanket] {
+	QObject::connect(locateAllButton, &QPushButton::clicked, locateAllButton, [this] {
 		const auto tally = locateAllByIdentity(_videoRows, [](const VideoRow& v) { return v.sourceMissing; }, isSupportedVideoFile,
-			[this](const MediaId& id, const QString& picked) { return _callbacks.locateSourceRequested(id, picked); },
+			[this](VideoRow& v, const QString& picked) { return relocateVideo(v, picked); },
 			QObject::tr("Select folder to search for moved source videos"));
 		if (!tally)
 			return;
-		refreshBlanket();
 
 		QStringList msg{ QObject::tr("Relocated %1 video(s).").arg(tally->relocated) };
 		if (tally->unmatched)
@@ -325,6 +297,15 @@ inline void IntegrityCheckSections::buildVideoIssues(const CatalogIntegrity::Int
 			[this](VideoRow& v) { return _callbacks.reimportRequested(v.id); }, QObject::tr("Re-imported."));
 		QApplication::restoreOverrideCursor();
 		showBlanketTally(QObject::tr("Re-import all"), QObject::tr("Re-imported %1 video(s)."), done, QObject::tr("%1 could not be re-imported."), failed);
+	});
+
+	QObject::connect(keepPreviewAllButton, &QPushButton::clicked, keepPreviewAllButton, [this] {
+		QApplication::setOverrideCursor(Qt::WaitCursor);
+		const auto [done, failed] = runBlanket(_videoRows, [](const VideoRow& v) { return v.canKeepPreviewOnly; },
+			[this](VideoRow& v) { return _callbacks.keepPreviewOnlyRequested(v.id); }, QObject::tr("Kept as preview only."));
+		QApplication::restoreOverrideCursor();
+		showBlanketTally(QObject::tr("Keep all as preview only"), QObject::tr("Kept %1 video(s) as preview only."), done,
+			QObject::tr("%1 could not get a preview - the source may be unavailable."), failed);
 	});
 
 	QObject::connect(regenerateAllButton, &QPushButton::clicked, regenerateAllButton, [this] {
@@ -382,7 +363,7 @@ inline void IntegrityCheckSections::buildMissingPhotos(const CatalogIntegrity::I
 		QPushButton* locateButton = photo.referenced ? addRowButton(rowLayout, row, QObject::tr("Locate...")) : nullptr;
 		QPushButton* removeButton = addRowButton(rowLayout, row, QObject::tr("Remove"));
 		QPushButton* skipButton   = addRowButton(rowLayout, row, QObject::tr("Skip"));
-		row->onClosed = refreshBlanket;
+		row->onStateChanged = refreshBlanket;
 
 		if (locateButton)
 			wireBrowse(locateButton, row,
@@ -398,13 +379,12 @@ inline void IntegrityCheckSections::buildMissingPhotos(const CatalogIntegrity::I
 		_missingPhotoRows.push_back({ row, id, photo.referenced });
 	}
 
-	QObject::connect(locateAllButton, &QPushButton::clicked, locateAllButton, [this, refreshBlanket] {
+	QObject::connect(locateAllButton, &QPushButton::clicked, locateAllButton, [this] {
 		const auto tally = locateAllByIdentity(_missingPhotoRows, [](const MissingPhotoRow& m) { return m.referenced; }, isSupportedImageFile,
-			[this](const MediaId& id, const QString& picked) { return _callbacks.locatePhotoRequested(id, picked); },
+			[this](MissingPhotoRow& m, const QString& picked) { return _callbacks.locatePhotoRequested(m.id, picked); },
 			QObject::tr("Select folder to search for missing photos"));
 		if (!tally)
 			return;
-		refreshBlanket();
 
 		QStringList msg{ QObject::tr("Relocated %1 photo(s).").arg(tally->relocated) };
 		if (tally->unmatched)
@@ -446,7 +426,7 @@ inline void IntegrityCheckSections::buildDanglingLabelIssues(const CatalogIntegr
 		const auto [rowLayout, row] = addRow(issue.id.name() + "<br>" + QObject::tr("missing label ID(s): %1").arg(missingIds.join(", ")));
 		QPushButton* dropButton = addRowButton(rowLayout, row, QObject::tr("Drop invalid references"));
 		QPushButton* skipButton = addRowButton(rowLayout, row, QObject::tr("Skip"));
-		row->onClosed = refreshBlanket;
+		row->onStateChanged = refreshBlanket;
 
 		const MediaId id = issue.id;
 		wireAction(dropButton, row, QObject::tr("Invalid label references dropped."), QObject::tr("Could not update the entry."),
@@ -536,6 +516,130 @@ inline void IntegrityCheckSections::wireSkip(QPushButton* skipButton, Resolvable
 	});
 }
 
+inline void IntegrityCheckSections::populateVideoRow(VideoRow& v, const CatalogIntegrity::MediaIssue& issue, const QString& resolvedNote)
+{
+	for (QPushButton* b : v.row->buttons)
+	{
+		b->hide();
+		b->deleteLater();  // may be the button whose click is being handled
+	}
+	v.row->buttons.clear();
+
+	// Integrity verdicts are orthogonal, so report every applicable problem.
+	QStringList problems;
+	if (issue.extractedFramesMissing())
+		problems << QObject::tr("extracted frames are gone");
+	if (issue.previewMissing())
+		problems << (issue.realFramesPresent ? QObject::tr("no preview - the card renders the full-size frames instead")
+		                                     : QObject::tr("no preview - the card has no image to show"));
+	if (issue.splitFlagStale())
+		problems << QObject::tr("marked not-yet-split, but frames exist");
+	if (issue.sourceMissing())
+		problems << (issue.sourcePath.isEmpty() ? QObject::tr("no source recorded")
+		                                        : QObject::tr("source missing: %1").arg(issue.sourcePath));
+	QString status = QFileInfo(issue.folder).fileName() + "<br>" + problems.join(QStringLiteral("; "));
+	if (!resolvedNote.isEmpty())
+		status += QStringLiteral("<br>✓ ") + resolvedNote;
+	v.row->statusLabel->setText(status);
+
+	v.id                 = issue.id;
+	v.canReimport        = issue.extractedFramesMissing() && issue.sourcePresent;
+	v.canKeepPreviewOnly = issue.extractedFramesMissing() && (issue.previewPresent || issue.sourcePresent);
+	v.canRegenerate      = issue.previewMissing() && !issue.extractedFramesMissing() && (issue.realFramesPresent || issue.sourcePresent);
+	v.sourceMissing      = issue.sourceMissing();
+	const bool canMarkSplit = issue.splitFlagStale() && !issue.previewMissing();
+
+	if (v.sourceMissing)
+	{
+		QPushButton* locateButton = addRowButton(v.layout, v.row, QObject::tr("Locate source..."));
+		QObject::connect(locateButton, &QPushButton::clicked, locateButton, [this, &v, recordedSource = issue.sourcePath] {
+			const QString picked = browseForSourceVideo(recordedSource);
+			if (picked.isEmpty())
+				return;
+			if (!resolveRow(v, QObject::tr("Relocated to %1").arg(picked), [&] { return relocateVideo(v, picked); }))
+				QMessageBox::warning(_dialog, QObject::tr("Catalog integrity check"),
+					QObject::tr("Could not relocate - that file's identity is already tracked as a different item."));
+		});
+	}
+
+	if (v.canReimport)
+		wireVideoAction(addRowButton(v.layout, v.row, QObject::tr("Re-import")), v, QObject::tr("Re-imported."),
+			QObject::tr("Re-import failed - see the error dialog for details."),
+			[this, &v] { return _callbacks.reimportRequested(v.id); });
+
+	if (v.canKeepPreviewOnly)
+	{
+		QPushButton* keepPreviewButton = addRowButton(v.layout, v.row, QObject::tr("Keep preview only"));
+		keepPreviewButton->setToolTip(QObject::tr("Go back to preview-only: frames are extracted again the first time they are viewed"));
+		wireVideoAction(keepPreviewButton, v, QObject::tr("Kept as preview only."),
+			QObject::tr("Could not create a preview - the source may be unavailable."),
+			[this, &v] { return _callbacks.keepPreviewOnlyRequested(v.id); });
+	}
+
+	if (v.canRegenerate)
+		wireVideoAction(addRowButton(v.layout, v.row, QObject::tr("Regenerate preview")), v, QObject::tr("Preview regenerated."),
+			QObject::tr("Could not regenerate the preview - the source may be unavailable."),
+			[this, &v] { return _callbacks.regeneratePreviewRequested(v.id); });
+
+	if (canMarkSplit)
+		wireVideoAction(addRowButton(v.layout, v.row, QObject::tr("Mark as fully split")), v, QObject::tr("Marked as fully split."),
+			QObject::tr("Could not update the entry."),
+			[this, &v] { return _callbacks.markSplitRequested(v.id); });
+
+	wireVideoAction(addRowButton(v.layout, v.row, QObject::tr("Remove")), v, QObject::tr("Removed from catalog."),
+		QObject::tr("Could not remove."),
+		[this, &v] { return _callbacks.removeEntryRequested(v.id); });
+
+	wireSkip(addRowButton(v.layout, v.row, QObject::tr("Skip")), v.row);
+}
+
+inline void IntegrityCheckSections::wireVideoAction(QPushButton* button, VideoRow& v, const QString& successText,
+                                                    const QString& failureText, std::function<bool()> action)
+{
+	QObject::connect(button, &QPushButton::clicked, button, [this, &v, successText, failureText, action = std::move(action)] {
+		if (!resolveRow(v, successText, action))
+			QMessageBox::warning(_dialog, QObject::tr("Catalog integrity check"), failureText);
+	});
+}
+
+inline bool IntegrityCheckSections::relocateVideo(VideoRow& v, const QString& newSourcePath)
+{
+	const MediaId newId = _callbacks.locateSourceRequested(v.id, newSourcePath);
+	if (!newId.isValid())
+		return false;
+	v.id = newId;
+	return true;
+}
+
+template <class Row>
+bool IntegrityCheckSections::resolveRow(Row& r, const QString& successText, const std::function<bool()>& action)
+{
+	return r.row->tryResolve(successText, action);
+}
+
+inline bool IntegrityCheckSections::resolveRow(VideoRow& v, const QString& successText, const std::function<bool()>& action)
+{
+	if (!action())
+		return false;
+
+	if (!_catalog.containsMediaItem(v.id))
+	{
+		v.row->close(successText);
+		return true;
+	}
+	const CatalogIntegrity::MediaIssue issue = CatalogIntegrity::inspectVideo(_catalog, v.id);
+	if (issue.healthy())
+	{
+		v.row->close(successText);
+		return true;
+	}
+
+	populateVideoRow(v, issue, successText);
+	if (v.row->onStateChanged)
+		v.row->onStateChanged();
+	return true;
+}
+
 inline QString IntegrityCheckSections::browseForSourceVideo(const QString& hint) const
 {
 	const QString startDir = hint.isEmpty() ? _catalog.anySourceDir() : QFileInfo(hint).absolutePath();
@@ -558,7 +662,7 @@ std::pair<int, int> IntegrityCheckSections::runBlanket(std::vector<Row>& rows, A
 	{
 		if (r.row->closed || !applies(r))
 			continue;
-		if (r.row->tryResolve(successText, [&] { return act(r); })) ++done;
+		if (resolveRow(r, successText, [&] { return act(r); })) ++done;
 		else ++failed;
 	}
 	return { done, failed };
@@ -607,7 +711,8 @@ std::optional<IntegrityCheckSections::LocateTally> IntegrityCheckSections::locat
 				continue;
 			const auto found = byIdentity.constFind(r.id.key());
 			if (found == byIdentity.constEnd()) { ++tally.unmatched; continue; }
-			if (relocate(r.id, found.value())) { r.row->close(QObject::tr("Relocated to %1").arg(found.value())); ++tally.relocated; }
+			const QString& picked = found.value();
+			if (resolveRow(r, QObject::tr("Relocated to %1").arg(picked), [&] { return relocate(r, picked); })) ++tally.relocated;
 			else ++tally.failed;
 		}
 	}

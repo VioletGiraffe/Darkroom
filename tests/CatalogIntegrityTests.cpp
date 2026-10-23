@@ -142,6 +142,19 @@ TEST_CASE("scan: each video verdict is reported, a healthy video is not", "[inte
 	REQUIRE(report.untrackedPhotos.empty());
 }
 
+TEST_CASE("inspectVideo: a split video whose frames are gone is healthy once marked preview-only", "[integrity]")
+{
+	IntegrityFixture f;
+	const MediaId id = f.addVideo("lost.mp4", 7, "L", true, true);
+	f.putFrame(Catalog::previewDirFor(f.frameFolder("lost.mp4", "L")));
+	REQUIRE(CatalogIntegrity::inspectVideo(f.catalog(), id).extractedFramesMissing());
+
+	f.catalog().markPreviewOnly(id);
+	REQUIRE_FALSE(f.catalog().isSplitIntoFrames(id));
+	requireRebuildStable(f.catalog());
+	REQUIRE(CatalogIntegrity::inspectVideo(f.catalog(), id).healthy());
+}
+
 TEST_CASE("scan: a photo with a missing source is flagged, owned vs referenced", "[integrity]")
 {
 	IntegrityFixture f;

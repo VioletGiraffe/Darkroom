@@ -81,4 +81,7 @@ using ScanProgress = std::function<void(ScanPhase phase, int done, int total)>;
 // Explicit, read-only scan; never part of normal refresh.
 [[nodiscard]] IntegrityReport scan(const Catalog& catalog, const QString& rootFolder, const ScanProgress& progress = {});
 
+// The disk facts scan reports for one tracked video. Requires a tracked video id.
+[[nodiscard]] MediaIssue inspectVideo(const Catalog& catalog, const MediaId& id);
+
 } // namespace CatalogIntegrity

@@ -75,7 +75,8 @@ removes partial output.
 
 Once imported, `preview/` is a permanent store separate from real extracted frames. Full extraction does not rewrite
 it. Integrity scanning reports missing real frames only for items marked as fully split, so a preview-only video is a
-valid catalog state. Media cards prefer the permanent preview and fall back to real frames when it is absent; see
+valid catalog state. `FrameExtraction::keepPreviewOnly` returns a split video whose frames are gone to that state.
+Media cards prefer the permanent preview and fall back to real frames when it is absent; see
 [media-widgets.md](media-widgets.md).
 
 ## ImportDialog

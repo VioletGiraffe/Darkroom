@@ -679,6 +679,17 @@ void Catalog::markSplitComplete(const MediaId& id)
 	notifyCatalogChanged();
 }
 
+void Catalog::markPreviewOnly(const MediaId& id)
+{
+	const auto it = _mediaItems.find(id);
+	if (it == _mediaItems.end() || it->type != MediaType::Video || !it->splitIntoFrames)
+		return;
+
+	_metadataStore.beginBatch().set(id, kSplitIntoFramesField, false);
+	it->splitIntoFrames = false;
+	notifyCatalogChanged();
+}
+
 void Catalog::setDurationMs(const MediaId& id, qint64 durationMs)
 {
 	const auto it = _mediaItems.find(id);

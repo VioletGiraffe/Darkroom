@@ -66,6 +66,22 @@ bool regeneratePreviewFromRealFrames(const QString& folderPath, int previewFrame
 	return anyCopied;
 }
 
+bool regeneratePreviewFromSource(Catalog& catalog, const MediaId& id, const QString& folderPath, int previewFrameCount)
+{
+	const QString source = catalog.sourcePathForMediaItem(id);
+	if (!QFile::exists(source))
+		return false;
+
+	const QString previewDirPath = Catalog::previewDirFor(folderPath);
+	if (!QDir{}.mkpath(previewDirPath))
+		assert_and_return_unconditional_r("Failed to create preview folder " + previewDirPath.toStdString(), false);
+
+	const Ffmpeg::PreviewResult result =
+		Ffmpeg::generatePreviewFrames(source, previewDirPath, previewFrameCount);
+	catalog.setDurationMs(id, result.durationMs);
+	return result.ok();
+}
+
 } // namespace
 
 bool FrameExtraction::ensureFramesExtracted(
@@ -168,19 +184,23 @@ bool FrameExtraction::regeneratePreview(Catalog& catalog, const MediaId& id, int
 		catalog.markSplitComplete(id);
 		return true;
 	}
+	return regeneratePreviewFromSource(catalog, id, folder, previewFrameCount);
+}
 
-	const QString source = catalog.sourcePathForMediaItem(id);
-	if (!QFile::exists(source))
+bool FrameExtraction::keepPreviewOnly(Catalog& catalog, const MediaId& id, int previewFrameCount)
+{
+	assert_and_return_r(catalog.containsMediaItem(id), false);
+	assert_and_return_r(catalog.mediaType(id) == Catalog::MediaType::Video, false);
+	const QString folder = catalog.folderForMediaItem(id);
+	assert_and_return_r(!folder.isEmpty(), false);  // QDir("") addresses the working directory
+	assert_and_return_r(listFrameImageFiles(QDir(folder)).isEmpty(), false);
+
+	if (listFrameImageFiles(QDir(Catalog::previewDirFor(folder))).isEmpty()
+		&& !regeneratePreviewFromSource(catalog, id, folder, previewFrameCount))
 		return false;
 
-	const QString previewDirPath = Catalog::previewDirFor(folder);
-	if (!QDir{}.mkpath(previewDirPath))
-		assert_and_return_unconditional_r("Failed to create preview folder " + previewDirPath.toStdString(), false);
-
-	const Ffmpeg::PreviewResult result =
-		Ffmpeg::generatePreviewFrames(source, previewDirPath, previewFrameCount);
-	catalog.setDurationMs(id, result.durationMs);
-	return result.ok();
+	catalog.markPreviewOnly(id);
+	return true;
 }
 
 bool FrameExtraction::reExportAllVideosInteractive(

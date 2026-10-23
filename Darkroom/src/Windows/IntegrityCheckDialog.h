@@ -26,9 +26,11 @@ public:
 		std::function<bool(const QString& filePath)> adoptPhotoRequested;
 		std::function<bool(const MediaId& id)> reimportRequested;
 		std::function<bool(const MediaId& id)> regeneratePreviewRequested;
+		std::function<bool(const MediaId& id)> keepPreviewOnlyRequested;
 		std::function<bool(const MediaId& id)> markSplitRequested;
 		// Locate callbacks preserve storage and may refuse an identity collision.
-		std::function<bool(const MediaId& id, const QString& newSourcePath)> locateSourceRequested;
+		// Returns the video's id for the new source, or an invalid id when refused.
+		std::function<MediaId(const MediaId& id, const QString& newSourcePath)> locateSourceRequested;
 		std::function<bool(const MediaId& id)> removeEntryRequested;
 		std::function<bool(const MediaId& id, const QString& newSourcePath)> locatePhotoRequested;
 		std::function<bool(const MediaId& id)> removeInvalidLabelReferencesRequested;

@@ -2,6 +2,7 @@
 #include "Core/Catalog.h"
 #include "Utils.h"
 
+#include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
@@ -57,16 +58,9 @@ IntegrityReport scan(const Catalog& catalog, const QString& rootFolder, const Sc
 			continue;
 		}
 
-		MediaIssue issue;
-		issue.id                = id;
-		issue.folder            = entry.folder;
-		issue.sourcePath        = entry.sourcePath;
-		issue.sourcePresent     = !entry.sourcePath.isEmpty() && QFileInfo::exists(entry.sourcePath);
-		issue.splitComplete     = entry.splitIntoFrames;
-		issue.realFramesPresent = !listFrameImageFiles(QDir(entry.folder)).isEmpty();
-		issue.previewPresent    = !listFrameImageFiles(QDir(Catalog::previewDirFor(entry.folder))).isEmpty();
+		MediaIssue issue = inspectVideo(catalog, id);
 		if (!issue.healthy())
-			report.issues.push_back(issue);
+			report.issues.push_back(std::move(issue));
 	}
 
 	// forEachFolder yields video frame folders, except under Photos where it yields label directories.
@@ -94,6 +88,22 @@ IntegrityReport scan(const Catalog& catalog, const QString& rootFolder, const Sc
 	});
 
 	return report;
+}
+
+MediaIssue inspectVideo(const Catalog& catalog, const MediaId& id)
+{
+	const auto it = catalog.mediaItems().constFind(id);
+	assert_and_return_r(it != catalog.mediaItems().cend() && it->type == Catalog::MediaType::Video, {});
+
+	MediaIssue issue;
+	issue.id                = id;
+	issue.folder            = it->folder;
+	issue.sourcePath        = it->sourcePath;
+	issue.sourcePresent     = !it->sourcePath.isEmpty() && QFileInfo::exists(it->sourcePath);
+	issue.splitComplete     = it->splitIntoFrames;
+	issue.realFramesPresent = !listFrameImageFiles(QDir(it->folder)).isEmpty();
+	issue.previewPresent    = !listFrameImageFiles(QDir(Catalog::previewDirFor(it->folder))).isEmpty();
+	return issue;
 }
 
 } // namespace CatalogIntegrity

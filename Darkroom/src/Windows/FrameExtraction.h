@@ -26,6 +26,10 @@ namespace FrameExtraction
 	// Regenerates from real frames when available, otherwise from the source video.
 	[[nodiscard]] bool regeneratePreview(Catalog& catalog, const MediaId& id, int previewFrameCount);
 
+	// Returns a fully split video whose real frames are gone to preview-only. Keeps an existing preview, otherwise
+	// generates one from the source video.
+	[[nodiscard]] bool keepPreviewOnly(Catalog& catalog, const MediaId& id, int previewFrameCount);
+
 	// Returns true after a confirmed non-empty batch, even when individual videos fail.
 	[[nodiscard]] bool reExportAllVideosInteractive(Catalog& catalog, int previewFrameCount, QWidget* dialogParent);
 }
