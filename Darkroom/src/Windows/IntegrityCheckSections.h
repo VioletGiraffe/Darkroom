@@ -41,7 +41,7 @@ struct ResolvableRow
 class IntegrityCheckSections
 {
 public:
-	IntegrityCheckSections(const Catalog& catalog, const CatalogIntegrity::IntegrityReport& report, IntegrityCheckDialog::Callbacks& callbacks,
+	IntegrityCheckSections(Catalog& catalog, const CatalogIntegrity::IntegrityReport& report, IntegrityCheckDialog::Callbacks& callbacks,
 	                       QWidget* content, QVBoxLayout* contentLayout, QWidget* dialog);
 
 private:
@@ -71,6 +71,9 @@ private:
 
 	template <class Row, class Applies, class Act>
 	static std::pair<int, int> runBlanket(std::vector<Row>& rows, Applies applies, Act act, const QString& successText);
+	// Persists the catalog once for the whole loop. Only for quick actions that pump no events: long runs flush per row so a crash keeps finished rows.
+	template <class Row, class Applies, class Act>
+	std::pair<int, int> runBatchedBlanket(std::vector<Row>& rows, Applies applies, Act act, const QString& successText);
 
 	void showBlanketTally(const QString& title, const QString& doneFmt, int done, const QString& failedFmt, int failed) const;
 
@@ -84,7 +87,7 @@ private:
 	template <class Row>
 	void confirmAndRemoveAll(std::vector<Row>& rows, const QString& title, const QString& questionFmt, const QString& doneFmt);
 
-	const Catalog& _catalog;
+	Catalog& _catalog;  // Only for persistence batching; mutations go through _callbacks.
 	IntegrityCheckDialog::Callbacks& _callbacks;
 	QWidget*     _dialog;
 	QWidget*     _content;
@@ -120,7 +123,7 @@ inline bool ResolvableRow::tryResolve(const QString& successText, const std::fun
 	return true;
 }
 
-inline IntegrityCheckSections::IntegrityCheckSections(const Catalog& catalog, const CatalogIntegrity::IntegrityReport& report,
+inline IntegrityCheckSections::IntegrityCheckSections(Catalog& catalog, const CatalogIntegrity::IntegrityReport& report,
                                                       IntegrityCheckDialog::Callbacks& callbacks,
                                                       QWidget* content, QVBoxLayout* contentLayout, QWidget* dialog)
 	: _catalog(catalog), _callbacks(callbacks), _dialog(dialog), _content(content), _layout(contentLayout),
@@ -193,7 +196,7 @@ inline void IntegrityCheckSections::buildUntrackedPhotos(const CatalogIntegrity:
 	}
 
 	QObject::connect(addAllButton, &QPushButton::clicked, addAllButton, [this] {
-		const auto [added, failed] = runBlanket(_untrackedPhotoRows, [](const AdoptRow&) { return true; },
+		const auto [added, failed] = runBatchedBlanket(_untrackedPhotoRows, [](const AdoptRow&) { return true; },
 			[this](AdoptRow& r) { return _callbacks.adoptPhotoRequested(r.filePath); }, QObject::tr("Added to catalog."));
 		showBlanketTally(QObject::tr("Add all photos"), QObject::tr("Added %1 photo(s) to the catalog."), added,
 			QObject::tr("%1 could not be added - a file with the same name and size is already tracked."), failed);
@@ -453,7 +456,7 @@ inline void IntegrityCheckSections::buildDanglingLabelIssues(const CatalogIntegr
 	}
 
 	QObject::connect(dropAllButton, &QPushButton::clicked, dropAllButton, [this] {
-		const auto [done, failed] = runBlanket(_danglingLabelRows, [](const DanglingLabelRow&) { return true; },
+		const auto [done, failed] = runBatchedBlanket(_danglingLabelRows, [](const DanglingLabelRow&) { return true; },
 			[this](DanglingLabelRow& r) { return _callbacks.removeInvalidLabelReferencesRequested(r.id); },
 			QObject::tr("Invalid label references dropped."));
 		showBlanketTally(QObject::tr("Drop invalid label references"), QObject::tr("Cleaned %1 item(s)."), done,
@@ -561,6 +564,13 @@ std::pair<int, int> IntegrityCheckSections::runBlanket(std::vector<Row>& rows, A
 	return { done, failed };
 }
 
+template <class Row, class Applies, class Act>
+std::pair<int, int> IntegrityCheckSections::runBatchedBlanket(std::vector<Row>& rows, Applies applies, Act act, const QString& successText)
+{
+	Catalog::BatchScope batch(_catalog);
+	return runBlanket(rows, std::move(applies), std::move(act), successText);
+}
+
 inline void IntegrityCheckSections::showBlanketTally(const QString& title, const QString& doneFmt, int done,
                                                      const QString& failedFmt, int failed) const
 {
@@ -579,6 +589,7 @@ std::optional<IntegrityCheckSections::LocateTally> IntegrityCheckSections::locat
 	if (dir.isEmpty())
 		return std::nullopt;
 
+	QApplication::setOverrideCursor(Qt::WaitCursor);
 	QHash<QString, QString> byIdentity;   // MediaId::key() -> first file found under dir carrying that identity
 	for (const QString& path : collectFilesInDirectory(dir, /*recursive=*/true, filePredicate))
 	{
@@ -588,15 +599,19 @@ std::optional<IntegrityCheckSections::LocateTally> IntegrityCheckSections::locat
 	}
 
 	LocateTally tally;
-	for (Row& r : rows)
 	{
-		if (r.row->closed || !applies(r))
-			continue;
-		const auto found = byIdentity.constFind(r.id.key());
-		if (found == byIdentity.constEnd()) { ++tally.unmatched; continue; }
-		if (relocate(r.id, found.value())) { r.row->close(QObject::tr("Relocated to %1").arg(found.value())); ++tally.relocated; }
-		else ++tally.failed;
+		Catalog::BatchScope batch(_catalog);
+		for (Row& r : rows)
+		{
+			if (r.row->closed || !applies(r))
+				continue;
+			const auto found = byIdentity.constFind(r.id.key());
+			if (found == byIdentity.constEnd()) { ++tally.unmatched; continue; }
+			if (relocate(r.id, found.value())) { r.row->close(QObject::tr("Relocated to %1").arg(found.value())); ++tally.relocated; }
+			else ++tally.failed;
+		}
 	}
+	QApplication::restoreOverrideCursor();
 	return tally;
 }
 
@@ -609,7 +624,7 @@ void IntegrityCheckSections::confirmAndRemoveAll(std::vector<Row>& rows, const Q
 		return;
 	if (QMessageBox::question(_dialog, title, questionFmt.arg(open)) != QMessageBox::Yes)
 		return;
-	runBlanket(rows, [](const Row&) { return true; },
+	runBatchedBlanket(rows, [](const Row&) { return true; },
 		[this](Row& r) { _callbacks.removeEntryRequested(r.id); return true; }, QObject::tr("Removed from catalog."));
 	QMessageBox::information(_dialog, title, doneFmt.arg(open));
 }

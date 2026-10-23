@@ -13,7 +13,7 @@ RESTORE_COMPILER_WARNINGS
 #include <memory>
 
 // Presents CatalogIntegrity findings and per-row/batch recovery actions. MainWindow supplies all callbacks
-// that mutate the catalog or disk; section UI lives in IntegrityCheckSections.
+// that mutate the catalog or disk; the dialog only batches their persistence. Section UI lives in IntegrityCheckSections.
 
 class IntegrityCheckSections;
 
@@ -35,10 +35,10 @@ public:
 	};
 
 	// Returns whether findings existed; a clean scan shows only an information box.
-	static bool scanAndShowUi(const Catalog& catalog, const QString& rootFolder, Callbacks callbacks, QWidget* parent);
+	static bool scanAndShowUi(Catalog& catalog, const QString& rootFolder, Callbacks callbacks, QWidget* parent);
 
 private:
-	IntegrityCheckDialog(const Catalog& catalog, const CatalogIntegrity::IntegrityReport& report, Callbacks callbacks, QWidget* parent);
+	IntegrityCheckDialog(Catalog& catalog, const CatalogIntegrity::IntegrityReport& report, Callbacks callbacks, QWidget* parent);
 	~IntegrityCheckDialog() override;
 
 	Callbacks _callbacks;

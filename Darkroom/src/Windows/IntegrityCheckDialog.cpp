@@ -6,6 +6,8 @@
 #include "widgets/cpersistenceenabler.h"
 
 DISABLE_COMPILER_WARNINGS
+#include <QApplication>
+#include <QElapsedTimer>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMessageBox>
@@ -17,22 +19,49 @@ RESTORE_COMPILER_WARNINGS
 #include <memory>
 #include <utility>
 
-bool IntegrityCheckDialog::scanAndShowUi(const Catalog& catalog, const QString& rootFolder, Callbacks callbacks, QWidget* parent)
+bool IntegrityCheckDialog::scanAndShowUi(Catalog& catalog, const QString& rootFolder, Callbacks callbacks, QWidget* parent)
 {
-	const CatalogIntegrity::IntegrityReport report = CatalogIntegrity::scan(catalog, rootFolder);
+	// Modal: the scan pumps events while it borrows the catalog.
+	QMessageBox progressBox(parent);
+	progressBox.setWindowTitle(tr("Catalog integrity check"));
+	progressBox.setStandardButtons(QMessageBox::NoButton);
+	progressBox.setModal(true);
+	progressBox.show();
+
+	const auto showProgress = [&progressBox](const QString& text) {
+		progressBox.setText(text);
+		QApplication::processEvents();
+	};
+	showProgress(tr("Checking catalog entries..."));
+
+	// Throttled: each text update relayouts the box.
+	QElapsedTimer sinceProgressShown;
+	sinceProgressShown.start();
+	const CatalogIntegrity::IntegrityReport report = CatalogIntegrity::scan(catalog, rootFolder,
+		[&](CatalogIntegrity::ScanPhase phase, int done, int total) {
+			if (sinceProgressShown.elapsed() < 50)
+				return;
+			sinceProgressShown.restart();
+			showProgress(phase == CatalogIntegrity::ScanPhase::Items ? tr("Checking catalog entry %1/%2...").arg(done + 1).arg(total)
+			                                                         : tr("Scanning library folders (%1)...").arg(done + 1));
+		});
+
 	if (report.isEmpty())
 	{
+		progressBox.close();
 		QMessageBox::information(parent, tr("Catalog integrity check"),
 			tr("No issues found - catalog entries, label references, and on-disk content are consistent."));
 		return false;
 	}
 
+	showProgress(tr("Preparing the results..."));
 	IntegrityCheckDialog dialog(catalog, report, std::move(callbacks), parent);
+	progressBox.close();
 	dialog.exec();
 	return true;
 }
 
-IntegrityCheckDialog::IntegrityCheckDialog(const Catalog& catalog, const CatalogIntegrity::IntegrityReport& report, Callbacks callbacks, QWidget* parent)
+IntegrityCheckDialog::IntegrityCheckDialog(Catalog& catalog, const CatalogIntegrity::IntegrityReport& report, Callbacks callbacks, QWidget* parent)
 	: QDialog(parent), _callbacks(std::move(callbacks))
 {
 	setWindowTitle(tr("Catalog Integrity Check"));

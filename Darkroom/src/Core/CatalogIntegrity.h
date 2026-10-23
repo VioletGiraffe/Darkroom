@@ -8,6 +8,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QString>
 RESTORE_COMPILER_WARNINGS
 
+#include <functional>
 #include <vector>
 
 class Catalog;
@@ -73,7 +74,11 @@ struct IntegrityReport
 	}
 };
 
+enum class ScanPhase { Items, Folders };
+// Called before each catalog item and each walked folder; done counts those already checked. Folders reports total 0: the walk is not counted up front.
+using ScanProgress = std::function<void(ScanPhase phase, int done, int total)>;
+
 // Explicit, read-only scan; never part of normal refresh.
-[[nodiscard]] IntegrityReport scan(const Catalog& catalog, const QString& rootFolder);
+[[nodiscard]] IntegrityReport scan(const Catalog& catalog, const QString& rootFolder, const ScanProgress& progress = {});
 
 } // namespace CatalogIntegrity

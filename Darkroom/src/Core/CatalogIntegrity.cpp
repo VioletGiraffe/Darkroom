@@ -21,7 +21,7 @@ RESTORE_COMPILER_WARNINGS
 
 namespace CatalogIntegrity {
 
-IntegrityReport scan(const Catalog& catalog, const QString& rootFolder)
+IntegrityReport scan(const Catalog& catalog, const QString& rootFolder, const ScanProgress& progress)
 {
 	IntegrityReport report;
 
@@ -32,8 +32,13 @@ IntegrityReport scan(const Catalog& catalog, const QString& rootFolder)
 	// Collect issues and the case-insensitive claimed paths needed by the untracked walk in one model pass.
 	QSet<QString> knownFolders;
 	QSet<QString> trackedSources;
+	const int itemCount = catalog.mediaItemCount();
+	int checkedItems = 0;
 	for (const auto& [id, entry] : catalog.mediaItems().asKeyValueRange())
 	{
+		if (progress)
+			progress(ScanPhase::Items, checkedItems++, itemCount);
+
 		knownFolders.insert(pathComparisonKey(entry.folder));
 		if (!entry.sourcePath.isEmpty())
 			trackedSources.insert(pathComparisonKey(entry.sourcePath));
@@ -65,7 +70,11 @@ IntegrityReport scan(const Catalog& catalog, const QString& rootFolder)
 	}
 
 	// forEachFolder yields video frame folders, except under Photos where it yields label directories.
+	int walkedFolders = 0;
 	forEachFolder(rootFolder, [&](const QString& storageFolder, const QString& folderPath) {
+		if (progress)
+			progress(ScanPhase::Folders, walkedFolders++, 0);
+
 		if (storageFolder.compare(Catalog::PhotosDirectoryName.toString(), Qt::CaseInsensitive) == 0)
 		{
 			const QString labelName = QFileInfo(folderPath).fileName();
