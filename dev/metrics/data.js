@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792760253824,
+  "lastUpdate": 1792761707205,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -16492,6 +16492,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .text",
             "value": 2921.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 442,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 57,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 47,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 13,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "ad58fb30373f15dd985faf91b4dd8dbb0b7fb49c",
+          "message": "Override wait cursors via ScopedWaitCursor; auto-align shows the wait cursor instead of the busy cursor while it blocks the GUI",
+          "timestamp": "2026-10-23T16:14:53+03:00",
+          "tree_id": "8d373c7fa1457b7f5d02367aa5f8b417a57de322",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/ad58fb30373f15dd985faf91b4dd8dbb0b7fb49c"
+        },
+        "date": 1792761705183,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 16623,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1400,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 29707,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3656.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 3652.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 3072.5,
             "unit": "KB"
           },
           {
