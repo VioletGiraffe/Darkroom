@@ -14,12 +14,12 @@
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
+#include "utils/scoped_cursor.h"
 #include "widgets/cpersistenceenabler.h"
 
 DISABLE_COMPILER_WARNINGS
 #include "resize/qimage_resize.h"
 
-#include <QApplication>
 #include <QBuffer>
 #include <QCheckBox>
 #include <QContextMenuEvent>
@@ -30,6 +30,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
+#include <QFontMetrics>
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QImageReader>
@@ -957,7 +958,7 @@ void PhotoCompareWindow::autoAlignPhotos()
 		return;
 	if (_calibrating)
 		setCalibrating(false);
-	QApplication::setOverrideCursor(Qt::BusyCursor);
+	const ScopedWaitCursor waitCursor;
 	for (Photo& photo : _photos)
 	{
 		photo.alignMarks.clear();
@@ -1023,7 +1024,6 @@ void PhotoCompareWindow::autoAlignPhotos()
 	for (const RefContribution& c : contrib)
 		ref.alignMarks.insert(ref.alignMarks.end(), c.refMarks.begin(), c.refMarks.end());
 	_alignMarkSize = contrib.front().patchSize;
-	QApplication::restoreOverrideCursor();
 	updateAllPanes();
 }
 

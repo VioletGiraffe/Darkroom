@@ -5,9 +5,9 @@
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
+#include "utils/scoped_cursor.h"
 
 DISABLE_COMPILER_WARNINGS
-#include <QApplication>
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -453,10 +453,11 @@ void IntegrityCheckTabs::runEach(Tab& tab, const std::vector<int>& findings, con
 
 	int done = 0, failed = 0, cancelled = 0;
 	{
+		std::optional<ScopedWaitCursor> waitCursor;
 		std::optional<Catalog::BatchScope> batch;
 		if (spec.quick)
 		{
-			QApplication::setOverrideCursor(Qt::WaitCursor);
+			waitCursor.emplace();
 			batch.emplace(_catalog);
 		}
 
@@ -480,8 +481,6 @@ void IntegrityCheckTabs::runEach(Tab& tab, const std::vector<int>& findings, con
 			}
 		}
 	}
-	if (spec.quick)
-		QApplication::restoreOverrideCursor();
 
 	QString doneText = spec.doneFmt.arg(done);
 	if (cancelled)
@@ -521,17 +520,17 @@ void IntegrityCheckTabs::locate(Tab& tab, const std::vector<int>& findings, cons
 	if (dir.isEmpty())
 		return;
 
-	QApplication::setOverrideCursor(Qt::WaitCursor);
-	QHash<QString, QString> byIdentity;   // MediaId::key() -> first file found under dir carrying that identity
-	for (const QString& path : collectFilesInDirectory(dir, /*recursive=*/true, spec.isCandidateFile))
-	{
-		const QString identity = MediaId::fromFile(path).key();
-		if (!byIdentity.contains(identity))
-			byIdentity.insert(identity, QDir::toNativeSeparators(path));
-	}
-
 	int relocated = 0, unmatched = 0, failed = 0;
 	{
+		const ScopedWaitCursor waitCursor;
+		QHash<QString, QString> byIdentity;   // MediaId::key() -> first file found under dir carrying that identity
+		for (const QString& path : collectFilesInDirectory(dir, /*recursive=*/true, spec.isCandidateFile))
+		{
+			const QString identity = MediaId::fromFile(path).key();
+			if (!byIdentity.contains(identity))
+				byIdentity.insert(identity, QDir::toNativeSeparators(path));
+		}
+
 		Catalog::BatchScope batch(_catalog);
 		for (const int f : findings)
 		{
@@ -550,7 +549,6 @@ void IntegrityCheckTabs::locate(Tab& tab, const std::vector<int>& findings, cons
 			settle(tab, f, QObject::tr("Relocated to %1").arg(found.value()));
 		}
 	}
-	QApplication::restoreOverrideCursor();
 
 	QString doneText = spec.doneFmt.arg(relocated);
 	if (unmatched)
