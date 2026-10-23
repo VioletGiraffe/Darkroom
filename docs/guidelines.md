@@ -40,7 +40,7 @@ container-type swap a smaller diff.
 When referring to a *tracked* media item across a call or time boundary, carry its `MediaId` (the stable
 name+size identity, `Core/MediaId.h`) rather than a filesystem path — and never re-derive identity with
 `MediaId::fromFile(path)` at a point where the file may have moved. `fromFile()` stats the file for its size;
-if the source was relocated in between (e.g. the Import dialog's "Move source file to:" relocation), it
+if the source was relocated in between (e.g. the Import dialog's "Move to:" source-video relocation), it
 returns an invalid id (`size == -1`) that matches nothing. The catalog API (`folderForMediaItem`, `addLabel`,
 …) is already id-based — match it.
 

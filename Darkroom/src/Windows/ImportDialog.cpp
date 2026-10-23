@@ -66,6 +66,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QSet>
 #include <QSettings>
 #include <QSplitter>
+#include <QTabWidget>
 #include <QThread>
 #include <QTimer>
 #include <QUuid>
@@ -186,42 +187,6 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 
 	QVBoxLayout* outerLayout = new QVBoxLayout(this);
 
-	QSettings relocateSettings;
-	_relocateModeCombo = new QComboBox(this);
-	_relocateModeCombo->addItem(tr("Leave source file in place (photos: reference, never touched)"), int(RelocateMode::LeaveInPlace));
-	_relocateModeCombo->addItem(tr("Copy source file to:"), int(RelocateMode::Copy));
-	_relocateModeCombo->addItem(tr("Move source file to:"), int(RelocateMode::Move));
-	_relocateModeCombo->setPlaceholderText(tr("Choose how to handle source files..."));
-	_relocateModeCombo->setCurrentIndex(-1);
-
-	QString relocateFolder = relocateSettings.value("importDialog/relocateFolder").toString();
-	if (relocateFolder.isEmpty())
-		relocateFolder = suggestedRelocateFolder;
-	_relocateFolderEdit = new QLineEdit(relocateFolder, this);
-	QPushButton* relocateBrowseButton = new QPushButton(tr("Browse..."), this);
-
-	const auto updateRelocateRowEnabled = [this, relocateBrowseButton] {
-		const auto modeData = _relocateModeCombo->currentData();
-		const bool enabled = modeData.isValid() && modeData.toInt() != int(RelocateMode::LeaveInPlace);
-		_relocateFolderEdit->setEnabled(enabled);
-		relocateBrowseButton->setEnabled(enabled);
-	};
-	updateRelocateRowEnabled();
-	connect(_relocateModeCombo, &QComboBox::currentIndexChanged, this, updateRelocateRowEnabled);
-
-	connect(relocateBrowseButton, &QPushButton::clicked, this, [this] {
-		const QString path = QFileDialog::getExistingDirectory(this, tr("Select destination folder"), _relocateFolderEdit->text());
-		if (!path.isEmpty())
-			_relocateFolderEdit->setText(QDir::toNativeSeparators(path));
-	});
-
-	QHBoxLayout* relocateRow = new QHBoxLayout;
-	relocateRow->addWidget(new QLabel(tr("Source file:"), this));
-	relocateRow->addWidget(_relocateModeCombo);
-	relocateRow->addWidget(_relocateFolderEdit, 1);
-	relocateRow->addWidget(relocateBrowseButton);
-	outerLayout->addLayout(relocateRow);
-
 	_splitter = new QSplitter(Qt::Horizontal, this);
 	outerLayout->addWidget(_splitter, 1);
 
@@ -277,57 +242,117 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 
 	_splitter->addWidget(labelPane);
 
-	QWidget* stagedPane = new QWidget();
-	QVBoxLayout* stagedPaneLayout = new QVBoxLayout(stagedPane);
-	stagedPaneLayout->setContentsMargins(0, 0, 0, 0);
+	_stagedTabs = new QTabWidget();
+	_sortDirectionToggle = new SegmentedToggle({ tr("A → Z"), tr("Z → A") });
+	connect(_sortDirectionToggle, &SegmentedToggle::currentChanged, this, &ImportDialog::resortStagedItems);
+	_stagedTabs->setCornerWidget(_sortDirectionToggle, Qt::TopRightCorner);
+
+	const auto addStagedTab = [this](QHBoxLayout* toolbar, QListWidget* grid, QPushButton* importButton) {
+		auto* renameStagedAction = new QAction(tr("Rename..."), this);
+		renameStagedAction->setShortcut(QKeySequence(Shortcuts::Rename));
+		renameStagedAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+		connect(renameStagedAction, &QAction::triggered, this, [this, grid] {
+			const std::vector<MediaId> ids = selectedStagedIds(grid);
+			if (ids.size() == 1)
+				renameStagedItem(ids.front());
+		});
+		grid->addAction(renameStagedAction);
+
+		auto* removeStagedAction = new QAction(tr("Remove from staging"), this);
+		removeStagedAction->setShortcut(QKeySequence(Shortcuts::RemoveFromList));
+		removeStagedAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+		connect(removeStagedAction, &QAction::triggered, this, [this, grid] { removeStagedItems(selectedStagedIds(grid)); });
+		grid->addAction(removeStagedAction);
+
+		auto* deleteStagedAction = new QAction(tr("Delete source file(s)"), this);
+		deleteStagedAction->setShortcut(QKeySequence(Shortcuts::DeleteFile));
+		deleteStagedAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
+		connect(deleteStagedAction, &QAction::triggered, this, [this, grid] { deleteStagedSourceFiles(selectedStagedIds(grid)); });
+		grid->addAction(deleteStagedAction);
+
+		QHBoxLayout* footer = new QHBoxLayout;
+		footer->addStretch(1);
+		footer->addWidget(importButton);
+
+		QWidget* page = new QWidget();
+		QVBoxLayout* pageLayout = new QVBoxLayout(page);
+		pageLayout->addLayout(toolbar);
+		pageLayout->addWidget(grid, 1);
+		pageLayout->addLayout(footer);
+		_stagedTabs->addTab(page, {});
+	};
+
+	_videoRelocateModeCombo = new QComboBox();
+	_videoRelocateModeCombo->addItem(tr("Leave in place"), int(RelocateMode::LeaveInPlace));
+	_videoRelocateModeCombo->addItem(tr("Copy to:"), int(RelocateMode::Copy));
+	_videoRelocateModeCombo->addItem(tr("Move to:"), int(RelocateMode::Move));
+	_videoRelocateModeCombo->setPlaceholderText(tr("Choose how to handle source videos..."));
+	_videoRelocateModeCombo->setCurrentIndex(-1);
+	_videoRelocateModeCombo->setToolTip(tr("Previews and extracted frames are always stored in the library; this only affects the source video file."));
+
+	QString relocateFolder = QSettings{}.value("importDialog/relocateFolder").toString();
+	if (relocateFolder.isEmpty())
+		relocateFolder = suggestedRelocateFolder;
+	_relocateFolderEdit = new QLineEdit(relocateFolder);
+	QPushButton* relocateBrowseButton = new QPushButton(tr("Browse..."));
+
+	const auto updateRelocateRowEnabled = [this, relocateBrowseButton] {
+		const auto modeData = _videoRelocateModeCombo->currentData();
+		const bool enabled = modeData.isValid() && modeData.toInt() != int(RelocateMode::LeaveInPlace);
+		_relocateFolderEdit->setEnabled(enabled);
+		relocateBrowseButton->setEnabled(enabled);
+	};
+	updateRelocateRowEnabled();
+	connect(_videoRelocateModeCombo, &QComboBox::currentIndexChanged, this, updateRelocateRowEnabled);
+
+	connect(relocateBrowseButton, &QPushButton::clicked, this, [this] {
+		const QString path = QFileDialog::getExistingDirectory(this, tr("Select destination folder"), _relocateFolderEdit->text());
+		if (!path.isEmpty())
+			_relocateFolderEdit->setText(QDir::toNativeSeparators(path));
+	});
 
 	const int mainWindowFrameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
 	const int savedStagedFrameCount = QSettings{}.value(STAGED_PREVIEW_FRAME_COUNT_KEY, mainWindowFrameCount).toInt();
-	_mediaTypeFilter = new SegmentedToggle({ tr("All"), tr("Videos"), tr("Photos") });
-	connect(_mediaTypeFilter, &SegmentedToggle::currentChanged, this, &ImportDialog::applyStagedMediaTypeFilter);
 	_previewFrameCountCombo = new PreviewFrameCountCombo(savedStagedFrameCount);
 	QSettings{}.setValue(STAGED_PREVIEW_FRAME_COUNT_KEY, _previewFrameCountCombo->frameCount());
 	connect(_previewFrameCountCombo, &QComboBox::currentIndexChanged, this, &ImportDialog::stagedPreviewFrameCountChanged);
-	QHBoxLayout* stagedToolbar = new QHBoxLayout;
-	stagedToolbar->addWidget(_mediaTypeFilter, 0, Qt::AlignVCenter);
-	stagedToolbar->addStretch(1);
-	stagedToolbar->addWidget(_previewFrameCountCombo, 0, Qt::AlignVCenter);
-	_sortDirectionToggle = new SegmentedToggle({ tr("A → Z"), tr("Z → A") });
-	connect(_sortDirectionToggle, &SegmentedToggle::currentChanged, this, &ImportDialog::resortStagedItems);
-	stagedToolbar->addWidget(_sortDirectionToggle, 0, Qt::AlignVCenter);
-	stagedPaneLayout->addLayout(stagedToolbar);
 
-	_stagedGrid = new MediaGrid();
+	QHBoxLayout* videoToolbar = new QHBoxLayout;
+	videoToolbar->addWidget(new QLabel(tr("Source videos:")));
+	videoToolbar->addWidget(_videoRelocateModeCombo);
+	videoToolbar->addWidget(_relocateFolderEdit, 1);
+	videoToolbar->addWidget(relocateBrowseButton);
+	videoToolbar->addWidget(_previewFrameCountCombo, 0, Qt::AlignVCenter);
+
+	QPushButton* importVideosButton = new QPushButton(tr("Import videos"));
+	connect(importVideosButton, &QPushButton::clicked, this, &ImportDialog::runVideoImport);
+	_videoGrid = new MediaGrid();
+	addStagedTab(videoToolbar, _videoGrid, importVideosButton);
+
+	_photoModeCombo = new QComboBox();
+	_photoModeCombo->addItem(tr("Reference in place (never touched)"), int(Import::PhotoImportMode::Reference));
+	_photoModeCombo->addItem(tr("Copy into the library"), int(Import::PhotoImportMode::Copy));
+	_photoModeCombo->addItem(tr("Move into the library"), int(Import::PhotoImportMode::Move));
+	_photoModeCombo->setPlaceholderText(tr("Choose how to import photos..."));
+	_photoModeCombo->setCurrentIndex(-1);
+	_photoModeCombo->setToolTip(tr("A copied or moved photo is stored in the library folder of its first label."));
+
+	QHBoxLayout* photoToolbar = new QHBoxLayout;
+	photoToolbar->addWidget(new QLabel(tr("Photos:")));
+	photoToolbar->addWidget(_photoModeCombo);
+	photoToolbar->addStretch(1);
+
+	QPushButton* importPhotosButton = new QPushButton(tr("Import photos"));
+	connect(importPhotosButton, &QPushButton::clicked, this, &ImportDialog::runPhotoImport);
+	_photoGrid = new MediaGrid();
+	addStagedTab(photoToolbar, _photoGrid, importPhotosButton);
 
 	_stagedCardZoomDebounce = new QTimer(this);
 	_stagedCardZoomDebounce->setSingleShot(true);
 	_stagedCardZoomDebounce->setInterval(80);
 	connect(_stagedCardZoomDebounce, &QTimer::timeout, this, &ImportDialog::rebuildAllStagedCards);
-	stagedPaneLayout->addWidget(_stagedGrid, 1);
 
-	auto* renameStagedAction = new QAction(tr("Rename..."), this);
-	renameStagedAction->setShortcut(QKeySequence(Shortcuts::Rename));
-	renameStagedAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
-	connect(renameStagedAction, &QAction::triggered, this, [this] {
-		const std::vector<MediaId> ids = selectedStagedIds();
-		if (ids.size() == 1)
-			renameStagedItem(ids.front());
-	});
-	_stagedGrid->addAction(renameStagedAction);
-
-	auto* removeStagedAction = new QAction(tr("Remove from staging"), this);
-	removeStagedAction->setShortcut(QKeySequence(Shortcuts::RemoveFromList));
-	removeStagedAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
-	connect(removeStagedAction, &QAction::triggered, this, [this] { removeStagedItems(selectedStagedIds()); });
-	_stagedGrid->addAction(removeStagedAction);
-
-	auto* deleteStagedAction = new QAction(tr("Delete source file(s)"), this);
-	deleteStagedAction->setShortcut(QKeySequence(Shortcuts::DeleteFile));
-	deleteStagedAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
-	connect(deleteStagedAction, &QAction::triggered, this, [this] { deleteStagedSourceFiles(selectedStagedIds()); });
-	_stagedGrid->addAction(deleteStagedAction);
-
-	_splitter->addWidget(stagedPane);
+	_splitter->addWidget(_stagedTabs);
 
 	_splitter->setStretchFactor(0, 0);
 	_splitter->setStretchFactor(1, 1);
@@ -337,20 +362,14 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 		tr("Drop video or image files here to stage them. Assign labels by dragging them from the list onto a card or through the card's right-click menu. "
 		   "Dropping a folder stages the media under it; click \"Suggest labels\" to apply labels derived from folder names. Right-click a "
 		   "label to rename, recolor, or remove it before importing. "
-		   "Double-click a card to preview; right-click for more options. \"Import\" imports every labeled card "
-		   "and clears it from staging."), this);
+		   "Double-click a card to preview; right-click for more options. Each tab's import button imports every labeled card "
+		   "on that tab and clears it from staging."), this);
 	instructions->setWordWrap(true);
 	instructions->setStyleSheet(QStringLiteral("color: %1;").arg(Theme::current().palette.textDim.name()));
 	outerLayout->addWidget(instructions);
 
-	QHBoxLayout* footer = new QHBoxLayout;
-	footer->addStretch(1);
-	QPushButton* importButton = new QPushButton(tr("Import"), this);
-	connect(importButton, &QPushButton::clicked, this, &ImportDialog::runImport);
-	footer->addWidget(importButton);
-	outerLayout->addLayout(footer);
-
 	refreshLabelList();
+	updateStagedTabTitles();
 
 	resize(1200, 800);
 	setWindowState(Qt::WindowMaximized);
@@ -368,20 +387,6 @@ ImportDialog::~ImportDialog()
 
 	for (const StagedEntry& entry : std::as_const(_staged))
 		assert_r(removeTempPreviewDirWithRetry(entry.tempPreviewDir));
-}
-
-void ImportDialog::reject()
-{
-	const bool anyHiddenItems = std::any_of(_staged.constBegin(), _staged.constEnd(),
-		[](const StagedEntry& entry) { return entry.item->isHidden(); });
-	if (anyHiddenItems)
-	{
-		_mediaTypeFilter->setCurrentIndex(0);
-		applyStagedMediaTypeFilter();
-		return;
-	}
-
-	QDialog::reject();
 }
 
 void ImportDialog::dragEnterEvent(QDragEnterEvent* event)
@@ -608,7 +613,7 @@ MediaItemWidget* ImportDialog::buildStagedCard(StagedGridItem* item, const QStri
 	if (!isPhoto)
 	{
 		const int frameCount = stagedPreviewFrameCount();
-		canvasSize.setWidth(MediaItemWidget::videoCanvasWidthForTiling(imageHeight, frameCount, _stagedGrid->spacing()));
+		canvasSize.setWidth(MediaItemWidget::videoCanvasWidthForTiling(imageHeight, frameCount, _videoGrid->spacing()));
 		const QDir previewDir(tempPreviewDir);
 		previewPaths = pickEvenlySpacedFrames(previewDir, listFrameImageFiles(previewDir), frameCount);
 	}
@@ -645,33 +650,21 @@ MediaItemWidget* ImportDialog::buildStagedCard(StagedGridItem* item, const QStri
 	return card;
 }
 
-bool ImportDialog::stagedItemMatchesMediaTypeFilter(const QString& path) const
+void ImportDialog::updateStagedTabTitles()
 {
-	const int filterIndex = _mediaTypeFilter->currentIndex();
-	if (filterIndex == 1)
-		return !isSupportedImageFile(path);
-	if (filterIndex == 2)
-		return isSupportedImageFile(path);
-	return true;
-}
-
-void ImportDialog::applyStagedMediaTypeFilter()
-{
-	for (StagedEntry& entry : _staged)
-	{
-		const bool hidden = !stagedItemMatchesMediaTypeFilter(entry.path);
-		entry.item->setHidden(hidden);
-		if (hidden)
-			entry.item->setSelected(false);
-	}
+	_stagedTabs->setTabText(_stagedTabs->indexOf(_videoGrid->parentWidget()), tr("Videos (%1)").arg(_videoGrid->count()));
+	_stagedTabs->setTabText(_stagedTabs->indexOf(_photoGrid->parentWidget()), tr("Photos (%1)").arg(_photoGrid->count()));
 }
 
 void ImportDialog::resortStagedItems()
 {
 	const bool descending = _sortDirectionToggle->currentIndex() == 1;
-	for (int row = 0; row < _stagedGrid->count(); ++row)
-		static_cast<StagedGridItem*>(_stagedGrid->item(row))->descending = descending;
-	_stagedGrid->sortItems(Qt::AscendingOrder);
+	for (QListWidget* grid : { _videoGrid, _photoGrid })
+	{
+		for (int row = 0; row < grid->count(); ++row)
+			static_cast<StagedGridItem*>(grid->item(row))->descending = descending;
+		grid->sortItems(Qt::AscendingOrder);
+	}
 }
 
 void ImportDialog::stageMediaItems(const QStringList& paths)
@@ -738,45 +731,50 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 	const int mainWindowFrameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
 	const int extractionFrameCount = std::max(stagedPreviewFrameCount(), mainWindowFrameCount);
 
-	const auto stageCard = [this, &suggestedLabelNameByPath](const QString& path, const QString& tempPreviewDir, qint64 durationMs = -1) {
+	const auto stageCard = [this, &suggestedLabelNameByPath](QListWidget* grid, const QString& path, const QString& tempPreviewDir, qint64 durationMs = -1) {
 		const MediaId id = MediaId::fromFile(path);
 		auto* item = new StagedGridItem(id, _sortDirectionToggle->currentIndex() == 1);
 		auto* card = buildStagedCard(item, path, tempPreviewDir, durationMs);
 		item->setSizeHint(card->sizeHint());
-		_stagedGrid->addItem(item);
-		_stagedGrid->setItemWidget(item, card);
+		grid->addItem(item);
+		grid->setItemWidget(item, card);
 
 		_staged.insert(id, StagedEntry{
 			path, tempPreviewDir, suggestedLabelNameByPath.value(path), durationMs, /*pendingBest*/ false, /*pendingLabelIds*/ {}, item });
-		item->setHidden(!stagedItemMatchesMediaTypeFilter(path));
 	};
 
 	for (const QString& path : photoPaths)
-		stageCard(path, /*tempPreviewDir*/ {});
+		stageCard(_photoGrid, path, /*tempPreviewDir*/ {});
 
-	if (videoPaths.isEmpty())
+	bool anyVideoStaged = false;
+	if (!videoPaths.isEmpty())
 	{
-		resortStagedItems();
-		return;
+		std::vector<Ffmpeg::PreviewJob> jobs;
+		jobs.reserve(videoPaths.size());
+		for (const QString& path : videoPaths)
+			jobs.push_back({ path, uniqueTempPreviewDir() });
+
+		const std::vector<Ffmpeg::PreviewResult> results =
+			FrameExtraction::generatePreviewFramesInteractively(jobs, extractionFrameCount, tr("Staging"), this);
+
+		for (size_t i = 0; i < jobs.size(); ++i)
+		{
+			// Cancelled jobs never become staged entries that could own their scratch directory.
+			if (results[i].status == Ffmpeg::PreviewResult::Status::Cancelled)
+				assert_r(removeTempPreviewDirWithRetry(jobs[i].destinationFolder));
+			else
+			{
+				stageCard(_videoGrid, jobs[i].videoFilePath, jobs[i].destinationFolder, results[i].durationMs);
+				anyVideoStaged = true;
+			}
+		}
 	}
 
-	std::vector<Ffmpeg::PreviewJob> jobs;
-	jobs.reserve(videoPaths.size());
-	for (const QString& path : videoPaths)
-		jobs.push_back({ path, uniqueTempPreviewDir() });
-
-	const std::vector<Ffmpeg::PreviewResult> results =
-		FrameExtraction::generatePreviewFramesInteractively(jobs, extractionFrameCount, tr("Staging"), this);
-
-	for (size_t i = 0; i < jobs.size(); ++i)
-	{
-		// Cancelled jobs never become staged entries that could own their scratch directory.
-		if (results[i].status == Ffmpeg::PreviewResult::Status::Cancelled)
-			assert_r(removeTempPreviewDirWithRetry(jobs[i].destinationFolder));
-		else
-			stageCard(jobs[i].videoFilePath, jobs[i].destinationFolder, results[i].durationMs);
-	}
 	resortStagedItems();
+	updateStagedTabTitles();
+	const bool anyPhotoStaged = !photoPaths.isEmpty();
+	if (anyPhotoStaged != anyVideoStaged)
+		_stagedTabs->setCurrentWidget((anyPhotoStaged ? _photoGrid : _videoGrid)->parentWidget());
 }
 
 void ImportDialog::suggestLabels()
@@ -810,6 +808,7 @@ void ImportDialog::unstage(const MediaId& id)
 	assert_r(removeTempPreviewDirWithRetry(it->tempPreviewDir));
 	delete it->item;
 	_staged.erase(it);
+	updateStagedTabTitles();
 }
 
 void ImportDialog::updateCardLabelDots(const MediaId& id)
@@ -829,7 +828,7 @@ void ImportDialog::updateCardLabelDots(const MediaId& id)
 		}
 	}
 
-	auto* card = static_cast<MediaItemWidget*>(_stagedGrid->itemWidget(it->item));
+	auto* card = static_cast<MediaItemWidget*>(it->item->listWidget()->itemWidget(it->item));
 	card->setLabelDots(colors, names.join(", "));
 }
 
@@ -904,14 +903,14 @@ void ImportDialog::rebuildAllStagedCards()
 		MediaItemWidget* card = buildStagedCard(it->item, it->path, it->tempPreviewDir, it->durationMs);
 		card->setInBest(it->pendingBest);
 		it->item->setSizeHint(card->sizeHint());
-		_stagedGrid->setItemWidget(it->item, card);
+		it->item->listWidget()->setItemWidget(it->item, card);
 		updateCardLabelDots(it.key());
 	}
 }
 
 std::vector<MediaId> ImportDialog::effectiveStagedSelection(const StagedGridItem* item) const
 {
-	const QList<QListWidgetItem*> selected = _stagedGrid->selectedItems();
+	const QList<QListWidgetItem*> selected = item->listWidget()->selectedItems();
 	if (selected.size() <= 1 || !item->isSelected())
 		return { item->mediaId };
 
@@ -931,17 +930,13 @@ void ImportDialog::showStagedCardContextMenu(StagedGridItem* item, const QPoint&
 
 	QMenu menu(this);
 
-	std::vector<MediaId> photoSelection;
-	for (const MediaId& sel : selection)
-		if (isSupportedImageFile(_staged.value(sel).path))
-			photoSelection.push_back(sel);
-	if (photoSelection.size() == selection.size() && photoSelection.size() >= 2)
+	const bool isPhoto = item->listWidget() == _photoGrid;
+	if (isPhoto && selection.size() >= 2)
 	{
-		menu.addAction(tr("Compare photos"), this, [this, photoSelection] { compareStagedPhotos(photoSelection); });
+		menu.addAction(tr("Compare photos"), this, [this, selection] { compareStagedPhotos(selection); });
 		menu.addSeparator();
 	}
 
-	const bool isPhoto = isSupportedImageFile(_staged.value(id).path);
 	menu.addAction(isPhoto ? tr("Open photo") : tr("Play source video"), this, [this, item] { previewStagedItem(item->mediaId); });
 	menu.addAction(tr("Locate source file"), this, [this, item] { locateStagedSourceFile(item->mediaId); });
 	menu.addAction(tr("Copy source path to clipboard"), this, [this, item] { copyStagedSourcePath(item->mediaId); });
@@ -1018,9 +1013,9 @@ void ImportDialog::showStagedCardContextMenu(StagedGridItem* item, const QPoint&
 	menu.exec(globalPos);
 }
 
-std::vector<MediaId> ImportDialog::selectedStagedIds() const
+std::vector<MediaId> ImportDialog::selectedStagedIds(const QListWidget* grid)
 {
-	const QList<QListWidgetItem*> selected = _stagedGrid->selectedItems();
+	const QList<QListWidgetItem*> selected = grid->selectedItems();
 	std::vector<MediaId> ids;
 	ids.reserve(selected.size());
 	for (const QListWidgetItem* item : selected)
@@ -1056,16 +1051,12 @@ void ImportDialog::previewStagedItem(const MediaId& id)
 
 	QStringList photoPaths;
 	int startIndex = -1;
-	for (int row = 0; row < _stagedGrid->count(); ++row)
+	for (int row = 0; row < _photoGrid->count(); ++row)
 	{
-		const auto* item = static_cast<const StagedGridItem*>(_stagedGrid->item(row));
-		const QString& path = _staged.constFind(item->mediaId)->path;
-		if (item->isHidden() || !isSupportedImageFile(path))
-			continue;
-
+		const auto* item = static_cast<const StagedGridItem*>(_photoGrid->item(row));
 		if (item->mediaId == id)
 			startIndex = static_cast<int>(photoPaths.size());
-		photoPaths << path;
+		photoPaths << _staged.constFind(item->mediaId)->path;
 	}
 
 	ImageViewerWindow* const viewer = ImageViewerWindow::showForImages(std::move(photoPaths), startIndex, this,
@@ -1084,8 +1075,10 @@ void ImportDialog::selectAndScrollToStagedItem(const MediaId& id)
 	if (it == _staged.constEnd())
 		return;
 
-	_stagedGrid->setCurrentItem(it->item, QItemSelectionModel::ClearAndSelect);
-	_stagedGrid->scrollToItem(it->item);
+	QListWidget* const grid = it->item->listWidget();
+	_stagedTabs->setCurrentWidget(grid->parentWidget());
+	grid->setCurrentItem(it->item, QItemSelectionModel::ClearAndSelect);
+	grid->scrollToItem(it->item);
 }
 
 void ImportDialog::locateStagedSourceFile(const MediaId& id)
@@ -1132,7 +1125,7 @@ void ImportDialog::setBestForStagedSelection(const std::vector<MediaId>& ids, bo
 		if (it == _staged.end())
 			continue;
 		it->pendingBest = inBest;
-		static_cast<MediaItemWidget*>(_stagedGrid->itemWidget(it->item))->setInBest(inBest);
+		static_cast<MediaItemWidget*>(it->item->listWidget()->itemWidget(it->item))->setInBest(inBest);
 	}
 }
 
@@ -1218,7 +1211,7 @@ void ImportDialog::renameStagedItem(const MediaId& id)
 	renamed.item->mediaId = newId;
 	_staged.insert(newId, renamed);
 	auto* card = buildStagedCard(renamed.item, newPath, renamed.tempPreviewDir, renamed.durationMs);
-	_stagedGrid->setItemWidget(renamed.item, card);
+	renamed.item->listWidget()->setItemWidget(renamed.item, card);
 
 	if (renamed.pendingBest)
 		card->setInBest(true);
@@ -1226,13 +1219,13 @@ void ImportDialog::renameStagedItem(const MediaId& id)
 	resortStagedItems();
 }
 
-void ImportDialog::materializeUsedProvisionalLabels()
+void ImportDialog::materializeUsedProvisionalLabels(const std::vector<MediaId>& ids)
 {
-	// Materialize only provisionals actually used by a staged item.
 	QHash<QString, QString> provisionalToReal;
-	for (auto it = _staged.constBegin(); it != _staged.constEnd(); ++it)
+	for (const MediaId& id : ids)
 	{
-		for (const QString& labelId : it->pendingLabelIds)
+		const QStringList pendingLabelIds = _staged.value(id).pendingLabelIds;
+		for (const QString& labelId : pendingLabelIds)
 		{
 			if (isProvisionalId(labelId) && !provisionalToReal.contains(labelId))
 			{
@@ -1360,44 +1353,89 @@ void ImportDialog::importVideoGroup(const QString& labelId, const std::vector<Me
 	}
 }
 
-void ImportDialog::runImport()
+std::vector<MediaId> ImportDialog::labeledIdsReadyForImport(const QListWidget* grid, QComboBox* modeCombo)
 {
-	const bool hasLabeledItems = std::any_of(
-		_staged.constBegin(), _staged.constEnd(), [](const StagedEntry& entry) { return !entry.pendingLabelIds.empty(); });
-	if (!hasLabeledItems)
+	std::vector<MediaId> ids;
+	for (int row = 0; row < grid->count(); ++row)
 	{
-		QMessageBox::information(this, tr("Import"), tr("No staged item has been labeled yet."));
-		return;
+		const MediaId& id = static_cast<const StagedGridItem*>(grid->item(row))->mediaId;
+		if (!_staged.value(id).pendingLabelIds.empty())
+			ids.push_back(id);
 	}
 
-	if (_relocateModeCombo->currentIndex() < 0)
+	if (ids.empty())
 	{
-		_relocateModeCombo->setFocus(Qt::OtherFocusReason);
-		_relocateModeCombo->showPopup();
-		return;
+		QMessageBox::information(this, tr("Import"),
+			grid == _photoGrid ? tr("No staged photo has been labeled yet.") : tr("No staged video has been labeled yet."));
+		return {};
 	}
 
-	const RelocateMode relocateMode = static_cast<RelocateMode>(_relocateModeCombo->currentData().toInt());
-
-	if (relocateMode != RelocateMode::LeaveInPlace)
+	if (modeCombo->currentIndex() < 0)
 	{
-		const bool move = relocateMode == RelocateMode::Move;
+		modeCombo->setFocus(Qt::OtherFocusReason);
+		modeCombo->showPopup();
+		return {};
+	}
+
+	return ids;
+}
+
+void ImportDialog::runPhotoImport()
+{
+	const std::vector<MediaId> ids = labeledIdsReadyForImport(_photoGrid, _photoModeCombo);
+	if (ids.empty())
+		return;
+
+	const auto mode = static_cast<Import::PhotoImportMode>(_photoModeCombo->currentData().toInt());
+	if (mode != Import::PhotoImportMode::Reference)
+	{
+		const bool move = mode == Import::PhotoImportMode::Move;
 		const QString text = move
-			? tr("Importing with \"Move\" will move each source file out of its current location, deleting the original. Continue?")
-			: tr("Importing with \"Copy\" will copy each source file into its destination. Continue?");
+			? tr("Importing with \"Move\" will move each photo into the library, deleting the original. Continue?")
+			: tr("Importing with \"Copy\" will copy each photo into the library. Continue?");
 		if (MessageDialog::question(this, tr("Import"), text, { move ? tr("Move and import") : tr("Copy and import") },
 				/*defaultIndex*/ 0, /*cancellable*/ true, QMessageBox::Warning) != 0)
 			return;
 	}
 
+	importByDestinationLabel(ids, [this, mode](const QString& labelId, const std::vector<MediaId>& photoIds, ImportOutcome& outcome) {
+		importPhotoGroup(labelId, photoIds, mode, outcome);
+	});
+}
+
+void ImportDialog::runVideoImport()
+{
+	const std::vector<MediaId> ids = labeledIdsReadyForImport(_videoGrid, _videoRelocateModeCombo);
+	if (ids.empty())
+		return;
+
+	const auto relocateMode = static_cast<RelocateMode>(_videoRelocateModeCombo->currentData().toInt());
+	if (relocateMode != RelocateMode::LeaveInPlace)
+	{
+		const bool move = relocateMode == RelocateMode::Move;
+		const QString text = move
+			? tr("Importing with \"Move\" will move each source video to the selected folder, deleting the original. Continue?")
+			: tr("Importing with \"Copy\" will copy each source video to the selected folder. Continue?");
+		if (MessageDialog::question(this, tr("Import"), text, { move ? tr("Move and import") : tr("Copy and import") },
+				/*defaultIndex*/ 0, /*cancellable*/ true, QMessageBox::Warning) != 0)
+			return;
+	}
+
+	importByDestinationLabel(ids, [this, relocateMode](const QString& labelId, const std::vector<MediaId>& videoIds, ImportOutcome& outcome) {
+		importVideoGroup(labelId, videoIds, relocateMode, outcome);
+	});
+}
+
+void ImportDialog::importByDestinationLabel(const std::vector<MediaId>& ids, const GroupImporter& importGroup)
+{
 	Catalog::ChangeBatchScope catalogChanges(_library.catalog());
-	materializeUsedProvisionalLabels();
+	materializeUsedProvisionalLabels(ids);
 
 	// Keep the pre-relocation MediaId: Move may delete the path before bookkeeping completes.
 	QHash<QString, std::vector<MediaId>> idsByLabelId;
-	for (auto it = _staged.constBegin(); it != _staged.constEnd(); ++it)
-		if (!it->pendingLabelIds.isEmpty())
-			idsByLabelId[it->pendingLabelIds.constFirst()].push_back(it.key());
+	for (const MediaId& id : ids)
+		if (const QStringList pendingLabelIds = _staged.value(id).pendingLabelIds; !pendingLabelIds.isEmpty())
+			idsByLabelId[pendingLabelIds.constFirst()].push_back(id);
 
 	if (idsByLabelId.isEmpty())
 	{
@@ -1405,28 +1443,10 @@ void ImportDialog::runImport()
 		return;
 	}
 
-	const Import::PhotoImportMode photoMode =
-		relocateMode == RelocateMode::Copy ? Import::PhotoImportMode::Copy :
-		relocateMode == RelocateMode::Move ? Import::PhotoImportMode::Move :
-		                                     Import::PhotoImportMode::Reference;
-
 	ImportOutcome outcome;
 	for (auto it = idsByLabelId.constBegin(); it != idsByLabelId.constEnd(); ++it)
-	{
-		const LabelOption* option = findLabelOption(it.key());
-		if (!option)
-			continue;
-
-		std::vector<MediaId> videoIds;
-		std::vector<MediaId> photoIds;
-		for (const MediaId& id : it.value())
-			(isSupportedImageFile(_staged.value(id).path) ? photoIds : videoIds).push_back(id);
-
-		if (!photoIds.empty())
-			importPhotoGroup(it.key(), photoIds, photoMode, outcome);
-		if (!videoIds.empty())
-			importVideoGroup(it.key(), videoIds, relocateMode, outcome);
-	}
+		if (findLabelOption(it.key()))
+			importGroup(it.key(), it.value(), outcome);
 
 	if (!outcome.bestItems.empty() || !outcome.extraLabelAssignments.empty())
 	{

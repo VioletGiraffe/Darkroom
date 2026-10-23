@@ -12,12 +12,14 @@ DISABLE_COMPILER_WARNINGS
 #include <QStringList>
 RESTORE_COMPILER_WARNINGS
 
+#include <functional>
 #include <vector>
 
 class QComboBox;
 class QLineEdit;
 class QListWidget;
 class QSplitter;
+class QTabWidget;
 class QTimer;
 class QWidget;
 class MediaItemWidget;
@@ -25,9 +27,9 @@ class Library;
 class PreviewFrameCountCombo;
 class SegmentedToggle;
 
-// Stages dropped videos/photos as media cards, assigns real or session-provisional labels, then imports every
-// labeled item in one pass. Provisional labels reach Catalog only when used by Import. Failed, cancelled, and
-// unlabeled items remain staged; successful and explicitly skipped collisions leave staging.
+// Stages dropped videos and photos as media cards on separate tabs, assigns real or session-provisional labels, then
+// imports every labeled item of a tab in one pass. Provisional labels reach Catalog only when used by an import. Failed,
+// cancelled, and unlabeled items remain staged; successful and explicitly skipped collisions leave staging.
 
 class ImportDialog final : public QDialog
 {
@@ -48,7 +50,6 @@ public:
 	void addToStaging(const QStringList& paths);
 
 protected:
-	void reject() override;
 	void dragEnterEvent(QDragEnterEvent* event) override;
 	void dropEvent(QDropEvent* event) override;
 
@@ -57,8 +58,7 @@ private:
 
 	void refreshLabelList();
 	void stageMediaItems(const QStringList& paths);
-	[[nodiscard]] bool stagedItemMatchesMediaTypeFilter(const QString& path) const;
-	void applyStagedMediaTypeFilter();
+	void updateStagedTabTitles();
 	void resortStagedItems();
 	void suggestLabels();
 	[[nodiscard]] MediaItemWidget* buildStagedCard(StagedGridItem* item, const QString& path, const QString& tempPreviewDir, qint64 durationMs);
@@ -82,7 +82,7 @@ private:
 	void setBestForStagedSelection(const std::vector<MediaId>& ids, bool inBest);
 	void removeStagedItems(const std::vector<MediaId>& ids);
 	void deleteStagedSourceFiles(const std::vector<MediaId>& ids);
-	[[nodiscard]] std::vector<MediaId> selectedStagedIds() const;
+	[[nodiscard]] static std::vector<MediaId> selectedStagedIds(const QListWidget* grid);
 	// Renames and re-keys in place, preserving "staged key == row id == current file id"; extension remains fixed.
 	void renameStagedItem(const MediaId& id);
 
@@ -102,8 +102,13 @@ private:
 	void importPhotoGroup(const QString& labelId, const std::vector<MediaId>& photoIds, Import::PhotoImportMode mode, ImportOutcome& outcome);
 	// A relocated but unimported entry follows its file so retry starts from the actual path.
 	void importVideoGroup(const QString& labelId, const std::vector<MediaId>& videoIds, SourceRelocation::Mode relocateMode, ImportOutcome& outcome);
-	// Groups labeled entries by their first (destination) label, imports, flushes labels, and unstages outcomes.
-	void runImport();
+	// Empty, after prompting for what is missing, when grid has no labeled card or modeCombo has no choice.
+	[[nodiscard]] std::vector<MediaId> labeledIdsReadyForImport(const QListWidget* grid, QComboBox* modeCombo);
+	using GroupImporter = std::function<void(const QString& labelId, const std::vector<MediaId>& ids, ImportOutcome& outcome)>;
+	// Groups ids by their first (destination) label, imports, flushes labels, and unstages outcomes.
+	void importByDestinationLabel(const std::vector<MediaId>& ids, const GroupImporter& importGroup);
+	void runPhotoImport();
+	void runVideoImport();
 	[[nodiscard]] const LabelOption* findLabelOption(const QString& id) const;
 
 	[[nodiscard]] static bool isProvisionalId(const QString& id);
@@ -118,8 +123,8 @@ private:
 	// Rewrites staged ids, dropping empty mappings and duplicate results while preserving first-label order.
 	bool remapStagedLabelIds(const QHash<QString, QString>& mapping);
 	void updateAllCardLabelDots();
-	// Materializes used provisional labels and rewrites staged picks to real ids.
-	void materializeUsedProvisionalLabels();
+	// Materializes the provisional labels ids use and rewrites staged picks to real ids.
+	void materializeUsedProvisionalLabels(const std::vector<MediaId>& ids);
 
 private:
 	// pendingLabelIds[0] is the destination label; the remaining ids are extra labels.
@@ -141,10 +146,12 @@ private:
 	QHash<MediaId, StagedEntry> _staged;
 
 	ContentWidthListWidget* _labelList = nullptr;
-	QListWidget* _stagedGrid = nullptr;
+	QTabWidget* _stagedTabs = nullptr;
+	QListWidget* _videoGrid = nullptr;
+	QListWidget* _photoGrid = nullptr;
 
-	QComboBox* _relocateModeCombo = nullptr;
-	SegmentedToggle* _mediaTypeFilter = nullptr;
+	QComboBox* _photoModeCombo = nullptr;
+	QComboBox* _videoRelocateModeCombo = nullptr;
 	PreviewFrameCountCombo* _previewFrameCountCombo = nullptr;
 	SegmentedToggle* _sortDirectionToggle = nullptr;
 	QLineEdit* _relocateFolderEdit = nullptr;

@@ -40,7 +40,7 @@ taskbar without an icon being scaled for every image browsed past.
 
 It browses a path list captured when it opens, skipping entries that have since left the disk; moves concluded by
 `followMovedMediaFiles` rebase it. Four callers build that list: MediaBrowserWidget from the photos the grid currently
-shows, ImportDialog from the staged photos its grid currently shows, FrameViewerWindow from one frame folder, and
+shows, ImportDialog from its staged photos, FrameViewerWindow from one frame folder, and
 CompareWindow from the frames of the pane that was clicked.
 
 Browsing, host actions and removal actions receive the current path of the image shown. MediaBrowserWidget and

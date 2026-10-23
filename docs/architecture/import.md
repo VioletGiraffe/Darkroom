@@ -114,8 +114,9 @@ their order.
 
 Staged videos receive cancellable scratch previews; photos stage directly from their source image. Completed scratch
 previews and probed durations are reused by video import, while unstaging or closing the dialog removes leftovers.
-The All/Videos/Photos selector only hides staged cards; Import and Suggest labels still process all of them. Closing
-while any are hidden first restores All and keeps the dialog open.
+Videos and photos stage on separate tabs, each with its own source-handling choice and Import button: photos are
+referenced in place or copied/moved into the library, source videos are left in place or copied/moved to a chosen
+folder. The label list and Suggest labels are shared by both tabs.
 Staged cards are naturally sorted by filename in the selected A-to-Z or Z-to-A direction.
 Explicit staged-source deletion uses the shared Trash-first workflow and unstages only the successfully removed
 items. Photo comparison reports successful deletion back to the dialog for the same reason. Internal scratch and
@@ -132,9 +133,9 @@ Every post-relocation catalog lookup and metadata assignment follows that invari
 
 ### Import transaction
 
-Import first materializes used provisional labels and rewrites pending ids to their catalog ids. It then groups
-labeled entries by their first label and runs the photo and video coordinators. Unlabeled entries and ordinary
-failures remain staged for correction or retry.
+An import covers one tab. It first materializes the provisional labels that tab's entries use and rewrites pending ids
+to their catalog ids. It then groups the labeled entries by their first label and runs that tab's coordinator.
+Unlabeled entries and ordinary failures remain staged for correction or retry.
 
 Photo results re-key pending metadata to the identity actually registered. Video relocation updates the staged source
 path so a retry follows a moved file, and a video counts as successful only when the catalog tracks it under the
