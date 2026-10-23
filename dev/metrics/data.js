@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792759752550,
+  "lastUpdate": 1792759838757,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -16309,6 +16309,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Lines of code (Darkroom)",
             "value": 16462,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1400,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 29006,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3491,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 3501,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2913.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 439.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 53.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 46.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 13,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "1223fee1c7b2d7bfbec0df69cd729c394347384a",
+          "message": "Tables take selection colours from the theme stylesheet instead of relying on alternating rows",
+          "timestamp": "2026-10-23T15:14:53+03:00",
+          "tree_id": "bbede211258501cf7528953a354b2c71e6bf02b2",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/1223fee1c7b2d7bfbec0df69cd729c394347384a"
+        },
+        "date": 1792759834258,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 16461,
             "unit": "LOC"
           },
           {
