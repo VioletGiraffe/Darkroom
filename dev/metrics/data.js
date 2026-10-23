@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792761707205,
+  "lastUpdate": 1792769458873,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -16581,6 +16581,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .data",
             "value": 57,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 47,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 13,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "b89944cd7076382f3f6615b07a96e83ab4858958",
+          "message": "Import dialog splits staging into Videos and Photos tabs, each with its own source-handling choice and Import button; photos state Reference / Copy / Move into the library instead of borrowing the video relocation wording",
+          "timestamp": "2026-10-23T18:16:50+03:00",
+          "tree_id": "8f9cb5669c9d5ccead418978dda081fd115ef18b",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/b89944cd7076382f3f6615b07a96e83ab4858958"
+        },
+        "date": 1792769454852,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 16647,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1400,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 29707,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3660,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 3652.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 3073.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 443.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 58,
             "unit": "KB"
           },
           {
