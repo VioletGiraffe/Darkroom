@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792716860749,
+  "lastUpdate": 1792759671300,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -16122,6 +16122,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .reloc",
             "value": 12.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "ebb661862351e7f863ca2af230e31cd131e994f8",
+          "message": "Integrity check shows each finding category as a table tab with actions on the selected rows; fixed rows move to a Resolved tab",
+          "timestamp": "2026-10-23T15:09:40+03:00",
+          "tree_id": "785c237bdb25506b6471334bab02e9e60e21ec49",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/ebb661862351e7f863ca2af230e31cd131e994f8"
+        },
+        "date": 1792759668965,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 16458,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1400,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 29006,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3491,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 3501,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2913.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 439.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 53.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 46.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 13,
             "unit": "KB"
           }
         ]
