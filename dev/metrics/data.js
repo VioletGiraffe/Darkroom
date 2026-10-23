@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792759678575,
+  "lastUpdate": 1792759752550,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -16280,6 +16280,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .reloc",
             "value": 12.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "aa7d98cd7c4e178f7413afa58749033d991404a6",
+          "message": "\"Re-export all videos\" becomes \"Re-extract frames of all videos\"; its confirmation states that preview-only videos get every frame extracted too",
+          "timestamp": "2026-10-23T15:17:56+03:00",
+          "tree_id": "07516da2ebbb82e6c16ede90849dd052baa75a26",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/aa7d98cd7c4e178f7413afa58749033d991404a6"
+        },
+        "date": 1792759747545,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 16462,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1400,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 29006,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3491,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 3501,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 2913.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 439.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 53.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 46.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 13,
             "unit": "KB"
           }
         ]
