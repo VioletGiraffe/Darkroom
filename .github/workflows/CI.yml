@@ -104,14 +104,23 @@ jobs:
         sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 50
         g++ --version
 
-    - name: Build & run tests (Windows)
+    - name: Build tests (Windows)
       if: startsWith(matrix.os, 'windows')
       shell: cmd
-      run: scripts\run_tests.bat -PlatformToolset v143
+      run: scripts\run_tests.bat -BuildOnly -PlatformToolset v143
 
-    - name: Build & run tests (Unix)
+    - name: Run tests (Windows)
+      if: startsWith(matrix.os, 'windows')
+      shell: cmd
+      run: scripts\run_tests.bat -NoBuild
+
+    - name: Build tests (Unix)
       if: ${{ !startsWith(matrix.os, 'windows') }}
-      run: ./scripts/run_tests.sh
+      run: ./scripts/run_tests.sh build
+
+    - name: Run tests (Unix)
+      if: ${{ !startsWith(matrix.os, 'windows') }}
+      run: ./scripts/run_tests.sh nobuild
 
     - name: Build app (Windows)
       id: build_app_windows
