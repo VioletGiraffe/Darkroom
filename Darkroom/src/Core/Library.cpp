@@ -18,6 +18,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QStringList>
 RESTORE_COMPILER_WARNINGS
 
+#include <algorithm>
 #include <limits>
 #include <optional>
 #include <utility>
@@ -35,10 +36,6 @@ struct LoadedLibraryData
 {
 	return QDir(QDir::cleanPath(QDir::fromNativeSeparators(root.trimmed()))).absolutePath();
 }
-
-// Either persisted store marks a folder as an existing library.
-[[nodiscard]] QString metadataFilePath(const QString& root) { return root + "/catalog.json"; }
-[[nodiscard]] QString labelRegistryFilePath(const QString& root) { return root + "/labels.json"; }
 
 [[nodiscard]] QString labelRegistryValidationError(const QString& path, const QJsonObject& registry)
 {
@@ -104,14 +101,14 @@ struct LoadedLibraryData
 		return std::nullopt;
 	}
 
-	JsonPersistence::ObjectReadResult metadata = JsonPersistence::readObject(metadataFilePath(normalized));
+	JsonPersistence::ObjectReadResult metadata = JsonPersistence::readObject(MetadataStore::filePathFor(normalized));
 	if (!metadata.success)
 	{
 		if (error)
 			*error = metadata.error;
 		return std::nullopt;
 	}
-	const QString labelsPath = labelRegistryFilePath(normalized);
+	const QString labelsPath = Catalog::registryFilePathFor(normalized);
 	JsonPersistence::ObjectReadResult labels = JsonPersistence::readObject(labelsPath, u"labels");
 	if (!labels.success)
 	{
@@ -225,12 +222,12 @@ bool Library::holdsLibrary(const QString& folder)
 		return false;
 
 	const QString normalized = normalizedRoot(folder);
-	return QFileInfo::exists(metadataFilePath(normalized)) || QFileInfo::exists(labelRegistryFilePath(normalized));
+	return std::ranges::any_of(persistenceFilePaths(normalized), [](const QString& path) { return QFileInfo::exists(path); });
 }
 
 QStringList Library::persistenceFilePaths(const QString& root)
 {
-	return { metadataFilePath(root), labelRegistryFilePath(root) };
+	return { MetadataStore::filePathFor(root), Catalog::registryFilePathFor(root) };
 }
 
 bool Library::setRoot(const QString& root, QString* error)

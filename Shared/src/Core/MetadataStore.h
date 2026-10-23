@@ -50,6 +50,9 @@ public:
 
 	[[nodiscard]] Writer beginBatch();
 
+	// The backing JSON document of a store rooted at rootFolder.
+	[[nodiscard]] static QString filePathFor(const QString& rootFolder);
+
 	MetadataStore(const MetadataStore&) = delete;
 	MetadataStore& operator=(const MetadataStore&) = delete;
 
@@ -67,7 +70,6 @@ private:
 	[[nodiscard]] const QString& pendingSaveError() const { return _pendingSaveError; }
 	void setPersistenceFailureHandler(std::function<void()> handler) { _persistenceFailureHandler = std::move(handler); }
 	void scheduleSave();
-	QString filePath() const;
 
 	const QString _rootFolder;
 	QJsonObject _records;

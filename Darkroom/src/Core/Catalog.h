@@ -83,6 +83,8 @@ public:
 	[[nodiscard]] static QString frameFolderName(const QString& baseName, const MediaId& id);
 	// Pure path join; frameFolder need not exist.
 	[[nodiscard]] static QString previewDirFor(const QString& frameFolder);
+	// The label registry's JSON document under rootFolder.
+	[[nodiscard]] static QString registryFilePathFor(const QString& rootFolder);
 	// False for a preview-only video. Unknown ids and photos return true because no split is pending.
 	[[nodiscard]] bool isSplitIntoFrames(const MediaId& id) const;
 	// Unknown id -> Video.
@@ -218,7 +220,6 @@ private:
 	bool ensureBestLabelExists();
 	bool ensureFolderLabelExists(const QString& displayName, const QString& color = {});
 	[[nodiscard]] LabelId generateLabelId();
-	[[nodiscard]] QString registryPath() const;
 	[[nodiscard]] QString photosRootFolder() const;
 
 	[[nodiscard]] static QString storageFolderNameOf(const QString& folderAbs);

@@ -8,20 +8,18 @@ RESTORE_COMPILER_WARNINGS
 
 #include <utility>
 
-namespace { constexpr const char* kFileName = "catalog.json"; }
-
 MetadataStore::MetadataStore(QString rootFolder, QJsonObject records)
 	: _rootFolder(std::move(rootFolder)), _records(std::move(records))
 {}
 
-QString MetadataStore::filePath() const
+QString MetadataStore::filePathFor(const QString& rootFolder)
 {
-	return _rootFolder + "/" + kFileName;
+	return rootFolder + "/catalog.json";
 }
 
 QString MetadataStore::writeRecords() const
 {
-	return JsonPersistence::writeObject(filePath(), _records);
+	return JsonPersistence::writeObject(filePathFor(_rootFolder), _records);
 }
 
 bool MetadataStore::flushPendingSave(QString* error)

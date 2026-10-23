@@ -130,9 +130,9 @@ void Catalog::finishChangeBatch()
 	}
 }
 
-QString Catalog::registryPath() const
+QString Catalog::registryFilePathFor(const QString& rootFolder)
 {
-	return _rootFolder + "/labels.json";
+	return rootFolder + "/labels.json";
 }
 
 QString Catalog::photosRootFolder() const
@@ -179,7 +179,7 @@ bool Catalog::flushPendingRegistrySave(QString* error)
 	QJsonObject root;
 	root.insert(kLabelsField.toString(), arr);
 
-	const QString saveError = JsonPersistence::writeObject(registryPath(), root);
+	const QString saveError = JsonPersistence::writeObject(registryFilePathFor(_rootFolder), root);
 	if (saveError.isEmpty())
 	{
 		_registryDirty = false;
