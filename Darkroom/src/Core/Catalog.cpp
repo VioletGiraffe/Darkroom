@@ -20,6 +20,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QScopeGuard>
 RESTORE_COMPILER_WARNINGS
 
+#include <optional>
 #include <utility>
 
 namespace
@@ -363,7 +364,19 @@ void Catalog::rebuildIndex()
 			e.referenced      = store.get(id, kReferencedField).toBool(false);
 			e.splitIntoFrames = store.get(id, kSplitIntoFramesField).toBool(true);
 			e.durationMs      = store.get(id, kDurationMsField).toInteger(-1);
-			e.labelIds        = computeLabelIds(id, e);
+
+			// An absolute folder outside the root locates the root a moved older-format library came from: item folders lie two levels below it.
+			if (!e.folder.isEmpty() && !pathRelativeTo(e.folder, _rootFolder))
+			{
+				const QString previousRoot = QDir::cleanPath(e.folder + "/../..");
+				const auto rebased = [&](const QString& path) {
+					const std::optional<QString> relative = pathRelativeTo(path, previousRoot);
+					return relative ? _rootFolder + '/' + *relative : path;
+				};
+				e.folder     = rebased(e.folder);
+				e.sourcePath = rebased(e.sourcePath);
+			}
+			e.labelIds = computeLabelIds(id, e);
 
 			// Converts absolute paths under the root, which older catalogs hold, to the stored form.
 			if (const QString folder = toStoredPath(e.folder); folder != storedFolder)

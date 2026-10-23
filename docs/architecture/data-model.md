@@ -41,7 +41,9 @@ The Catalog record links storage products to their source media. Virtual-label m
 metadata are stored by `MediaId`; they do not create directories.
 
 Persisted paths under the root are root-relative, so the library folder can move; paths outside it stay absolute.
-Loading rewrites any absolute path under the root to the relative form. In-memory paths are always absolute.
+Loading rewrites any absolute path under the root to the relative form. An older-format library moved before that
+rewrite still holds paths under its previous root; loading rebases them onto the current root first. In-memory paths
+are always absolute.
 
 ## MediaId
 

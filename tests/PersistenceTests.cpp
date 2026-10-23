@@ -194,6 +194,47 @@ TEST_CASE("A library opens intact after its folder moves", "[persistence]")
 	REQUIRE(catalog.sourcePathForMediaItem(video) == outsideLibraryPath("videos/Clip.mp4"));  // outside the root, so stored as-is
 }
 
+TEST_CASE("A legacy library moved before its first load rebases its paths onto the new root", "[persistence]")
+{
+	QTemporaryDir moved;
+	REQUIRE(moved.isValid());
+	const QString previousRoot = outsideLibraryPath("old-library");
+
+	// Absolute paths under a root the library no longer lives at; sources outside it must stay as they are.
+	writeTextFile(moved.path() + "/catalog.json", QStringLiteral(R"({
+		"1000:clip.mp4": { "name": "Clip.mp4", "folder": "%1/Family/Clip", "sourceVideoPath": "%2/Clip.mp4", "splitIntoFrames": false },
+		"1500:inside.mp4": { "name": "Inside.mp4", "folder": "%1/Family/Inside", "sourceVideoPath": "%1/Sources/Inside.mp4" },
+		"2000:old.jpg": { "name": "Old.jpg", "folder": "%1/Photos/Trip", "sourceVideoPath": "%1/Photos/Trip/Old.jpg", "type": "photo" },
+		"3000:ref.png": { "name": "Ref.png", "sourceVideoPath": "%3/Ref.png", "type": "photo", "referenced": true }
+	})").arg(previousRoot, outsideLibraryPath("videos"), outsideLibraryPath("elsewhere")).toUtf8());
+
+	Library library;
+	REQUIRE(library.setRoot(moved.path()));
+	const Catalog& catalog = library.catalog();
+	const QString root = library.rootFolder();
+
+	const MediaId video = MediaId::fromNameAndSize("Clip.mp4", 1000);
+	REQUIRE(catalog.folderForMediaItem(video) == root + "/Family/Clip");
+	REQUIRE(catalog.sourcePathForMediaItem(video) == outsideLibraryPath("videos/Clip.mp4"));
+	REQUIRE(catalog.labelsForMediaItem(video) == QList<LabelId>{ labelIdByName(catalog, "Family") });
+
+	const MediaId inside = MediaId::fromNameAndSize("Inside.mp4", 1500);
+	REQUIRE(catalog.folderForMediaItem(inside) == root + "/Family/Inside");
+	REQUIRE(catalog.sourcePathForMediaItem(inside) == root + "/Sources/Inside.mp4");
+
+	const MediaId photo = MediaId::fromNameAndSize("Old.jpg", 2000);
+	REQUIRE(catalog.folderForMediaItem(photo) == root + "/Photos/Trip");
+	REQUIRE(catalog.sourcePathForMediaItem(photo) == root + "/Photos/Trip/Old.jpg");
+
+	REQUIRE(catalog.sourcePathForMediaItem(MediaId::fromNameAndSize("Ref.png", 3000)) == outsideLibraryPath("elsewhere/Ref.png"));
+
+	// The rebased paths are persisted root-relative.
+	REQUIRE(library.flushPendingWrites());
+	QFile catalogFile(moved.path() + "/catalog.json");
+	REQUIRE(catalogFile.open(QIODevice::ReadOnly));
+	REQUIRE_FALSE(catalogFile.readAll().contains(previousRoot.toUtf8()));
+}
+
 TEST_CASE("setRoot on a fresh Library fails cleanly on corrupt data", "[persistence]")
 {
 	QTemporaryDir dir;

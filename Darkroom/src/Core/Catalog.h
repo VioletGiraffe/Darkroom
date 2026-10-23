@@ -48,7 +48,7 @@ public:
 	[[nodiscard]] const Label* labelById(LabelId id) const;
 
 	// Rebuilds the model from MetadataStore and ensures its storage labels and Best exist in the registry. Rewrites
-	// stored absolute paths under the root as root-relative.
+	// stored absolute paths under the root, or under the previous root of a moved older-format library, as root-relative.
 	void rebuildIndex();
 
 	[[nodiscard]] QList<LabelId> labelsForMediaItem(const MediaId& id) const;
