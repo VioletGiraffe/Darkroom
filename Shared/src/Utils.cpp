@@ -200,18 +200,22 @@ bool isPathAtOrUnder(const QString& path, const QStringList& roots)
 	});
 }
 
+std::optional<QString> pathRelativeTo(const QString& path, const QString& root)
+{
+	if (!isPathAtOrUnder(path, { root }))
+		return std::nullopt;
+
+	// By segment count: lowercasing can change a key's length.
+	const QStringList segments = QDir::cleanPath(QDir::fromNativeSeparators(path)).split('/');
+	const qsizetype rootDepth = pathComparisonKey(root).count('/') + 1;
+	return segments.mid(rootDepth).join('/');
+}
+
 QString pathAfterMoves(const QString& path, const std::vector<PathMove>& moves)
 {
 	for (const PathMove& move : moves)
-	{
-		if (!isPathAtOrUnder(path, { move.from }))
-			continue;
-
-		// By segment count: lowercasing can change a key's length.
-		const QStringList segments = QDir::cleanPath(QDir::fromNativeSeparators(path)).split('/');
-		const qsizetype fromDepth = pathComparisonKey(move.from).count('/') + 1;
-		return segments.size() == fromDepth ? move.to : move.to + '/' + segments.mid(fromDepth).join('/');
-	}
+		if (const std::optional<QString> relative = pathRelativeTo(path, move.from))
+			return relative->isEmpty() ? move.to : move.to + '/' + *relative;
 	return path;
 }
 

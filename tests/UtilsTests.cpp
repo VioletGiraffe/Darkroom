@@ -49,6 +49,19 @@ TEST_CASE("isPathAtOrUnder: the root itself and its descendants, case- and separ
 	REQUIRE_FALSE(isPathAtOrUnder("/x", { "" }));
 }
 
+TEST_CASE("pathRelativeTo: the remainder below root in the path's spelling; empty for root itself, nullopt outside it", "[utils]")
+{
+	REQUIRE(pathRelativeTo("C:/Lib/Photos/Trip/A.jpg", "C:/Lib") == "Photos/Trip/A.jpg");
+	REQUIRE(pathRelativeTo("c:/lib/Photos/Trip/A.jpg", "C:/Lib/") == "Photos/Trip/A.jpg");
+#ifdef Q_OS_WIN
+	REQUIRE(pathRelativeTo("C:\\Lib\\Photos\\A.jpg", "C:/Lib") == "Photos/A.jpg");
+#endif
+	REQUIRE(pathRelativeTo("C:/Lib", "C:/Lib") == "");
+	REQUIRE_FALSE(pathRelativeTo("C:/Library/A.jpg", "C:/Lib"));
+	REQUIRE_FALSE(pathRelativeTo("D:/videos/Clip.mp4", "C:/Lib"));
+	REQUIRE_FALSE(pathRelativeTo("", "C:/Lib"));
+}
+
 TEST_CASE("pathAfterMoves: rebases the moved path and its descendants, keeping the descendants' spelling", "[utils]")
 {
 	const std::vector<PathMove> moves{ { "C:/Lib/Photos/Cats", "C:/Lib/Photos/Kittens" }, { "C:/v/clip.mp4", "C:/v/renamed.mp4" } };

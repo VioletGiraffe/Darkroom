@@ -35,7 +35,7 @@ namespace
 			const QString folder = root + '/' + labelName + '/' + QFileInfo(name).completeBaseName();
 			REQUIRE(QDir{}.mkpath(folder));
 			const MediaId id = MediaId::fromNameAndSize(name, size);
-			REQUIRE(library.catalog().addMediaItem(id, "D:/videos/" + name, folder, true));
+			REQUIRE(library.catalog().addMediaItem(id, outsideLibraryPath("videos/") + name, folder, true));
 			return id;
 		}
 
@@ -101,25 +101,25 @@ TEST_CASE("addMediaItem: collision and re-registration rules", "[catalog]")
 	const MediaId id = f.addVideo("Clip.mp4", 1000, "Alpha");
 
 	// Same id at a different folder: a name+size collision - refused, the existing entry untouched.
-	REQUIRE_FALSE(catalog.addMediaItem(id, "D:/other/Clip.mp4", f.root + "/Beta/Clip", true));
+	REQUIRE_FALSE(catalog.addMediaItem(id, outsideLibraryPath("other/Clip.mp4"), f.root + "/Beta/Clip", true));
 	REQUIRE(catalog.folderForMediaItem(id) == f.root + "/Alpha/Clip");
-	REQUIRE(catalog.sourcePathForMediaItem(id) == "D:/videos/Clip.mp4");
+	REQUIRE(catalog.sourcePathForMediaItem(id) == outsideLibraryPath("videos/Clip.mp4"));
 
 	// A case-variant of the same name is the same id - still a collision.
-	REQUIRE_FALSE(catalog.addMediaItem(MediaId::fromNameAndSize("CLIP.MP4", 1000), "D:/other/CLIP.MP4", f.root + "/Beta/CLIP", true));
+	REQUIRE_FALSE(catalog.addMediaItem(MediaId::fromNameAndSize("CLIP.MP4", 1000), outsideLibraryPath("other/CLIP.MP4"), f.root + "/Beta/CLIP", true));
 
 	// Re-registration at the same folder is not a collision: it updates the entry (the re-export /
 	// on-demand split flow).
-	REQUIRE(catalog.addMediaItem(id, "D:/videos/Clip.mp4", f.root + "/Alpha/Clip", false, 5000));
+	REQUIRE(catalog.addMediaItem(id, outsideLibraryPath("videos/Clip.mp4"), f.root + "/Alpha/Clip", false, 5000));
 	REQUIRE_FALSE(catalog.isSplitIntoFrames(id));
 	REQUIRE(catalog.durationMsForMediaItem(id) == 5000);
 
 	// An unknown incoming duration must not erase the stored one.
-	REQUIRE(catalog.addMediaItem(id, "D:/videos/Clip.mp4", f.root + "/Alpha/Clip", true, -1));
+	REQUIRE(catalog.addMediaItem(id, outsideLibraryPath("videos/Clip.mp4"), f.root + "/Alpha/Clip", true, -1));
 	REQUIRE(catalog.durationMsForMediaItem(id) == 5000);
 	REQUIRE(catalog.isSplitIntoFrames(id));
 
-	REQUIRE_FALSE(catalog.addMediaItem(MediaId{}, "D:/videos/x.mp4", f.root + "/Alpha/x", true));
+	REQUIRE_FALSE(catalog.addMediaItem(MediaId{}, outsideLibraryPath("videos/x.mp4"), f.root + "/Alpha/x", true));
 
 	requireRebuildStable(catalog);
 }
@@ -187,14 +187,14 @@ TEST_CASE("applyRename: metadata follows the new identity, collisions are refuse
 	const MediaId other = f.addVideo("Other.mp4", 2000, "Alpha");
 
 	// Renaming onto another tracked item's identity is refused, both entries untouched.
-	REQUIRE_FALSE(catalog.applyRename(oldId, other, "D:/videos/Other.mp4", f.root + "/Alpha/Other"));
+	REQUIRE_FALSE(catalog.applyRename(oldId, other, outsideLibraryPath("videos/Other.mp4"), f.root + "/Alpha/Other"));
 	REQUIRE(catalog.folderForMediaItem(oldId) == f.root + "/Alpha/Clip");
 	REQUIRE(catalog.folderForMediaItem(other) == f.root + "/Alpha/Other");
 
 	// A real rename: new name, new folder; labels and duration ride along to the new identity.
 	const MediaId newId = MediaId::fromNameAndSize("Renamed.mp4", 1000);
 	REQUIRE(QFile::rename(f.root + "/Alpha/Clip", f.root + "/Alpha/Renamed"));
-	REQUIRE(catalog.applyRename(oldId, newId, "D:/videos/Renamed.mp4", f.root + "/Alpha/Renamed"));
+	REQUIRE(catalog.applyRename(oldId, newId, outsideLibraryPath("videos/Renamed.mp4"), f.root + "/Alpha/Renamed"));
 	REQUIRE(catalog.containsMediaItem(newId));
 	REQUIRE(catalog.durationMsForMediaItem(newId) == 5000);
 	REQUIRE(catalog.mediaItemHasLabel(newId, Catalog::BestLabelId));
@@ -203,7 +203,7 @@ TEST_CASE("applyRename: metadata follows the new identity, collisions are refuse
 
 	// A case-only rename is the same identity, but the stored original-case name must still update.
 	const MediaId casedId = MediaId::fromNameAndSize("RENAMED.MP4", 1000);
-	REQUIRE(catalog.applyRename(newId, casedId, "D:/videos/RENAMED.MP4", f.root + "/Alpha/Renamed"));
+	REQUIRE(catalog.applyRename(newId, casedId, outsideLibraryPath("videos/RENAMED.MP4"), f.root + "/Alpha/Renamed"));
 	REQUIRE(catalog.containsMediaItem(newId));  // same identity under either spelling
 	bool nameUpdated = false;
 	for (auto it = catalog.mediaItems().cbegin(); it != catalog.mediaItems().cend(); ++it)
@@ -339,7 +339,7 @@ TEST_CASE("A mutated library reloads to an identical state", "[catalog][persiste
 	catalog.removeLabel(video, f.alpha);  // relocates Alpha/Clip -> Beta/Clip
 	const MediaId newId = MediaId::fromNameAndSize("Renamed.mp4", 1000);
 	REQUIRE(QFile::rename(f.root + "/Beta/Clip", f.root + "/Beta/Renamed"));
-	REQUIRE(catalog.applyRename(video, newId, "D:/videos/Renamed.mp4", f.root + "/Beta/Renamed"));
+	REQUIRE(catalog.applyRename(video, newId, outsideLibraryPath("videos/Renamed.mp4"), f.root + "/Beta/Renamed"));
 	catalog.removeMediaItem(f.addVideo("Doomed.mp4", 9000, "Beta"));
 	REQUIRE(f.library.flushPendingWrites());
 

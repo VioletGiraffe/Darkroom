@@ -209,7 +209,7 @@ void Catalog::ensureBestAndFolderLabels()
 		if (folderRel.isEmpty())
 			continue;
 		const bool isPhoto = store.get(id, kTypeField).toString() == kPhotoTypeValue;
-		labelNames.insert(isPhoto ? QFileInfo(folderRel).fileName() : storageFolderNameOf(absoluteFolder(folderRel)));
+		labelNames.insert(isPhoto ? QFileInfo(folderRel).fileName() : storageFolderNameOf(fromStoredPath(folderRel)));
 	}
 	for (const QString& labelName : labelNames)
 		changed = ensureFolderLabelExists(labelName) || changed;
@@ -312,19 +312,17 @@ LabelId Catalog::storageLabelIdOf(const Entry& e) const
 	return name.isEmpty() ? LabelId::None : ordinaryLabelIdByName(name);
 }
 
-QString Catalog::relativeFolder(const QString& folderAbs) const
+QString Catalog::toStoredPath(const QString& absolutePath) const
 {
-	const QString& root = _rootFolder;
-	if (folderAbs.startsWith(root + '/'))
-		return folderAbs.mid(root.length() + 1);
-	return folderAbs;
+	// Never the root itself: no item is stored there.
+	return pathRelativeTo(absolutePath, _rootFolder).value_or(absolutePath);
 }
 
-QString Catalog::absoluteFolder(const QString& folderRel) const
+QString Catalog::fromStoredPath(const QString& storedPath) const
 {
-	if (QDir::isAbsolutePath(folderRel))
-		return folderRel;
-	return _rootFolder + '/' + folderRel;
+	if (storedPath.isEmpty() || QDir::isAbsolutePath(storedPath))
+		return storedPath;
+	return _rootFolder + '/' + storedPath;
 }
 
 QList<LabelId> Catalog::computeLabelIds(const MediaId& id, const Entry& e) const
@@ -348,22 +346,33 @@ void Catalog::rebuildIndex()
 
 	_mediaItems.clear();
 	MetadataStore& store = _metadataStore;
-	for (const MediaId& id : store.allMediaIds())
 	{
-		const QString folderRel = store.get(id, kFolderField).toString();
-		const bool isPhoto = store.get(id, kTypeField).toString() == kPhotoTypeValue;
-		if (folderRel.isEmpty() && !isPhoto)
-			continue;  // Legacy folderless video metadata is not a catalog item.
+		MetadataStore::Writer writer = store.beginBatch();
+		for (const MediaId& id : store.allMediaIds())
+		{
+			const QString storedFolder = store.get(id, kFolderField).toString();
+			const bool isPhoto = store.get(id, kTypeField).toString() == kPhotoTypeValue;
+			if (storedFolder.isEmpty() && !isPhoto)
+				continue;  // Legacy folderless video metadata is not a catalog item.
 
-		Entry e;
-		e.folder          = folderRel.isEmpty() ? QString{} : absoluteFolder(folderRel);
-		e.sourcePath      = store.get(id, kSourcePathField).toString();
-		e.type            = isPhoto ? MediaType::Photo : MediaType::Video;
-		e.referenced      = store.get(id, kReferencedField).toBool(false);
-		e.splitIntoFrames = store.get(id, kSplitIntoFramesField).toBool(true);
-		e.durationMs      = store.get(id, kDurationMsField).toInteger(-1);
-		e.labelIds        = computeLabelIds(id, e);
-		_mediaItems.insert(id, e);
+			const QString storedSourcePath = store.get(id, kSourcePathField).toString();
+			Entry e;
+			e.folder          = fromStoredPath(storedFolder);
+			e.sourcePath      = fromStoredPath(storedSourcePath);
+			e.type            = isPhoto ? MediaType::Photo : MediaType::Video;
+			e.referenced      = store.get(id, kReferencedField).toBool(false);
+			e.splitIntoFrames = store.get(id, kSplitIntoFramesField).toBool(true);
+			e.durationMs      = store.get(id, kDurationMsField).toInteger(-1);
+			e.labelIds        = computeLabelIds(id, e);
+
+			// Converts absolute paths under the root, which older catalogs hold, to the stored form.
+			if (const QString folder = toStoredPath(e.folder); folder != storedFolder)
+				writer.set(id, kFolderField, folder);
+			if (const QString sourcePath = toStoredPath(e.sourcePath); sourcePath != storedSourcePath)
+				writer.set(id, kSourcePathField, sourcePath);
+
+			_mediaItems.insert(id, e);
+		}
 	}
 	notifyCatalogChanged();
 }
@@ -570,8 +579,8 @@ bool Catalog::addMediaItem(const MediaId& id, const QString& sourcePath, const Q
 		: (existing != _mediaItems.constEnd() ? existing->durationMs : -1);
 
 	MetadataStore::Writer writer = _metadataStore.beginBatch();
-	writer.set(id, kSourcePathField, sourcePath);
-	writer.set(id, kFolderField, relativeFolder(folderAbs));
+	writer.set(id, kSourcePathField, toStoredPath(sourcePath));
+	writer.set(id, kFolderField, toStoredPath(folderAbs));
 	writer.set(id, kSplitIntoFramesField, splitIntoFrames);
 	if (effectiveDurationMs > 0)
 		writer.set(id, kDurationMsField, effectiveDurationMs);
@@ -608,8 +617,8 @@ bool Catalog::addPhoto(const MediaId& id, const QString& sourcePath, const QStri
 	}
 
 	MetadataStore::Writer writer = _metadataStore.beginBatch();
-	writer.set(id, kSourcePathField, sourcePath);
-	writer.set(id, kFolderField, relativeFolder(labelDirAbs));
+	writer.set(id, kSourcePathField, toStoredPath(sourcePath));
+	writer.set(id, kFolderField, toStoredPath(labelDirAbs));
 	writer.set(id, kTypeField, kPhotoTypeValue.toString());
 	writer.set(id, kReferencedField, referenced);  // Explicitly clear a stale value when import mode changes.
 
@@ -645,8 +654,8 @@ bool Catalog::applyRename(const MediaId& oldId, const MediaId& newId, const QStr
 
 	MetadataStore::Writer writer = _metadataStore.beginBatch();
 	writer.rekey(oldId, newId);
-	writer.set(newId, kSourcePathField, newSourcePath);
-	writer.set(newId, kFolderField, relativeFolder(newFolderAbs));
+	writer.set(newId, kSourcePathField, toStoredPath(newSourcePath));
+	writer.set(newId, kFolderField, toStoredPath(newFolderAbs));
 
 	Entry e = _mediaItems.value(oldId);
 	_mediaItems.remove(oldId);
@@ -745,7 +754,7 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, LabelId removedLabelId)
 			qWarning() << "Catalog: failed to relocate" << entryIt->sourcePath << "to" << newFilePath;
 			return;
 		}
-		writer.set(id, kSourcePathField, newFilePath);
+		writer.set(id, kSourcePathField, toStoredPath(newFilePath));
 		entryIt->sourcePath = newFilePath;
 		newFolderAbs = destDir;
 	}
@@ -781,7 +790,7 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, LabelId removedLabelId)
 	if (changed)
 		writeStoredLabelIds(id, ids);
 
-	writer.set(id, kFolderField, relativeFolder(newFolderAbs));
+	writer.set(id, kFolderField, toStoredPath(newFolderAbs));
 	entryIt->folder   = newFolderAbs;
 	entryIt->labelIds = computeLabelIds(id, *entryIt);
 	notifyCatalogChanged();
@@ -922,12 +931,12 @@ bool Catalog::renameLabel(LabelId labelId, const QString& newDisplayName, QStrin
 			continue;
 		if (it->type == MediaType::Photo)
 		{
-			writer.set(it.key(), kFolderField, relativeFolder(newPhotoDir));
-			writer.set(it.key(), kSourcePathField, newPhotoDir + "/" + QFileInfo(it->sourcePath).fileName());
+			writer.set(it.key(), kFolderField, toStoredPath(newPhotoDir));
+			writer.set(it.key(), kSourcePathField, toStoredPath(newPhotoDir + "/" + QFileInfo(it->sourcePath).fileName()));
 		}
 		else
 		{
-			writer.set(it.key(), kFolderField, relativeFolder(newFolder + "/" + QFileInfo(it->folder).fileName()));
+			writer.set(it.key(), kFolderField, toStoredPath(newFolder + "/" + QFileInfo(it->folder).fileName()));
 		}
 	}
 

@@ -8,6 +8,7 @@ DISABLE_COMPILER_WARNINGS
 RESTORE_COMPILER_WARNINGS
 
 #include <functional>
+#include <optional>
 #include <vector>
 
 class QDateTime;
@@ -45,6 +46,9 @@ void clearStuckHoverIfCursorLeft(QWidget* w);
 
 // Whether path is one of roots or lies under one, by pathComparisonKey. Empty paths and roots never match.
 [[nodiscard]] bool isPathAtOrUnder(const QString& path, const QStringList& roots);
+
+// path below root, '/'-separated and spelled as in path, by pathComparisonKey. Empty for root itself; nullopt when path is not at or under root.
+[[nodiscard]] std::optional<QString> pathRelativeTo(const QString& path, const QString& root);
 
 // A completed move of a file or folder.
 struct PathMove

@@ -47,7 +47,8 @@ public:
 	[[nodiscard]] const std::vector<Label>& allLabels() const { return _labels; }
 	[[nodiscard]] const Label* labelById(LabelId id) const;
 
-	// Rebuilds the model from MetadataStore and ensures its storage labels and Best exist in the registry.
+	// Rebuilds the model from MetadataStore and ensures its storage labels and Best exist in the registry. Rewrites
+	// stored absolute paths under the root as root-relative.
 	void rebuildIndex();
 
 	[[nodiscard]] QList<LabelId> labelsForMediaItem(const MediaId& id) const;
@@ -223,8 +224,9 @@ private:
 	[[nodiscard]] static QString storageLabelNameOf(const Entry& e);
 	[[nodiscard]] LabelId storageLabelIdOf(const Entry& e) const;
 	[[nodiscard]] bool hasOtherOrdinaryLabel(const MediaId& id, LabelId excludedLabelId) const;
-	[[nodiscard]] QString relativeFolder(const QString& folderAbs) const;
-	[[nodiscard]] QString absoluteFolder(const QString& folderRel) const;
+	// Persisted paths are root-relative under the library root, so the library can move; absolute elsewhere. Empty maps to empty.
+	[[nodiscard]] QString toStoredPath(const QString& absolutePath) const;
+	[[nodiscard]] QString fromStoredPath(const QString& storedPath) const;
 	[[nodiscard]] QList<LabelId> computeLabelIds(const MediaId& id, const Entry& e) const;
 	void refreshMediaItemLabels(const MediaId& id);
 

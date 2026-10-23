@@ -4,6 +4,7 @@
 
 #include "3rdparty/catch2/catch.hpp"
 
+#include <QDir>
 #include <QFile>
 #include <QString>
 #include <QStringList>
@@ -59,6 +60,12 @@ inline void requireRebuildStable(Catalog& catalog)
 	const QString before = dumpCatalog(catalog);
 	catalog.rebuildIndex();
 	REQUIRE(dumpCatalog(catalog) == before);
+}
+
+// Absolute on every OS and outside any test library; nothing needs to exist there.
+[[nodiscard]] inline QString outsideLibraryPath(const QString& relativePath)
+{
+	return QDir::rootPath() + "outside-library/" + relativePath;
 }
 
 inline void writeTextFile(const QString& path, const QByteArray& utf8Content)
