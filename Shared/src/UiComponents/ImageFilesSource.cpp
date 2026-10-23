@@ -87,14 +87,21 @@ namespace {
 	// Shared lifetime spans I/O, decode and the Request.
 	// Immutable after posting except the token, the delivery's own state, and the read results, each slot written by its own read.
 	struct LoadJob {
-		LoadJob(QObject* context, std::function<void(ImageSource::Result)> done) : _delivery{ context, std::move(done) } {}
+		LoadJob(QObject* context, std::function<void(ImageSource::Result)> done, QStringList paths, QSize canvasLogical, qreal dpr)
+			: _delivery{ context, std::move(done) }
+			, _paths{ std::move(paths) }
+			, _bytesPerPath(_paths.size())
+			, _readErrorPerPath(_paths.size())
+			, _canvasLogical{ canvasLogical }
+			, _dpr{ dpr }
+		{}
 
 		ImageSource::Delivery _delivery;
-		QStringList _paths;
+		const QStringList _paths;
 		std::vector<QByteArray> _bytesPerPath;
 		std::vector<QString> _readErrorPerPath;
-		QSize _canvasLogical;
-		qreal _dpr = 1.0;
+		const QSize _canvasLogical;
+		const qreal _dpr;
 #ifdef PROFILING_ENABLED
 		std::unique_ptr<LoadBatchToken> _batchToken;
 #endif
@@ -282,12 +289,7 @@ ImageSource::Request ImageFilesSource::renderAsync(QSize box, qreal dpr, QObject
 {
 	assert_and_return_r(!_paths.empty(), {});
 
-	auto job = std::make_shared<LoadJob>(context, std::move(done));
-	job->_paths = _paths;
-	job->_bytesPerPath.resize(_paths.size());
-	job->_readErrorPerPath.resize(_paths.size());
-	job->_canvasLogical = box;
-	job->_dpr = dpr;
+	auto job = std::make_shared<LoadJob>(context, std::move(done), _paths, box, dpr);
 #ifdef PROFILING_ENABLED
 	job->_batchToken = std::make_unique<LoadBatchToken>();
 #endif
