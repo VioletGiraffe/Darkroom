@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792842398994,
+  "lastUpdate": 1792867708724,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -17139,6 +17139,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 48,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 13.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "40349bd6f02ee5b392047adfadc724f5178154e3",
+          "message": "Media items assigned random id instead of the name+size MediaId; catalog.json gains a format version and converts on first load\n\nThe first-format catalog is kept as catalog.v1-backup.json; its records that were not media items (such as playback settings of unimported videos) are removed",
+          "timestamp": "2026-10-24T21:36:42+03:00",
+          "tree_id": "0a5be1a10ffd51ee06787a437d493fc747a40705",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/40349bd6f02ee5b392047adfadc724f5178154e3"
+        },
+        "date": 1792867706147,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 17094,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1399,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 30256,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 4801,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 4757,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 4190,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 459,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 65,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 48.5,
             "unit": "KB"
           },
           {
