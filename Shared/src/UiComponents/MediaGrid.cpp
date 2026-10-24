@@ -13,6 +13,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QModelIndex>
 #include <QPainter>
 #include <QPixmap>
+#include <QRect>
 #include <QResizeEvent>
 #include <QScrollBar>
 #include <QStyle>
@@ -56,6 +57,26 @@ void setCardSelected(QWidget& card, bool selected)
 	card.style()->unpolish(&card);
 	card.style()->polish(&card);
 	card.update();
+}
+
+struct ViewportAnchor
+{
+	QListWidgetItem* item = nullptr;
+	int top = 0;   // viewport coordinates
+};
+
+// Rows flow left to right, so the first shown row reaching into the viewport is the top-left visible item.
+ViewportAnchor firstVisibleItem(const QListWidget& grid)
+{
+	for (int row = 0, rows = grid.count(); row < rows; ++row)
+	{
+		QListWidgetItem* rowItem = grid.item(row);
+		if (rowItem->isHidden())
+			continue;
+		if (const QRect rect = grid.visualItemRect(rowItem); rect.bottom() >= 0)
+			return { rowItem, rect.top() };
+	}
+	return {};
 }
 
 }  // namespace
@@ -194,7 +215,14 @@ void MediaGrid::wheelEvent(QWheelEvent* event)
 
 void MediaGrid::resizeEvent(QResizeEvent* event)
 {
+	// Read before the base handler, which reflows the items for the new width.
+	const ViewportAnchor anchor = event->size().width() != event->oldSize().width() ? firstVisibleItem(*this) : ViewportAnchor{};
 	QListWidget::resizeEvent(event);
+	if (anchor.item)
+	{
+		executeDelayedItemsLayout();   // QListView may defer the reflow
+		verticalScrollBar()->setValue(verticalScrollBar()->value() + visualItemRect(anchor.item).top() - anchor.top);
+	}
 	ensureVisibleCardsExist();
 }
 

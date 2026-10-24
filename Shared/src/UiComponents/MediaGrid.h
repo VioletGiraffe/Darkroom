@@ -16,6 +16,7 @@ class QUrl;
 // no item is visible. Its owner supplies the data sources; the view contains no catalog logic.
 // Every card carries a "selected" dynamic property mirroring its row, so the central sheet can style the selected state.
 // Hidden rows are never selected, so actions on the selection never reach them.
+// A width change keeps the first visible item at its viewport offset through the reflow.
 class MediaGrid final : public QListWidget {
 public:
 	explicit MediaGrid(QWidget* parent = nullptr);
