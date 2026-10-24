@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/MediaId.h"
+#include "Core/MediaItemId.h"
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -45,10 +45,10 @@ public:
 	void resetForLibrarySwitch();
 
 	[[nodiscard]] int previewFrameCount() const;
-	[[nodiscard]] std::vector<MediaId> selectedMediaItems() const;
+	[[nodiscard]] std::vector<MediaItemId> selectedMediaItems() const;
 	// Grid order, without the rows the name filter hides: what a player or viewer can browse through.
-	[[nodiscard]] std::vector<MediaId> visibleVideosInViewOrder() const;
-	[[nodiscard]] std::vector<MediaId> visiblePhotosInViewOrder() const;
+	[[nodiscard]] std::vector<MediaItemId> visibleVideosInViewOrder() const;
+	[[nodiscard]] std::vector<MediaItemId> visiblePhotosInViewOrder() const;
 
 	void installGridAction(QAction* action);
 	[[nodiscard]] bool isGridDragSource(const QObject* source) const;
@@ -57,11 +57,11 @@ public:
 	void removeSelectedMediaItemsFromLibraryInteractive();
 	void renameSelectedMediaItemInteractive();
 	// Remove from library without the confirmation.
-	void removeMediaItemsFromLibrary(const std::vector<MediaId>& ids);
+	void removeMediaItemsFromLibrary(const std::vector<MediaItemId>& ids);
 
 signals:
 	void selectionChanged();
-	void inspectVideoFramesRequested(const MediaId& id);
+	void inspectVideoFramesRequested(MediaItemId id);
 	// An empty new path means the folder was deleted or may have been partially deleted.
 	void frameFolderPathChanged(const QString& oldFolderPath, const QString& newFolderPath, const QString& newDisplayName);
 
@@ -69,22 +69,22 @@ private:
 	struct GridViewState;
 
 	void setupUi();
-	void activateMediaItem(const MediaId& id);
-	void playVideo(const MediaId& id);
+	void activateMediaItem(MediaItemId id);
+	void playVideo(MediaItemId id);
 	// Browsable across the photos the grid currently shows.
-	void viewPhoto(const MediaId& id);
+	void viewPhoto(MediaItemId id);
 	// Does nothing when the item is absent or hidden.
-	void selectAndScrollToMediaItem(const MediaId& id);
-	void openSourceInSystemApp(const MediaId& id);
-	void showMediaItemContextMenu(const MediaId& id, const QPoint& globalPos);
-	void deleteMediaItemsInteractive(const std::vector<MediaId>& selection);
-	void removeMediaItemsFromLibraryInteractive(const std::vector<MediaId>& selection);
-	// The two workflows above for one item, as the viewer and player removal actions: true when it left the catalog.
-	[[nodiscard]] bool deleteMediaItemAndReportGone(const MediaId& id);
-	[[nodiscard]] bool untrackMediaItemAndReportGone(const MediaId& id);
+	void selectAndScrollToMediaItem(MediaItemId id);
+	void openSourceInSystemApp(MediaItemId id);
+	void showMediaItemContextMenu(MediaItemId id, const QPoint& globalPos);
+	void deleteMediaItemsInteractive(const std::vector<MediaItemId>& selection);
+	void removeMediaItemsFromLibraryInteractive(const std::vector<MediaItemId>& selection);
+	// The two workflows above for the item at a viewer's or player's current path: true when it is no longer in the catalog.
+	[[nodiscard]] bool deleteMediaItemAndReportGone(const QString& sourcePath);
+	[[nodiscard]] bool untrackMediaItemAndReportGone(const QString& sourcePath);
 	void syncViewsAfterRemoval(const MediaItemManagement::RemovalResult& result);
-	void renameMediaItemInteractive(const MediaId& id);
-	void toggleBest(const MediaId& id);
+	void renameMediaItemInteractive(MediaItemId id);
+	void toggleBest(MediaItemId id);
 	void zoomCards(int steps);
 
 	// Grid operations, split by what changed: which rows exist, how cards look, their order, which are hidden.
@@ -108,8 +108,8 @@ private:
 	[[nodiscard]] GridViewState captureGridViewState() const;
 	void restoreGridViewState(const GridViewState& state);
 
-	[[nodiscard]] std::vector<MediaId> effectiveSelection(std::optional<MediaId> target = std::nullopt) const;
-	[[nodiscard]] std::vector<MediaId> mediaItemsMatchingFilters() const;
+	[[nodiscard]] std::vector<MediaItemId> effectiveSelection(std::optional<MediaItemId> target = std::nullopt) const;
+	[[nodiscard]] std::vector<MediaItemId> mediaItemsMatchingFilters() const;
 	[[nodiscard]] MediaItemWidget* buildMediaCard(QListWidgetItem* item);
 	[[nodiscard]] QList<QUrl> dragUrlsForItems(const QList<QListWidgetItem*>& items) const;
 

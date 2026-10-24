@@ -1,12 +1,13 @@
 #pragma once
 
-#include "Core/MediaId.h"
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
+#include <QJsonValue>
 #include <QMainWindow>
 #include <QString>
 #include <QStringList>
+#include <QStringView>
 RESTORE_COMPILER_WARNINGS
 
 #include <functional>
@@ -23,18 +24,22 @@ class QCheckBox;
 class QComboBox;
 class QPushButton;
 class MarkerSlider;
-class MetadataStore;
 class OscillatingPlayback;
 struct OscillationRequest;
 
 class VideoPlayerWindow final : public QMainWindow
 {
 public:
-	// Called at each metadata read and write: the store it returns can be replaced between calls.
-	using MetadataStoreProvider = std::function<MetadataStore*()>;
+	// Persists speed and saved loops per video, as named JSON fields; without it they last until another video loads.
+	struct PlaybackSettingsStore
+	{
+		// Undefined when nothing is stored.
+		std::function<QJsonValue(const QString& videoPath, QStringView field)> load;
+		// An undefined value removes the field.
+		std::function<void(const QString& videoPath, QStringView field, const QJsonValue& value)> save;
+	};
 
-	// metadataStore persists speed and saved loops per video; without it they last until another video loads.
-	VideoPlayerWindow(const QString& videoPath, MetadataStoreProvider metadataStore, QWidget* parent);
+	VideoPlayerWindow(const QString& videoPath, PlaybackSettingsStore settingsStore, QWidget* parent);
 	~VideoPlayerWindow() override;
 
 	// Previous/next navigation through videoPaths; it stays inert unless they include the video playing.
@@ -58,7 +63,7 @@ public:
 	{
 		QString text; // menu wording
 		// Returns whether the item left the host's list.
-		std::function<bool(const MediaId& id, const QString& videoPath)> remove;
+		std::function<bool(const QString& videoPath)> remove;
 	};
 	// Call at most once. After a removal the player moves to an adjacent item, or closes when it has none.
 	void setRemovalActions(RemovalAction onDelete, RemovalAction onShiftDelete);
@@ -72,7 +77,7 @@ public:
 		const std::function<QString(const QString& path)>& newLocation);
 
 	// Opens a self-managing player.
-	static VideoPlayerWindow* createPlayerWindow(const QString& videoPath, QWidget* parent, MetadataStoreProvider metadataStore = {});
+	static VideoPlayerWindow* createPlayerWindow(const QString& videoPath, QWidget* parent, PlaybackSettingsStore settingsStore = {});
 
 private:
 	friend class OscillatingPlayback;
@@ -82,8 +87,9 @@ private:
 
 	// Everything per-file lives here; the constructor is the first caller.
 	void loadFile(const QString& videoPath);
-	// Null without a provider.
-	[[nodiscard]] MetadataStore* currentMetadataStore() const;
+	// For the current video; inert without a store.
+	[[nodiscard]] QJsonValue loadSetting(QStringView field) const;
+	void saveSetting(QStringView field, const QJsonValue& value) const;
 	// Skips entries cleared by a removal or gone from the disk; -1 when the list ends first.
 	[[nodiscard]] int adjacentIndex(Direction direction) const;
 	void loadAdjacentFile(Direction direction);
@@ -131,8 +137,7 @@ private:
 private:
 	static std::vector<VideoPlayerWindow*> _instances;
 
-	const MetadataStoreProvider _metadataStore;
-	MediaId _mediaId;
+	const PlaybackSettingsStore _settingsStore;
 	QString _videoPath;
 	QStringList _navigationPaths;
 	int _navigationIndex = -1;

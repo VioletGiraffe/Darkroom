@@ -2,7 +2,7 @@
 
 #include "Core/Catalog.h"
 #include "Core/CatalogIntegrity.h"
-#include "Core/MediaId.h"
+#include "Core/MediaItemId.h"
 #include "Windows/FrameExtraction.h"
 #include "compiler/compiler_warnings_control.h"
 
@@ -26,6 +26,7 @@ class IntegrityCheckDialog final : public QDialog
 public:
 	struct Callbacks
 	{
+		// Both refuse a file that is tracked, or has the same bytes as a tracked one.
 		std::function<bool(const QString& folderPath, const QString& sourcePath, bool splitIntoFrames)> registerRequested;
 		std::function<bool(const QString& filePath)> adoptPhotoRequested;
 		// Returns the paths that are gone afterwards.
@@ -33,17 +34,16 @@ public:
 		// Opens the Import dialog with paths staged; returns when it closes.
 		std::function<void(const QStringList& paths)> importRequested;
 		// The ffmpeg actions take a batch and return an outcome per id, in order.
-		std::function<std::vector<FrameExtraction::Outcome>(const std::vector<MediaId>& ids)> reextractFramesRequested;
-		std::function<std::vector<FrameExtraction::Outcome>(const std::vector<MediaId>& ids)> regeneratePreviewRequested;
-		std::function<std::vector<FrameExtraction::Outcome>(const std::vector<MediaId>& ids)> keepPreviewOnlyRequested;
-		std::function<bool(const MediaId& id)> markSplitRequested;
-		// Locate callbacks preserve storage and may refuse an identity collision.
-		// Returns the video's id for the new source, or an invalid id when refused.
-		std::function<MediaId(const MediaId& id, const QString& newSourcePath)> locateSourceRequested;
+		std::function<std::vector<FrameExtraction::Outcome>(const std::vector<MediaItemId>& ids)> reextractFramesRequested;
+		std::function<std::vector<FrameExtraction::Outcome>(const std::vector<MediaItemId>& ids)> regeneratePreviewRequested;
+		std::function<std::vector<FrameExtraction::Outcome>(const std::vector<MediaItemId>& ids)> keepPreviewOnlyRequested;
+		std::function<bool(MediaItemId id)> markSplitRequested;
+		// Locate preserves storage and the id; refused when another item is recorded at newSourcePath.
+		std::function<bool(MediaItemId id, const QString& newSourcePath)> locateRequested;
 		// Remove from library: reports its own failures; an id still in the catalog afterwards was not removed.
-		std::function<void(const std::vector<MediaId>& ids)> removeEntriesRequested;
-		std::function<bool(const MediaId& id, const QString& newSourcePath)> locatePhotoRequested;
-		std::function<bool(const MediaId& id)> removeInvalidLabelReferencesRequested;
+		std::function<void(const std::vector<MediaItemId>& ids)> removeEntriesRequested;
+		std::function<bool(MediaItemId id)> refreshSourceSizeRequested;
+		std::function<bool(MediaItemId id)> removeInvalidLabelReferencesRequested;
 	};
 
 	// Returns whether findings existed; a clean scan shows only an information box.

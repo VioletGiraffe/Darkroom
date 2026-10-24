@@ -58,7 +58,6 @@ RESTORE_COMPILER_WARNINGS
 #include <cmath>
 #include <memory>
 #include <numbers>
-#include <optional>
 #include <thread>
 #include <utility>
 
@@ -659,22 +658,11 @@ void PhotoCompareWindow::deletePhotoInteractive(int index)
 	}
 
 	const QString filePath = _photos[index].filePath;
-	const QString pathKey = pathComparisonKey(filePath);
-	std::optional<MediaId> trackedId;
 	Catalog& catalog = _library.catalog();
-	for (auto it = catalog.mediaItems().cbegin(); it != catalog.mediaItems().cend(); ++it)
+	if (const MediaItemId trackedId = catalog.mediaItemAtSourcePath(filePath); trackedId != MediaItemId::None)
 	{
-		if (it->type == Catalog::MediaType::Photo && pathComparisonKey(it->sourcePath) == pathKey)
-		{
-			trackedId = it.key();
-			break;
-		}
-	}
-
-	if (trackedId)
-	{
-		const MediaItemManagement::RemovalResult result = MediaItemManagement::deleteItemsInteractive(catalog, { *trackedId }, this);
-		if (std::ranges::contains(result.removedItems, *trackedId))
+		const MediaItemManagement::RemovalResult result = MediaItemManagement::deleteItemsInteractive(catalog, { trackedId }, this);
+		if (std::ranges::contains(result.removedItems, trackedId))
 			removePhotoFromComparison(index);
 		return;
 	}

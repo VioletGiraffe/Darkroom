@@ -3,7 +3,6 @@
 #include "Windows/OscillatingPlayback.h"
 #include "Windows/OscillationCurve.h"
 #include "UiComponents/MarkerSlider.h"
-#include "Core/MetadataStore.h"
 #include "Shortcuts.h"
 #include "Theme/Theme.h"
 #include "theme/ctintedsvgiconengine.h"
@@ -134,8 +133,8 @@ QString oscillationCurveSetting(OscillationCurve curve)
 std::vector<VideoPlayerWindow*> VideoPlayerWindow::_instances;
 
 
-VideoPlayerWindow::VideoPlayerWindow(const QString& videoPath, MetadataStoreProvider metadataStore, QWidget* parent)
-	: QMainWindow(parent), _metadataStore(std::move(metadataStore))
+VideoPlayerWindow::VideoPlayerWindow(const QString& videoPath, PlaybackSettingsStore settingsStore, QWidget* parent)
+	: QMainWindow(parent), _settingsStore(std::move(settingsStore))
 {
 	setAttribute(Qt::WA_DeleteOnClose);
 
@@ -176,14 +175,7 @@ VideoPlayerWindow::VideoPlayerWindow(const QString& videoPath, MetadataStoreProv
 			return;
 		const double speed = _speedCombo->itemData(index).toDouble();
 		applyPlaybackSpeed(speed);
-		MetadataStore* store = currentMetadataStore();
-		if (!store)
-			return;
-		auto writer = store->beginBatch();
-		if (qAbs(speed - 1.0) < 0.001)
-			writer.removeField(_mediaId, u"playbackSpeed");
-		else
-			writer.set(_mediaId, u"playbackSpeed", speed);
+		saveSetting(u"playbackSpeed", qAbs(speed - 1.0) < 0.001 ? QJsonValue(QJsonValue::Undefined) : QJsonValue(speed));
 	});
 
 	auto* pauseOnSeekCheck = new QCheckBox(tr("Pause on seek"), this);
@@ -276,9 +268,6 @@ VideoPlayerWindow::VideoPlayerWindow(const QString& videoPath, MetadataStoreProv
 		updateOscillationAvailability();
 	};
 	const auto persistIntervals = [this] {
-		MetadataStore* store = currentMetadataStore();
-		if (!store)
-			return;
 		QJsonArray array;
 		for (int i = 1; i < _savedLoopCombo->count(); ++i)
 		{
@@ -289,7 +278,7 @@ VideoPlayerWindow::VideoPlayerWindow(const QString& videoPath, MetadataStoreProv
 			object.insert("speed", _savedLoopCombo->itemData(i, LoopSpeedRole).toDouble());
 			array.append(object);
 		}
-		store->beginBatch().set(_mediaId, u"intervals", array);
+		saveSetting(u"intervals", array);
 	};
 	const auto promptLoopName = [this](const QString& title, const QString& initial) -> std::optional<QString> {
 		bool ok = false;
@@ -517,9 +506,8 @@ void VideoPlayerWindow::loadFile(const QString& videoPath)
 	exitOscillatingPlayback(false);
 	_player->stop();
 
-	// The metadata below is keyed by the new identity, so it has to be in place first.
+	// The settings below are loaded for _videoPath, so it has to be in place first.
 	_videoPath = videoPath;
-	_mediaId = MediaId::fromFile(videoPath);
 	setWindowTitle(QFileInfo{ videoPath }.completeBaseName());
 
 	_pendingFormatError.reset();
@@ -528,12 +516,11 @@ void VideoPlayerWindow::loadFile(const QString& videoPath)
 	_positionToRestoreMs.reset();
 
 	clearAbInterval();
-	MetadataStore* const store = currentMetadataStore();
 	{
 		const QSignalBlocker blocker{ _savedLoopCombo };
 		_savedLoopCombo->clear();
 		_savedLoopCombo->addItem(tr("No loop"));
-		const QJsonArray saved = store ? store->get(_mediaId, u"intervals").toArray() : QJsonArray{};
+		const QJsonArray saved = loadSetting(u"intervals").toArray();
 		for (const QJsonValue& value : saved)
 		{
 			const QJsonObject object = value.toObject();
@@ -542,7 +529,7 @@ void VideoPlayerWindow::loadFile(const QString& videoPath)
 		}
 	}
 
-	const double storedSpeed = store ? store->get(_mediaId, u"playbackSpeed").toDouble() : 0.0;
+	const double storedSpeed = loadSetting(u"playbackSpeed").toDouble();
 	selectPlaybackSpeed(storedSpeed > 0 ? storedSpeed : 1.0);
 
 	{
@@ -557,9 +544,15 @@ void VideoPlayerWindow::loadFile(const QString& videoPath)
 		setPlaybackActive(true);
 }
 
-MetadataStore* VideoPlayerWindow::currentMetadataStore() const
+QJsonValue VideoPlayerWindow::loadSetting(QStringView field) const
 {
-	return _metadataStore ? _metadataStore() : nullptr;
+	return _settingsStore.load ? _settingsStore.load(_videoPath, field) : QJsonValue(QJsonValue::Undefined);
+}
+
+void VideoPlayerWindow::saveSetting(QStringView field, const QJsonValue& value) const
+{
+	if (_settingsStore.save)
+		_settingsStore.save(_videoPath, field, value);
 }
 
 void VideoPlayerWindow::setNavigation(QStringList videoPaths, std::function<void(const QString& path)> onNavigated)
@@ -621,7 +614,7 @@ void VideoPlayerWindow::setRemovalActions(RemovalAction onDelete, RemovalAction 
 
 void VideoPlayerWindow::performRemoval(const RemovalAction& action)
 {
-	if (action.remove(_mediaId, _videoPath))
+	if (action.remove(_videoPath))
 	{
 		// Cleared so that navigation skips it as it skips a deleted file: a removal may leave the file on disk.
 		if (_navigationIndex >= 0)
@@ -708,9 +701,9 @@ void VideoPlayerWindow::closeAll()
 		delete win;
 }
 
-VideoPlayerWindow* VideoPlayerWindow::createPlayerWindow(const QString& videoPath, QWidget* parent, MetadataStoreProvider metadataStore)
+VideoPlayerWindow* VideoPlayerWindow::createPlayerWindow(const QString& videoPath, QWidget* parent, PlaybackSettingsStore settingsStore)
 {
-	auto* player = new VideoPlayerWindow(videoPath, std::move(metadataStore), parent);
+	auto* player = new VideoPlayerWindow(videoPath, std::move(settingsStore), parent);
 	player->show();
 	return player;
 }

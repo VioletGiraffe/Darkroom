@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/MediaId.h"
+#include "Core/MediaItemId.h"
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -21,5 +21,5 @@ namespace MediaRename
 		QString newName;
 	};
 
-	Result renameItemInteractive(Catalog& catalog, const MediaId& id, QWidget* dialogParent);
+	Result renameItemInteractive(Catalog& catalog, MediaItemId id, QWidget* dialogParent);
 }

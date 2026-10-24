@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Core/LabelId.h"
-#include "Core/MediaId.h"
+#include "Core/MediaItemId.h"
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -46,7 +46,7 @@ struct UnknownItem
 // Raw video disk facts; verdict predicates are orthogonal.
 struct MediaIssue
 {
-	MediaId id;
+	MediaItemId id = MediaItemId::None;
 	QString folder;
 	QString sourcePath;
 	bool    sourcePresent     = false;
@@ -64,15 +64,24 @@ struct MediaIssue
 // A tracked photo whose only backing file is missing; referenced selects the available recovery.
 struct PhotoIssue
 {
-	MediaId id;
+	MediaItemId id = MediaItemId::None;
 	QString sourcePath;
 	bool    referenced = false;
+};
+
+// An item whose source file is not the size recorded for it, such as after an edit in another app.
+struct ChangedSizeIssue
+{
+	MediaItemId id = MediaItemId::None;
+	QString sourcePath;
+	qint64  recordedSize = -1;  // -1 = none recorded
+	qint64  currentSize  = -1;
 };
 
 // An item whose persisted extra-label list refers to ids absent from the label registry.
 struct DanglingLabelIssue
 {
-	MediaId id;
+	MediaItemId id = MediaItemId::None;
 	std::vector<LabelId> missingLabelIds;
 };
 
@@ -84,11 +93,12 @@ struct IntegrityReport
 	std::vector<UnknownItem>        unknownItems;
 	std::vector<MediaIssue>         issues;
 	std::vector<PhotoIssue>         photoIssues;
+	std::vector<ChangedSizeIssue>   changedSizeIssues;
 	std::vector<DanglingLabelIssue> danglingLabelIssues;
 	[[nodiscard]] bool isEmpty() const
 	{
 		return untracked.empty() && untrackedPhotos.empty() && untrackedVideos.empty() && unknownItems.empty() && issues.empty()
-			&& photoIssues.empty() && danglingLabelIssues.empty();
+			&& photoIssues.empty() && changedSizeIssues.empty() && danglingLabelIssues.empty();
 	}
 };
 
@@ -100,6 +110,6 @@ using ScanProgress = std::function<void(ScanPhase phase, int done, int total)>;
 [[nodiscard]] IntegrityReport scan(const Catalog& catalog, const QString& rootFolder, const ScanProgress& progress = {});
 
 // The disk facts scan reports for one tracked video. Requires a tracked video id.
-[[nodiscard]] MediaIssue inspectVideo(const Catalog& catalog, const MediaId& id);
+[[nodiscard]] MediaIssue inspectVideo(const Catalog& catalog, MediaItemId id);
 
 } // namespace CatalogIntegrity

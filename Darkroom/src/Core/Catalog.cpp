@@ -20,6 +20,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QScopeGuard>
 RESTORE_COMPILER_WARNINGS
 
+#include <functional>
 #include <optional>
 #include <utility>
 
@@ -32,6 +33,8 @@ namespace
 	constexpr QStringView kTypeField            = u"type";             // kPhotoTypeValue for photos; absent = video, so pre-photos records need no migration
 	constexpr QStringView kReferencedField      = u"referenced";       // bool; photos only
 	constexpr QStringView kDurationMsField      = u"durationMs";       // video source length in ms; absent = unknown (pre-existing record / photo)
+	constexpr QStringView kSourceSizeField      = u"sourceSize";       // bytes; absent = unknown
+	constexpr QStringView kFirstFormatNameField = u"name";             // the original-case file name; first format only
 	constexpr QStringView kPhotoTypeValue       = u"photo";
 	constexpr QStringView kBestLabelName        = u"Best";
 	// Seeded into the label once at creation and persisted; the star glyph itself is themed separately,
@@ -72,6 +75,23 @@ namespace
 				return {};
 		}
 		return child;
+	}
+
+	[[nodiscard]] MediaItemId randomMediaItemId(const std::function<bool(MediaItemId)>& isTaken)
+	{
+		for (;;)
+		{
+			const auto id = static_cast<MediaItemId>(QRandomGenerator::system()->generate64());
+			if (id != MediaItemId::None && !isTaken(id))
+				return id;
+		}
+	}
+
+	// -1 for a missing file.
+	[[nodiscard]] qint64 fileSize(const QString& path)
+	{
+		const QFileInfo info{ path };
+		return info.isFile() ? info.size() : -1;
 	}
 }
 
@@ -204,7 +224,7 @@ void Catalog::ensureBestAndFolderLabels()
 	// Seed only locations represented by model entries; empty folders and referenced photos imply no label.
 	MetadataStore& store = _metadataStore;
 	QSet<QString> labelNames;
-	for (const MediaId& id : store.allMediaIds())
+	for (const MediaItemId id : store.allItemIds())
 	{
 		const QString folderRel = store.get(id, kFolderField).toString();
 		if (folderRel.isEmpty())
@@ -275,7 +295,12 @@ LabelId Catalog::generateLabelId()
 	return labelIdFromUInt64(++_nextLabelId);
 }
 
-QList<LabelId> Catalog::readStoredLabelIds(const MediaId& id) const
+MediaItemId Catalog::generateMediaItemId() const
+{
+	return randomMediaItemId([this](MediaItemId id) { return _mediaItems.contains(id); });
+}
+
+QList<LabelId> Catalog::readStoredLabelIds(MediaItemId id) const
 {
 	const QJsonArray arr = _metadataStore.get(id, kLabelsField).toArray();
 	QList<LabelId> out;
@@ -285,7 +310,7 @@ QList<LabelId> Catalog::readStoredLabelIds(const MediaId& id) const
 	return out;
 }
 
-void Catalog::writeStoredLabelIds(const MediaId& id, const QList<LabelId>& labelIds)
+void Catalog::writeStoredLabelIds(MediaItemId id, const QList<LabelId>& labelIds)
 {
 	QJsonArray arr;
 	for (const LabelId labelId : labelIds)
@@ -326,7 +351,7 @@ QString Catalog::fromStoredPath(const QString& storedPath) const
 	return _rootFolder + '/' + storedPath;
 }
 
-QList<LabelId> Catalog::computeLabelIds(const MediaId& id, const Entry& e) const
+QList<LabelId> Catalog::computeLabelIds(MediaItemId id, const Entry& e) const
 {
 	QList<LabelId> labelIds;
 
@@ -346,20 +371,26 @@ void Catalog::rebuildIndex()
 	ensureBestAndFolderLabels();
 
 	_mediaItems.clear();
+	_mediaItemBySourcePath.clear();
+	_videoByFrameFolder.clear();
 	MetadataStore& store = _metadataStore;
 	{
 		MetadataStore::Writer writer = store.beginBatch();
-		for (const MediaId& id : store.allMediaIds())
+		for (const MediaItemId id : store.allItemIds())
 		{
 			const QString storedFolder = store.get(id, kFolderField).toString();
 			const bool isPhoto = store.get(id, kTypeField).toString() == kPhotoTypeValue;
 			if (storedFolder.isEmpty() && !isPhoto)
-				continue;  // Legacy folderless video metadata is not a catalog item.
+			{
+				assert_unconditional_r(("Catalog: video record " + toString(id) + " has no frame folder").toStdString());
+				continue;
+			}
 
 			const QString storedSourcePath = store.get(id, kSourcePathField).toString();
 			Entry e;
 			e.folder          = fromStoredPath(storedFolder);
 			e.sourcePath      = fromStoredPath(storedSourcePath);
+			e.sourceSize      = store.get(id, kSourceSizeField).toInteger(-1);
 			e.type            = isPhoto ? MediaType::Photo : MediaType::Video;
 			e.referenced      = store.get(id, kReferencedField).toBool(false);
 			e.splitIntoFrames = store.get(id, kSplitIntoFramesField).toBool(true);
@@ -384,35 +415,76 @@ void Catalog::rebuildIndex()
 			if (const QString sourcePath = toStoredPath(e.sourcePath); sourcePath != storedSourcePath)
 				writer.set(id, kSourcePathField, sourcePath);
 
-			_mediaItems.insert(id, e);
+			insertMediaItem(id, std::move(e));
 		}
 	}
 	notifyCatalogChanged();
 }
 
-void Catalog::refreshMediaItemLabels(const MediaId& id)
+void Catalog::insertMediaItem(MediaItemId id, Entry e)
+{
+	assert_and_return_r(!_mediaItems.contains(id), );
+	indexMediaItemPaths(id, e);
+	_mediaItems.insert(id, std::move(e));
+}
+
+void Catalog::eraseMediaItem(MediaItemId id)
+{
+	const auto it = _mediaItems.constFind(id);
+	if (it == _mediaItems.cend())
+		return;
+	unindexMediaItemPaths(id, *it);
+	_mediaItems.erase(it);
+}
+
+void Catalog::setMediaItemPaths(MediaItemId id, Entry& e, const QString& sourcePath, const QString& folder)
+{
+	unindexMediaItemPaths(id, e);
+	e.sourcePath = sourcePath;
+	e.folder     = folder;
+	indexMediaItemPaths(id, e);
+}
+
+void Catalog::indexMediaItemPaths(MediaItemId id, const Entry& e)
+{
+	if (!e.sourcePath.isEmpty())
+		_mediaItemBySourcePath.insert(pathComparisonKey(e.sourcePath), id);
+	if (e.type == MediaType::Video)
+		_videoByFrameFolder.insert(pathComparisonKey(e.folder), id);
+}
+
+void Catalog::unindexMediaItemPaths(MediaItemId id, const Entry& e)
+{
+	// Older libraries can record one path for two items: only the item the index holds unindexes it.
+	if (const QString key = pathComparisonKey(e.sourcePath); _mediaItemBySourcePath.value(key) == id)
+		_mediaItemBySourcePath.remove(key);
+	if (const QString key = pathComparisonKey(e.folder); e.type == MediaType::Video && _videoByFrameFolder.value(key) == id)
+		_videoByFrameFolder.remove(key);
+}
+
+void Catalog::refreshMediaItemLabels(MediaItemId id)
 {
 	const auto it = _mediaItems.find(id);
 	if (it != _mediaItems.end())
 		it->labelIds = computeLabelIds(id, *it);
 }
 
-QList<LabelId> Catalog::labelsForMediaItem(const MediaId& id) const
+QList<LabelId> Catalog::labelsForMediaItem(MediaItemId id) const
 {
 	const auto it = _mediaItems.constFind(id);
 	return it != _mediaItems.cend() ? it->labelIds : QList<LabelId>{};
 }
 
-QSet<MediaId> Catalog::mediaItemsForLabel(LabelId labelId) const
+QSet<MediaItemId> Catalog::mediaItemsForLabel(LabelId labelId) const
 {
-	QSet<MediaId> out;
+	QSet<MediaItemId> out;
 	for (auto it = _mediaItems.cbegin(); it != _mediaItems.cend(); ++it)
 		if (it->labelIds.contains(labelId))
 			out.insert(it.key());
 	return out;
 }
 
-bool Catalog::mediaItemHasLabel(const MediaId& id, LabelId labelId) const
+bool Catalog::mediaItemHasLabel(MediaItemId id, LabelId labelId) const
 {
 	const auto it = _mediaItems.constFind(id);
 	return it != _mediaItems.cend() && it->labelIds.contains(labelId);
@@ -427,25 +499,45 @@ QHash<LabelId, int> Catalog::labelMediaItemCounts() const
 	return counts;
 }
 
-QString Catalog::folderForMediaItem(const MediaId& id) const
+MediaItemId Catalog::mediaItemAtSourcePath(const QString& path) const
+{
+	return _mediaItemBySourcePath.value(pathComparisonKey(path), MediaItemId::None);
+}
+
+MediaItemId Catalog::videoAtFrameFolder(const QString& folder) const
+{
+	return _videoByFrameFolder.value(pathComparisonKey(folder), MediaItemId::None);
+}
+
+QString Catalog::folderForMediaItem(MediaItemId id) const
 {
 	return _mediaItems.value(id).folder;
 }
 
-QString Catalog::sourcePathForMediaItem(const MediaId& id) const
+QString Catalog::sourcePathForMediaItem(MediaItemId id) const
 {
 	return _mediaItems.value(id).sourcePath;
 }
 
-QString Catalog::displayName(const MediaId& id) const
+QString Catalog::displayName(MediaItemId id) const
 {
 	return QFileInfo(_mediaItems.value(id).sourcePath).completeBaseName();
 }
 
-QString Catalog::frameFolderName(const QString& baseName, const MediaId& id)
+QString Catalog::frameFolderName(const QString& baseName, const QString& sourceSuffix, qint64 sourceSize)
 {
 	// The separator stays when the extension is empty: "a_b" without an extension must not match "a.b"
-	return baseName + "_" + QFileInfo(id.name()).suffix() + "_" + QString::number(id.size());
+	return baseName + "_" + sourceSuffix + "_" + QString::number(sourceSize);
+}
+
+QString Catalog::frameFolderForNewVideo(const QString& storageFolder, const QString& sourcePath) const
+{
+	const QFileInfo source{ sourcePath };
+	const QString folder = storageFolder + "/" + frameFolderName(source.completeBaseName(), source.suffix(), source.size());
+	QString candidate = folder;
+	for (int number = 2; videoAtFrameFolder(candidate) != MediaItemId::None; ++number)
+		candidate = folder + "_" + QString::number(number);
+	return candidate;
 }
 
 QString Catalog::previewDirFor(const QString& frameFolder)
@@ -453,22 +545,22 @@ QString Catalog::previewDirFor(const QString& frameFolder)
 	return frameFolder + "/preview";
 }
 
-bool Catalog::isSplitIntoFrames(const MediaId& id) const
+bool Catalog::isSplitIntoFrames(MediaItemId id) const
 {
 	return _mediaItems.value(id).splitIntoFrames;
 }
 
-Catalog::MediaType Catalog::mediaType(const MediaId& id) const
+Catalog::MediaType Catalog::mediaType(MediaItemId id) const
 {
 	return _mediaItems.value(id).type;
 }
 
-bool Catalog::isReferenced(const MediaId& id) const
+bool Catalog::isReferenced(MediaItemId id) const
 {
 	return _mediaItems.value(id).referenced;
 }
 
-qint64 Catalog::durationMsForMediaItem(const MediaId& id) const
+qint64 Catalog::durationMsForMediaItem(MediaItemId id) const
 {
 	return _mediaItems.value(id).durationMs;
 }
@@ -481,29 +573,30 @@ QString Catalog::anySourceDir() const
 	return {};
 }
 
-QString Catalog::findPhotoBySameContent(const QString& photoPath) const
+MediaItemId Catalog::findMediaItemWithSameContent(const QString& filePath) const
 {
-	const qint64 photoSize = QFileInfo(photoPath).size();
+	const qint64 size = fileSize(filePath);
+	if (size < 0)
+		return MediaItemId::None;
+
 	for (auto it = _mediaItems.cbegin(); it != _mediaItems.cend(); ++it)
 	{
-		if (it->type != MediaType::Photo || it.key().size() != photoSize)
-			continue;
-		if (filesAreIdentical(photoPath, it->sourcePath))
-			return it->sourcePath;
+		if (it->sourceSize == size && filesAreIdentical(filePath, it->sourcePath))
+			return it.key();
 	}
-	return {};
+	return MediaItemId::None;
 }
 
-void Catalog::addLabel(const MediaId& id, LabelId labelId)
+void Catalog::addLabel(MediaItemId id, LabelId labelId)
 {
-	if (!id.isValid())
+	if (!_mediaItems.contains(id))
 	{
-		qWarning() << "Catalog: cannot add label" << toUInt64(labelId) << "- invalid media id (source file missing?)";
+		qWarning() << "Catalog: cannot add label" << toUInt64(labelId) << "to unknown item" << toString(id);
 		return;
 	}
 	if (!labelById(labelId))
 	{
-		qWarning() << "Catalog: cannot add unknown label" << toUInt64(labelId) << "to" << id.key();
+		qWarning() << "Catalog: cannot add unknown label" << toUInt64(labelId) << "to" << toString(id);
 		return;
 	}
 	QList<LabelId> ids = readStoredLabelIds(id);
@@ -516,11 +609,12 @@ void Catalog::addLabel(const MediaId& id, LabelId labelId)
 	}
 }
 
-void Catalog::removeLabel(const MediaId& id, LabelId labelId)
+void Catalog::removeLabel(MediaItemId id, LabelId labelId)
 {
-	if (!id.isValid())
+	const auto it = _mediaItems.constFind(id);
+	if (it == _mediaItems.cend())
 	{
-		qWarning() << "Catalog: cannot remove label" << toUInt64(labelId) << "- invalid media id (source file missing?)";
+		qWarning() << "Catalog: cannot remove label" << toUInt64(labelId) << "from unknown item" << toString(id);
 		return;
 	}
 
@@ -528,20 +622,16 @@ void Catalog::removeLabel(const MediaId& id, LabelId labelId)
 	const Label* label = labelById(labelId);
 	if (label && !label->isVirtual())
 	{
-		const auto it = _mediaItems.constFind(id);
-		if (it != _mediaItems.cend())
+		if (storageLabelIdOf(*it) == labelId)
 		{
-			if (storageLabelIdOf(*it) == labelId)
-			{
-				relocateFolderOffLabel(id, labelId);
-				return;
-			}
-			// Referenced photos have no relocation path to enforce the last-ordinary-label invariant.
-			if (it->folder.isEmpty() && !hasOtherOrdinaryLabel(id, labelId))
-			{
-				qWarning() << "Catalog: refusing to remove the last ordinary label from" << id.key() << "- an item must always keep one";
-				return;
-			}
+			relocateFolderOffLabel(id, labelId);
+			return;
+		}
+		// Referenced photos have no relocation path to enforce the last-ordinary-label invariant.
+		if (it->folder.isEmpty() && !hasOtherOrdinaryLabel(id, labelId))
+		{
+			qWarning() << "Catalog: refusing to remove the last ordinary label from" << toString(id) << "- an item must always keep one";
+			return;
 		}
 	}
 
@@ -554,7 +644,7 @@ void Catalog::removeLabel(const MediaId& id, LabelId labelId)
 	}
 }
 
-bool Catalog::removeInvalidLabelReferences(const MediaId& id)
+bool Catalog::removeInvalidLabelReferences(MediaItemId id)
 {
 	if (!_mediaItems.contains(id))
 		return false;
@@ -570,117 +660,155 @@ bool Catalog::removeInvalidLabelReferences(const MediaId& id)
 	return true;
 }
 
-bool Catalog::addMediaItem(const MediaId& id, const QString& sourcePath, const QString& folderAbs, bool splitIntoFrames, qint64 durationMs)
+MediaItemId Catalog::addMediaItem(const QString& sourcePath, const QString& folderAbs, bool splitIntoFrames, qint64 durationMs)
 {
-	if (!id.isValid())
+	// Two items sharing a source or a frame folder would each move or delete it from under the other.
+	if (const MediaItemId existing = mediaItemAtSourcePath(sourcePath); existing != MediaItemId::None)
 	{
-		qWarning() << "Catalog: cannot add media item with an invalid id, source" << sourcePath;
-		return false;
+		qWarning() << "Catalog: refusing to add media item" << sourcePath << "- its source is already tracked as" << toString(existing);
+		return MediaItemId::None;
+	}
+	if (const MediaItemId existing = videoAtFrameFolder(folderAbs); existing != MediaItemId::None)
+	{
+		qWarning() << "Catalog: refusing to add media item" << sourcePath << "- its frame folder" << folderAbs << "belongs to" << toString(existing);
+		return MediaItemId::None;
 	}
 
-	// Refuse cross-folder identity collisions; overwriting would orphan existing storage and labels.
-	const auto existing = _mediaItems.constFind(id);
-	if (existing != _mediaItems.constEnd() && existing->folder != folderAbs)
-	{
-		qWarning() << "Catalog: refusing to add media item, id" << id.key() << "is already tracked at" << existing->folder
-		           << "- collides with" << sourcePath;
-		return false;
-	}
-
-	// Re-registration with an unknown duration must not erase an earlier probe.
-	const qint64 effectiveDurationMs = durationMs > 0 ? durationMs
-		: (existing != _mediaItems.constEnd() ? existing->durationMs : -1);
+	const MediaItemId id = generateMediaItemId();
+	Entry e;
+	e.folder          = folderAbs;
+	e.sourcePath      = sourcePath;
+	e.sourceSize      = fileSize(sourcePath);
+	e.splitIntoFrames = splitIntoFrames;
+	e.durationMs      = durationMs > 0 ? durationMs : -1;
 
 	MetadataStore::Writer writer = _metadataStore.beginBatch();
 	writer.set(id, kSourcePathField, toStoredPath(sourcePath));
 	writer.set(id, kFolderField, toStoredPath(folderAbs));
 	writer.set(id, kSplitIntoFramesField, splitIntoFrames);
-	if (effectiveDurationMs > 0)
-		writer.set(id, kDurationMsField, effectiveDurationMs);
+	if (e.sourceSize >= 0)
+		writer.set(id, kSourceSizeField, e.sourceSize);
+	if (e.durationMs > 0)
+		writer.set(id, kDurationMsField, e.durationMs);
 
 	if (ensureFolderLabelExists(storageFolderNameOf(folderAbs)))
 		saveRegistry();
 
-	Entry e;
-	e.folder          = folderAbs;
-	e.sourcePath      = sourcePath;
-	e.splitIntoFrames = splitIntoFrames;
-	e.durationMs      = effectiveDurationMs;
-	e.labelIds        = computeLabelIds(id, e);
-	_mediaItems.insert(id, e);
+	e.labelIds = computeLabelIds(id, e);
+	insertMediaItem(id, std::move(e));
 	notifyCatalogChanged();
-	return true;
+	return id;
 }
 
-bool Catalog::addPhoto(const MediaId& id, const QString& sourcePath, const QString& labelDirAbs, bool referenced)
+MediaItemId Catalog::addPhoto(const QString& sourcePath, const QString& labelDirAbs, bool referenced)
 {
-	if (!id.isValid())
+	if (const MediaItemId existing = mediaItemAtSourcePath(sourcePath); existing != MediaItemId::None)
 	{
-		qWarning() << "Catalog: cannot add photo with an invalid id, source" << sourcePath;
-		return false;
+		qWarning() << "Catalog: refusing to add photo" << sourcePath << "- it is already tracked as" << toString(existing);
+		return MediaItemId::None;
 	}
 
-	// Same cross-folder collision rule as addMediaItem.
-	const auto existing = _mediaItems.constFind(id);
-	if (existing != _mediaItems.constEnd() && existing->folder != labelDirAbs)
-	{
-		qWarning() << "Catalog: refusing to add photo, id" << id.key() << "is already tracked at" << existing->folder
-		           << "- collides with" << sourcePath;
-		return false;
-	}
+	const MediaItemId id = generateMediaItemId();
+	Entry e;
+	e.folder     = labelDirAbs;
+	e.sourcePath = sourcePath;
+	e.sourceSize = fileSize(sourcePath);
+	e.type       = MediaType::Photo;
+	e.referenced = referenced;
 
 	MetadataStore::Writer writer = _metadataStore.beginBatch();
 	writer.set(id, kSourcePathField, toStoredPath(sourcePath));
 	writer.set(id, kFolderField, toStoredPath(labelDirAbs));
 	writer.set(id, kTypeField, kPhotoTypeValue.toString());
-	writer.set(id, kReferencedField, referenced);  // Explicitly clear a stale value when import mode changes.
+	writer.set(id, kReferencedField, referenced);
+	if (e.sourceSize >= 0)
+		writer.set(id, kSourceSizeField, e.sourceSize);
 
 	if (!labelDirAbs.isEmpty() && ensureFolderLabelExists(QFileInfo(labelDirAbs).fileName()))
 		saveRegistry();
 
-	Entry e;
-	e.folder     = labelDirAbs;
-	e.sourcePath = sourcePath;
-	e.type       = MediaType::Photo;
-	e.referenced = referenced;
-	e.labelIds   = computeLabelIds(id, e);
-	_mediaItems.insert(id, e);
+	e.labelIds = computeLabelIds(id, e);
+	insertMediaItem(id, std::move(e));
 	notifyCatalogChanged();
-	return true;
+	return id;
 }
 
-void Catalog::removeMediaItem(const MediaId& id)
+void Catalog::removeMediaItem(MediaItemId id)
 {
+	if (!_mediaItems.contains(id))
+		return;
 	_metadataStore.beginBatch().remove(id);
-	if (_mediaItems.remove(id))
-		notifyCatalogChanged();
+	eraseMediaItem(id);
+	notifyCatalogChanged();
 }
 
-bool Catalog::applyRename(const MediaId& oldId, const MediaId& newId, const QString& newSourcePath, const QString& newFolderAbs)
+bool Catalog::updateMediaItemPaths(MediaItemId id, const QString& newSourcePath, const QString& newFolderAbs)
 {
-	// Refuse a rename onto another item; oldId == newId is the same entry, not a collision.
-	if (oldId != newId && _mediaItems.contains(newId))
+	const auto it = _mediaItems.find(id);
+	if (it == _mediaItems.end())
+		return false;
+	if (const MediaItemId existing = mediaItemAtSourcePath(newSourcePath); existing != MediaItemId::None && existing != id)
 	{
-		qWarning() << "Catalog: refusing to rename to id" << newId.key() << "- already tracked at" << _mediaItems.value(newId).folder;
+		qWarning() << "Catalog: refusing to move" << toString(id) << "to" << newSourcePath << "- already tracked as" << toString(existing);
 		return false;
 	}
 
 	MetadataStore::Writer writer = _metadataStore.beginBatch();
-	writer.rekey(oldId, newId);
-	writer.set(newId, kSourcePathField, toStoredPath(newSourcePath));
-	writer.set(newId, kFolderField, toStoredPath(newFolderAbs));
+	writer.set(id, kSourcePathField, toStoredPath(newSourcePath));
+	writer.set(id, kFolderField, toStoredPath(newFolderAbs));
+	if (const qint64 size = fileSize(newSourcePath); size >= 0)
+	{
+		writer.set(id, kSourceSizeField, size);
+		it->sourceSize = size;
+	}
 
-	Entry e = _mediaItems.value(oldId);
-	_mediaItems.remove(oldId);
-	e.folder     = newFolderAbs;
-	e.sourcePath = newSourcePath;
-	e.labelIds   = computeLabelIds(newId, e);
-	_mediaItems.insert(newId, e);
+	setMediaItemPaths(id, *it, newSourcePath, newFolderAbs);
+	it->labelIds = computeLabelIds(id, *it);
 	notifyCatalogChanged();
 	return true;
 }
 
-void Catalog::markSplitComplete(const MediaId& id)
+bool Catalog::refreshSourceSize(MediaItemId id)
+{
+	const auto it = _mediaItems.find(id);
+	if (it == _mediaItems.end())
+		return false;
+	const qint64 size = fileSize(it->sourcePath);
+	if (size < 0)
+		return false;
+	if (size == it->sourceSize)
+		return true;
+
+	_metadataStore.beginBatch().set(id, kSourceSizeField, size);
+	it->sourceSize = size;
+	notifyCatalogChanged();
+	return true;
+}
+
+QJsonObject Catalog::itemRecordsFromFirstFormat(const QJsonObject& document)
+{
+	QJsonObject records;
+	for (auto it = document.begin(); it != document.end(); ++it)
+	{
+		// Keys are "<size>:<lowercased name>".
+		QJsonObject record = it.value().toObject();
+		bool sizeParsed = false;
+		const qint64 size = it.key().section(':', 0, 0).toLongLong(&sizeParsed);
+		const bool isPhoto = record.value(kTypeField).toString() == kPhotoTypeValue;
+		// The first-format loader skipped these records: they were never items.
+		if (!sizeParsed || size < 0 || record.value(kFirstFormatNameField).toString().isEmpty()
+			|| (record.value(kFolderField).toString().isEmpty() && !isPhoto))
+			continue;
+
+		record.remove(kFirstFormatNameField);
+		record.insert(kSourceSizeField, size);
+		const MediaItemId id = randomMediaItemId([&records](MediaItemId candidate) { return records.contains(toString(candidate)); });
+		records.insert(toString(id), record);
+	}
+	return records;
+}
+
+void Catalog::markSplitComplete(MediaItemId id)
 {
 	const auto it = _mediaItems.find(id);
 	if (it == _mediaItems.end() || it->splitIntoFrames)
@@ -692,7 +820,7 @@ void Catalog::markSplitComplete(const MediaId& id)
 	notifyCatalogChanged();
 }
 
-void Catalog::markPreviewOnly(const MediaId& id)
+void Catalog::markPreviewOnly(MediaItemId id)
 {
 	const auto it = _mediaItems.find(id);
 	if (it == _mediaItems.end() || it->type != MediaType::Video || !it->splitIntoFrames)
@@ -703,7 +831,7 @@ void Catalog::markPreviewOnly(const MediaId& id)
 	notifyCatalogChanged();
 }
 
-void Catalog::setDurationMs(const MediaId& id, qint64 durationMs)
+void Catalog::setDurationMs(MediaItemId id, qint64 durationMs)
 {
 	const auto it = _mediaItems.find(id);
 	if (it == _mediaItems.end() || durationMs <= 0 || it->durationMs == durationMs)
@@ -714,7 +842,7 @@ void Catalog::setDurationMs(const MediaId& id, qint64 durationMs)
 	notifyCatalogChanged();
 }
 
-bool Catalog::hasOtherOrdinaryLabel(const MediaId& id, LabelId excludedLabelId) const
+bool Catalog::hasOtherOrdinaryLabel(MediaItemId id, LabelId excludedLabelId) const
 {
 	for (const LabelId labelId : labelsForMediaItem(id))
 	{
@@ -727,7 +855,7 @@ bool Catalog::hasOtherOrdinaryLabel(const MediaId& id, LabelId excludedLabelId) 
 	return false;
 }
 
-void Catalog::relocateFolderOffLabel(const MediaId& id, LabelId removedLabelId)
+void Catalog::relocateFolderOffLabel(MediaItemId id, LabelId removedLabelId)
 {
 	const auto entryIt = _mediaItems.find(id);
 	if (entryIt == _mediaItems.end())
@@ -757,6 +885,7 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, LabelId removedLabelId)
 
 	// Videos move their frame folder; owned photos move their file and therefore source path.
 	QString newFolderAbs;
+	QString newSourcePath = entryIt->sourcePath;
 	if (entryIt->type == MediaType::Photo)
 	{
 		const QString sourceDir = photoFolderForLabel(removedLabelId);
@@ -767,9 +896,9 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, LabelId removedLabelId)
 		if (destDir.isEmpty())
 			return;
 		const QString newFilePath = destDir + "/" + QFileInfo(entryIt->sourcePath).fileName();
-		if (QFileInfo::exists(newFilePath))
+		if (QFileInfo::exists(newFilePath) || mediaItemAtSourcePath(newFilePath) != MediaItemId::None)
 		{
-			qWarning() << "Catalog: cannot relocate" << entryIt->sourcePath << "to" << newFilePath << "- destination already exists";
+			qWarning() << "Catalog: cannot relocate" << entryIt->sourcePath << "to" << newFilePath << "- destination already exists or is recorded for another item";
 			return;
 		}
 		assert_r(QDir{}.mkpath(destDir));
@@ -779,7 +908,7 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, LabelId removedLabelId)
 			return;
 		}
 		writer.set(id, kSourcePathField, toStoredPath(newFilePath));
-		entryIt->sourcePath = newFilePath;
+		newSourcePath = newFilePath;
 		newFolderAbs = destDir;
 	}
 	else
@@ -794,9 +923,9 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, LabelId removedLabelId)
 		if (destStorageFolder.isEmpty())
 			return;
 		newFolderAbs = destStorageFolder + "/" + QFileInfo(entryIt->folder).fileName();
-		if (QFileInfo::exists(newFolderAbs))
+		if (QFileInfo::exists(newFolderAbs) || videoAtFrameFolder(newFolderAbs) != MediaItemId::None)
 		{
-			qWarning() << "Catalog: cannot relocate" << entryIt->folder << "to" << newFolderAbs << "- destination already exists";
+			qWarning() << "Catalog: cannot relocate" << entryIt->folder << "to" << newFolderAbs << "- destination already exists or is recorded for another item";
 			return;
 		}
 		assert_r(QDir{}.mkpath(destStorageFolder));
@@ -815,7 +944,7 @@ void Catalog::relocateFolderOffLabel(const MediaId& id, LabelId removedLabelId)
 		writeStoredLabelIds(id, ids);
 
 	writer.set(id, kFolderField, toStoredPath(newFolderAbs));
-	entryIt->folder   = newFolderAbs;
+	setMediaItemPaths(id, *entryIt, newSourcePath, newFolderAbs);
 	entryIt->labelIds = computeLabelIds(id, *entryIt);
 	notifyCatalogChanged();
 }
@@ -1020,7 +1149,7 @@ Catalog::DeleteImpact Catalog::deleteLabelImpact(LabelId labelId) const
 	if (!label || label->isVirtual())
 		return impact;
 
-	for (const MediaId& id : mediaItemsForLabel(labelId))
+	for (const MediaItemId id : mediaItemsForLabel(labelId))
 	{
 		const Entry entry = _mediaItems.value(id);
 		if (storageLabelIdOf(entry) != labelId)
@@ -1039,7 +1168,7 @@ Catalog::DeleteImpact Catalog::deleteLabelImpact(LabelId labelId) const
 	return impact;
 }
 
-bool Catalog::deleteLabel(LabelId labelId, std::vector<MediaId>* itemsLeftBehind)
+bool Catalog::deleteLabel(LabelId labelId, std::vector<MediaItemId>* itemsLeftBehind)
 {
 	if (itemsLeftBehind)
 		itemsLeftBehind->clear();
@@ -1052,18 +1181,16 @@ bool Catalog::deleteLabel(LabelId labelId, std::vector<MediaId>* itemsLeftBehind
 	BatchScope batch(*this);
 
 	// Collect first because relocation mutates _mediaItems.
-	std::vector<MediaId> storedHere;
-	for (const MediaId& id : mediaItemsForLabel(labelId))
+	std::vector<MediaItemId> storedHere;
+	for (const MediaItemId id : mediaItemsForLabel(labelId))
 		if (storageLabelIdOf(_mediaItems.value(id)) == labelId)
 			storedHere.push_back(id);
-	for (const MediaId& id : storedHere)
+	for (const MediaItemId id : storedHere)
 		relocateFolderOffLabel(id, labelId);
 
 	// Remaining carriers hold the label only as stored metadata.
-	for (const MediaId& id : mediaItemsForLabel(labelId))
+	for (const MediaItemId id : mediaItemsForLabel(labelId))
 	{
-		if (!id.isValid())
-			continue;
 		QList<LabelId> ids = readStoredLabelIds(id);
 		if (ids.removeAll(labelId) > 0)
 		{
@@ -1073,8 +1200,8 @@ bool Catalog::deleteLabel(LabelId labelId, std::vector<MediaId>* itemsLeftBehind
 	}
 
 	// A blocked relocation still needs this registry entry; rebuilding would otherwise recreate it.
-	std::vector<MediaId> leftBehind;
-	for (const MediaId& id : mediaItemsForLabel(labelId))
+	std::vector<MediaItemId> leftBehind;
+	for (const MediaItemId id : mediaItemsForLabel(labelId))
 		if (storageLabelIdOf(_mediaItems.value(id)) == labelId)
 			leftBehind.push_back(id);
 	const bool relocatedEverything = leftBehind.empty();

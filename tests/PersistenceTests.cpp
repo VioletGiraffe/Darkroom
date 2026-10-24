@@ -1,11 +1,38 @@
 #include "Core/Catalog.h"
+#include "Core/JsonPersistence.h"
 #include "Core/Library.h"
-#include "Core/MediaId.h"
+#include "Core/MediaItemId.h"
+#include "Core/MetadataStore.h"
 #include "TestHelpers.h"
 
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonObject>
+#include <QSet>
 #include <QTemporaryDir>
+
+namespace
+{
+	[[nodiscard]] QByteArray readFile(const QString& path)
+	{
+		QFile file(path);
+		REQUIRE(file.open(QIODevice::ReadOnly));
+		return file.readAll();
+	}
+}
+
+TEST_CASE("MediaItemId: the persisted string form", "[persistence]")
+{
+	const MediaItemId id = static_cast<MediaItemId>(0x1234abcdULL);
+	REQUIRE(toString(id) == "000000001234abcd");
+	REQUIRE(mediaItemIdFromString(toString(id)) == id);
+	REQUIRE(mediaItemIdFromString(QStringLiteral("ffffffffffffffff")) == static_cast<MediaItemId>(~0ULL));
+
+	REQUIRE(mediaItemIdFromString(QStringLiteral("1234abcd")) == MediaItemId::None);          // not 16 digits
+	REQUIRE(mediaItemIdFromString(QStringLiteral("000000001234abcg")) == MediaItemId::None);  // not hex
+	REQUIRE(mediaItemIdFromString(QString()) == MediaItemId::None);
+}
 
 TEST_CASE("A new empty library seeds Best and persists the registry", "[persistence]")
 {
@@ -26,10 +53,9 @@ TEST_CASE("A new empty library seeds Best and persists the registry", "[persiste
 	REQUIRE(QFileInfo::exists(library.rootFolder() + "/labels.json"));
 }
 
-// The golden backward-compatibility fixture: every record shape catalog.json has ever held. If a schema
-// change breaks reading any of these, existing libraries break with it - extend this fixture when the
-// schema evolves, never weaken it.
-TEST_CASE("Every stored record format loads correctly", "[persistence]")
+// The golden backward-compatibility fixture for the first catalog.json format: every record shape it ever held.
+// Loading converts it to the current format. Never weaken this fixture.
+TEST_CASE("Every first-format record converts and loads correctly", "[persistence]")
 {
 	QTemporaryDir dir;
 	REQUIRE(dir.isValid());
@@ -38,11 +64,11 @@ TEST_CASE("Every stored record format loads correctly", "[persistence]")
 	writeTextFile(root + "/labels.json", QStringLiteral(R"({
 		"labels": [ { "id": 1001, "displayName": "Trip", "color": "#112233" } ]
 	})").toUtf8());
-	// In order: a pre-photos video record (no type/splitIntoFrames/durationMs), a current video record
-	// (with a legacy absolute folder), an owned photo with a legacy absolute source, a current owned photo,
-	// a referenced photo, then records the loader must skip: a folder-less video, a negative-size
+	// In order: a pre-photos video record (no type/splitIntoFrames/durationMs), a newer video record
+	// (with a legacy absolute folder), an owned photo with a legacy absolute source, a newer owned photo,
+	// a referenced photo, then records that were never items: a folder-less video, a negative-size
 	// (source-unavailable) key, a nameless record.
-	writeTextFile(root + "/catalog.json", QStringLiteral(R"({
+	const QByteArray firstFormat = QStringLiteral(R"({
 		"1000:clip.mp4": { "name": "Clip.MP4", "folder": "Family/Clip", "sourceVideoPath": "%2/Clip.MP4" },
 		"1500:new.mp4": { "name": "New.mp4", "folder": "%1/Family/New", "sourceVideoPath": "%2/New.mp4",
 		                  "splitIntoFrames": false, "durationMs": 98765 },
@@ -52,7 +78,8 @@ TEST_CASE("Every stored record format loads correctly", "[persistence]")
 		"4000:orphan.mp4": { "name": "Orphan.mp4", "labels": [1001] },
 		"-1:invalid.mp4": { "name": "invalid.mp4", "folder": "Family/invalid" },
 		"5000:nameless.mp4": { "folder": "Family/nameless" }
-	})").arg(root, outsideLibraryPath("videos"), outsideLibraryPath("elsewhere")).toUtf8());
+	})").arg(root, outsideLibraryPath("videos"), outsideLibraryPath("elsewhere")).toUtf8();
+	writeTextFile(root + "/catalog.json", firstFormat);
 
 	Library library;
 	QString error;
@@ -61,6 +88,13 @@ TEST_CASE("Every stored record format loads correctly", "[persistence]")
 	const QString rootFolder = library.rootFolder();
 
 	REQUIRE(catalog.mediaItemCount() == 5);
+
+	// The original is kept beside the converted file, which is saved on load.
+	REQUIRE(readFile(root + "/catalog.v1-backup.json") == firstFormat);
+	const JsonPersistence::ObjectReadResult converted = JsonPersistence::readObject(root + "/catalog.json");
+	REQUIRE(converted.success);
+	REQUIRE(converted.object.value(MetadataStore::VersionField).toInteger() == MetadataStore::FormatVersion);
+	REQUIRE(converted.object.value(MetadataStore::ItemsField).toObject().size() == 5);
 
 	// Registry: Best pinned first, the persisted label kept as-is, "Family" seeded from the items'
 	// storage folders, "Trip" resolved to the persisted entry rather than duplicated.
@@ -73,49 +107,83 @@ TEST_CASE("Every stored record format loads correctly", "[persistence]")
 	REQUIRE(toUInt64(family) >= FirstRealLabelId);
 	REQUIRE(catalog.allLabels().size() == 3u);
 
-	// The pre-photos video: absent fields take their documented defaults.
-	const MediaId video = MediaId::fromNameAndSize("Clip.MP4", 1000);
-	REQUIRE(catalog.containsMediaItem(video));
+	// The pre-photos video: absent fields take their documented defaults; the size comes from the key.
+	const MediaItemId video = catalog.mediaItemAtSourcePath(outsideLibraryPath("videos/Clip.MP4"));
+	REQUIRE(video != MediaItemId::None);
 	REQUIRE(catalog.mediaType(video) == Catalog::MediaType::Video);
 	REQUIRE(catalog.isSplitIntoFrames(video));
 	REQUIRE(catalog.durationMsForMediaItem(video) == -1);
+	REQUIRE(catalog.mediaItems().value(video).sourceSize == 1000);
 	REQUIRE_FALSE(catalog.isReferenced(video));
 	REQUIRE(catalog.folderForMediaItem(video) == rootFolder + "/Family/Clip");
-	REQUIRE(catalog.sourcePathForMediaItem(video) == outsideLibraryPath("videos/Clip.MP4"));
 	REQUIRE(catalog.labelsForMediaItem(video) == QList<LabelId>{ family });
 	REQUIRE(catalog.mediaItemsForLabel(family).contains(video));
 
-	// Identity is case-insensitive: a case-variant spelling addresses the same item.
-	REQUIRE(catalog.containsMediaItem(MediaId::fromNameAndSize("CLIP.mp4", 1000)));
-
-	// The current-format video: explicit fields honored; a legacy absolute folder value is tolerated.
-	const MediaId newVideo = MediaId::fromNameAndSize("New.mp4", 1500);
+	// The newer video record: explicit fields honored; a legacy absolute folder value is tolerated.
+	const MediaItemId newVideo = catalog.mediaItemAtSourcePath(outsideLibraryPath("videos/New.mp4"));
 	REQUIRE_FALSE(catalog.isSplitIntoFrames(newVideo));
 	REQUIRE(catalog.durationMsForMediaItem(newVideo) == 98765);
 	REQUIRE(catalog.folderForMediaItem(newVideo) == root + "/Family/New");
 
-	const MediaId photo = MediaId::fromNameAndSize("Photo.jpg", 2000);
+	const MediaItemId photo = catalog.mediaItemAtSourcePath(root + "/Photos/Trip/Photo.jpg");
 	REQUIRE(catalog.mediaType(photo) == Catalog::MediaType::Photo);
 	REQUIRE_FALSE(catalog.isReferenced(photo));
 	REQUIRE(catalog.folderForMediaItem(photo) == rootFolder + "/Photos/Trip");
-	REQUIRE(catalog.sourcePathForMediaItem(photo) == root + "/Photos/Trip/Photo.jpg");
 	REQUIRE(catalog.labelsForMediaItem(photo) == QList<LabelId>{ trip });
 
-	// The current-format photo: its source is root-relative.
-	const MediaId currentPhoto = MediaId::fromNameAndSize("Current.jpg", 2500);
+	// The newer photo record: its source is root-relative.
+	const MediaItemId currentPhoto = catalog.mediaItemAtSourcePath(rootFolder + "/Photos/Trip/Current.jpg");
 	REQUIRE(catalog.folderForMediaItem(currentPhoto) == rootFolder + "/Photos/Trip");
-	REQUIRE(catalog.sourcePathForMediaItem(currentPhoto) == rootFolder + "/Photos/Trip/Current.jpg");
 
 	// A referenced photo has no folder; all its labels are stored ids.
-	const MediaId referenced = MediaId::fromNameAndSize("Ref.png", 3000);
+	const MediaItemId referenced = catalog.mediaItemAtSourcePath(outsideLibraryPath("elsewhere/Ref.png"));
 	REQUIRE(catalog.mediaType(referenced) == Catalog::MediaType::Photo);
 	REQUIRE(catalog.isReferenced(referenced));
 	REQUIRE(catalog.folderForMediaItem(referenced).isEmpty());
 	REQUIRE(catalog.labelsForMediaItem(referenced) == QList<LabelId>{ trip });
 
-	REQUIRE_FALSE(catalog.containsMediaItem(MediaId::fromNameAndSize("Orphan.mp4", 4000)));
-	REQUIRE_FALSE(catalog.containsMediaItem(MediaId::fromNameAndSize("invalid.mp4", -1)));
-	REQUIRE_FALSE(catalog.containsMediaItem(MediaId::fromNameAndSize("nameless.mp4", 5000)));
+	REQUIRE(QSet<MediaItemId>{ video, newVideo, photo, currentPhoto, referenced }.size() == 5);
+
+	// The converted library reloads to the same state, ids included.
+	Library reloaded;
+	REQUIRE(reloaded.setRoot(root));
+	REQUIRE(dumpCatalog(reloaded.catalog()) == dumpCatalog(catalog));
+}
+
+// The golden fixture for the current format.
+TEST_CASE("Current-format records load under their stored ids", "[persistence]")
+{
+	QTemporaryDir dir;
+	REQUIRE(dir.isValid());
+	const QString root = dir.path();
+
+	writeTextFile(root + "/catalog.json", QStringLiteral(R"({
+		"version": 2,
+		"items": {
+			"00000000000004d2": { "folder": "Family/Clip", "sourceVideoPath": "%1/Clip.mp4", "sourceSize": 1000,
+			                      "splitIntoFrames": false, "durationMs": 5000 },
+			"fedcba9876543210": { "folder": "Photos/Trip", "sourceVideoPath": "Photos/Trip/Photo.jpg", "type": "photo" }
+		}
+	})").arg(outsideLibraryPath("videos")).toUtf8());
+
+	Library library;
+	REQUIRE(library.setRoot(root));
+	const Catalog& catalog = library.catalog();
+	const QString rootFolder = library.rootFolder();
+	REQUIRE(catalog.mediaItemCount() == 2);
+	REQUIRE_FALSE(QFileInfo::exists(root + "/catalog.v1-backup.json"));
+
+	const MediaItemId video = mediaItemIdFromString(QStringLiteral("00000000000004d2"));
+	REQUIRE(catalog.mediaItemAtSourcePath(outsideLibraryPath("videos/Clip.mp4")) == video);
+	REQUIRE(catalog.folderForMediaItem(video) == rootFolder + "/Family/Clip");
+	REQUIRE(catalog.mediaItems().value(video).sourceSize == 1000);
+	REQUIRE_FALSE(catalog.isSplitIntoFrames(video));
+	REQUIRE(catalog.durationMsForMediaItem(video) == 5000);
+
+	const MediaItemId photo = mediaItemIdFromString(QStringLiteral("fedcba9876543210"));
+	REQUIRE(catalog.mediaType(photo) == Catalog::MediaType::Photo);
+	REQUIRE(catalog.sourcePathForMediaItem(photo) == rootFolder + "/Photos/Trip/Photo.jpg");
+	REQUIRE(catalog.mediaItems().value(photo).sourceSize == -1);  // none recorded
 }
 
 TEST_CASE("An API-built library round-trips through disk unchanged", "[persistence]")
@@ -130,8 +198,8 @@ TEST_CASE("An API-built library round-trips through disk unchanged", "[persisten
 		Catalog& catalog = library.catalog();
 		const QString root = library.rootFolder();
 
-		const MediaId video = MediaId::fromNameAndSize("Clip.mp4", 1000);
-		REQUIRE(catalog.addMediaItem(video, outsideLibraryPath("videos/Clip.mp4"), root + "/Alpha/Clip", false, 5000));
+		const MediaItemId video = catalog.addMediaItem(outsideLibraryPath("videos/Clip.mp4"), root + "/Alpha/Clip", false, 5000);
+		REQUIRE(video != MediaItemId::None);
 		QString error;
 		const LabelId beta = catalog.createLabel("Beta", "#334455", &error);
 		REQUIRE(beta != LabelId::None);
@@ -140,11 +208,13 @@ TEST_CASE("An API-built library round-trips through disk unchanged", "[persisten
 		catalog.markSplitComplete(video);
 		catalog.setDurationMs(video, 6000);
 
-		const MediaId photo = MediaId::fromNameAndSize("Photo.jpg", 2000);
-		REQUIRE(catalog.addPhoto(photo, root + "/Photos/Beta/Photo.jpg", root + "/Photos/Beta", false));
+		const QString photoPath = root + "/Photos/Beta/Photo.jpg";
+		REQUIRE(QDir{}.mkpath(root + "/Photos/Beta"));
+		writeTextFile(photoPath, "photo");
+		REQUIRE(catalog.addPhoto(photoPath, root + "/Photos/Beta", false) != MediaItemId::None);
 
-		const MediaId referenced = MediaId::fromNameAndSize("Ref.png", 3000);
-		REQUIRE(catalog.addPhoto(referenced, outsideLibraryPath("elsewhere/Ref.png"), {}, true));
+		const MediaItemId referenced = catalog.addPhoto(outsideLibraryPath("elsewhere/Ref.png"), {}, true);
+		REQUIRE(referenced != MediaItemId::None);
 		catalog.addLabel(referenced, beta);
 
 		requireRebuildStable(catalog);
@@ -163,21 +233,18 @@ TEST_CASE("A library opens intact after its folder moves", "[persistence]")
 	REQUIRE(original.isValid());
 	REQUIRE(moved.isValid());
 
-	// A legacy record holding absolute paths under the root; loading must convert it.
+	// A first-format record holding absolute paths under the root; loading must convert it.
 	writeTextFile(original.path() + "/catalog.json", QStringLiteral(R"({
 		"2000:old.jpg": { "name": "Old.jpg", "folder": "%1/Photos/Trip", "sourceVideoPath": "%1/Photos/Trip/Old.jpg", "type": "photo" }
 	})").arg(original.path()).toUtf8());
 
-	const MediaId oldPhoto = MediaId::fromNameAndSize("Old.jpg", 2000);
-	const MediaId newPhoto = MediaId::fromNameAndSize("New.jpg", 3000);
-	const MediaId video    = MediaId::fromNameAndSize("Clip.mp4", 1000);
 	{
 		Library library;
 		REQUIRE(library.setRoot(original.path()));
 		Catalog& catalog = library.catalog();
 		const QString root = library.rootFolder();
-		REQUIRE(catalog.addPhoto(newPhoto, root + "/Photos/Trip/New.jpg", root + "/Photos/Trip", false));
-		REQUIRE(catalog.addMediaItem(video, outsideLibraryPath("videos/Clip.mp4"), root + "/Family/Clip", true));
+		REQUIRE(catalog.addPhoto(root + "/Photos/Trip/New.jpg", root + "/Photos/Trip", false) != MediaItemId::None);
+		REQUIRE(catalog.addMediaItem(outsideLibraryPath("videos/Clip.mp4"), root + "/Family/Clip", true) != MediaItemId::None);
 		REQUIRE(library.flushPendingWrites());
 	}
 	for (const char* file : { "catalog.json", "labels.json" })
@@ -187,11 +254,12 @@ TEST_CASE("A library opens intact after its folder moves", "[persistence]")
 	REQUIRE(library.setRoot(moved.path()));
 	const Catalog& catalog = library.catalog();
 	const QString root = library.rootFolder();
+	const MediaItemId oldPhoto = catalog.mediaItemAtSourcePath(root + "/Photos/Trip/Old.jpg");
+	REQUIRE(oldPhoto != MediaItemId::None);
 	REQUIRE(catalog.folderForMediaItem(oldPhoto) == root + "/Photos/Trip");
-	REQUIRE(catalog.sourcePathForMediaItem(oldPhoto) == root + "/Photos/Trip/Old.jpg");
-	REQUIRE(catalog.sourcePathForMediaItem(newPhoto) == root + "/Photos/Trip/New.jpg");
+	REQUIRE(catalog.mediaItemAtSourcePath(root + "/Photos/Trip/New.jpg") != MediaItemId::None);
+	const MediaItemId video = catalog.mediaItemAtSourcePath(outsideLibraryPath("videos/Clip.mp4"));  // outside the root, so stored as-is
 	REQUIRE(catalog.folderForMediaItem(video) == root + "/Family/Clip");
-	REQUIRE(catalog.sourcePathForMediaItem(video) == outsideLibraryPath("videos/Clip.mp4"));  // outside the root, so stored as-is
 }
 
 TEST_CASE("A legacy library moved before its first load rebases its paths onto the new root", "[persistence]")
@@ -213,26 +281,22 @@ TEST_CASE("A legacy library moved before its first load rebases its paths onto t
 	const Catalog& catalog = library.catalog();
 	const QString root = library.rootFolder();
 
-	const MediaId video = MediaId::fromNameAndSize("Clip.mp4", 1000);
+	const MediaItemId video = catalog.mediaItemAtSourcePath(outsideLibraryPath("videos/Clip.mp4"));
 	REQUIRE(catalog.folderForMediaItem(video) == root + "/Family/Clip");
-	REQUIRE(catalog.sourcePathForMediaItem(video) == outsideLibraryPath("videos/Clip.mp4"));
 	REQUIRE(catalog.labelsForMediaItem(video) == QList<LabelId>{ labelIdByName(catalog, "Family") });
 
-	const MediaId inside = MediaId::fromNameAndSize("Inside.mp4", 1500);
+	const MediaItemId inside = catalog.mediaItemAtSourcePath(root + "/Sources/Inside.mp4");
 	REQUIRE(catalog.folderForMediaItem(inside) == root + "/Family/Inside");
-	REQUIRE(catalog.sourcePathForMediaItem(inside) == root + "/Sources/Inside.mp4");
 
-	const MediaId photo = MediaId::fromNameAndSize("Old.jpg", 2000);
+	const MediaItemId photo = catalog.mediaItemAtSourcePath(root + "/Photos/Trip/Old.jpg");
 	REQUIRE(catalog.folderForMediaItem(photo) == root + "/Photos/Trip");
-	REQUIRE(catalog.sourcePathForMediaItem(photo) == root + "/Photos/Trip/Old.jpg");
 
-	REQUIRE(catalog.sourcePathForMediaItem(MediaId::fromNameAndSize("Ref.png", 3000)) == outsideLibraryPath("elsewhere/Ref.png"));
+	REQUIRE(catalog.mediaItemAtSourcePath(outsideLibraryPath("elsewhere/Ref.png")) != MediaItemId::None);
+	REQUIRE(catalog.mediaItemCount() == 4);
 
 	// The rebased paths are persisted root-relative.
 	REQUIRE(library.flushPendingWrites());
-	QFile catalogFile(moved.path() + "/catalog.json");
-	REQUIRE(catalogFile.open(QIODevice::ReadOnly));
-	REQUIRE_FALSE(catalogFile.readAll().contains(previousRoot.toUtf8()));
+	REQUIRE_FALSE(readFile(moved.path() + "/catalog.json").contains(previousRoot.toUtf8()));
 }
 
 TEST_CASE("setRoot on a fresh Library fails cleanly on corrupt data", "[persistence]")
@@ -266,6 +330,22 @@ TEST_CASE("A failed setRoot leaves the current library untouched", "[persistence
 	SECTION("catalog.json with a non-object root")
 	{
 		writeTextFile(badDir.path() + "/catalog.json", "[1, 2, 3]");
+	}
+	SECTION("catalog.json in an unknown format version")
+	{
+		writeTextFile(badDir.path() + "/catalog.json", R"({ "version": 3, "items": {} })");
+	}
+	SECTION("catalog.json whose items are not an object")
+	{
+		writeTextFile(badDir.path() + "/catalog.json", R"({ "version": 2, "items": [] })");
+	}
+	SECTION("catalog.json with an invalid item id")
+	{
+		writeTextFile(badDir.path() + "/catalog.json", R"({ "version": 2, "items": { "1000:clip.mp4": {} } })");
+	}
+	SECTION("catalog.json with a non-object item record")
+	{
+		writeTextFile(badDir.path() + "/catalog.json", R"({ "version": 2, "items": { "00000000000004d2": 42 } })");
 	}
 	SECTION("labels.json without a 'labels' array")
 	{

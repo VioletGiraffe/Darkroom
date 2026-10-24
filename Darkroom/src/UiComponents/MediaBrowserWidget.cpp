@@ -84,7 +84,7 @@ struct ItemInfo
 	QString name;
 };
 
-ItemInfo itemInfoFor(Catalog& catalog, const MediaId& id, bool sortByDate)
+ItemInfo itemInfoFor(Catalog& catalog, MediaItemId id, bool sortByDate)
 {
 	const QString name = catalog.displayName(id);
 	const bool isBest = catalog.mediaItemHasLabel(id, Catalog::BestLabelId);
@@ -96,7 +96,7 @@ class GridItem final : public QListWidgetItem {
 public:
 	static inline SortOrder order;
 
-	MediaId mediaId;
+	MediaItemId mediaId = MediaItemId::None;
 	ItemInfo info;
 	// Position among the visible rows; kept here because the card that shows it may not exist yet.
 	int displayNumber = 0;
@@ -120,7 +120,7 @@ QString gridCaption(int displayNumber, const QString& name)
 	return QString::number(displayNumber) + ":  " + name;
 }
 
-void applyLabelDots(Catalog& catalog, const MediaId& id, MediaItemWidget* card)
+void applyLabelDots(Catalog& catalog, MediaItemId id, MediaItemWidget* card)
 {
 	std::vector<QColor> dotColors;
 	QStringList dotNames;
@@ -144,7 +144,7 @@ void applyLabelDots(Catalog& catalog, const MediaId& id, MediaItemWidget* card)
 // A card can be built at any moment, so everything it shows must derive from (Catalog, GridItem) alone.
 void applyItemStateToCard(Catalog& catalog, const GridItem& item, MediaItemWidget& card)
 {
-	const MediaId& id = item.mediaId;
+	const MediaItemId id = item.mediaId;
 	const bool isPhoto = catalog.mediaType(id) == Catalog::MediaType::Photo;
 
 	card.setLabel(gridCaption(item.displayNumber, item.info.name));
@@ -168,10 +168,10 @@ void renumberGridCaptions(QListWidget* grid)
 	}
 }
 
-std::vector<MediaId> visibleItemsInViewOrder(const QListWidget* grid, const Catalog& catalog, Catalog::MediaType type)
+std::vector<MediaItemId> visibleItemsInViewOrder(const QListWidget* grid, const Catalog& catalog, Catalog::MediaType type)
 {
 	const int count = grid->count();
-	std::vector<MediaId> items;
+	std::vector<MediaItemId> items;
 	items.reserve(count);
 	for (int row = 0; row < count; ++row)
 	{
@@ -306,7 +306,7 @@ void MediaBrowserWidget::setupUi()
 	connect(_labelSidebar, &LabelSidebar::preferredWidthChanged, this, &MediaBrowserWidget::fitLabelSidebarWidth, Qt::QueuedConnection);
 }
 
-void MediaBrowserWidget::activateMediaItem(const MediaId& id)
+void MediaBrowserWidget::activateMediaItem(MediaItemId id)
 {
 	if (_library.catalog().mediaType(id) == Catalog::MediaType::Photo)
 		viewPhoto(id);
@@ -314,7 +314,7 @@ void MediaBrowserWidget::activateMediaItem(const MediaId& id)
 		playVideo(id);
 }
 
-void MediaBrowserWidget::viewPhoto(const MediaId& id)
+void MediaBrowserWidget::viewPhoto(MediaItemId id)
 {
 	const Catalog& catalog = _library.catalog();
 	const QString sourcePath = catalog.sourcePathForMediaItem(id);
@@ -326,7 +326,7 @@ void MediaBrowserWidget::viewPhoto(const MediaId& id)
 
 	QStringList paths;
 	int startIndex = -1;
-	for (const MediaId& photoId : visiblePhotosInViewOrder())
+	for (const MediaItemId photoId : visiblePhotosInViewOrder())
 	{
 		if (photoId == id)
 			startIndex = static_cast<int>(paths.size());
@@ -339,30 +339,31 @@ void MediaBrowserWidget::viewPhoto(const MediaId& id)
 		startIndex = 0;
 	}
 
-	// Ids come from the viewer's current paths: a rename while it is open changes an item's id.
 	ImageViewerWindow* const viewer = ImageViewerWindow::showForImages(std::move(paths), startIndex, window(),
-		[this](const QString& path) { selectAndScrollToMediaItem(MediaId::fromFile(path)); });
+		[this](const QString& path) { selectAndScrollToMediaItem(_library.catalog().mediaItemAtSourcePath(path)); });
 	if (!viewer)
 		return;
 
 	auto* bestAction = new QAction(tr("Best"), viewer);
 	bestAction->setCheckable(true);
 	bestAction->setShortcut(QKeySequence(Qt::Key_B));
-	connect(bestAction, &QAction::triggered, viewer, [this, viewer] { toggleBest(MediaId::fromFile(viewer->currentImagePath())); });
+	connect(bestAction, &QAction::triggered, viewer, [this, viewer] {
+		if (const MediaItemId shownId = _library.catalog().mediaItemAtSourcePath(viewer->currentImagePath()); shownId != MediaItemId::None)
+			toggleBest(shownId);
+	});
 	viewer->addImageAction(bestAction, [this, bestAction](const QString& path) {
-		const MediaId shownId = MediaId::fromFile(path);
 		const Catalog& catalog = _library.catalog();
-		const bool tracked = catalog.containsMediaItem(shownId);
-		bestAction->setEnabled(tracked);
-		bestAction->setChecked(tracked && catalog.mediaItemHasLabel(shownId, Catalog::BestLabelId));
+		const MediaItemId shownId = catalog.mediaItemAtSourcePath(path);
+		bestAction->setEnabled(shownId != MediaItemId::None);
+		bestAction->setChecked(catalog.mediaItemHasLabel(shownId, Catalog::BestLabelId));
 	});
 
 	viewer->setRemovalActions(
-		{ tr("Remove from library (untrack)"), [this](const QString& path) { return untrackMediaItemAndReportGone(MediaId::fromFile(path)); } },
-		{ tr("Delete"), [this](const QString& path) { return deleteMediaItemAndReportGone(MediaId::fromFile(path)); } });
+		{ tr("Remove from library (untrack)"), [this](const QString& path) { return untrackMediaItemAndReportGone(path); } },
+		{ tr("Delete"), [this](const QString& path) { return deleteMediaItemAndReportGone(path); } });
 }
 
-void MediaBrowserWidget::playVideo(const MediaId& id)
+void MediaBrowserWidget::playVideo(MediaItemId id)
 {
 	const QString sourcePath = _library.catalog().sourcePathForMediaItem(id);
 	if (!QFile::exists(sourcePath))
@@ -374,17 +375,17 @@ void MediaBrowserWidget::playVideo(const MediaId& id)
 	VideoPlayerWindow* const playerWindow = LibraryPlayer::open(_library, sourcePath, nullptr);
 
 	QStringList navigationPaths;
-	for (const MediaId& videoId : visibleVideosInViewOrder())
+	for (const MediaItemId videoId : visibleVideosInViewOrder())
 		navigationPaths << _library.catalog().sourcePathForMediaItem(videoId);
-	// Ids come from the player's current paths, as in viewPhoto.
-	playerWindow->setNavigation(std::move(navigationPaths), [this](const QString& path) { selectAndScrollToMediaItem(MediaId::fromFile(path)); });
+	playerWindow->setNavigation(std::move(navigationPaths),
+		[this](const QString& path) { selectAndScrollToMediaItem(_library.catalog().mediaItemAtSourcePath(path)); });
 
 	playerWindow->setRemovalActions(
-		{ tr("Remove from library (untrack)"), [this](const MediaId& playedId, const QString&) { return untrackMediaItemAndReportGone(playedId); } },
-		{ tr("Delete"), [this](const MediaId& playedId, const QString&) { return deleteMediaItemAndReportGone(playedId); } });
+		{ tr("Remove from library (untrack)"), [this](const QString& path) { return untrackMediaItemAndReportGone(path); } },
+		{ tr("Delete"), [this](const QString& path) { return deleteMediaItemAndReportGone(path); } });
 }
 
-void MediaBrowserWidget::openSourceInSystemApp(const MediaId& id)
+void MediaBrowserWidget::openSourceInSystemApp(MediaItemId id)
 {
 	const QString sourcePath = _library.catalog().sourcePathForMediaItem(id);
 	if (!QFile::exists(sourcePath))
@@ -396,10 +397,10 @@ void MediaBrowserWidget::openSourceInSystemApp(const MediaId& id)
 	QDesktopServices::openUrl(QUrl::fromLocalFile(sourcePath));
 }
 
-void MediaBrowserWidget::showMediaItemContextMenu(const MediaId& id, const QPoint& globalPos)
+void MediaBrowserWidget::showMediaItemContextMenu(MediaItemId id, const QPoint& globalPos)
 {
 	Catalog& catalog = _library.catalog();
-	const std::vector<MediaId> selection = effectiveSelection(id);
+	const std::vector<MediaItemId> selection = effectiveSelection(id);
 	const QString folderPath = catalog.folderForMediaItem(id);
 	const bool isPhoto = catalog.mediaType(id) == Catalog::MediaType::Photo;
 
@@ -412,7 +413,7 @@ void MediaBrowserWidget::showMediaItemContextMenu(const MediaId& id, const QPoin
 	};
 
 	size_t videoCount = 0;
-	for (const MediaId& selectedId : selection)
+	for (const MediaItemId selectedId : selection)
 		if (catalog.mediaType(selectedId) == Catalog::MediaType::Video)
 			++videoCount;
 	const bool selectionAllVideos = videoCount == selection.size();
@@ -422,7 +423,7 @@ void MediaBrowserWidget::showMediaItemContextMenu(const MediaId& id, const QPoin
 	{
 		menu.addAction(selection.size() > 1 ? tr("Compare selected") : tr("Inspect"), this, [this, selection] {
 			QStringList folders;
-			for (const MediaId& selectedId : selection)
+			for (const MediaItemId selectedId : selection)
 				folders << _library.catalog().folderForMediaItem(selectedId);
 			auto* compareWindow = new CompareWindow(folders, window());
 			compareWindow->setAttribute(Qt::WA_DeleteOnClose);
@@ -435,7 +436,7 @@ void MediaBrowserWidget::showMediaItemContextMenu(const MediaId& id, const QPoin
 	{
 		menu.addAction(tr("Compare photos"), this, [this, selection] {
 			QStringList paths;
-			for (const MediaId& selectedId : selection)
+			for (const MediaItemId selectedId : selection)
 				paths << _library.catalog().sourcePathForMediaItem(selectedId);
 			PhotoCompareWindow::showForFiles(_library, paths, window());
 		});
@@ -481,7 +482,7 @@ void MediaBrowserWidget::showMediaItemContextMenu(const MediaId& id, const QPoin
 		const LabelId labelId = label.id;
 
 		int haveCount = 0;
-		for (const MediaId& selectedId : selection)
+		for (const MediaItemId selectedId : selection)
 			if (catalog.mediaItemHasLabel(selectedId, labelId))
 				++haveCount;
 
@@ -489,7 +490,7 @@ void MediaBrowserWidget::showMediaItemContextMenu(const MediaId& id, const QPoin
 			LabelVisuals::presenceForCount(haveCount, static_cast<int>(selection.size())),
 			[this, selection, labelId](bool addToAll) {
 				Catalog::BatchScope batch(_library.catalog());
-				for (const MediaId& selectedId : selection)
+				for (const MediaItemId selectedId : selection)
 				{
 					if (addToAll)
 						_library.catalog().addLabel(selectedId, labelId);
@@ -512,17 +513,17 @@ void MediaBrowserWidget::showMediaItemContextMenu(const MediaId& id, const QPoin
 	menu.exec(globalPos);
 }
 
-void MediaBrowserWidget::removeMediaItemsFromLibrary(const std::vector<MediaId>& ids)
+void MediaBrowserWidget::removeMediaItemsFromLibrary(const std::vector<MediaItemId>& ids)
 {
 	syncViewsAfterRemoval(MediaItemManagement::removeItemsFromLibrary(_library.catalog(), ids, window()));
 }
 
-void MediaBrowserWidget::deleteMediaItemsInteractive(const std::vector<MediaId>& selection)
+void MediaBrowserWidget::deleteMediaItemsInteractive(const std::vector<MediaItemId>& selection)
 {
 	syncViewsAfterRemoval(MediaItemManagement::deleteItemsInteractive(_library.catalog(), selection, window()));
 }
 
-void MediaBrowserWidget::removeMediaItemsFromLibraryInteractive(const std::vector<MediaId>& selection)
+void MediaBrowserWidget::removeMediaItemsFromLibraryInteractive(const std::vector<MediaItemId>& selection)
 {
 	syncViewsAfterRemoval(MediaItemManagement::removeItemsFromLibraryInteractive(_library.catalog(), selection, window()));
 }
@@ -535,19 +536,25 @@ void MediaBrowserWidget::syncViewsAfterRemoval(const MediaItemManagement::Remova
 		emit frameFolderPathChanged(folderPath, {}, {});
 }
 
-bool MediaBrowserWidget::deleteMediaItemAndReportGone(const MediaId& id)
+bool MediaBrowserWidget::deleteMediaItemAndReportGone(const QString& sourcePath)
 {
+	const MediaItemId id = _library.catalog().mediaItemAtSourcePath(sourcePath);
+	if (id == MediaItemId::None)
+		return false;
 	deleteMediaItemsInteractive({ id });
 	return !_library.catalog().containsMediaItem(id);
 }
 
-bool MediaBrowserWidget::untrackMediaItemAndReportGone(const MediaId& id)
+bool MediaBrowserWidget::untrackMediaItemAndReportGone(const QString& sourcePath)
 {
+	const MediaItemId id = _library.catalog().mediaItemAtSourcePath(sourcePath);
+	if (id == MediaItemId::None)
+		return false;
 	removeMediaItemsFromLibraryInteractive({ id });
 	return !_library.catalog().containsMediaItem(id);
 }
 
-void MediaBrowserWidget::renameMediaItemInteractive(const MediaId& id)
+void MediaBrowserWidget::renameMediaItemInteractive(MediaItemId id)
 {
 	const MediaRename::Result result = MediaRename::renameItemInteractive(_library.catalog(), id, window());
 	if (!result.renamed)
@@ -569,7 +576,7 @@ void MediaBrowserWidget::removeSelectedMediaItemsFromLibraryInteractive()
 
 void MediaBrowserWidget::renameSelectedMediaItemInteractive()
 {
-	const std::vector<MediaId> selection = selectedMediaItems();
+	const std::vector<MediaItemId> selection = selectedMediaItems();
 	if (selection.size() == 1)
 		renameMediaItemInteractive(selection.front());
 }
@@ -653,12 +660,12 @@ void MediaBrowserWidget::zoomCards(int steps)
 	_gridZoomDebounce->start();
 }
 
-std::vector<MediaId> MediaBrowserWidget::mediaItemsMatchingFilters() const
+std::vector<MediaItemId> MediaBrowserWidget::mediaItemsMatchingFilters() const
 {
 	const Catalog& catalog = _library.catalog();
 
 	const QList<LabelId> activeLabelIds = _labelSidebar->activeLabelIds();
-	std::vector<MediaId> mediaItems;
+	std::vector<MediaItemId> mediaItems;
 	if (activeLabelIds.empty())
 	{
 		const auto& all = catalog.mediaItems();
@@ -666,10 +673,10 @@ std::vector<MediaId> MediaBrowserWidget::mediaItemsMatchingFilters() const
 	}
 	else
 	{
-		QSet<MediaId> matched = catalog.mediaItemsForLabel(activeLabelIds.front());
+		QSet<MediaItemId> matched = catalog.mediaItemsForLabel(activeLabelIds.front());
 		for (qsizetype i = 1; i < activeLabelIds.size(); ++i)
 		{
-			const QSet<MediaId> next = catalog.mediaItemsForLabel(activeLabelIds[i]);
+			const QSet<MediaItemId> next = catalog.mediaItemsForLabel(activeLabelIds[i]);
 			if (_labelSidebar->isAndMode())
 				matched.intersect(next);
 			else
@@ -681,7 +688,7 @@ std::vector<MediaId> MediaBrowserWidget::mediaItemsMatchingFilters() const
 	if (const int typeFilterIdx = _mediaTypeFilter->currentIndex(); typeFilterIdx != 0)
 	{
 		const Catalog::MediaType wanted = typeFilterIdx == 2 ? Catalog::MediaType::Photo : Catalog::MediaType::Video;
-		std::erase_if(mediaItems, [&](const MediaId& id) { return catalog.mediaType(id) != wanted; });
+		std::erase_if(mediaItems, [&](MediaItemId id) { return catalog.mediaType(id) != wanted; });
 	}
 
 	return mediaItems;
@@ -690,7 +697,7 @@ std::vector<MediaId> MediaBrowserWidget::mediaItemsMatchingFilters() const
 MediaItemWidget* MediaBrowserWidget::buildMediaCard(QListWidgetItem* item)
 {
 	const auto& gridItem = *static_cast<GridItem*>(item);
-	const MediaId& id = gridItem.mediaId;
+	const MediaItemId id = gridItem.mediaId;
 
 	Catalog& catalog = _library.catalog();
 	const bool isPhoto = catalog.mediaType(id) == Catalog::MediaType::Photo;
@@ -717,7 +724,6 @@ MediaItemWidget* MediaBrowserWidget::buildMediaCard(QListWidgetItem* item)
 	auto* card = new MediaItemWidget(
 		isPhoto ? _photoCanvas : _videoCanvas,
 		previewPaths, QString(),
-		id,
 		gridItem.info.isBest,
 		[this, id] { toggleBest(id); },
 		[this, id] { activateMediaItem(id); },
@@ -731,14 +737,14 @@ MediaItemWidget* MediaBrowserWidget::buildMediaCard(QListWidgetItem* item)
 
 	// Defer rebuilding the grid until this card's dropEvent has unwound.
 	card->setOnLabelDropped([this, id](const QString& labelId) {
-		const std::vector<MediaId> targets = effectiveSelection(id);
+		const std::vector<MediaItemId> targets = effectiveSelection(id);
 		const LabelId dropped = labelIdFromString(labelId);
 		const uint64_t libraryGeneration = _library.generation();
 		QMetaObject::invokeMethod(this, [this, libraryGeneration, targets, dropped] {
 			if (_library.generation() != libraryGeneration)
 				return;
 			Catalog::BatchScope batch(_library.catalog());
-			for (const MediaId& target : targets)
+			for (const MediaItemId target : targets)
 				_library.catalog().addLabel(target, dropped);
 		}, Qt::QueuedConnection);
 	});
@@ -761,7 +767,6 @@ QSize MediaBrowserWidget::cardSizeHintFor(bool isPhoto) const
 	MediaItemWidget probe{
 		isPhoto ? _photoCanvas : _videoCanvas,
 		{}, QString(),
-		MediaId{},
 		false,
 		{}, {}, {},
 		/* dynamic size hint */ false,
@@ -803,7 +808,7 @@ void MediaBrowserWidget::rebuildGridRows()
 	GridItem::order = _sortControl->order();
 	const bool sortByDate = GridItem::order.sortBy == SortBy::Date;
 
-	const std::vector<MediaId> mediaItems = mediaItemsMatchingFilters();
+	const std::vector<MediaItemId> mediaItems = mediaItemsMatchingFilters();
 
 	_mediaGrid->setEmptyMessage(catalog.mediaItemCount() == 0
 		? tr("The library is empty.\nDrop media files here, or use Tools > Import.")
@@ -811,7 +816,7 @@ void MediaBrowserWidget::rebuildGridRows()
 
 	const QSize photoCardHint = cardSizeHintFor(/* isPhoto */ true);
 	const QSize videoCardHint = cardSizeHintFor(/* isPhoto */ false);
-	for (const MediaId& id : mediaItems)
+	for (const MediaItemId id : mediaItems)
 	{
 		auto* item = new GridItem();
 		item->mediaId = id;
@@ -838,7 +843,7 @@ QString MediaBrowserWidget::topAnchorKey() const
 	{
 		const QListWidgetItem* item = _mediaGrid->item(row);
 		if (!item->isHidden() && _mediaGrid->visualItemRect(item).bottom() >= 0)
-			return static_cast<const GridItem*>(item)->mediaId.key();
+			return toString(static_cast<const GridItem*>(item)->mediaId);
 	}
 	return {};
 }
@@ -850,7 +855,7 @@ void MediaBrowserWidget::scrollGridToAnchorKey(const QString& anchorKey)
 	for (int row = 0; row < _mediaGrid->count(); ++row)
 	{
 		QListWidgetItem* item = _mediaGrid->item(row);
-		if (!item->isHidden() && static_cast<const GridItem*>(item)->mediaId.key() == anchorKey)
+		if (!item->isHidden() && toString(static_cast<const GridItem*>(item)->mediaId) == anchorKey)
 		{
 			_mediaGrid->scrollToItem(item, QAbstractItemView::PositionAtTop);
 			return;
@@ -858,7 +863,7 @@ void MediaBrowserWidget::scrollGridToAnchorKey(const QString& anchorKey)
 	}
 }
 
-void MediaBrowserWidget::selectAndScrollToMediaItem(const MediaId& id)
+void MediaBrowserWidget::selectAndScrollToMediaItem(MediaItemId id)
 {
 	for (int row = 0; row < _mediaGrid->count(); ++row)
 	{
@@ -877,9 +882,9 @@ MediaBrowserWidget::GridViewState MediaBrowserWidget::captureGridViewState() con
 	GridViewState state;
 	state.scrollAnchorKey = topAnchorKey();
 	for (const QListWidgetItem* item : _mediaGrid->selectedItems())
-		state.selectedKeys.insert(static_cast<const GridItem*>(item)->mediaId.key());
+		state.selectedKeys.insert(toString(static_cast<const GridItem*>(item)->mediaId));
 	if (const QListWidgetItem* current = _mediaGrid->currentItem())
-		state.currentKey = static_cast<const GridItem*>(current)->mediaId.key();
+		state.currentKey = toString(static_cast<const GridItem*>(current)->mediaId);
 	return state;
 }
 
@@ -895,7 +900,7 @@ void MediaBrowserWidget::restoreGridViewState(const GridViewState& state)
 				auto* item = static_cast<GridItem*>(_mediaGrid->item(row));
 				if (item->isHidden())
 					continue;
-				const QString key = item->mediaId.key();
+				const QString key = toString(item->mediaId);
 				if (state.selectedKeys.contains(key))
 					item->setSelected(true);
 				if (!state.currentKey.isEmpty() && key == state.currentKey)
@@ -945,29 +950,29 @@ void MediaBrowserWidget::applyNameFilter()
 	_mediaGrid->ensureVisibleCardsExist();
 }
 
-std::vector<MediaId> MediaBrowserWidget::selectedMediaItems() const
+std::vector<MediaItemId> MediaBrowserWidget::selectedMediaItems() const
 {
 	const QList<QListWidgetItem*> selectedItems = _mediaGrid->selectedItems();
-	std::vector<MediaId> selected;
+	std::vector<MediaItemId> selected;
 	selected.reserve(selectedItems.size());
 	for (const QListWidgetItem* item : selectedItems)
 		selected.push_back(static_cast<const GridItem*>(item)->mediaId);
 	return selected;
 }
 
-std::vector<MediaId> MediaBrowserWidget::visibleVideosInViewOrder() const
+std::vector<MediaItemId> MediaBrowserWidget::visibleVideosInViewOrder() const
 {
 	return visibleItemsInViewOrder(_mediaGrid, _library.catalog(), Catalog::MediaType::Video);
 }
 
-std::vector<MediaId> MediaBrowserWidget::visiblePhotosInViewOrder() const
+std::vector<MediaItemId> MediaBrowserWidget::visiblePhotosInViewOrder() const
 {
 	return visibleItemsInViewOrder(_mediaGrid, _library.catalog(), Catalog::MediaType::Photo);
 }
 
-std::vector<MediaId> MediaBrowserWidget::effectiveSelection(std::optional<MediaId> target) const
+std::vector<MediaItemId> MediaBrowserWidget::effectiveSelection(std::optional<MediaItemId> target) const
 {
-	std::vector<MediaId> selected = selectedMediaItems();
+	std::vector<MediaItemId> selected = selectedMediaItems();
 	if (target && std::find(selected.cbegin(), selected.cend(), *target) == selected.cend())
 		selected = { *target };
 	return selected;
@@ -987,7 +992,7 @@ QList<QUrl> MediaBrowserWidget::dragUrlsForItems(const QList<QListWidgetItem*>& 
 	return urls;
 }
 
-void MediaBrowserWidget::toggleBest(const MediaId& id)
+void MediaBrowserWidget::toggleBest(MediaItemId id)
 {
 	Catalog& catalog = _library.catalog();
 	if (catalog.mediaItemHasLabel(id, Catalog::BestLabelId))

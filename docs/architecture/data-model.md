@@ -38,31 +38,28 @@ The library layout has three relevant forms:
 - Referenced photos and source videos remain at external source paths recorded by Catalog.
 
 The Catalog record links storage products to their source media. Virtual-label membership and optional feature
-metadata are stored by `MediaId`; they do not create directories.
+metadata are stored by `MediaItemId`; they do not create directories.
 
 Persisted paths under the root are root-relative, so the library folder can move; paths outside it stay absolute.
 Loading rewrites any absolute path under the root to the relative form. An older-format library moved before that
 rewrite still holds paths under its previous root; loading rebases them onto the current root first. In-memory paths
 are always absolute.
 
-## MediaId
+## MediaItemId
 
-`MediaId` identifies a source file by case-insensitive filename plus byte size. Path is excluded, so moving a source
-or storage product preserves identity. Renaming the source changes identity and must go through
-`Catalog::applyRename` so every persisted field is re-keyed.
+`MediaItemId` is an assigned identity: Catalog mints a random 64-bit value at registration, and nothing about the file
+changes it. A rename, a move, a located source, or an edit to the file updates the item's recorded paths or size.
+Anything that refers to a tracked item across a call or time boundary carries its id.
 
-`MediaId::fromFile` stats an existing file; it cannot reconstruct an id from a path after that file has moved or
-disappeared. Workflows therefore capture the id while the source exists and carry it across later operations.
+A file's name and size are matching aids, not an identity:
 
-The canonical persisted key combines size with the lowercased filename. Its folding rule is a storage-format
-contract: changing it would orphan existing records. Name-and-size identity can collide for different bytes, so
-staging and registration treat such collisions explicitly rather than assuming content equality.
+- The recorded size selects the tracked items a content-duplicate check byte-compares.
+- The recorded name and size re-find a moved source in a searched folder.
+- An edit made outside Darkroom leaves the recorded size stale until the integrity check records it again.
 
-Files or folders whose names differ only in letter case are unsupported on every platform: `MediaId` and
-`pathComparisonKey` fold case by design. Case-only media renames are refused on case-sensitive file systems. Qt name
-filters match case-insensitively on all platforms unless `QDir::CaseSensitive` is passed.
-
-Media ids are derived rather than assigned; there is no separate file-to-id registry to synchronize.
+Files or folders whose names differ only in letter case are unsupported on every platform: `pathComparisonKey` folds
+case by design. Case-only media renames are refused on case-sensitive file systems. Qt name filters match
+case-insensitively on all platforms unless `QDir::CaseSensitive` is passed.
 
 ## LabelId
 
@@ -71,21 +68,20 @@ monotonic counter restored from `labels.json`; the low range is reserved for sen
 `None` and `Best`.
 
 Stable ids let label rename preserve every membership association. The scoped type prevents accidental interchange
-with strings, integers, or `MediaId`. Persistence uses numeric ids; conversion to text is confined to string-based UI
+with strings, integers, or `MediaItemId`. Persistence uses numeric ids; conversion to text is confined to string-based UI
 payloads and ImportDialog's provisional-id namespace.
 
 ## MetadataStore
 
-`MetadataStore` is a GUI-thread, `MediaId`-keyed JSON record store owned by Library. It deliberately knows nothing
+`MetadataStore` is a GUI-thread, `MediaItemId`-keyed JSON record store owned by Library. It deliberately knows nothing
 about labels, folders, playback loops, or other feature semantics. Each feature owns the serialization of its fields,
 while Catalog is the sole interpreter of item and label records.
 
 The backing `catalog.json` travels with the library root. Records are field-granular so independent features can
-update one named value without replacing their neighbors. Removing the final meaningful field removes the record;
-the reserved human-readable name field cannot keep an otherwise empty record alive.
+update one named value without replacing their neighbors. Removing a record's last field removes the record.
 
-Catalog enumerates persisted ids through the store rather than disk. `rekey` moves a complete record when a source
-rename changes `MediaId`, preserving unrelated feature metadata.
+Every record belongs to a catalog item; features write fields only for items. Catalog enumerates persisted ids through
+the store rather than disk.
 
 All mutation goes through `MetadataStore::Writer`. Changes become visible in memory immediately, while physical
 save is deferred until the outermost nested Writer ends. One Writer can therefore publish a multi-field record as a
@@ -101,6 +97,10 @@ than redirecting a live record set.
 an absent file, which is valid for a new library, from unreadable or malformed data. Library validates the candidate
 objects before constructing Catalog and MetadataStore, then passes those same objects through without permissive
 re-parsing.
+
+`catalog.json` carries a format version. A document from before versioning was keyed by file name and size; loading
+converts it, minting ids and dropping the records that were never items, and keeps the original as
+`catalog.v1-backup.json` before the converted form is saved.
 
 Both stores save atomically and retain failed writes as dirty, retryable state. UI reporting is queued outside writer
 destruction. A candidate library whose required initial registry cannot be saved is rejected before publication, and

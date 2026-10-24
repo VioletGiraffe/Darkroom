@@ -38,8 +38,8 @@ CI and local builds run the same scripts in `scripts/`; the `.bat` files start t
   adds their dependencies and include paths.
 
 The tests do not link `Shared`: `tests/tests.pro` compiles the sources under test directly, so the tests build even when
-the rest of the apps' code does not. It takes the model half of `Core/` (`Catalog`, `CatalogIntegrity`, `Library` from
-`Darkroom/src`; `JsonPersistence`, `MediaId`, `MetadataStore` from `Shared/src`) plus `Utils.cpp` for its path helpers.
+the rest of the apps' code does not. It takes the model half of `Core/` (`Catalog`, `CatalogIntegrity`, `Library`,
+`MetadataStore` from `Darkroom/src`; `JsonPersistence` from `Shared/src`) plus `Utils.cpp` for its path helpers.
 Its `LIBS` are hand-listed too.
 
 **The link trap:** a source the tests compile gaining an `#include` of a submodule library the tests do not link breaks

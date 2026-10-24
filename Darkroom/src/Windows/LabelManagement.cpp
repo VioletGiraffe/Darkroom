@@ -99,7 +99,7 @@ void LabelManagement::deleteLabelInteractive(Catalog& catalog, LabelId labelId, 
 		return;
 
 	Catalog::ChangeBatchScope catalogChanges(catalog);
-	std::vector<MediaId> itemsLeftBehind;
+	std::vector<MediaItemId> itemsLeftBehind;
 	if (!catalog.deleteLabel(labelId, &itemsLeftBehind))
 	{
 		QString failure = QObject::tr("Could not fully delete \"%1\".").arg(name);
@@ -107,7 +107,7 @@ void LabelManagement::deleteLabelInteractive(Catalog& catalog, LabelId labelId, 
 			failure += "\n\n" + QObject::tr("Some items may not have been moved.");
 		else
 		{
-			std::ranges::sort(itemsLeftBehind, [&catalog](const MediaId& a, const MediaId& b) {
+			std::ranges::sort(itemsLeftBehind, [&catalog](MediaItemId a, MediaItemId b) {
 				return NaturalSort::lessCaseInsensitive(
 					MediaItemManagement::itemDisplayName(catalog, a), MediaItemManagement::itemDisplayName(catalog, b));
 			});

@@ -2,7 +2,8 @@
 #include "Windows/VideoPlayerWindow.h"
 #include "Core/Catalog.h"
 #include "Core/Library.h"
-#include "Core/MediaId.h"
+#include "Core/MediaItemId.h"
+#include "Core/MetadataStore.h"
 #include "DarkroomSettings.h"
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
@@ -11,12 +12,16 @@ DISABLE_COMPILER_WARNINGS
 #include <QCursor>
 #include <QDir>
 #include <QFile>
+#include <QJsonValue>
 #include <QMessageBox>
 #include <QObject>
 #include <QSettings>
 #include <QString>
+#include <QStringView>
 #include <QToolTip>
 RESTORE_COMPILER_WARNINGS
+
+#include <utility>
 
 namespace {
 
@@ -55,20 +60,20 @@ void registerExtractedFrame(Catalog& catalog, const QString& framePath, QWidget*
 	const LabelId labelId = catalog.ordinaryLabelIdByName(labelName); // created by prepareExtractedLabelFolder
 	assert_and_return_r(labelId != LabelId::None, );
 
-	if (const QString existingPath = catalog.findPhotoBySameContent(framePath); !existingPath.isEmpty())
+	if (const MediaItemId existing = catalog.findMediaItemWithSameContent(framePath); existing != MediaItemId::None)
 	{
 		QFile::remove(framePath);
-		catalog.addLabel(MediaId::fromFile(existingPath), labelId);
+		catalog.addLabel(existing, labelId);
 		QToolTip::showText(QCursor::pos(), QObject::tr("Already in the library as %1\nLabelled \"%2\"")
-			.arg(QDir::toNativeSeparators(existingPath), labelName), dialogParent);
+			.arg(QDir::toNativeSeparators(catalog.sourcePathForMediaItem(existing)), labelName), dialogParent);
 		return;
 	}
 
-	if (!catalog.addPhoto(MediaId::fromFile(framePath), framePath, catalog.photoFolderForLabel(labelId), /*referenced=*/false))
+	if (catalog.addPhoto(framePath, catalog.photoFolderForLabel(labelId), /*referenced=*/false) == MediaItemId::None)
 	{
 		QFile::remove(framePath);
 		QMessageBox::critical(dialogParent, QObject::tr("Error"),
-			QObject::tr("An item with the same name and file size is already tracked elsewhere:\n%1").arg(QDir::toNativeSeparators(framePath)));
+			QObject::tr("The extracted frame could not be registered in the library:\n%1").arg(QDir::toNativeSeparators(framePath)));
 		return;
 	}
 
@@ -79,8 +84,24 @@ void registerExtractedFrame(Catalog& catalog, const QString& framePath, QWidget*
 
 VideoPlayerWindow* LibraryPlayer::open(Library& library, const QString& videoPath, QWidget* parent)
 {
-	// Library is stable across library switches; the store it holds is not.
-	VideoPlayerWindow* const player = VideoPlayerWindow::createPlayerWindow(videoPath, parent, [&library] { return &library.metadataStore(); });
+	// Library is stable across library switches; its catalog and store are not.
+	VideoPlayerWindow::PlaybackSettingsStore settingsStore{
+		.load = [&library](const QString& path, QStringView field) {
+			const MediaItemId id = library.catalog().mediaItemAtSourcePath(path);
+			return id == MediaItemId::None ? QJsonValue(QJsonValue::Undefined) : library.metadataStore().get(id, field);
+		},
+		.save = [&library](const QString& path, QStringView field, const QJsonValue& value) {
+			const MediaItemId id = library.catalog().mediaItemAtSourcePath(path);
+			if (id == MediaItemId::None)
+				return;
+			MetadataStore::Writer writer = library.metadataStore().beginBatch();
+			if (value.isUndefined())
+				writer.removeField(id, field);
+			else
+				writer.set(id, field, value);
+		},
+	};
+	VideoPlayerWindow* const player = VideoPlayerWindow::createPlayerWindow(videoPath, parent, std::move(settingsStore));
 	player->setFrameTarget({
 		QObject::tr("Extract frame and import to library"),
 		QObject::tr("Extract frame → library"),

@@ -1,6 +1,5 @@
 #include "Core/Catalog.h"
 #include "Core/Library.h"
-#include "Core/MediaId.h"
 #include "TestHelpers.h"
 
 #include <QDir>
@@ -29,13 +28,13 @@ namespace
 		}
 
 		// Registers a video whose frame folder physically exists under the given label's storage folder,
-		// so the disk-touching paths (relocation, label rename) can operate on it.
-		MediaId addVideo(const QString& name, qint64 size, const QString& labelName)
+		// so the disk-touching paths (relocation, label rename) can operate on it. The source does not exist.
+		MediaItemId addVideo(const QString& name, const QString& labelName, const QString& sourceFolder = "videos")
 		{
 			const QString folder = root + '/' + labelName + '/' + QFileInfo(name).completeBaseName();
 			REQUIRE(QDir{}.mkpath(folder));
-			const MediaId id = MediaId::fromNameAndSize(name, size);
-			REQUIRE(library.catalog().addMediaItem(id, outsideLibraryPath("videos/") + name, folder, true));
+			const MediaItemId id = library.catalog().addMediaItem(outsideLibraryPath(sourceFolder + '/') + name, folder, true);
+			REQUIRE(id != MediaItemId::None);
 			return id;
 		}
 
@@ -47,17 +46,17 @@ namespace
 	};
 }
 
-TEST_CASE("frameFolderName: derived from the identity's fields alone", "[catalog]")
+TEST_CASE("frameFolderName: derived from the source's name, extension and size", "[catalog]")
 {
 	// Names folders on disk: these values pin the scheme
-	CHECK(Catalog::frameFolderName("clip", MediaId::fromNameAndSize("clip.mp4", 734003200)) == "clip_mp4_734003200");
-	CHECK(Catalog::frameFolderName("clip", MediaId::fromNameAndSize("clip", 5)) == "clip__5");
-	CHECK(Catalog::frameFolderName("", MediaId::fromNameAndSize(".mp4", 5)) == "_mp4_5");
+	CHECK(Catalog::frameFolderName("clip", "mp4", 734003200) == "clip_mp4_734003200");
+	CHECK(Catalog::frameFolderName("clip", "", 5) == "clip__5");
+	CHECK(Catalog::frameFolderName("", "mp4", 5) == "_mp4_5");
 
-	// Identities differing in extension, size, or only where an underscore replaces the dot
-	CHECK(Catalog::frameFolderName("clip", MediaId::fromNameAndSize("clip.mp4", 5)) != Catalog::frameFolderName("clip", MediaId::fromNameAndSize("clip.mov", 5)));
-	CHECK(Catalog::frameFolderName("clip", MediaId::fromNameAndSize("clip.mp4", 5)) != Catalog::frameFolderName("clip", MediaId::fromNameAndSize("clip.mp4", 6)));
-	CHECK(Catalog::frameFolderName("a_b", MediaId::fromNameAndSize("a_b", 5)) != Catalog::frameFolderName("a", MediaId::fromNameAndSize("a.b", 5)));
+	// Sources differing in extension, size, or only where an underscore replaces the dot
+	CHECK(Catalog::frameFolderName("clip", "mp4", 5) != Catalog::frameFolderName("clip", "mov", 5));
+	CHECK(Catalog::frameFolderName("clip", "mp4", 5) != Catalog::frameFolderName("clip", "mp4", 6));
+	CHECK(Catalog::frameFolderName("a_b", "", 5) != Catalog::frameFolderName("a", "b", 5));
 }
 
 TEST_CASE("Library forwards coalesced Catalog change notifications", "[catalog]")
@@ -72,11 +71,11 @@ TEST_CASE("Library forwards coalesced Catalog change notifications", "[catalog]"
 	catalog.setColor(f.alpha, "#123456");
 	REQUIRE(notificationCount == 1);
 
-	MediaId video;
+	MediaItemId video = MediaItemId::None;
 	{
 		Catalog::ChangeBatchScope changes(catalog);
 		catalog.setColor(f.beta, "#654321");
-		video = f.addVideo("Clip.mp4", 1000, "Alpha");
+		video = f.addVideo("Clip.mp4", "Alpha");
 		catalog.addLabel(video, f.beta);
 	}
 	REQUIRE(notificationCount == 2);
@@ -93,34 +92,75 @@ TEST_CASE("Library forwards coalesced Catalog change notifications", "[catalog]"
 	REQUIRE(notificationCount == 4);
 }
 
-TEST_CASE("addMediaItem: collision and re-registration rules", "[catalog]")
+TEST_CASE("addMediaItem: a new id per item; a tracked source or frame folder is refused", "[catalog]")
 {
 	LibraryFixture f;
 	Catalog& catalog = f.library.catalog();
 
-	const MediaId id = f.addVideo("Clip.mp4", 1000, "Alpha");
+	const MediaItemId id = f.addVideo("Clip.mp4", "Alpha");
+	REQUIRE(catalog.mediaItemAtSourcePath(outsideLibraryPath("videos/Clip.mp4")) == id);
+	REQUIRE(catalog.videoAtFrameFolder(f.root + "/Alpha/Clip") == id);
 
-	// Same id at a different folder: a name+size collision - refused, the existing entry untouched.
-	REQUIRE_FALSE(catalog.addMediaItem(id, outsideLibraryPath("other/Clip.mp4"), f.root + "/Beta/Clip", true));
+	// The same source, under any spelling, is refused; the existing entry is untouched.
+	REQUIRE(catalog.addMediaItem(outsideLibraryPath("videos/Clip.mp4"), f.root + "/Beta/Clip", true) == MediaItemId::None);
+	REQUIRE(catalog.addMediaItem(outsideLibraryPath("VIDEOS/CLIP.MP4"), f.root + "/Beta/CLIP", true) == MediaItemId::None);
 	REQUIRE(catalog.folderForMediaItem(id) == f.root + "/Alpha/Clip");
-	REQUIRE(catalog.sourcePathForMediaItem(id) == outsideLibraryPath("videos/Clip.mp4"));
+	REQUIRE(catalog.mediaItemCount() == 1);
 
-	// A case-variant of the same name is the same id - still a collision.
-	REQUIRE_FALSE(catalog.addMediaItem(MediaId::fromNameAndSize("CLIP.MP4", 1000), outsideLibraryPath("other/CLIP.MP4"), f.root + "/Beta/CLIP", true));
+	// So is a second source for the same frame folder.
+	REQUIRE(catalog.addMediaItem(outsideLibraryPath("other/Clip.mp4"), f.root + "/Alpha/Clip", true) == MediaItemId::None);
 
-	// Re-registration at the same folder is not a collision: it updates the entry (an import overwriting the video's folder).
-	REQUIRE(catalog.addMediaItem(id, outsideLibraryPath("videos/Clip.mp4"), f.root + "/Alpha/Clip", false, 5000));
-	REQUIRE_FALSE(catalog.isSplitIntoFrames(id));
-	REQUIRE(catalog.durationMsForMediaItem(id) == 5000);
+	// Another source with the same name is a different item with its own id.
+	const MediaItemId other = f.addVideo("Clip.mp4", "Beta", "other");
+	REQUIRE(other != id);
+	REQUIRE(catalog.mediaItemCount() == 2);
 
-	// An unknown incoming duration must not erase the stored one.
-	REQUIRE(catalog.addMediaItem(id, outsideLibraryPath("videos/Clip.mp4"), f.root + "/Alpha/Clip", true, -1));
-	REQUIRE(catalog.durationMsForMediaItem(id) == 5000);
-	REQUIRE(catalog.isSplitIntoFrames(id));
-
-	REQUIRE_FALSE(catalog.addMediaItem(MediaId{}, outsideLibraryPath("videos/x.mp4"), f.root + "/Alpha/x", true));
+	// A missing source records no size; a non-positive duration records none.
+	REQUIRE(catalog.mediaItems().value(id).sourceSize == -1);
+	REQUIRE(catalog.durationMsForMediaItem(id) == -1);
 
 	requireRebuildStable(catalog);
+}
+
+TEST_CASE("addMediaItem and addPhoto record the source's size", "[catalog]")
+{
+	LibraryFixture f;
+	Catalog& catalog = f.library.catalog();
+
+	const QString photoPath = f.root + "/Ref.png";
+	writeTextFile(photoPath, "0123456789");
+	const MediaItemId photo = catalog.addPhoto(photoPath, {}, true);
+	REQUIRE(catalog.mediaItems().value(photo).sourceSize == 10);
+
+	const QString videoPath = f.root + "/clip.mp4";
+	writeTextFile(videoPath, "0123");
+	REQUIRE(QDir{}.mkpath(f.root + "/Alpha/clip"));
+	const MediaItemId video = catalog.addMediaItem(videoPath, f.root + "/Alpha/clip", true, 5000);
+	REQUIRE(catalog.mediaItems().value(video).sourceSize == 4);
+	REQUIRE(catalog.durationMsForMediaItem(video) == 5000);
+
+	requireRebuildStable(catalog);
+}
+
+TEST_CASE("frameFolderForNewVideo: numbered when another video owns the folder", "[catalog]")
+{
+	LibraryFixture f;
+	Catalog& catalog = f.library.catalog();
+
+	// Two different files with the same name and size.
+	const QString first = f.root + "/a/Clip.mp4";
+	const QString second = f.root + "/b/Clip.mp4";
+	REQUIRE(QDir{}.mkpath(f.root + "/a"));
+	REQUIRE(QDir{}.mkpath(f.root + "/b"));
+	writeTextFile(first, "1111");
+	writeTextFile(second, "2222");
+
+	const QString storage = f.root + "/Alpha";
+	const QString firstFolder = catalog.frameFolderForNewVideo(storage, first);
+	REQUIRE(firstFolder == storage + "/Clip_mp4_4");
+	REQUIRE(catalog.addMediaItem(first, firstFolder, false) != MediaItemId::None);
+
+	REQUIRE(catalog.frameFolderForNewVideo(storage, second) == storage + "/Clip_mp4_4_2");
 }
 
 TEST_CASE("removeLabel: storage relocation and the last-ordinary-label invariant", "[catalog]")
@@ -128,13 +168,15 @@ TEST_CASE("removeLabel: storage relocation and the last-ordinary-label invariant
 	LibraryFixture f;
 	Catalog& catalog = f.library.catalog();
 
-	const MediaId video = f.addVideo("Clip.mp4", 1000, "Alpha");
+	const MediaItemId video = f.addVideo("Clip.mp4", "Alpha");
 	catalog.addLabel(video, f.beta);
 	catalog.addLabel(video, Catalog::BestLabelId);
 
 	// Removing the storage label relocates the frame folder to the remaining ordinary label.
 	catalog.removeLabel(video, f.alpha);
 	REQUIRE(catalog.folderForMediaItem(video) == f.root + "/Beta/Clip");
+	REQUIRE(catalog.videoAtFrameFolder(f.root + "/Beta/Clip") == video);
+	REQUIRE(catalog.videoAtFrameFolder(f.root + "/Alpha/Clip") == MediaItemId::None);
 	REQUIRE(QDir(f.root + "/Beta/Clip").exists());
 	REQUIRE_FALSE(QDir(f.root + "/Alpha/Clip").exists());
 	REQUIRE_FALSE(catalog.mediaItemHasLabel(video, f.alpha));
@@ -153,6 +195,26 @@ TEST_CASE("removeLabel: storage relocation and the last-ordinary-label invariant
 	requireRebuildStable(catalog);
 }
 
+TEST_CASE("removeLabel: a relocated owned photo is found at its new path", "[catalog]")
+{
+	LibraryFixture f;
+	Catalog& catalog = f.library.catalog();
+
+	const QString photosAlpha = f.root + "/Photos/Alpha";
+	REQUIRE(QDir{}.mkpath(photosAlpha));
+	const QString oldPath = photosAlpha + "/pic.png";
+	writeTextFile(oldPath, "x");
+	const MediaItemId photo = catalog.addPhoto(oldPath, photosAlpha, false);
+	catalog.addLabel(photo, f.beta);
+
+	catalog.removeLabel(photo, f.alpha);
+	const QString newPath = f.root + "/Photos/Beta/pic.png";
+	REQUIRE(catalog.sourcePathForMediaItem(photo) == newPath);
+	REQUIRE(catalog.mediaItemAtSourcePath(newPath) == photo);
+	REQUIRE(catalog.mediaItemAtSourcePath(oldPath) == MediaItemId::None);
+	requireRebuildStable(catalog);
+}
+
 TEST_CASE("A referenced photo keeps its last ordinary label", "[catalog]")
 {
 	LibraryFixture f;
@@ -160,8 +222,8 @@ TEST_CASE("A referenced photo keeps its last ordinary label", "[catalog]")
 
 	const QString photoPath = f.root + "/Ref.png";
 	writeTextFile(photoPath, "0123456789");
-	const MediaId photo = MediaId::fromFile(photoPath);
-	REQUIRE(catalog.addPhoto(photo, photoPath, {}, true));
+	const MediaItemId photo = catalog.addPhoto(photoPath, {}, true);
+	REQUIRE(photo != MediaItemId::None);
 	catalog.addLabel(photo, f.alpha);
 
 	catalog.removeLabel(photo, f.alpha);  // the last ordinary label - refused
@@ -175,42 +237,60 @@ TEST_CASE("A referenced photo keeps its last ordinary label", "[catalog]")
 	requireRebuildStable(catalog);
 }
 
-TEST_CASE("applyRename: metadata follows the new identity, collisions are refused", "[catalog]")
+TEST_CASE("updateMediaItemPaths: the id and metadata stay, another item's source is refused", "[catalog]")
 {
 	LibraryFixture f;
 	Catalog& catalog = f.library.catalog();
 
-	const MediaId oldId = f.addVideo("Clip.mp4", 1000, "Alpha");
-	catalog.addLabel(oldId, Catalog::BestLabelId);
-	catalog.setDurationMs(oldId, 5000);
-	const MediaId other = f.addVideo("Other.mp4", 2000, "Alpha");
+	const MediaItemId id = f.addVideo("Clip.mp4", "Alpha");
+	catalog.addLabel(id, Catalog::BestLabelId);
+	catalog.setDurationMs(id, 5000);
+	const MediaItemId other = f.addVideo("Other.mp4", "Alpha");
 
-	// Renaming onto another tracked item's identity is refused, both entries untouched.
-	REQUIRE_FALSE(catalog.applyRename(oldId, other, outsideLibraryPath("videos/Other.mp4"), f.root + "/Alpha/Other"));
-	REQUIRE(catalog.folderForMediaItem(oldId) == f.root + "/Alpha/Clip");
+	// Moving onto another tracked item's source is refused, both entries untouched.
+	REQUIRE_FALSE(catalog.updateMediaItemPaths(id, outsideLibraryPath("videos/Other.mp4"), f.root + "/Alpha/Other"));
+	REQUIRE(catalog.folderForMediaItem(id) == f.root + "/Alpha/Clip");
 	REQUIRE(catalog.folderForMediaItem(other) == f.root + "/Alpha/Other");
 
-	// A real rename: new name, new folder; labels and duration ride along to the new identity.
-	const MediaId newId = MediaId::fromNameAndSize("Renamed.mp4", 1000);
+	// A rename: new paths under the same id; labels and duration stay.
 	REQUIRE(QFile::rename(f.root + "/Alpha/Clip", f.root + "/Alpha/Renamed"));
-	REQUIRE(catalog.applyRename(oldId, newId, outsideLibraryPath("videos/Renamed.mp4"), f.root + "/Alpha/Renamed"));
-	REQUIRE(catalog.containsMediaItem(newId));
-	REQUIRE(catalog.durationMsForMediaItem(newId) == 5000);
-	REQUIRE(catalog.mediaItemHasLabel(newId, Catalog::BestLabelId));
-	REQUIRE(catalog.folderForMediaItem(newId) == f.root + "/Alpha/Renamed");
+	REQUIRE(catalog.updateMediaItemPaths(id, outsideLibraryPath("videos/Renamed.mp4"), f.root + "/Alpha/Renamed"));
+	REQUIRE(catalog.durationMsForMediaItem(id) == 5000);
+	REQUIRE(catalog.mediaItemHasLabel(id, Catalog::BestLabelId));
+	REQUIRE(catalog.folderForMediaItem(id) == f.root + "/Alpha/Renamed");
+	REQUIRE(catalog.mediaItemAtSourcePath(outsideLibraryPath("videos/Renamed.mp4")) == id);
+	REQUIRE(catalog.mediaItemAtSourcePath(outsideLibraryPath("videos/Clip.mp4")) == MediaItemId::None);
+	REQUIRE(catalog.videoAtFrameFolder(f.root + "/Alpha/Renamed") == id);
 	requireRebuildStable(catalog);
 
-	// A case-only rename is the same identity, but the stored original-case name must still update.
-	const MediaId casedId = MediaId::fromNameAndSize("RENAMED.MP4", 1000);
-	REQUIRE(catalog.applyRename(newId, casedId, outsideLibraryPath("videos/RENAMED.MP4"), f.root + "/Alpha/Renamed"));
-	REQUIRE(catalog.containsMediaItem(newId));  // same identity under either spelling
-	bool nameUpdated = false;
-	for (auto it = catalog.mediaItems().cbegin(); it != catalog.mediaItems().cend(); ++it)
-		if (it.key() == casedId)
-			nameUpdated = (it.key().name() == "RENAMED.MP4");
-	REQUIRE(nameUpdated);
-	REQUIRE(catalog.mediaItemHasLabel(casedId, Catalog::BestLabelId));
+	// A located source that exists has its size recorded; a missing one keeps the recorded size.
+	const QString located = f.root + "/Located.mp4";
+	writeTextFile(located, "012345");
+	REQUIRE(catalog.updateMediaItemPaths(id, located, f.root + "/Alpha/Renamed"));
+	REQUIRE(catalog.mediaItems().value(id).sourceSize == 6);
+	REQUIRE(catalog.updateMediaItemPaths(id, outsideLibraryPath("videos/Gone.mp4"), f.root + "/Alpha/Renamed"));
+	REQUIRE(catalog.mediaItems().value(id).sourceSize == 6);
 	requireRebuildStable(catalog);
+}
+
+TEST_CASE("refreshSourceSize records the current size", "[catalog]")
+{
+	LibraryFixture f;
+	Catalog& catalog = f.library.catalog();
+
+	const QString photoPath = f.root + "/Ref.png";
+	writeTextFile(photoPath, "0123");
+	const MediaItemId photo = catalog.addPhoto(photoPath, {}, true);
+	writeTextFile(photoPath, "0123456789");
+	REQUIRE(catalog.mediaItems().value(photo).sourceSize == 4);
+
+	REQUIRE(catalog.refreshSourceSize(photo));
+	REQUIRE(catalog.mediaItems().value(photo).sourceSize == 10);
+	requireRebuildStable(catalog);
+
+	REQUIRE(QFile::remove(photoPath));
+	REQUIRE_FALSE(catalog.refreshSourceSize(photo));
+	REQUIRE(catalog.mediaItems().value(photo).sourceSize == 10);
 }
 
 TEST_CASE("renameLabel: folders and stored paths follow, associations survive", "[catalog]")
@@ -218,7 +298,7 @@ TEST_CASE("renameLabel: folders and stored paths follow, associations survive", 
 	LibraryFixture f;
 	Catalog& catalog = f.library.catalog();
 
-	const MediaId video = f.addVideo("Clip.mp4", 1000, "Alpha");
+	const MediaItemId video = f.addVideo("Clip.mp4", "Alpha");
 	catalog.addLabel(video, Catalog::BestLabelId);
 	QString error;
 
@@ -229,6 +309,7 @@ TEST_CASE("renameLabel: folders and stored paths follow, associations survive", 
 		REQUIRE(labelIdByName(catalog, "Alpha") == LabelId::None);
 		REQUIRE(labelIdByName(catalog, "Gamma") == f.alpha);  // same id - associations preserved
 		REQUIRE(catalog.folderForMediaItem(video) == f.root + "/Gamma/Clip");
+		REQUIRE(catalog.videoAtFrameFolder(f.root + "/Gamma/Clip") == video);
 		REQUIRE(QDir(f.root + "/Gamma/Clip").exists());
 		REQUIRE_FALSE(QDir(f.root + "/Alpha").exists());
 		REQUIRE(catalog.mediaItemHasLabel(video, f.alpha));
@@ -267,10 +348,10 @@ TEST_CASE("deleteLabel: relocates, untags, refuses orphaning", "[catalog]")
 	LibraryFixture f;
 	Catalog& catalog = f.library.catalog();
 
-	const MediaId stored1 = f.addVideo("One.mp4", 1000, "Alpha");
+	const MediaItemId stored1 = f.addVideo("One.mp4", "Alpha");
 	catalog.addLabel(stored1, f.beta);
-	const MediaId stored2 = f.addVideo("Two.mp4", 2000, "Alpha");  // Alpha is its only label so far
-	const MediaId tagger = f.addVideo("Three.mp4", 3000, "Beta");
+	const MediaItemId stored2 = f.addVideo("Two.mp4", "Alpha");  // Alpha is its only label so far
+	const MediaItemId tagger = f.addVideo("Three.mp4", "Beta");
 	catalog.addLabel(tagger, f.alpha);
 
 	// stored2 would be orphaned: the impact reports it, and the delete is refused wholesale.
@@ -307,15 +388,15 @@ TEST_CASE("deleteLabel: a blocked relocation keeps the label and reports what st
 	LibraryFixture f;
 	Catalog& catalog = f.library.catalog();
 
-	const MediaId blocked = f.addVideo("One.mp4", 1000, "Alpha");
+	const MediaItemId blocked = f.addVideo("One.mp4", "Alpha");
 	catalog.addLabel(blocked, f.beta);
-	const MediaId movable = f.addVideo("Two.mp4", 2000, "Alpha");
+	const MediaItemId movable = f.addVideo("Two.mp4", "Alpha");
 	catalog.addLabel(movable, f.beta);
 
 	// An occupied destination is what blocks the move; the rest of the deletion still runs.
 	REQUIRE(QDir{}.mkpath(f.root + "/Beta/One"));
 
-	std::vector<MediaId> itemsLeftBehind;
+	std::vector<MediaItemId> itemsLeftBehind;
 	REQUIRE_FALSE(catalog.deleteLabel(f.alpha, &itemsLeftBehind));
 	REQUIRE(itemsLeftBehind.size() == 1);
 	REQUIRE(itemsLeftBehind.front() == blocked);
@@ -331,15 +412,14 @@ TEST_CASE("A mutated library reloads to an identical state", "[catalog][persiste
 	LibraryFixture f;
 	Catalog& catalog = f.library.catalog();
 
-	const MediaId video = f.addVideo("Clip.mp4", 1000, "Alpha");
+	const MediaItemId video = f.addVideo("Clip.mp4", "Alpha");
 	catalog.addLabel(video, f.beta);
 	catalog.addLabel(video, Catalog::BestLabelId);
 	catalog.setColor(f.beta, "#445566");
 	catalog.removeLabel(video, f.alpha);  // relocates Alpha/Clip -> Beta/Clip
-	const MediaId newId = MediaId::fromNameAndSize("Renamed.mp4", 1000);
 	REQUIRE(QFile::rename(f.root + "/Beta/Clip", f.root + "/Beta/Renamed"));
-	REQUIRE(catalog.applyRename(video, newId, outsideLibraryPath("videos/Renamed.mp4"), f.root + "/Beta/Renamed"));
-	catalog.removeMediaItem(f.addVideo("Doomed.mp4", 9000, "Beta"));
+	REQUIRE(catalog.updateMediaItemPaths(video, outsideLibraryPath("videos/Renamed.mp4"), f.root + "/Beta/Renamed"));
+	catalog.removeMediaItem(f.addVideo("Doomed.mp4", "Beta"));
 	REQUIRE(f.library.flushPendingWrites());
 
 	Library reloaded;
@@ -347,7 +427,7 @@ TEST_CASE("A mutated library reloads to an identical state", "[catalog][persiste
 	REQUIRE(dumpCatalog(reloaded.catalog()) == dumpCatalog(catalog));
 }
 
-TEST_CASE("findPhotoBySameContent: same-size photos are byte-compared, the rest skipped", "[catalog]")
+TEST_CASE("findMediaItemWithSameContent: same-size items are byte-compared, the rest skipped", "[catalog]")
 {
 	LibraryFixture f;
 	Catalog& catalog = f.library.catalog();
@@ -356,24 +436,30 @@ TEST_CASE("findPhotoBySameContent: same-size photos are byte-compared, the rest 
 	REQUIRE(QDir{}.mkpath(photosBeta));
 	const QString storedPath = photosBeta + "/Stored.png";
 	writeTextFile(storedPath, "0123456789");  // 10 bytes
-	const MediaId photo = MediaId::fromFile(storedPath);
-	REQUIRE(catalog.addPhoto(photo, storedPath, photosBeta, false));
+	const MediaItemId photo = catalog.addPhoto(storedPath, photosBeta, false);
 
 	// A byte-identical file under a different name is the same content re-encountered.
 	const QString identical = f.root + "/copy.png";
 	writeTextFile(identical, "0123456789");
-	REQUIRE(catalog.findPhotoBySameContent(identical) == storedPath);
+	REQUIRE(catalog.findMediaItemWithSameContent(identical) == photo);
 
 	// Same size clears the gate but the byte compare rejects it - the case that catches a broken gate or
 	// a broken compare masking each other.
 	const QString sameSizeOtherBytes = f.root + "/other.png";
 	writeTextFile(sameSizeOtherBytes, "9876543210");  // 10 bytes, different content
-	REQUIRE(catalog.findPhotoBySameContent(sameSizeOtherBytes).isEmpty());
+	REQUIRE(catalog.findMediaItemWithSameContent(sameSizeOtherBytes) == MediaItemId::None);
 
 	// A different size never reaches the byte compare.
 	const QString differentSize = f.root + "/short.png";
 	writeTextFile(differentSize, "012");
-	REQUIRE(catalog.findPhotoBySameContent(differentSize).isEmpty());
+	REQUIRE(catalog.findMediaItemWithSameContent(differentSize) == MediaItemId::None);
+
+	// The gate is the recorded size: a tracked file grown since is not compared.
+	writeTextFile(storedPath, "0123456789ab");
+	writeTextFile(identical, "0123456789ab");
+	REQUIRE(catalog.findMediaItemWithSameContent(identical) == MediaItemId::None);
+	REQUIRE(catalog.refreshSourceSize(photo));
+	REQUIRE(catalog.findMediaItemWithSameContent(identical) == photo);
 }
 
 TEST_CASE("removeLabel: a relocation blocked by a name collision leaves the item untouched", "[catalog]")
@@ -383,10 +469,10 @@ TEST_CASE("removeLabel: a relocation blocked by a name collision leaves the item
 
 	SECTION("a video's frame folder")
 	{
-		const MediaId video = f.addVideo("Clip.mp4", 1000, "Alpha");  // <root>/Alpha/Clip
+		const MediaItemId video = f.addVideo("Clip.mp4", "Alpha");  // <root>/Alpha/Clip
 		catalog.addLabel(video, f.beta);
-		// A different item (same name, different size -> different id) already occupies the destination basename.
-		f.addVideo("Clip.mp4", 2000, "Beta");  // <root>/Beta/Clip
+		// A different item already occupies the destination basename.
+		f.addVideo("Clip.mp4", "Beta", "other");  // <root>/Beta/Clip
 
 		catalog.removeLabel(video, f.alpha);  // would relocate Alpha/Clip -> Beta/Clip, which exists -> refused
 
@@ -407,11 +493,10 @@ TEST_CASE("removeLabel: a relocation blocked by a name collision leaves the item
 		const QString aPath = photosAlpha + "/pic.png";
 		const QString bPath = photosBeta + "/pic.png";
 		writeTextFile(aPath, "aaaa");
-		writeTextFile(bPath, "bbbbbb");  // same name, different size -> different id
-		const MediaId photo = MediaId::fromFile(aPath);
-		REQUIRE(catalog.addPhoto(photo, aPath, photosAlpha, false));
+		writeTextFile(bPath, "bbbbbb");
+		const MediaItemId photo = catalog.addPhoto(aPath, photosAlpha, false);
 		catalog.addLabel(photo, f.beta);
-		REQUIRE(catalog.addPhoto(MediaId::fromFile(bPath), bPath, photosBeta, false));
+		REQUIRE(catalog.addPhoto(bPath, photosBeta, false) != MediaItemId::None);
 
 		catalog.removeLabel(photo, f.alpha);  // would relocate to Photos/Beta/pic.png, which exists -> refused
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Core/LabelId.h"
-#include "Core/MediaId.h"
+#include "Core/MediaItemId.h"
 #include "Core/MetadataStore.h"  // BatchScope holds a MetadataStore::Writer by value
 #include "Utils.h"
 #include "compiler/compiler_warnings_control.h"
@@ -51,9 +51,9 @@ public:
 	// stored absolute paths under the root, or under the previous root of a moved older-format library, as root-relative.
 	void rebuildIndex();
 
-	[[nodiscard]] QList<LabelId> labelsForMediaItem(const MediaId& id) const;
-	[[nodiscard]] QSet<MediaId> mediaItemsForLabel(LabelId labelId) const;
-	[[nodiscard]] bool mediaItemHasLabel(const MediaId& id, LabelId labelId) const;
+	[[nodiscard]] QList<LabelId> labelsForMediaItem(MediaItemId id) const;
+	[[nodiscard]] QSet<MediaItemId> mediaItemsForLabel(LabelId labelId) const;
+	[[nodiscard]] bool mediaItemHasLabel(MediaItemId id, LabelId labelId) const;
 
 	// Read-only through mediaItems(); mutated only by Catalog.
 	struct Entry
@@ -61,6 +61,7 @@ public:
 		QString       folder;         // absolute; empty for a referenced photo
 		QString       sourcePath;     // absolute; may currently be unavailable
 		QList<LabelId> labelIds;      // derived storage label first, then stored labels
+		qint64      sourceSize = -1;  // bytes when last recorded; -1 = unknown
 		bool        splitIntoFrames = true;
 		qint64      durationMs = -1;
 		MediaType   type = MediaType::Video;
@@ -68,43 +69,50 @@ public:
 	};
 
 	// Live, unordered model borrow. Use asKeyValueRange() when both id and entry are needed.
-	[[nodiscard]] const QHash<MediaId, Entry>& mediaItems() const { return _mediaItems; }
-	[[nodiscard]] bool containsMediaItem(const MediaId& id) const { return _mediaItems.contains(id); }
+	[[nodiscard]] const QHash<MediaItemId, Entry>& mediaItems() const { return _mediaItems; }
+	[[nodiscard]] bool containsMediaItem(MediaItemId id) const { return _mediaItems.contains(id); }
 	[[nodiscard]] int mediaItemCount() const { return static_cast<int>(_mediaItems.size()); }
 	[[nodiscard]] QHash<LabelId, int> labelMediaItemCounts() const;
 
+	// By pathComparisonKey; None when no item's source is recorded at path.
+	[[nodiscard]] MediaItemId mediaItemAtSourcePath(const QString& path) const;
+	// By pathComparisonKey; None when no video's frame folder is folder.
+	[[nodiscard]] MediaItemId videoAtFrameFolder(const QString& folder) const;
+	// A tracked item whose source has the same bytes as filePath, None when there is none. Only items of the same recorded size are compared.
+	[[nodiscard]] MediaItemId findMediaItemWithSameContent(const QString& filePath) const;
+
 	// Empty for an unknown id.
-	[[nodiscard]] QString folderForMediaItem(const MediaId& id) const;
-	[[nodiscard]] QString sourcePathForMediaItem(const MediaId& id) const;
-	// Source basename used for display and sorting; never exposes a video frame-folder identity suffix.
-	[[nodiscard]] QString displayName(const MediaId& id) const;
-	// Appends the identity's extension and byte size, so even an empty, reserved, or trailing-dot basename yields a valid unique leaf.
+	[[nodiscard]] QString folderForMediaItem(MediaItemId id) const;
+	[[nodiscard]] QString sourcePathForMediaItem(MediaItemId id) const;
+	// Source basename used for display and sorting; never exposes a video frame-folder suffix.
+	[[nodiscard]] QString displayName(MediaItemId id) const;
+	// Appends the source's extension and byte size, so even an empty, reserved, or trailing-dot basename yields a valid leaf.
 	// Names folders on disk: a scheme change mismatches the folders of existing items.
-	[[nodiscard]] static QString frameFolderName(const QString& baseName, const MediaId& id);
+	[[nodiscard]] static QString frameFolderName(const QString& baseName, const QString& sourceSuffix, qint64 sourceSize);
+	// <storageFolder>/<frameFolderName> for the file at sourcePath, numbered when another video already owns that folder.
+	// The returned folder may exist on disk untracked.
+	[[nodiscard]] QString frameFolderForNewVideo(const QString& storageFolder, const QString& sourcePath) const;
 	// Pure path join; frameFolder need not exist.
 	[[nodiscard]] static QString previewDirFor(const QString& frameFolder);
 	// The label registry's JSON document under rootFolder.
 	[[nodiscard]] static QString registryFilePathFor(const QString& rootFolder);
 	// False for a preview-only video. Unknown ids and photos return true because no split is pending.
-	[[nodiscard]] bool isSplitIntoFrames(const MediaId& id) const;
+	[[nodiscard]] bool isSplitIntoFrames(MediaItemId id) const;
 	// Unknown id -> Video.
-	[[nodiscard]] MediaType mediaType(const MediaId& id) const;
+	[[nodiscard]] MediaType mediaType(MediaItemId id) const;
 	// True for a photo tracked in place; catalog label/removal operations never touch its file.
-	[[nodiscard]] bool isReferenced(const MediaId& id) const;
+	[[nodiscard]] bool isReferenced(MediaItemId id) const;
 	// Video duration in ms; -1 for an unknown id, a photo, or an unprobed video.
-	[[nodiscard]] qint64 durationMsForMediaItem(const MediaId& id) const;
+	[[nodiscard]] qint64 durationMsForMediaItem(MediaItemId id) const;
 	// Directory of the first available video source, in unspecified iteration order; empty when none exists.
 	[[nodiscard]] QString anySourceDir() const;
 
-	// Returns a byte-identical tracked photo's source path, size-gating disk comparisons; empty when none matches.
-	[[nodiscard]] QString findPhotoBySameContent(const QString& photoPath) const;
-
-	// Invalid ids no-op. Removing the storage label relocates an owned item's storage to its alphabetically
+	// Unknown ids no-op. Removing the storage label relocates an owned item's storage to its alphabetically
 	// first remaining ordinary label. Removing any item's last ordinary label is refused.
-	void addLabel(const MediaId& id, LabelId labelId);
-	void removeLabel(const MediaId& id, LabelId labelId);
+	void addLabel(MediaItemId id, LabelId labelId);
+	void removeLabel(MediaItemId id, LabelId labelId);
 	// Drops stored label ids that no longer exist in the registry. Returns whether anything changed.
-	bool removeInvalidLabelReferences(const MediaId& id);
+	bool removeInvalidLabelReferences(MediaItemId id);
 
 	// Coalesces catalog-change notification without extending a persistence batch. Use around compound,
 	// event-pumping workflows whose intermediate model states should not reach observers.
@@ -136,19 +144,26 @@ public:
 		MetadataStore::Writer _writer;
 	};
 
-	// Registers or updates a video and ensures its storage label exists. A matching id under another folder is
-	// refused; re-registering it in place is allowed. durationMs <= 0 preserves any stored duration.
-	bool addMediaItem(const MediaId& id, const QString& sourcePath, const QString& folderAbs, bool splitIntoFrames, qint64 durationMs = -1);
-	// Same collision rule as addMediaItem. labelDirAbs is empty for a referenced photo, whose initial label must
+	// Registers a video under a newly minted id, records its source's size, and ensures its storage label exists.
+	// Returns None, changing nothing, when the source path or frame folder is already tracked. durationMs <= 0 records none.
+	MediaItemId addMediaItem(const QString& sourcePath, const QString& folderAbs, bool splitIntoFrames, qint64 durationMs = -1);
+	// Same refusal rule for the source path. labelDirAbs is empty for a referenced photo, whose initial label must
 	// be added separately.
-	bool addPhoto(const MediaId& id, const QString& sourcePath, const QString& labelDirAbs, bool referenced);
+	MediaItemId addPhoto(const QString& sourcePath, const QString& labelDirAbs, bool referenced);
 	// Forgets the item without touching its files.
-	void removeMediaItem(const MediaId& id);
-	// Re-keys the complete metadata/model entry after an on-disk rename. oldId == newId is allowed; collision
-	// with another tracked item is refused without mutation so the caller can roll back disk changes.
-	bool applyRename(const MediaId& oldId, const MediaId& newId, const QString& newSourcePath, const QString& newFolderAbs);
-	// Backfills a video's duration; invalid, non-positive, and unchanged values no-op.
-	void setDurationMs(const MediaId& id, qint64 durationMs);
+	void removeMediaItem(MediaItemId id);
+	// Records new paths after an on-disk rename or a located source; the id and all metadata are kept. The size is
+	// re-recorded when a file is at newSourcePath. Refused without mutation when another item's source is at
+	// newSourcePath, so the caller can roll back disk changes.
+	bool updateMediaItemPaths(MediaItemId id, const QString& newSourcePath, const QString& newFolderAbs);
+	// Records the current size of the item's source file. False for an unknown id or a missing file.
+	bool refreshSourceSize(MediaItemId id);
+	// Backfills a video's duration; unknown ids, non-positive and unchanged values no-op.
+	void setDurationMs(MediaItemId id, qint64 durationMs);
+
+	// The current-format item records equivalent to a first-format catalog.json document: ids are minted, sizes are
+	// taken from the keys, and records that were not items are dropped.
+	[[nodiscard]] static QJsonObject itemRecordsFromFirstFormat(const QJsonObject& document);
 
 	// Returns a translatable source-text error, or nullptr when displayName is a safe portable path component.
 	[[nodiscard]] static const char* labelNameValidationError(const QString& displayName);
@@ -180,12 +195,12 @@ public:
 	// Relocates storage, removes extra tags, and then removes the empty backing folder and registry entry.
 	// Refuses Best, unknown ids, orphaning, or incomplete relocation. Incomplete relocation keeps the label and
 	// fills itemsLeftBehind with the items still stored under it; the other refusals leave it empty.
-	bool deleteLabel(LabelId labelId, std::vector<MediaId>* itemsLeftBehind = nullptr);
+	bool deleteLabel(LabelId labelId, std::vector<MediaItemId>* itemsLeftBehind = nullptr);
 
 	// Persists a video's completed split; unknown and already-complete ids no-op.
-	void markSplitComplete(const MediaId& id);
+	void markSplitComplete(MediaItemId id);
 	// Returns a video to preview-only, so viewing its frames extracts them again; unknown ids, photos and preview-only videos no-op.
-	void markPreviewOnly(const MediaId& id);
+	void markPreviewOnly(MediaItemId id);
 
 	// Called around each move of item storage on disk: a label removal relocating an item, a label rename. Both optional.
 	struct StorageMoveHandlers
@@ -220,32 +235,43 @@ private:
 	bool ensureBestLabelExists();
 	bool ensureFolderLabelExists(const QString& displayName, const QString& color = {});
 	[[nodiscard]] LabelId generateLabelId();
+	[[nodiscard]] MediaItemId generateMediaItemId() const;
 	[[nodiscard]] QString photosRootFolder() const;
 
 	[[nodiscard]] static QString storageFolderNameOf(const QString& folderAbs);
 	// The video storage-folder or owned-photo label-directory name; empty for referenced photos.
 	[[nodiscard]] static QString storageLabelNameOf(const Entry& e);
 	[[nodiscard]] LabelId storageLabelIdOf(const Entry& e) const;
-	[[nodiscard]] bool hasOtherOrdinaryLabel(const MediaId& id, LabelId excludedLabelId) const;
+	[[nodiscard]] bool hasOtherOrdinaryLabel(MediaItemId id, LabelId excludedLabelId) const;
 	// Persisted paths are root-relative under the library root, so the library can move; absolute elsewhere. Empty maps to empty.
 	[[nodiscard]] QString toStoredPath(const QString& absolutePath) const;
 	[[nodiscard]] QString fromStoredPath(const QString& storedPath) const;
-	[[nodiscard]] QList<LabelId> computeLabelIds(const MediaId& id, const Entry& e) const;
-	void refreshMediaItemLabels(const MediaId& id);
+	[[nodiscard]] QList<LabelId> computeLabelIds(MediaItemId id, const Entry& e) const;
+	void refreshMediaItemLabels(MediaItemId id);
+
+	// Every insertion, removal and path change goes through these, so the path indexes stay in step.
+	void insertMediaItem(MediaItemId id, Entry e);
+	void eraseMediaItem(MediaItemId id);
+	void setMediaItemPaths(MediaItemId id, Entry& e, const QString& sourcePath, const QString& folder);
+	void indexMediaItemPaths(MediaItemId id, const Entry& e);
+	void unindexMediaItemPaths(MediaItemId id, const Entry& e);
 
 	[[nodiscard]] Label* mutableLabelById(LabelId id);
 	// Moves an item's storage (a video's frame folder / an owned photo's file) off the label that currently
 	// names it, onto its alphabetically-first remaining ordinary label, and updates the model entry. Warns and
 	// does nothing if no other ordinary label remains. Never reached by referenced photos (no storage label).
-	void relocateFolderOffLabel(const MediaId& id, LabelId removedLabelId);
+	void relocateFolderOffLabel(MediaItemId id, LabelId removedLabelId);
 
-	[[nodiscard]] QList<LabelId> readStoredLabelIds(const MediaId& id) const;
-	void writeStoredLabelIds(const MediaId& id, const QList<LabelId>& labelIds);
+	[[nodiscard]] QList<LabelId> readStoredLabelIds(MediaItemId id) const;
+	void writeStoredLabelIds(MediaItemId id, const QList<LabelId>& labelIds);
 
 	const QString          _rootFolder;
 	MetadataStore&         _metadataStore;
 	std::vector<Label>    _labels;
-	QHash<MediaId, Entry> _mediaItems;
+	QHash<MediaItemId, Entry> _mediaItems;
+	// pathComparisonKey -> item.
+	QHash<QString, MediaItemId> _mediaItemBySourcePath;
+	QHash<QString, MediaItemId> _videoByFrameFolder;
 	uint64_t              _nextLabelId = FirstRealLabelId - 1;
 	bool                  _registryDirty = false;
 	QString               _pendingRegistrySaveError;

@@ -6,6 +6,7 @@
 #include "dialogs/messagedialog.h"
 
 DISABLE_COMPILER_WARNINGS
+#include <QFileInfo>
 #include <QMessageBox>
 #include <QObject>
 #include <QSet>
@@ -20,21 +21,21 @@ enum class SourceFiles { Keep, Trash };
 
 // A video's frame folder always goes to Trash; a photo's folder is shared by siblings and is never touched.
 MediaItemManagement::RemovalResult removeItems(
-	Catalog& catalog, const std::vector<MediaId>& items, SourceFiles sourceFiles, QWidget* dialogParent)
+	Catalog& catalog, const std::vector<MediaItemId>& items, SourceFiles sourceFiles, QWidget* dialogParent)
 {
 	Catalog::ChangeBatchScope catalogChanges(catalog);
 	const bool trashSources = sourceFiles == SourceFiles::Trash;
 
 	struct ItemPaths
 	{
-		MediaId id;
+		MediaItemId id;
 		bool isPhoto;
 		QString sourcePath;
 		QString frameFolder; // empty for a photo
 	};
 	std::vector<ItemPaths> itemPaths;
 	QStringList photoFilesAndFrameFolders;
-	for (const MediaId& id : items)
+	for (const MediaItemId id : items)
 	{
 		const bool isPhoto = catalog.mediaType(id) == Catalog::MediaType::Photo;
 		itemPaths.push_back({ id, isPhoto, catalog.sourcePathForMediaItem(id), isPhoto ? QString() : catalog.folderForMediaItem(id) });
@@ -98,7 +99,7 @@ MediaItemManagement::RemovalResult removeItems(
 			else
 			{
 				result.storageRefreshRequired = true;
-				failedItems << QObject::tr("%1:\n%2").arg(item.id.name(), failedParts.join("\n"));
+				failedItems << QObject::tr("%1:\n%2").arg(MediaItemManagement::itemDisplayName(catalog, item.id), failedParts.join("\n"));
 			}
 		}
 	}
@@ -115,12 +116,12 @@ MediaItemManagement::RemovalResult removeItems(
 
 } // namespace
 
-QString MediaItemManagement::itemDisplayName(const Catalog& catalog, const MediaId& id)
+QString MediaItemManagement::itemDisplayName(const Catalog& catalog, MediaItemId id)
 {
-	return catalog.mediaType(id) == Catalog::MediaType::Photo ? id.name() : catalog.displayName(id);
+	return catalog.mediaType(id) == Catalog::MediaType::Photo ? QFileInfo(catalog.sourcePathForMediaItem(id)).fileName() : catalog.displayName(id);
 }
 
-QString MediaItemManagement::bulletedItemNameList(const Catalog& catalog, const std::vector<MediaId>& items)
+QString MediaItemManagement::bulletedItemNameList(const Catalog& catalog, const std::vector<MediaItemId>& items)
 {
 	QString list;
 	constexpr size_t maxListed = 15;
@@ -132,7 +133,7 @@ QString MediaItemManagement::bulletedItemNameList(const Catalog& catalog, const 
 }
 
 MediaItemManagement::RemovalResult MediaItemManagement::deleteItemsInteractive(
-	Catalog& catalog, const std::vector<MediaId>& selection, QWidget* dialogParent)
+	Catalog& catalog, const std::vector<MediaItemId>& selection, QWidget* dialogParent)
 {
 	if (selection.empty())
 		return {};
@@ -140,7 +141,7 @@ MediaItemManagement::RemovalResult MediaItemManagement::deleteItemsInteractive(
 	QString message;
 	if (selection.size() == 1)
 	{
-		const MediaId& id = selection.front();
+		const MediaItemId id = selection.front();
 		const QString sourcePath = catalog.sourcePathForMediaItem(id);
 		if (catalog.mediaType(id) == Catalog::MediaType::Photo)
 		{
@@ -157,7 +158,7 @@ MediaItemManagement::RemovalResult MediaItemManagement::deleteItemsInteractive(
 	{
 		bool anyVideo = false;
 		bool anyPhoto = false;
-		for (const MediaId& id : selection)
+		for (const MediaItemId id : selection)
 		{
 			if (catalog.mediaType(id) == Catalog::MediaType::Video)
 				anyVideo = true;
@@ -183,7 +184,7 @@ MediaItemManagement::RemovalResult MediaItemManagement::deleteItemsInteractive(
 }
 
 MediaItemManagement::RemovalResult MediaItemManagement::removeItemsFromLibraryInteractive(
-	Catalog& catalog, const std::vector<MediaId>& selection, QWidget* dialogParent)
+	Catalog& catalog, const std::vector<MediaItemId>& selection, QWidget* dialogParent)
 {
 	if (selection.empty())
 		return {};
@@ -191,7 +192,7 @@ MediaItemManagement::RemovalResult MediaItemManagement::removeItemsFromLibraryIn
 	QString message;
 	if (selection.size() == 1)
 	{
-		const MediaId& id = selection.front();
+		const MediaItemId id = selection.front();
 		message = QObject::tr("This will remove the item from the library:\n");
 		if (catalog.mediaType(id) == Catalog::MediaType::Video)
 			message += "\n• " + catalog.folderForMediaItem(id);
@@ -204,7 +205,7 @@ MediaItemManagement::RemovalResult MediaItemManagement::removeItemsFromLibraryIn
 		message = QObject::tr("This will remove %1 items from the library:\n").arg(selection.size());
 		message += bulletedItemNameList(catalog, selection);
 	}
-	const bool anyVideo = std::ranges::any_of(selection, [&catalog](const MediaId& id) { return catalog.mediaType(id) == Catalog::MediaType::Video; });
+	const bool anyVideo = std::ranges::any_of(selection, [&catalog](MediaItemId id) { return catalog.mediaType(id) == Catalog::MediaType::Video; });
 	message += "\n\n" + (anyVideo
 		? QObject::tr("Video frames and previews will be moved to Trash. Source files are kept, but labels and other catalog metadata will be discarded. Continue?")
 		: QObject::tr("No files will be deleted, but labels and other catalog metadata will be discarded. Continue?"));
@@ -217,7 +218,7 @@ MediaItemManagement::RemovalResult MediaItemManagement::removeItemsFromLibraryIn
 }
 
 MediaItemManagement::RemovalResult MediaItemManagement::removeItemsFromLibrary(
-	Catalog& catalog, const std::vector<MediaId>& items, QWidget* dialogParent)
+	Catalog& catalog, const std::vector<MediaItemId>& items, QWidget* dialogParent)
 {
 	return removeItems(catalog, items, SourceFiles::Keep, dialogParent);
 }

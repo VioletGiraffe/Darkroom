@@ -43,7 +43,6 @@ HEADERS += \
 # dependencies below. SharedSettings.cpp is here because Utils.cpp reads the ffmpeg path through it.
 SOURCES += \
 	main.cpp \
-	MediaIdTests.cpp \
 	PersistenceTests.cpp \
 	CatalogTests.cpp \
 	CatalogIntegrityTests.cpp \
@@ -53,9 +52,8 @@ SOURCES += \
 	../Darkroom/src/Core/Catalog.cpp \
 	../Darkroom/src/Core/CatalogIntegrity.cpp \
 	../Darkroom/src/Core/Library.cpp \
+	../Darkroom/src/Core/MetadataStore.cpp \
 	../Shared/src/Core/JsonPersistence.cpp \
-	../Shared/src/Core/MediaId.cpp \
-	../Shared/src/Core/MetadataStore.cpp \
 	../Shared/src/MJpegParser.cpp \
 	../Shared/src/SharedSettings.cpp \
 	../Shared/src/Utils.cpp \

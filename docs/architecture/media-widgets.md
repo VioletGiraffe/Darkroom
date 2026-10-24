@@ -4,8 +4,8 @@
 
 ## MediaItemWidget
 
-`MediaItemWidget` is the rich card attached to a materialized browser or staging row. It carries `MediaId`, not a
-storage path. `MediaBrowserWidget` retains paths and Catalog knowledge and supplies plain display state to the card:
+`MediaItemWidget` is the rich card attached to a materialized browser or staging row. It holds no item identity or
+storage path. `MediaBrowserWidget` retains ids, paths and Catalog knowledge and supplies plain display state to the card:
 preview inputs, label colors and tooltip, duration, Best state, and full-frame readiness. The governing split is
 **browser computes, card draws**.
 

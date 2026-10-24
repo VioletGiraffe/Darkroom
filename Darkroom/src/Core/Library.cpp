@@ -1,6 +1,7 @@
 #include "Core/Library.h"
 #include "Core/Catalog.h"
 #include "Core/JsonPersistence.h"
+#include "Core/MediaItemId.h"
 #include "Core/MetadataStore.h"
 
 #include "assert/advanced_assert.h"
@@ -9,6 +10,7 @@
 DISABLE_COMPILER_WARNINGS
 #include <QDebug>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonObject>
@@ -30,6 +32,7 @@ struct LoadedLibraryData
 	QString rootFolder;
 	QJsonObject metadataRecords;
 	QJsonObject labelRegistry;
+	bool metadataConverted = false;  // from the first format: saved on load
 };
 
 [[nodiscard]] QString normalizedRoot(const QString& root)
@@ -74,6 +77,34 @@ struct LoadedLibraryData
 	return {};
 }
 
+[[nodiscard]] QString metadataValidationError(const QString& path, const QJsonObject& document)
+{
+	const QJsonValue version = document.value(MetadataStore::VersionField);
+	if (version.toInteger(-1) != MetadataStore::FormatVersion)
+		return QObject::tr("The catalog was saved in an unsupported format, possibly by a newer version of Darkroom:\n%1")
+			.arg(QDir::toNativeSeparators(path));
+
+	const QJsonValue items = document.value(MetadataStore::ItemsField);
+	if (!items.isObject())
+		return QObject::tr("Invalid catalog:\n%1\n\n'%2' must be a JSON object.").arg(QDir::toNativeSeparators(path), MetadataStore::ItemsField.toString());
+	const QJsonObject records = items.toObject();
+	for (auto it = records.begin(); it != records.end(); ++it)
+	{
+		if (mediaItemIdFromString(it.key()) == MediaItemId::None)
+			return QObject::tr("Invalid catalog:\n%1\n\n'%2' is not a valid item id.").arg(QDir::toNativeSeparators(path), it.key());
+		if (!it.value().isObject())
+			return QObject::tr("Invalid catalog:\n%1\n\nItem %2 must be a JSON object.").arg(QDir::toNativeSeparators(path), it.key());
+	}
+	return {};
+}
+
+// The original is kept beside the converted catalog; an existing copy is from an earlier attempt and stays.
+[[nodiscard]] bool backUpFirstFormatCatalog(const QString& path)
+{
+	const QString backupPath = QFileInfo(path).dir().filePath(QStringLiteral("catalog.v1-backup.json"));
+	return QFileInfo::exists(backupPath) || QFile::copy(path, backupPath);
+}
+
 [[nodiscard]] std::optional<LoadedLibraryData> loadLibraryData(const QString& root, QString* error)
 {
 	if (error)
@@ -101,7 +132,8 @@ struct LoadedLibraryData
 		return std::nullopt;
 	}
 
-	JsonPersistence::ObjectReadResult metadata = JsonPersistence::readObject(MetadataStore::filePathFor(normalized));
+	const QString metadataPath = MetadataStore::filePathFor(normalized);
+	JsonPersistence::ObjectReadResult metadata = JsonPersistence::readObject(metadataPath);
 	if (!metadata.success)
 	{
 		if (error)
@@ -124,7 +156,30 @@ struct LoadedLibraryData
 		return std::nullopt;
 	}
 
-	return LoadedLibraryData{ normalized, std::move(metadata.object), std::move(labels.object) };
+	// The first format has no version field: it is the record object itself.
+	if (!metadata.object.isEmpty() && !metadata.object.contains(MetadataStore::VersionField))
+	{
+		if (!backUpFirstFormatCatalog(metadataPath))
+		{
+			if (error)
+				*error = QObject::tr("The catalog needs converting to the current format, but a backup copy of it could not be created next to it:\n%1")
+					.arg(QDir::toNativeSeparators(metadataPath));
+			return std::nullopt;
+		}
+		return LoadedLibraryData{ normalized, Catalog::itemRecordsFromFirstFormat(metadata.object), std::move(labels.object), true };
+	}
+
+	if (!metadata.object.isEmpty())
+	{
+		const QString metadataError = metadataValidationError(metadataPath, metadata.object);
+		if (!metadataError.isEmpty())
+		{
+			if (error)
+				*error = metadataError;
+			return std::nullopt;
+		}
+	}
+	return LoadedLibraryData{ normalized, metadata.object.value(MetadataStore::ItemsField).toObject(), std::move(labels.object) };
 }
 
 } // namespace
@@ -137,6 +192,8 @@ public:
 		, metadataStore(rootFolder, std::move(data.metadataRecords))
 		, catalog(rootFolder, metadataStore, data.labelRegistry)
 	{
+		if (data.metadataConverted)
+			metadataStore.scheduleSave();
 	}
 
 	[[nodiscard]] bool flushPendingWrites(QString* error)

@@ -1,7 +1,6 @@
 #include "Core/CatalogIntegrity.h"
 #include "Core/Catalog.h"
 #include "Core/Library.h"
-#include "Core/MediaId.h"
 #include "Core/MetadataStore.h"
 #include "Utils.h"
 #include "TestHelpers.h"
@@ -41,7 +40,7 @@ namespace
 		}
 
 		// Registers a video with frame folder <root>/<label>/<base>. Its source lives under <root>/sources, created iff sourcePresent.
-		MediaId addVideo(const QString& name, qint64 size, const QString& label, bool splitComplete, bool sourcePresent)
+		MediaItemId addVideo(const QString& name, const QString& label, bool splitComplete, bool sourcePresent)
 		{
 			REQUIRE(QDir{}.mkpath(frameFolder(name, label)));
 			const QString sourcePath = root + "/sources/" + name;
@@ -50,8 +49,8 @@ namespace
 				REQUIRE(QDir{}.mkpath(root + "/sources"));
 				writeTextFile(sourcePath, "src");
 			}
-			const MediaId id = MediaId::fromNameAndSize(name, size);
-			REQUIRE(catalog().addMediaItem(id, sourcePath, frameFolder(name, label), splitComplete));
+			const MediaItemId id = catalog().addMediaItem(sourcePath, frameFolder(name, label), splitComplete);
+			REQUIRE(id != MediaItemId::None);
 			return id;
 		}
 
@@ -60,7 +59,7 @@ namespace
 		QString root;
 	};
 
-	[[nodiscard]] const CatalogIntegrity::MediaIssue* videoIssueFor(const CatalogIntegrity::IntegrityReport& r, const MediaId& id)
+	[[nodiscard]] const CatalogIntegrity::MediaIssue* videoIssueFor(const CatalogIntegrity::IntegrityReport& r, MediaItemId id)
 	{
 		for (const CatalogIntegrity::MediaIssue& i : r.issues)
 			if (i.id == id)
@@ -68,7 +67,7 @@ namespace
 		return nullptr;
 	}
 
-	[[nodiscard]] const CatalogIntegrity::PhotoIssue* photoIssueFor(const CatalogIntegrity::IntegrityReport& r, const MediaId& id)
+	[[nodiscard]] const CatalogIntegrity::PhotoIssue* photoIssueFor(const CatalogIntegrity::IntegrityReport& r, MediaItemId id)
 	{
 		for (const CatalogIntegrity::PhotoIssue& i : r.photoIssues)
 			if (i.id == id)
@@ -82,25 +81,25 @@ TEST_CASE("scan: each video verdict is reported, a healthy video is not", "[inte
 	IntegrityFixture f;
 
 	// Healthy: split done, real frames + preview + source all present.
-	const MediaId healthy = f.addVideo("healthy.mp4", 1, "L", true, true);
+	const MediaItemId healthy = f.addVideo("healthy.mp4", "L", true, true);
 	f.putFrame(f.frameFolder("healthy.mp4", "L"));
 	f.putFrame(Catalog::previewDirFor(f.frameFolder("healthy.mp4", "L")));
 
 	// Extracted frames missing: split done but the real frames (the deliverable) are gone; preview still renders the card.
-	const MediaId noFrames = f.addVideo("noframes.mp4", 2, "L", true, true);
+	const MediaItemId noFrames = f.addVideo("noframes.mp4", "L", true, true);
 	f.putFrame(Catalog::previewDirFor(f.frameFolder("noframes.mp4", "L")));
 
 	// Preview missing: the card falls back to the real frames, which are still there.
-	const MediaId noPreview = f.addVideo("nopreview.mp4", 3, "L", true, true);
+	const MediaItemId noPreview = f.addVideo("nopreview.mp4", "L", true, true);
 	f.putFrame(f.frameFolder("nopreview.mp4", "L"));
 
 	// Stale split flag: real frames already exist but the entry is still flagged preview-only.
-	const MediaId staleFlag = f.addVideo("staleflag.mp4", 4, "L", false, true);
+	const MediaItemId staleFlag = f.addVideo("staleflag.mp4", "L", false, true);
 	f.putFrame(f.frameFolder("staleflag.mp4", "L"));
 	f.putFrame(Catalog::previewDirFor(f.frameFolder("staleflag.mp4", "L")));
 
 	// Source missing: backing intact, but the source file is gone (overlays any cell; here the only fault).
-	const MediaId noSource = f.addVideo("nosource.mp4", 5, "L", true, false);
+	const MediaItemId noSource = f.addVideo("nosource.mp4", "L", true, false);
 	f.putFrame(f.frameFolder("nosource.mp4", "L"));
 	f.putFrame(Catalog::previewDirFor(f.frameFolder("nosource.mp4", "L")));
 
@@ -148,7 +147,7 @@ TEST_CASE("scan: each video verdict is reported, a healthy video is not", "[inte
 TEST_CASE("inspectVideo: a split video whose frames are gone is healthy once marked preview-only", "[integrity]")
 {
 	IntegrityFixture f;
-	const MediaId id = f.addVideo("lost.mp4", 7, "L", true, true);
+	const MediaItemId id = f.addVideo("lost.mp4", "L", true, true);
 	f.putFrame(Catalog::previewDirFor(f.frameFolder("lost.mp4", "L")));
 	REQUIRE(CatalogIntegrity::inspectVideo(f.catalog(), id).extractedFramesMissing());
 
@@ -169,16 +168,16 @@ TEST_CASE("scan: a photo with a missing source is flagged, owned vs referenced",
 	// Present owned photo -> healthy, no issue.
 	const QString presentPath = photosAlpha + "/present.png";
 	writeTextFile(presentPath, "x");
-	const MediaId present = MediaId::fromFile(presentPath);
-	REQUIRE(catalog.addPhoto(present, presentPath, photosAlpha, false));
+	const MediaItemId present = catalog.addPhoto(presentPath, photosAlpha, false);
+	REQUIRE(present != MediaItemId::None);
 
 	// Owned photo whose library file is gone -> LOST (referenced == false).
-	const MediaId lost = MediaId::fromNameAndSize("lost.png", 10);
-	REQUIRE(catalog.addPhoto(lost, photosAlpha + "/lost.png", photosAlpha, false));
+	const MediaItemId lost = catalog.addPhoto(photosAlpha + "/lost.png", photosAlpha, false);
+	REQUIRE(lost != MediaItemId::None);
 
 	// Referenced photo whose external file moved/unmounted -> GONE (referenced == true).
-	const MediaId gone = MediaId::fromNameAndSize("gone.png", 20);
-	REQUIRE(catalog.addPhoto(gone, f.root + "/nonexistent/gone.png", {}, true));
+	const MediaItemId gone = catalog.addPhoto(f.root + "/nonexistent/gone.png", {}, true);
+	REQUIRE(gone != MediaItemId::None);
 
 	const CatalogIntegrity::IntegrityReport report = CatalogIntegrity::scan(catalog, f.root);
 
@@ -203,7 +202,7 @@ TEST_CASE("scan: everything the layout does not account for surfaces; adoptable 
 	Catalog& catalog = f.catalog();
 
 	// A claimed, healthy video and an empty label folder -> nothing to report.
-	f.addVideo("kept.mp4", 1, "Kept", true, true);
+	f.addVideo("kept.mp4", "Kept", true, true);
 	const QString keptFolder = f.frameFolder("kept.mp4", "Kept");
 	f.putFrame(keptFolder);
 	f.putFrame(Catalog::previewDirFor(keptFolder));
@@ -257,7 +256,7 @@ TEST_CASE("scan: everything the layout does not account for surfaces; adoptable 
 	REQUIRE(QDir{}.mkpath(photosAlpha));
 	const QString trackedPhoto = photosAlpha + "/tracked.png";
 	writeTextFile(trackedPhoto, "x");
-	REQUIRE(catalog.addPhoto(MediaId::fromFile(trackedPhoto), trackedPhoto, photosAlpha, false));
+	REQUIRE(catalog.addPhoto(trackedPhoto, photosAlpha, false) != MediaItemId::None);
 	const QString loose = photosAlpha + "/loose.png";
 	writeTextFile(loose, "x");
 	const QString photoNotes = photosAlpha + "/notes.txt";
@@ -311,7 +310,7 @@ TEST_CASE("scan: dangling label references are reported, repairable, and rejecte
 	IntegrityFixture f;
 	Catalog& catalog = f.catalog();
 
-	const MediaId video = f.addVideo("labeled.mp4", 1, "Storage", true, true);
+	const MediaItemId video = f.addVideo("labeled.mp4", "Storage", true, true);
 	f.putFrame(f.frameFolder("labeled.mp4", "Storage"));
 	f.putFrame(Catalog::previewDirFor(f.frameFolder("labeled.mp4", "Storage")));
 	const LabelId validExtra = catalog.createLabel("Extra");
@@ -343,4 +342,28 @@ TEST_CASE("scan: dangling label references are reported, repairable, and rejecte
 
 	catalog.addLabel(video, missing);
 	REQUIRE_FALSE(catalog.mediaItemHasLabel(video, missing));
+}
+
+TEST_CASE("scan: a source whose size changed since it was recorded is reported until the size is recorded again", "[integrity]")
+{
+	IntegrityFixture f;
+	Catalog& catalog = f.catalog();
+
+	const QString photosAlpha = f.root + "/Photos/Alpha";
+	REQUIRE(QDir{}.mkpath(photosAlpha));
+	const QString photoPath = photosAlpha + "/edited.jpg";
+	writeTextFile(photoPath, "png bytes");
+	const MediaItemId photo = catalog.addPhoto(photoPath, photosAlpha, false);
+	REQUIRE(CatalogIntegrity::scan(catalog, f.root).changedSizeIssues.empty());
+
+	writeTextFile(photoPath, "converted jpeg bytes");
+	const CatalogIntegrity::IntegrityReport report = CatalogIntegrity::scan(catalog, f.root);
+	REQUIRE(report.changedSizeIssues.size() == 1u);
+	REQUIRE(report.changedSizeIssues.front().id == photo);
+	REQUIRE(report.changedSizeIssues.front().recordedSize == 9);
+	REQUIRE(report.changedSizeIssues.front().currentSize == 20);
+	REQUIRE(report.photoIssues.empty());
+
+	REQUIRE(catalog.refreshSourceSize(photo));
+	REQUIRE(CatalogIntegrity::scan(catalog, f.root).isEmpty());
 }

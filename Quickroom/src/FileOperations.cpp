@@ -154,8 +154,7 @@ void FileOperations::installDeleteActions(ImageViewerWindow& viewer, std::functi
 void FileOperations::installDeleteActions(VideoPlayerWindow& player, std::function<void(const QString& path)> onDeleted)
 {
 	const auto removalAction = [&player, &onDeleted](PathDeletion::Mode mode) {
-		return VideoPlayerWindow::RemovalAction{ deleteActionText(mode),
-			[deletePath = pathDeleter(&player, mode, onDeleted)](const MediaId&, const QString& videoPath) { return deletePath(videoPath); } };
+		return VideoPlayerWindow::RemovalAction{ deleteActionText(mode), pathDeleter(&player, mode, onDeleted) };
 	};
 	player.setRemovalActions(removalAction(PathDeletion::Mode::Trash), removalAction(PathDeletion::Mode::Permanent));
 }

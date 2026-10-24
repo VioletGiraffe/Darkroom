@@ -51,10 +51,11 @@ reported: the caller already acted on it.
 ## VideoPlayerWindow
 
 `VideoPlayerWindow` coordinates Qt media playback, controls, saved-loop persistence, optional oscillating
-presentation, and single-frame extraction. It does not depend on the library model: a host can supply a getter for a
-`MetadataStore`, a navigation list, and a frame target. `LibraryPlayer` opens players with the library's store and
-the Extracted-label target; Quickroom's players have neither. Open players are tracked app-wide so library replacement
-can close them synchronously before the getter starts returning a different store.
+presentation, and single-frame extraction. It does not depend on the library model: a host can supply a playback
+settings store, a navigation list, and a frame target. `LibraryPlayer` opens players with a store that resolves each
+path through the catalog, so only library items keep their settings, and with the Extracted-label target; Quickroom's
+players have neither. Open players are tracked app-wide so library replacement can close them synchronously before
+the store starts resolving against a different library.
 
 MediaBrowserWidget and Quickroom's browser give each player they open the paths of the videos the grid currently shows
 as its previous/next order, and a handler that moves the grid selection onto the item navigated to, as with the image
@@ -130,12 +131,12 @@ re-extraction may replace wholesale. Successful import reaches the browser throu
 
 ### Saved loops and playback speed
 
-Saved A-B loops are stored per `MediaId` in `MetadataStore`, including their name and captured playback speed.
+Saved A-B loops are stored per video, including their name and captured playback speed.
 Activating a loop restores its speed without overwriting the video's independently remembered speed.
 
 Playback speed is also persisted per video. The default 1x value removes the field, distinguishing untouched/default
 state without redundant records. Applying a restored or loop-specific speed can bypass persistence. Players resolve
-the current store only at read/write points; MainWindow closes them before a library switch can redirect those
+the current video's item only at read/write points; MainWindow closes them before a library switch can redirect those
 operations.
 
 `MarkerSlider` adds paint-only A/B markers to `QSlider` using the slider's real style metrics. Retaining the native

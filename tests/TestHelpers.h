@@ -28,7 +28,7 @@ namespace Catch {
 
 // Deterministic textual snapshot of the registry + item model, for whole-state comparison across
 // rebuildIndex() and save/reload boundaries. Labels keep registry (display) order; items are sorted
-// by key because QHash order is unspecified.
+// by id because QHash order is unspecified.
 [[nodiscard]] inline QString dumpCatalog(const Catalog& catalog)
 {
 	QString out;
@@ -42,9 +42,9 @@ namespace Catch {
 		QStringList labelIds;
 		for (const LabelId labelId : it->labelIds)
 			labelIds.push_back(QString::number(toUInt64(labelId)));
-		items.push_back(QStringLiteral("item %1 name='%2' folder='%3' source='%4' labels=[%5] split=%6 duration=%7 type=%8 referenced=%9")
-			.arg(it.key().key(), it.key().name(), it->folder, it->sourcePath, labelIds.join(','))
-			.arg(it->splitIntoFrames).arg(it->durationMs)
+		items.push_back(QStringLiteral("item %1 folder='%2' source='%3' labels=[%4] size=%5 split=%6 duration=%7 type=%8 referenced=%9")
+			.arg(toString(it.key()), it->folder, it->sourcePath, labelIds.join(','))
+			.arg(it->sourceSize).arg(it->splitIntoFrames).arg(it->durationMs)
 			.arg(it->type == Catalog::MediaType::Photo ? QStringLiteral("photo") : QStringLiteral("video"))
 			.arg(it->referenced));
 	}

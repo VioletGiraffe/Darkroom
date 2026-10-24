@@ -20,8 +20,9 @@ RESTORE_COMPILER_WARNINGS
 
 // Video verdicts are independent: a completed split needs real frames, every video needs a preview, and real
 // frames behind a preview-only flag make that flag stale. Source absence overlays any combination. A photo has
-// only its source file. Every item is also checked for label ids absent from the registry. The final disk walk
-// compares the tree under the root with the layout the catalog and label registry define.
+// only its source file. Every item is also checked for label ids absent from the registry, and a present source
+// for a size other than the recorded one. The final disk walk compares the tree under the root with the layout
+// the catalog and label registry define.
 
 namespace CatalogIntegrity {
 
@@ -245,6 +246,9 @@ IntegrityReport scan(const Catalog& catalog, const QString& rootFolder, const Sc
 		if (!labelIssue.missingLabelIds.empty())
 			report.danglingLabelIssues.push_back(std::move(labelIssue));
 
+		if (const QFileInfo source{ entry.sourcePath }; source.isFile() && source.size() != entry.sourceSize)
+			report.changedSizeIssues.push_back({ id, entry.sourcePath, entry.sourceSize, source.size() });
+
 		if (entry.type == Catalog::MediaType::Photo)
 		{
 			if (entry.sourcePath.isEmpty() || !QFileInfo::exists(entry.sourcePath))
@@ -261,7 +265,7 @@ IntegrityReport scan(const Catalog& catalog, const QString& rootFolder, const Sc
 	return report;
 }
 
-MediaIssue inspectVideo(const Catalog& catalog, const MediaId& id)
+MediaIssue inspectVideo(const Catalog& catalog, MediaItemId id)
 {
 	const auto it = catalog.mediaItems().constFind(id);
 	assert_and_return_r(it != catalog.mediaItems().cend() && it->type == Catalog::MediaType::Video, {});

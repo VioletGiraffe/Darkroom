@@ -142,6 +142,27 @@ TEST_CASE("invalidFilenameChar: the first Windows-illegal character, null when t
 		REQUIRE(invalidFilenameChar(QString("name") + c) == c);
 }
 
+TEST_CASE("filesAreIdentical: every byte across chunk boundaries", "[utils]")
+{
+	QTemporaryDir dir;
+	REQUIRE(dir.isValid());
+	const QDir d(dir.path());
+
+	// Spans several comparison chunks.
+	QByteArray content(1536 * 1024 + 7, 'a');
+	writeTextFile(d.filePath("a.bin"), content);
+	writeTextFile(d.filePath("same.bin"), content);
+	REQUIRE(filesAreIdentical(d.filePath("a.bin"), d.filePath("same.bin")));
+
+	content.back() = 'b';
+	writeTextFile(d.filePath("lastByte.bin"), content);
+	REQUIRE_FALSE(filesAreIdentical(d.filePath("a.bin"), d.filePath("lastByte.bin")));
+
+	content.chop(1);
+	writeTextFile(d.filePath("shorter.bin"), content);
+	REQUIRE_FALSE(filesAreIdentical(d.filePath("a.bin"), d.filePath("shorter.bin")));
+}
+
 TEST_CASE("isSupportedVideoFile / isSupportedImageFile: by suffix, case-insensitively", "[utils]")
 {
 	REQUIRE(isSupportedVideoFile("C:/v/clip.MP4"));

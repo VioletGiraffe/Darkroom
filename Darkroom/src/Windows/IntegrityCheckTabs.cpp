@@ -114,6 +114,12 @@ public:
 	return problems.join(QStringLiteral("; "));
 }
 
+// Locate matches a moved file by name and size; names compare case-insensitively.
+[[nodiscard]] QString nameAndSizeKey(const QString& fileName, qint64 size)
+{
+	return QString::number(size) + ':' + fileName.toLower();
+}
+
 } // namespace
 
 IntegrityCheckTabs::IntegrityCheckTabs(Catalog& catalog, CatalogIntegrity::IntegrityReport report,
@@ -128,6 +134,7 @@ IntegrityCheckTabs::IntegrityCheckTabs(Catalog& catalog, CatalogIntegrity::Integ
 	buildUnknownItems();
 	buildVideos();
 	buildMissingPhotos();
+	buildChangedSizes();
 	buildInvalidLabels();
 	buildResolvedTab();
 	updateTabTitles();
@@ -159,7 +166,7 @@ void IntegrityCheckTabs::buildUntrackedFolders()
 				return;
 			if (!_callbacks.registerRequested(folder.folderPath, picked, folder.realFramesPresent))
 			{
-				reportResult({}, QObject::tr("Could not register - that file's identity is already tracked under a different folder."));
+				reportResult({}, QObject::tr("Could not register - that file, or one with the same content, is already in the library."));
 				return;
 			}
 			const QString outcome = QObject::tr("Registered with %1").arg(QDir::toNativeSeparators(picked));
@@ -189,7 +196,7 @@ void IntegrityCheckTabs::buildUntrackedPhotos()
 		.act = perFinding([this](int f) { return _callbacks.adoptPhotoRequested(_report.untrackedPhotos[f].filePath); }),
 		.outcome = QObject::tr("Added to catalog"),
 		.doneFmt = QObject::tr("Added %1 photo(s) to the catalog."),
-		.failedFmt = QObject::tr("%1 could not be added - a file with the same name and size is already tracked elsewhere."),
+		.failedFmt = QObject::tr("%1 could not be added - a photo with the same content is already in the library."),
 		.quick = true,
 	});
 
@@ -267,13 +274,6 @@ void IntegrityCheckTabs::buildVideos()
 				.idOf = [this](int f) { return _report.issues[f].id; },
 				.browseForFile = [this](int f) { return browseForSourceVideo(_report.issues[f].sourcePath); },
 				.isCandidateFile = isSupportedVideoFile,
-				.relocate = [this](int f, const QString& path) {
-					const MediaId newId = _callbacks.locateSourceRequested(_report.issues[f].id, path);
-					if (!newId.isValid())
-						return false;
-					_report.issues[f].id = newId;
-					return true;
-				},
 				.folderPrompt = QObject::tr("Select folder to search for moved source videos"),
 				.doneFmt = QObject::tr("Relocated %1 video(s)."),
 			});
@@ -345,7 +345,6 @@ void IntegrityCheckTabs::buildMissingPhotos()
 				.idOf = [this](int f) { return _report.photoIssues[f].id; },
 				.browseForFile = [this](int f) { return browseForSourcePhoto(_report.photoIssues[f].sourcePath); },
 				.isCandidateFile = isSupportedImageFile,
-				.relocate = [this](int f, const QString& path) { return _callbacks.locatePhotoRequested(_report.photoIssues[f].id, path); },
 				.folderPrompt = QObject::tr("Select folder to search for missing photos"),
 				.doneFmt = QObject::tr("Relocated %1 photo(s)."),
 			});
@@ -361,6 +360,32 @@ void IntegrityCheckTabs::buildMissingPhotos()
 	});
 }
 
+void IntegrityCheckTabs::buildChangedSizes()
+{
+	if (_report.changedSizeIssues.empty())
+		return;
+
+	Tab& tab = addTab(QObject::tr("Changed files"),
+		QObject::tr("Tracked files whose size differs from the one recorded, such as after editing in another app. "
+		            "Duplicate detection compares recorded sizes."),
+		{ QObject::tr("File"), QObject::tr("Recorded size"), QObject::tr("Current size"), QObject::tr("Path") }, _report.changedSizeIssues.size(),
+		[this](int f, const QStringList&) {
+			const CatalogIntegrity::ChangedSizeIssue& issue = _report.changedSizeIssues[f];
+			const QString path = QDir::toNativeSeparators(issue.sourcePath);
+			const QString recorded = issue.recordedSize < 0 ? QObject::tr("none") : QString::number(issue.recordedSize);
+			return std::vector<Cell>{ { QFileInfo(path).fileName(), path }, { recorded, {} }, { QString::number(issue.currentSize), {} }, { path, path } };
+		});
+
+	addEachAction(tab, QObject::tr("Record current size"), {}, [](int) { return true; }, {
+		.act = perFinding([this](int f) { return _callbacks.refreshSourceSizeRequested(_report.changedSizeIssues[f].id); }),
+		.outcome = QObject::tr("Size recorded"),
+		.doneFmt = QObject::tr("Recorded the size of %1 file(s)."),
+		.failedFmt = QObject::tr("%1 file(s) could not be read."),
+		.quick = true,
+	});
+	addRevealContextMenu(tab, [this](int f) { return _report.changedSizeIssues[f].sourcePath; });
+}
+
 void IntegrityCheckTabs::buildInvalidLabels()
 {
 	if (_report.danglingLabelIssues.empty())
@@ -373,7 +398,8 @@ void IntegrityCheckTabs::buildInvalidLabels()
 			QStringList missingIds;
 			for (const LabelId labelId : issue.missingLabelIds)
 				missingIds << QString::number(toUInt64(labelId));
-			return std::vector<Cell>{ { issue.id.name(), {} }, { missingIds.join(QStringLiteral(", ")), {} } };
+			return std::vector<Cell>{ { QFileInfo(_catalog.sourcePathForMediaItem(issue.id)).fileName(), {} },
+			                          { missingIds.join(QStringLiteral(", ")), {} } };
 		});
 
 	addEachAction(tab, QObject::tr("Drop invalid references"), {}, [](int) { return true; }, {
@@ -604,18 +630,18 @@ void IntegrityCheckTabs::runEach(Tab& tab, const std::vector<int>& findings, con
 	reportResult(doneText, failed ? spec.failedFmt.arg(failed) : QString{});
 }
 
-std::vector<MediaId> IntegrityCheckTabs::videoIds(const std::vector<int>& findings) const
+std::vector<MediaItemId> IntegrityCheckTabs::videoIds(const std::vector<int>& findings) const
 {
-	std::vector<MediaId> ids;
+	std::vector<MediaItemId> ids;
 	ids.reserve(findings.size());
 	for (const int f : findings)
 		ids.push_back(_report.issues[f].id);
 	return ids;
 }
 
-std::vector<Outcome> IntegrityCheckTabs::removeEntries(const std::vector<int>& findings, const std::function<MediaId(int finding)>& idOf)
+std::vector<Outcome> IntegrityCheckTabs::removeEntries(const std::vector<int>& findings, const std::function<MediaItemId(int finding)>& idOf)
 {
-	std::vector<MediaId> ids;
+	std::vector<MediaItemId> ids;
 	ids.reserve(findings.size());
 	for (const int f : findings)
 		ids.push_back(idOf(f));
@@ -623,7 +649,7 @@ std::vector<Outcome> IntegrityCheckTabs::removeEntries(const std::vector<int>& f
 
 	std::vector<Outcome> outcomes;
 	outcomes.reserve(ids.size());
-	for (const MediaId& id : ids)
+	for (const MediaItemId id : ids)
 		outcomes.push_back(_catalog.containsMediaItem(id) ? Outcome::Failed : Outcome::Done);
 	return outcomes;
 }
@@ -636,9 +662,9 @@ void IntegrityCheckTabs::locate(Tab& tab, const std::vector<int>& findings, cons
 		const QString picked = spec.browseForFile(f);
 		if (picked.isEmpty())
 			return;
-		if (!spec.relocate(f, picked))
+		if (!_callbacks.locateRequested(spec.idOf(f), picked))
 		{
-			reportResult({}, QObject::tr("Could not relocate - that file's identity is already tracked as a different item."));
+			reportResult({}, QObject::tr("Could not relocate - that file is already recorded for another item."));
 			return;
 		}
 		const QString outcome = QObject::tr("Relocated to %1").arg(QDir::toNativeSeparators(picked));
@@ -654,24 +680,27 @@ void IntegrityCheckTabs::locate(Tab& tab, const std::vector<int>& findings, cons
 	int relocated = 0, unmatched = 0, failed = 0;
 	{
 		const ScopedWaitCursor waitCursor;
-		QHash<QString, QString> byIdentity;   // MediaId::key() -> first file found under dir carrying that identity
+		QHash<QString, QString> byNameAndSize;   // nameAndSizeKey -> first file found under dir
 		for (const QString& path : collectFilesInDirectory(dir, /*recursive=*/true, spec.isCandidateFile))
 		{
-			const QString identity = MediaId::fromFile(path).key();
-			if (!byIdentity.contains(identity))
-				byIdentity.insert(identity, QDir::toNativeSeparators(path));
+			const QFileInfo info{ path };
+			const QString key = nameAndSizeKey(info.fileName(), info.size());
+			if (!byNameAndSize.contains(key))
+				byNameAndSize.insert(key, QDir::toNativeSeparators(path));
 		}
 
 		Catalog::BatchScope batch(_catalog);
 		for (const int f : findings)
 		{
-			const auto found = byIdentity.constFind(spec.idOf(f).key());
-			if (found == byIdentity.constEnd())
+			const MediaItemId id = spec.idOf(f);
+			const Catalog::Entry entry = _catalog.mediaItems().value(id);
+			const auto found = byNameAndSize.constFind(nameAndSizeKey(QFileInfo(entry.sourcePath).fileName(), entry.sourceSize));
+			if (found == byNameAndSize.constEnd())
 			{
 				++unmatched;
 				continue;
 			}
-			if (!spec.relocate(f, found.value()))
+			if (!_callbacks.locateRequested(id, found.value()))
 			{
 				++failed;
 				continue;
@@ -684,7 +713,7 @@ void IntegrityCheckTabs::locate(Tab& tab, const std::vector<int>& findings, cons
 	QString doneText = spec.doneFmt.arg(relocated);
 	if (unmatched)
 		doneText += ' ' + QObject::tr("%1 had no matching file in that folder.").arg(unmatched);
-	reportResult(doneText, failed ? QObject::tr("%1 could not be relocated - the identity is already tracked as a different item.").arg(failed)
+	reportResult(doneText, failed ? QObject::tr("%1 could not be relocated - the file is already recorded for another item.").arg(failed)
 	                              : QString{});
 }
 

@@ -1,12 +1,11 @@
 #pragma once
 
 #include "Core/LabelId.h"
-#include "Core/MediaId.h"
+#include "Core/MediaItemId.h"
 #include "Import.h"
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
-#include <QHash>
 #include <QStringList>
 RESTORE_COMPILER_WARNINGS
 
@@ -18,9 +17,17 @@ class QWidget;
 // Interactive batch execution over the UI-free per-item Import workers.
 namespace ImportExecution
 {
-	// storageFolderPath must be a Catalog-verified video storage path.
-	void importVideosInteractive(Catalog& catalog, QStringList videoPaths, const QString& storageFolderPath,
-		const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations, QWidget* dialogParent);
+	struct StagedVideo
+	{
+		QString path;
+		QString previewDir;      // see Import::importVideo
+		qint64  durationMs = -1;
+	};
+
+	// storageFolderPath must be a Catalog-verified video storage path. Returns, per video in input order, the
+	// registered id, or None when it was not imported.
+	[[nodiscard]] std::vector<MediaItemId> importVideosInteractive(Catalog& catalog, const std::vector<StagedVideo>& videos,
+		const QString& storageFolderPath, QWidget* dialogParent);
 
 	// Returns one result per processed path, preserving input order.
 	[[nodiscard]] std::vector<Import::PhotoResult> importPhotosInteractive(

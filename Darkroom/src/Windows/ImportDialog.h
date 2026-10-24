@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/MediaId.h"
+#include "Core/MediaItemId.h"
 #include "Import.h"  // Import::PhotoImportMode, used by importPhotoGroup
 #include "UiComponents/ContentWidthListWidget.h"
 #include "Windows/SourceRelocation.h"  // SourceRelocation::Mode, importVideoGroup's parameter
@@ -12,6 +12,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QStringList>
 RESTORE_COMPILER_WARNINGS
 
+#include <cstdint>
 #include <functional>
 #include <vector>
 
@@ -54,6 +55,8 @@ protected:
 	void dropEvent(QDropEvent* event) override;
 
 private:
+	// Dialog-local handle of a staged file; a rename keeps it.
+	enum class StagedId : uint32_t { None = 0 };
 	class StagedGridItem;
 
 	void refreshLabelList();
@@ -63,50 +66,51 @@ private:
 	void suggestLabels();
 	[[nodiscard]] MediaItemWidget* buildStagedCard(StagedGridItem* item, const QString& path, const QString& tempPreviewDir, qint64 durationMs);
 	// Removes the card and its temporary preview directory.
-	void unstage(const MediaId& id);
-	void updateCardLabelDots(const MediaId& id);
+	void unstage(StagedId id);
+	void updateCardLabelDots(StagedId id);
 	[[nodiscard]] int stagedPreviewFrameCount() const;
 	void stagedPreviewFrameCountChanged();
 	void regenerateInsufficientStagedVideoPreviews(int frameCount);
 	void zoomStagedCards(int steps);
 	void rebuildAllStagedCards();
+	// By pathComparisonKey; None when no staged file is at path.
+	[[nodiscard]] StagedId stagedIdAtPath(const QString& path) const;
 	// Whole selection when item is selected; otherwise that item alone.
-	[[nodiscard]] std::vector<MediaId> effectiveStagedSelection(const StagedGridItem* item) const;
+	[[nodiscard]] std::vector<StagedId> effectiveStagedSelection(const StagedGridItem* item) const;
 	void showStagedCardContextMenu(StagedGridItem* item, const QPoint& globalPos);
-	void previewStagedItem(const MediaId& id);
+	void previewStagedItem(StagedId id);
 	// Does nothing when the item is no longer staged.
-	void selectAndScrollToStagedItem(const MediaId& id);
-	void locateStagedSourceFile(const MediaId& id);
-	void copyStagedSourcePath(const MediaId& id);
-	void compareStagedPhotos(const std::vector<MediaId>& photoIds);
-	void setBestForStagedSelection(const std::vector<MediaId>& ids, bool inBest);
-	void removeStagedItems(const std::vector<MediaId>& ids);
-	void deleteStagedSourceFiles(const std::vector<MediaId>& ids);
-	[[nodiscard]] static std::vector<MediaId> selectedStagedIds(const QListWidget* grid);
-	// Renames and re-keys in place, preserving "staged key == row id == current file id"; extension remains fixed.
-	void renameStagedItem(const MediaId& id);
+	void selectAndScrollToStagedItem(StagedId id);
+	void locateStagedSourceFile(StagedId id);
+	void copyStagedSourcePath(StagedId id);
+	void compareStagedPhotos(const std::vector<StagedId>& photoIds);
+	void setBestForStagedSelection(const std::vector<StagedId>& ids, bool inBest);
+	void removeStagedItems(const std::vector<StagedId>& ids);
+	void deleteStagedSourceFiles(const std::vector<StagedId>& ids);
+	[[nodiscard]] static std::vector<StagedId> selectedStagedIds(const QListWidget* grid);
+	// Renames the file in place; the extension remains fixed.
+	void renameStagedItem(StagedId id);
 
-	// Keyed by registered id because owned-photo import may auto-rename.
 	struct ExtraLabelAssignment
 	{
-		MediaId mediaId;
+		MediaItemId mediaItemId = MediaItemId::None;
 		QStringList labelIds;
 	};
 	struct ImportOutcome
 	{
-		std::vector<MediaId> succeededIds;
-		std::vector<MediaId> skippedIds;
-		std::vector<MediaId> bestItems;
+		std::vector<StagedId> succeededIds;
+		std::vector<StagedId> skippedIds;
+		std::vector<MediaItemId> bestItems;
 		std::vector<ExtraLabelAssignment> extraLabelAssignments;
 	};
-	void importPhotoGroup(const QString& labelId, const std::vector<MediaId>& photoIds, Import::PhotoImportMode mode, ImportOutcome& outcome);
+	void importPhotoGroup(const QString& labelId, const std::vector<StagedId>& photoIds, Import::PhotoImportMode mode, ImportOutcome& outcome);
 	// A relocated but unimported entry follows its file so retry starts from the actual path.
-	void importVideoGroup(const QString& labelId, const std::vector<MediaId>& videoIds, SourceRelocation::Mode relocateMode, ImportOutcome& outcome);
+	void importVideoGroup(const QString& labelId, const std::vector<StagedId>& videoIds, SourceRelocation::Mode relocateMode, ImportOutcome& outcome);
 	// Empty, after prompting for what is missing, when grid has no labeled card or modeCombo has no choice.
-	[[nodiscard]] std::vector<MediaId> labeledIdsReadyForImport(const QListWidget* grid, QComboBox* modeCombo);
-	using GroupImporter = std::function<void(const QString& labelId, const std::vector<MediaId>& ids, ImportOutcome& outcome)>;
+	[[nodiscard]] std::vector<StagedId> labeledIdsReadyForImport(const QListWidget* grid, QComboBox* modeCombo);
+	using GroupImporter = std::function<void(const QString& labelId, const std::vector<StagedId>& ids, ImportOutcome& outcome)>;
 	// Groups ids by their first (destination) label, imports, flushes labels, and unstages outcomes.
-	void importByDestinationLabel(const std::vector<MediaId>& ids, const GroupImporter& importGroup);
+	void importByDestinationLabel(const std::vector<StagedId>& ids, const GroupImporter& importGroup);
 	void runPhotoImport();
 	void runVideoImport();
 	[[nodiscard]] const LabelOption* findLabelOption(const QString& id) const;
@@ -124,7 +128,7 @@ private:
 	bool remapStagedLabelIds(const QHash<QString, QString>& mapping);
 	void updateAllCardLabelDots();
 	// Materializes the provisional labels ids use and rewrites staged picks to real ids.
-	void materializeUsedProvisionalLabels(const std::vector<MediaId>& ids);
+	void materializeUsedProvisionalLabels(const std::vector<StagedId>& ids);
 
 private:
 	// pendingLabelIds[0] is the destination label; the remaining ids are extra labels.
@@ -143,7 +147,8 @@ private:
 	std::vector<LabelOption> _labelOptions;
 	std::vector<LabelOption> _provisionalLabels;
 	int _provisionalSeq = 0;
-	QHash<MediaId, StagedEntry> _staged;
+	QHash<StagedId, StagedEntry> _staged;
+	uint32_t _lastStagedId = 0;
 
 	ContentWidthListWidget* _labelList = nullptr;
 	QTabWidget* _stagedTabs = nullptr;

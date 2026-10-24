@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Core/MediaId.h"
 #include "UiComponents/ThumbnailWidget.h"
 #include "compiler/compiler_warnings_control.h"
 
@@ -24,7 +23,6 @@ class MediaItemWidget final : public QWidget {
 public:
 	MediaItemWidget(
 		QSize maxImageSize, const QStringList& previewPaths, const QString& label,
-		const MediaId& mediaId,
 		bool inBest, std::function<void()> onToggleBest,
 		std::function<void()> onDoubleClick = {},
 		std::function<void(QPoint globalPos)> onContextMenu = {},
@@ -45,8 +43,6 @@ public:
 	{
 		return frameCount * photoSide + (frameCount - 1) * (gridGap + 2 * CardChromePerSide);
 	}
-
-	[[nodiscard]] const MediaId& mediaId() const { return _mediaId; }
 
 	void setLabel(const QString& label);
 
@@ -86,7 +82,6 @@ private:
 	QWidget*                     _labelDots = nullptr;
 	QWidget*                     _framesReadyBadge = nullptr;
 	QWidget*                     _durationBadge = nullptr;
-	MediaId                      _mediaId;
 	bool                         _filmStrip = false;
 	std::function<void()>               _onMiddleButtonClick;
 	std::function<void()>               _onDoubleClick;

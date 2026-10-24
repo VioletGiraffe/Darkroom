@@ -10,7 +10,7 @@
 #include "Windows/OpenFileRelease.h"
 #include "Windows/PathDeletion.h"
 #include "Windows/SettingsDialog.h"
-#include "Core/MediaId.h"
+#include "Core/MediaItemId.h"
 #include "Windows/VideoPlayerWindow.h"
 #include "Utils.h"
 #include "DarkroomSettings.h"
@@ -188,7 +188,7 @@ void MainWindow::setupUI()
 	_mediaBrowser = new MediaBrowserWidget(_library, this);
 	setCentralWidget(_mediaBrowser);
 
-	connect(_mediaBrowser, &MediaBrowserWidget::inspectVideoFramesRequested, this, [this](const MediaId& id) {
+	connect(_mediaBrowser, &MediaBrowserWidget::inspectVideoFramesRequested, this, [this](MediaItemId id) {
 		if (FrameExtraction::ensureFramesExtracted(
 				libraryCatalog(), id, _mediaBrowser->previewFrameCount(), this))
 			_frameViewer->showForFolder(libraryCatalog().folderForMediaItem(id), libraryCatalog().displayName(id));
@@ -472,7 +472,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
 
 void MainWindow::updateEditActions()
 {
-	const std::vector<MediaId> selected = _mediaBrowser->selectedMediaItems();
+	const std::vector<MediaItemId> selected = _mediaBrowser->selectedMediaItems();
 	const bool hasSelection = !selected.empty();
 	_deleteAction->setEnabled(hasSelection);
 	_removeFromLibraryAction->setEnabled(hasSelection);
@@ -561,43 +561,44 @@ void MainWindow::scanForUntrackedFiles()
 
 void MainWindow::checkCatalogIntegrity()
 {
+	// The library holds no two items with the same bytes, as import ensures.
+	const auto contentIsTracked = [this](const QString& filePath) {
+		return libraryCatalog().findMediaItemWithSameContent(filePath) != MediaItemId::None;
+	};
+
 	IntegrityCheckDialog::Callbacks callbacks{
-		.registerRequested = [this](const QString& folderPath, const QString& sourcePath, bool splitIntoFrames) {
-			return libraryCatalog().addMediaItem(MediaId::fromFile(sourcePath), sourcePath, folderPath, splitIntoFrames);
+		.registerRequested = [this, contentIsTracked](const QString& folderPath, const QString& sourcePath, bool splitIntoFrames) {
+			return !contentIsTracked(sourcePath) && libraryCatalog().addMediaItem(sourcePath, folderPath, splitIntoFrames) != MediaItemId::None;
 		},
-		.adoptPhotoRequested = [this](const QString& filePath) {
-			Catalog& catalog = libraryCatalog();
-			const QString labelDir = QFileInfo(filePath).absolutePath();
-			return catalog.addPhoto(MediaId::fromFile(filePath), filePath, labelDir, /*referenced=*/false);
+		.adoptPhotoRequested = [this, contentIsTracked](const QString& filePath) {
+			return !contentIsTracked(filePath)
+				&& libraryCatalog().addPhoto(filePath, QFileInfo(filePath).absolutePath(), /*referenced=*/false) != MediaItemId::None;
 		},
 		.trashRequested = [this](const QStringList& paths) {
 			return PathDeletion::removePathsInteractive(paths, PathDeletion::Mode::Trash, this);
 		},
 		.importRequested = [this](const QStringList& paths) { openImportDialog(paths); },
-		.reextractFramesRequested = [this](const std::vector<MediaId>& ids) {
+		.reextractFramesRequested = [this](const std::vector<MediaItemId>& ids) {
 			return FrameExtraction::reextractVideoFrames(libraryCatalog(), ids,
 				FrameExtraction::PreviewHandling::Regenerate, _mediaBrowser->previewFrameCount(), this);
 		},
-		.regeneratePreviewRequested = [this](const std::vector<MediaId>& ids) {
+		.regeneratePreviewRequested = [this](const std::vector<MediaItemId>& ids) {
 			return FrameExtraction::regeneratePreviews(libraryCatalog(), ids, _mediaBrowser->previewFrameCount(), this);
 		},
-		.keepPreviewOnlyRequested = [this](const std::vector<MediaId>& ids) {
+		.keepPreviewOnlyRequested = [this](const std::vector<MediaItemId>& ids) {
 			return FrameExtraction::keepPreviewOnly(libraryCatalog(), ids, _mediaBrowser->previewFrameCount(), this);
 		},
-		.markSplitRequested = [this](const MediaId& id) {
+		.markSplitRequested = [this](MediaItemId id) {
 			libraryCatalog().markSplitComplete(id);
 			return true;
 		},
-		.locateSourceRequested = [this](const MediaId& id, const QString& newSourcePath) {
+		.locateRequested = [this](MediaItemId id, const QString& newSourcePath) {
 			Catalog& catalog = libraryCatalog();
-			const MediaId newId = MediaId::fromFile(newSourcePath);
-			return catalog.applyRename(id, newId, newSourcePath, catalog.folderForMediaItem(id)) ? newId : MediaId{};
+			return catalog.updateMediaItemPaths(id, newSourcePath, catalog.folderForMediaItem(id));
 		},
-		.removeEntriesRequested = [this](const std::vector<MediaId>& ids) { _mediaBrowser->removeMediaItemsFromLibrary(ids); },
-		.locatePhotoRequested = [this](const MediaId& id, const QString& newSourcePath) {
-			return libraryCatalog().applyRename(id, MediaId::fromFile(newSourcePath), newSourcePath, /*newFolderAbs=*/QString{});
-		},
-		.removeInvalidLabelReferencesRequested = [this](const MediaId& id) {
+		.removeEntriesRequested = [this](const std::vector<MediaItemId>& ids) { _mediaBrowser->removeMediaItemsFromLibrary(ids); },
+		.refreshSourceSizeRequested = [this](MediaItemId id) { return libraryCatalog().refreshSourceSize(id); },
+		.removeInvalidLabelReferencesRequested = [this](MediaItemId id) {
 			return libraryCatalog().removeInvalidLabelReferences(id);
 		},
 	};

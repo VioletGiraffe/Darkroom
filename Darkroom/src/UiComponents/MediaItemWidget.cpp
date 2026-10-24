@@ -186,7 +186,6 @@ private:
 
 MediaItemWidget::MediaItemWidget(
 	QSize maxImageSize, const QStringList& previewPaths, const QString& label,
-	const MediaId& mediaId,
 	bool inBest, std::function<void()> onToggleBest,
 	std::function<void()> onDoubleClick,
 	std::function<void(QPoint)> onContextMenu,
@@ -195,7 +194,6 @@ MediaItemWidget::MediaItemWidget(
 	QWidget* parent
 )
 	: QWidget{ parent }
-	, _mediaId{ mediaId }
 	, _filmStrip{ filmStrip }
 	, _onDoubleClick{ std::move(onDoubleClick) }
 	, _onContextMenu{ std::move(onContextMenu) }

@@ -1,6 +1,5 @@
 #include "Import.h"
 #include "Core/Catalog.h"
-#include "Core/MediaId.h"
 #include "Ffmpeg.h"
 #include "DarkroomSettings.h"
 #include "Utils.h"
@@ -31,12 +30,12 @@ static bool copyPreviewFrames(const QString& srcPreviewDir, const QString& dstPr
 Import::Result Import::importVideo(Catalog& catalog, const QString& videoPath, const QString& storageFolderPath,
 	const QString& stagedPreviewDir, bool overwriteExisting, qint64 stagedDurationMs)
 {
-	QFileInfo videoInfo(videoPath);
-	if (!videoInfo.exists())
+	if (!QFileInfo::exists(videoPath))
 		return { Status::Error, QObject::tr("Video file does not exist:\n%1").arg(videoPath) };
+	if (catalog.mediaItemAtSourcePath(videoPath) != MediaItemId::None)
+		return { Status::Error, QObject::tr("This video is already in the library:\n%1").arg(videoPath) };
 
-	const MediaId id = MediaId::fromFile(videoPath);
-	const QString outputFolder = storageFolderPath + "/" + Catalog::frameFolderName(videoInfo.completeBaseName(), id);
+	const QString outputFolder = catalog.frameFolderForNewVideo(storageFolderPath, videoPath);
 	if (!QDir{}.mkpath(storageFolderPath))
 		return { Status::Error, QObject::tr("Failed to create label folder:\n%1").arg(storageFolderPath) };
 
@@ -59,15 +58,16 @@ Import::Result Import::importVideo(Catalog& catalog, const QString& videoPath, c
 		durationMs = Ffmpeg::generatePreviewFrames(videoPath, Catalog::previewDirFor(outputFolder), previewFrameCount).durationMs;
 	}
 
-	if (!catalog.addMediaItem(id, videoPath, outputFolder, /*splitIntoFrames=*/false, durationMs))
+	const MediaItemId id = catalog.addMediaItem(videoPath, outputFolder, /*splitIntoFrames=*/false, durationMs);
+	if (id == MediaItemId::None)
 	{
-		QString message = QObject::tr("An item with the same name and file size is already tracked under a different label:\n%1").arg(videoPath);
+		QString message = QObject::tr("The video could not be registered in the library:\n%1").arg(videoPath);
 		if (!QDir(outputFolder).removeRecursively())
 			message += "\n\n" + QObject::tr("Additionally, failed to clean up the created folder:\n%1").arg(outputFolder);
 		return { Status::Error, message };
 	}
 
-	return {};
+	return { Status::Success, {}, id };
 }
 
 Import::PhotoResult Import::importPhoto(Catalog& catalog, const QString& labelPhotoFolder, const QString& photoPath, PhotoImportMode mode)
@@ -78,20 +78,18 @@ Import::PhotoResult Import::importPhoto(Catalog& catalog, const QString& labelPh
 
 	if (mode == PhotoImportMode::Reference)
 	{
-		const MediaId id = MediaId::fromFile(photoPath);
-		// Reference mode can reuse only the same path; it has no owned filename to change around a collision.
-		if (catalog.containsMediaItem(id) && !(catalog.isReferenced(id) && catalog.sourcePathForMediaItem(id) == photoPath))
-			return { PhotoStatus::IdCollision, {}, {} };
+		if (const MediaItemId existing = catalog.mediaItemAtSourcePath(photoPath); existing != MediaItemId::None)
+			return { PhotoStatus::Success, {}, existing };
 
-		if (!catalog.addPhoto(id, photoPath, /*labelDirAbs=*/{}, /*referenced=*/true))
-			return { PhotoStatus::Error, QObject::tr("An item with the same name and file size is already tracked:\n%1").arg(photoPath), {} };
+		const MediaItemId id = catalog.addPhoto(photoPath, /*labelDirAbs=*/{}, /*referenced=*/true);
+		if (id == MediaItemId::None)
+			return { PhotoStatus::Error, QObject::tr("The photo could not be registered in the library:\n%1").arg(photoPath), {} };
 		return { PhotoStatus::Success, {}, id };
 	}
 
 	if (!QDir{}.mkpath(labelPhotoFolder))
 		return { PhotoStatus::Error, QObject::tr("Failed to create photo folder:\n%1").arg(labelPhotoFolder), {} };
 
-	// Preserving the byte size lets one rename resolve both path and identity collisions.
 	const QString baseName = photoInfo.completeBaseName();
 	const QString suffix   = photoInfo.suffix();
 	QString destPath;
@@ -104,15 +102,18 @@ Import::PhotoResult Import::importPhoto(Catalog& catalog, const QString& labelPh
 		const QString candidateName = attempt == 1 ? photoInfo.fileName()
 		                                           : baseName + "_" + QString::number(attempt) + "." + suffix;
 		const QString candidatePath = labelPhotoFolder + "/" + candidateName;
-		if (QFile::exists(candidatePath))
+		// A tracked photo whose file is missing still owns its path.
+		const MediaItemId trackedThere = catalog.mediaItemAtSourcePath(candidatePath);
+		const bool occupied = QFile::exists(candidatePath);
+		if (occupied && filesAreIdentical(photoPath, candidatePath))
 		{
-			if (!filesAreIdentical(photoPath, candidatePath))
-				continue;
+			if (trackedThere != MediaItemId::None)
+				return { PhotoStatus::Success, {}, trackedThere };
 			destPath = candidatePath;
 			adoptExisting = true;
 			break;
 		}
-		if (catalog.containsMediaItem(MediaId::fromNameAndSize(candidateName, photoInfo.size())))
+		if (occupied || trackedThere != MediaItemId::None)
 			continue;
 		destPath = candidatePath;
 		break;
@@ -126,10 +127,10 @@ Import::PhotoResult Import::importPhoto(Catalog& catalog, const QString& labelPh
 				.arg(isMove ? QObject::tr("move") : QObject::tr("copy"), photoPath, destPath), {} };
 	}
 
-	const MediaId registeredId = MediaId::fromFile(destPath);
-	if (!catalog.addPhoto(registeredId, destPath, labelPhotoFolder, /*referenced=*/false))
+	const MediaItemId registeredId = catalog.addPhoto(destPath, labelPhotoFolder, /*referenced=*/false);
+	if (registeredId == MediaItemId::None)
 	{
-		QString message = QObject::tr("An item with the same name and file size is already tracked elsewhere:\n%1").arg(photoPath);
+		QString message = QObject::tr("The photo could not be registered in the library:\n%1").arg(photoPath);
 		if (!adoptExisting && !(mode == PhotoImportMode::Move ? QFile{ destPath }.rename(photoPath) : QFile::remove(destPath)))
 			message += "\n\n" + QObject::tr("Additionally, the imported file could not be cleaned up and remains at:\n%1").arg(destPath);
 		return { PhotoStatus::Error, message, {} };

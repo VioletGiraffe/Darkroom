@@ -71,7 +71,7 @@ The split depends on three invariants:
 
 1. Each row has its media-type-specific size before a card exists.
 2. Everything a later-built card displays is derivable from current Catalog and row state.
-3. View restoration uses `MediaId`, not row index or raw scroll offset, because filtering and sorting change both.
+3. View restoration uses `MediaItemId`, not row index or raw scroll offset, because filtering and sorting change both.
 
 Qt defers icon-view layout, so startup restores filters first and constructs rows after the post-show geometry turn;
 only then can it restore the persisted anchor and materialize initial cards. In-session structural rebuilds preserve
@@ -116,16 +116,16 @@ synchronize MainWindow's persistent viewer.
 
 ## Renaming media
 
-`MediaRename` owns interactive video and photo rename transactions. The caller addresses the item by `MediaId`;
+`MediaRename` owns interactive video and photo rename transactions. The caller addresses the item by `MediaItemId`;
 successful Catalog publication refreshes the browser, while the result carries old/new frame-folder information for
 the persistent frame viewer.
 
-A video rename changes the source file, then its frame folder, then re-keys the metadata through
-`Catalog::applyRename`. If the new identity collides or Catalog publication fails, both filesystem changes are
-rolled back. This is the only video frame-folder move outside Catalog's label-reconciliation paths.
+A video rename changes the source file, then its frame folder, then records both paths through
+`Catalog::updateMediaItemPaths`. If Catalog refuses the new source path, both filesystem changes are rolled back.
+This is the only video frame-folder move outside Catalog's label-reconciliation paths.
 
-A photo rename changes only the file's base name in place, preserving directory and extension, then re-keys through
-the same Catalog operation. Missing sources are refused.
+A photo rename changes only the file's base name in place, preserving directory and extension, then records the path
+through the same Catalog operation. Missing sources are refused.
 
 ## Integrity check
 

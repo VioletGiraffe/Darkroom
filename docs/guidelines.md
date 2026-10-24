@@ -35,18 +35,16 @@ about `QList`.)
 `front()`/`back()` over `first()`/`last()`. Keeps code uniform with adjacent std containers and makes a later
 container-type swap a smaller diff.
 
-## Identity — carry `MediaId`, not a path, across boundaries
+## Identity — carry `MediaItemId`, not a path, across boundaries
 
-When referring to a *tracked* media item across a call or time boundary, carry its `MediaId` (the stable
-name+size identity, `Core/MediaId.h`) rather than a filesystem path — and never re-derive identity with
-`MediaId::fromFile(path)` at a point where the file may have moved. `fromFile()` stats the file for its size;
-if the source was relocated in between (e.g. the Import dialog's "Move to:" source-video relocation), it
-returns an invalid id (`size == -1`) that matches nothing. The catalog API (`folderForMediaItem`, `addLabel`,
-…) is already id-based — match it.
+When referring to a *tracked* media item across a call or time boundary, carry its `MediaItemId`
+(`Core/MediaItemId.h`) rather than a filesystem path: paths change on rename, relocation and label moves, the id
+never does. The catalog API (`folderForMediaItem`, `addLabel`, …) is id-based — match it.
 
-Paths are still correct where you genuinely need the file on disk (open, copy, relocate, import). For
-string-only needs without touching disk, `MediaId::name()` yields the original filename and
-`MediaId::fromNameAndSize()` reconstructs an id.
+Where only a path is at hand, such as a viewer or player reporting its current file, resolve it with
+`Catalog::mediaItemAtSourcePath` at the moment it is needed. Never treat a file's name or size as its identity.
+
+Paths are still correct where you genuinely need the file on disk (open, copy, relocate, import).
 
 ## Dialogs — flush caller-visible state from `done(int)`, not the destructor
 

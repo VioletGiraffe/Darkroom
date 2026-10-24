@@ -72,10 +72,9 @@ private:
 
 	struct LocateSpec
 	{
-		std::function<MediaId(int finding)> idOf;
+		std::function<MediaItemId(int finding)> idOf;
 		std::function<QString(int finding)> browseForFile;
 		std::function<bool(const QString& path)> isCandidateFile;
-		std::function<bool(int finding, const QString& path)> relocate;
 		QString folderPrompt;
 		QString doneFmt;
 	};
@@ -86,6 +85,7 @@ private:
 	void buildUnknownItems();
 	void buildVideos();
 	void buildMissingPhotos();
+	void buildChangedSizes();
 	void buildInvalidLabels();
 	void buildResolvedTab();
 
@@ -105,7 +105,7 @@ private:
 	void updateTabTitles();
 
 	void runEach(Tab& tab, const std::vector<int>& findings, const EachSpec& spec);
-	// One row: picks the file. Several: matches files under a picked folder by name/size identity.
+	// One row: picks the file. Several: matches files under a picked folder by recorded name and size.
 	void locate(Tab& tab, const std::vector<int>& findings, const LocateSpec& spec);
 	// Records a successful repair: the row moves to Resolved unless a re-check finds problems left.
 	void settle(Tab& tab, int finding, const QString& outcome);
@@ -114,8 +114,8 @@ private:
 	void showStatus(const QString& text);
 	void reportResult(const QString& doneText, const QString& failureText);
 
-	[[nodiscard]] std::vector<MediaId> videoIds(const std::vector<int>& findings) const;
-	[[nodiscard]] std::vector<FrameExtraction::Outcome> removeEntries(const std::vector<int>& findings, const std::function<MediaId(int finding)>& idOf);
+	[[nodiscard]] std::vector<MediaItemId> videoIds(const std::vector<int>& findings) const;
+	[[nodiscard]] std::vector<FrameExtraction::Outcome> removeEntries(const std::vector<int>& findings, const std::function<MediaItemId(int finding)>& idOf);
 
 	[[nodiscard]] QString browseForSourceVideo(const QString& hint) const;
 	[[nodiscard]] QString browseForSourcePhoto(const QString& hint) const;

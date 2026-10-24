@@ -158,7 +158,8 @@ bool filesAreIdentical(const QString& pathA, const QString& pathB)
 	if (!fileA.open(QIODevice::ReadOnly) || !fileB.open(QIODevice::ReadOnly))
 		return false;
 
-	constexpr qint64 chunkSize = 4 * 1024 * 1024;
+	// Files of equal size but different content usually differ early.
+	constexpr qint64 chunkSize = 512 * 1024;
 	while (!fileA.atEnd())
 	{
 		if (fileA.read(chunkSize) != fileB.read(chunkSize))

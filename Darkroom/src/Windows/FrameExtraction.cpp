@@ -79,7 +79,7 @@ bool regeneratePreviewFromRealFrames(const QString& folderPath, int previewFrame
 } // namespace
 
 bool FrameExtraction::ensureFramesExtracted(
-	Catalog& catalog, const MediaId& id, int previewFrameCount, QWidget* dialogParent)
+	Catalog& catalog, MediaItemId id, int previewFrameCount, QWidget* dialogParent)
 {
 	assert_and_return_r(catalog.containsMediaItem(id), false);
 	assert_and_return_r(catalog.mediaType(id) == Catalog::MediaType::Video, false);
@@ -94,7 +94,7 @@ bool FrameExtraction::ensureFramesExtracted(
 namespace {
 
 // Replaces one video's frame folder transactionally and marks the catalog complete only after the new folder commits.
-FrameExtraction::Outcome reextractOneVideo(Catalog& catalog, const MediaId& id, FrameExtraction::PreviewHandling previewHandling,
+FrameExtraction::Outcome reextractOneVideo(Catalog& catalog, MediaItemId id, FrameExtraction::PreviewHandling previewHandling,
 	int previewFrameCount, const std::atomic<bool>& cancelled, const std::function<void(double)>& onProgress, QWidget* dialogParent)
 {
 	using FrameExtraction::Outcome;
@@ -173,7 +173,7 @@ FrameExtraction::Outcome reextractOneVideo(Catalog& catalog, const MediaId& id, 
 }
 
 // The video folder of a tracked video; empty, with an assertion, otherwise.
-QString trackedVideoFolder(const Catalog& catalog, const MediaId& id)
+QString trackedVideoFolder(const Catalog& catalog, MediaItemId id)
 {
 	assert_and_return_r(catalog.containsMediaItem(id), {});
 	assert_and_return_r(catalog.mediaType(id) == Catalog::MediaType::Video, {});
@@ -184,9 +184,9 @@ QString trackedVideoFolder(const Catalog& catalog, const MediaId& id)
 
 // Generates the previews of ids[i] for each i in indices from their source videos, recording each result in outcomes[i].
 // onGenerated runs for each success. A video whose source is missing fails without a job.
-void generatePreviewsFromSources(Catalog& catalog, const std::vector<MediaId>& ids, const std::vector<size_t>& indices,
+void generatePreviewsFromSources(Catalog& catalog, const std::vector<MediaItemId>& ids, const std::vector<size_t>& indices,
 	int previewFrameCount, const QString& title, QWidget* dialogParent, std::vector<FrameExtraction::Outcome>& outcomes,
-	const std::function<void(const MediaId&)>& onGenerated)
+	const std::function<void(MediaItemId)>& onGenerated)
 {
 	using FrameExtraction::Outcome;
 
@@ -225,7 +225,7 @@ void generatePreviewsFromSources(Catalog& catalog, const std::vector<MediaId>& i
 
 } // namespace
 
-std::vector<FrameExtraction::Outcome> FrameExtraction::reextractVideoFrames(Catalog& catalog, const std::vector<MediaId>& ids,
+std::vector<FrameExtraction::Outcome> FrameExtraction::reextractVideoFrames(Catalog& catalog, const std::vector<MediaItemId>& ids,
 	PreviewHandling previewHandling, int previewFrameCount, QWidget* dialogParent)
 {
 	if (ids.empty())
@@ -262,7 +262,7 @@ std::vector<FrameExtraction::Outcome> FrameExtraction::reextractVideoFrames(Cata
 	return outcomes;
 }
 
-std::vector<FrameExtraction::Outcome> FrameExtraction::regeneratePreviews(Catalog& catalog, const std::vector<MediaId>& ids,
+std::vector<FrameExtraction::Outcome> FrameExtraction::regeneratePreviews(Catalog& catalog, const std::vector<MediaItemId>& ids,
 	int previewFrameCount, QWidget* dialogParent)
 {
 	std::vector<Outcome> outcomes(ids.size(), Outcome::Failed);
@@ -286,11 +286,11 @@ std::vector<FrameExtraction::Outcome> FrameExtraction::regeneratePreviews(Catalo
 	}
 
 	generatePreviewsFromSources(catalog, ids, needSource, previewFrameCount, QObject::tr("Regenerating previews"), dialogParent,
-		outcomes, [](const MediaId&) {});
+		outcomes, [](MediaItemId) {});
 	return outcomes;
 }
 
-std::vector<FrameExtraction::Outcome> FrameExtraction::keepPreviewOnly(Catalog& catalog, const std::vector<MediaId>& ids,
+std::vector<FrameExtraction::Outcome> FrameExtraction::keepPreviewOnly(Catalog& catalog, const std::vector<MediaItemId>& ids,
 	int previewFrameCount, QWidget* dialogParent)
 {
 	std::vector<Outcome> outcomes(ids.size(), Outcome::Failed);
@@ -318,7 +318,7 @@ std::vector<FrameExtraction::Outcome> FrameExtraction::keepPreviewOnly(Catalog& 
 	}
 
 	generatePreviewsFromSources(catalog, ids, needSource, previewFrameCount, QObject::tr("Generating previews"), dialogParent,
-		outcomes, [&catalog](const MediaId& id) { catalog.markPreviewOnly(id); });
+		outcomes, [&catalog](MediaItemId id) { catalog.markPreviewOnly(id); });
 	return outcomes;
 }
 
@@ -332,7 +332,7 @@ bool FrameExtraction::reextractAllVideoFramesInteractive(
 			QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
 		return false;
 
-	std::vector<MediaId> toReextract;
+	std::vector<MediaItemId> toReextract;
 	for (const auto& [id, entry] : catalog.mediaItems().asKeyValueRange())
 	{
 		if (entry.type == Catalog::MediaType::Video && !entry.sourcePath.isEmpty() && QFile::exists(entry.sourcePath))

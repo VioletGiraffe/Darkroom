@@ -99,7 +99,7 @@ by hand and must be extended with them:
 
 ## Cross-cutting principles
 
-- **Catalog is the authoritative media-item and label model.** It is keyed by `MediaId`, maintained through its
+- **Catalog is the authoritative media-item and label model.** It is keyed by `MediaItemId`, maintained through its
   mutation API, and never reconstructed from disk during normal refresh. Disk reconciliation is explicit.
 - **Library is the stable root-bound owner.** MainWindow owns one immovable `Library`; a complete private state
   containing root, MetadataStore, and Catalog is replaced transactionally. Persistent collaborators borrow
@@ -124,7 +124,7 @@ by hand and must be extended with them:
 
 ### [Data model and identity](architecture/data-model.md)
 
-Stable Library lifetime and root replacement, library layout, `MediaId` and `LabelId`, dumb per-item
+Stable Library lifetime and root replacement, library layout, `MediaItemId` and `LabelId`, dumb per-item
 `MetadataStore` persistence, nested writers, and checked JSON publication.
 
 ### [Catalog and labels](architecture/catalog-and-labels.md)

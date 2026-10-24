@@ -3,11 +3,11 @@
 [← Back to architecture index](../DARKROOM.md)
 
 `Catalog` is the authoritative GUI-thread model of the library's media-item set and label registry. It is keyed by
-`MediaId`, kept current through its mutation API, and owned by `Library`. Item and label queries never derive the
+`MediaItemId`, kept current through its mutation API, and owned by `Library`. Item and label queries never derive the
 normal application state by walking disk. Callers use `Catalog`, not `MetadataStore`, for model semantics.
 
-Identity is minted from the source file at import. Every later operation carries the existing `MediaId`; source
-presence and storage relocation do not redefine the item's identity.
+Registration mints an item's id; every later operation carries it. A path held by the UI resolves to its item through
+Catalog's path index.
 
 ## Model and persistence
 
@@ -27,7 +27,7 @@ that is a property of the item location, not of the label. `Best` is the sole vi
 never names storage and cannot be renamed or deleted.
 
 The ordered label registry lives in `labels.json`; per-item additional label ids live in `MetadataStore`. Keeping
-the registry separate preserves the store's invariant that every metadata record is keyed by `MediaId`. A registry
+the registry separate preserves the store's invariant that every metadata record is keyed by `MediaItemId`. A registry
 entry persists independently of item count: an empty label is valid and remains until explicitly deleted.
 
 ## Storage-label reconciliation
@@ -48,16 +48,16 @@ boundaries.
 
 ## Item and membership mutations
 
-Video and photo registration publish a freshly imported item only after its storage preparation succeeds. The catalog
-refuses an identity already registered as a different item; re-registering the same item at its current storage is
-allowed for recovery. Video registration also records whether only a permanent preview exists or full frames have
-been extracted; see [import.md](import.md).
+Video and photo registration publish a freshly imported item only after its storage preparation succeeds, and record
+the source's size. Registration refuses a source path or video frame folder that another item already has, since each
+item moves and deletes its files on its own. Video registration also records whether only a permanent preview exists
+or full frames have been extracted; see [import.md](import.md).
 
 Removing an item drops the catalog record. The caller decides whether disk content must first be deleted or is
 deliberately being left behind, because those are distinct user operations.
 
-Rename callers perform and roll back the filesystem transaction; `Catalog::applyRename` carries the complete
-metadata record to the new identity and paths. It refuses a destination identity already owned by another item.
+Rename and locate callers perform and roll back the filesystem transaction; `Catalog::updateMediaItemPaths` records the
+new paths under the unchanged id. It refuses a source path another item already has.
 
 `addLabel` changes stored membership only. `removeLabel` is also metadata-only unless the label names the item's
 storage location; in that case storage moves to the alphabetically first remaining ordinary label. Every item must
@@ -108,9 +108,9 @@ transient, and item count is not authorization to discard identity, color, or fu
 
 `CatalogIntegrity` compares the authoritative catalog with disk only on explicit request. It detects unclaimed
 Darkroom-shaped frame folders, untracked images and videos anywhere under the root, any other file or folder the
-catalog's layout does not account for, broken tracked video products, missing photo sources, and stored label ids
-absent from the registry. Metadata files that the OS or a sync client recreates after deletion are ignored. Normal
-refresh never performs this scan.
+catalog's layout does not account for, broken tracked video products, missing photo sources, sources whose size
+differs from the recorded one, and stored label ids absent from the registry. Metadata files that the OS or a sync
+client recreates after deletion are ignored. Normal refresh never performs this scan.
 
 The scanner reasons over the public Catalog model and filesystem without mutating either. Resolution remains in the
 components that own the affected catalog or disk operation. The detailed media-state verdict grid belongs beside

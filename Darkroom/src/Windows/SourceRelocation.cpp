@@ -1,6 +1,5 @@
 #include "Windows/SourceRelocation.h"
 #include "Core/Library.h"
-#include "Core/MediaId.h"
 #include "Utils.h"
 #include "Windows/LibraryPlayer.h"
 #include "Windows/OpenFileRelease.h"
@@ -143,8 +142,7 @@ struct RelocationOutcome
 	if (!QFile::exists(destPath))
 		return { copyOrMove(dialogParent, path, destPath, isMove), false };
 
-	// MediaId is only the cheap gate; confirm duplicates byte-for-byte.
-	const bool isDuplicate = (MediaId::fromFile(path) == MediaId::fromFile(destPath)) && filesAreIdentical(path, destPath);
+	const bool isDuplicate = filesAreIdentical(path, destPath);
 	FileCollisionDialog collisionDialog(library, path, destPath, isDuplicate, dialogParent);
 	collisionDialog.exec();
 

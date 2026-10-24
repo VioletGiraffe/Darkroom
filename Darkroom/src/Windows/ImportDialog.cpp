@@ -74,6 +74,7 @@ DISABLE_COMPILER_WARNINGS
 RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
+#include <utility>
 
 namespace {
 
@@ -146,32 +147,23 @@ QList<StagedFile> flattenToSupportedMediaFiles(const QStringList& paths)
 
 using RelocateMode = SourceRelocation::Mode;
 
-// A matching id elsewhere may be a collision, so success requires the expected destination.
-[[nodiscard]] bool isTrackedUnderLabel(const Catalog& catalog, const MediaId& id, const QString& labelId)
-{
-	const QString storageFolder = catalog.storageFolderForLabel(labelIdFromString(labelId));
-	if (storageFolder.isEmpty())
-		return false;
-	const QString expectedFolder = storageFolder + "/" + Catalog::frameFolderName(QFileInfo(id.name()).completeBaseName(), id);
-	return QString::compare(catalog.folderForMediaItem(id), expectedFolder, Qt::CaseInsensitive) == 0;
-}
-
 } // namespace
 
 class ImportDialog::StagedGridItem final : public QListWidgetItem
 {
 public:
-	StagedGridItem(const MediaId& id, bool sortDescending) : mediaId(id), descending(sortDescending) {}
+	StagedGridItem(StagedId id, QString name, bool sortDescending) : stagedId(id), fileName(std::move(name)), descending(sortDescending) {}
 
 	bool operator<(const QListWidgetItem& other) const override
 	{
-		const QString& otherName = static_cast<const StagedGridItem&>(other).mediaId.name();
+		const QString& otherName = static_cast<const StagedGridItem&>(other).fileName;
 		return descending
-			? NaturalSort::lessCaseInsensitive(otherName, mediaId.name())
-			: NaturalSort::lessCaseInsensitive(mediaId.name(), otherName);
+			? NaturalSort::lessCaseInsensitive(otherName, fileName)
+			: NaturalSort::lessCaseInsensitive(fileName, otherName);
 	}
 
-	MediaId mediaId;
+	const StagedId stagedId;
+	QString fileName;
 	bool descending = false;
 };
 
@@ -252,7 +244,7 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 		renameStagedAction->setShortcut(QKeySequence(Shortcuts::Rename));
 		renameStagedAction->setShortcutContext(Qt::WidgetWithChildrenShortcut);
 		connect(renameStagedAction, &QAction::triggered, this, [this, grid] {
-			const std::vector<MediaId> ids = selectedStagedIds(grid);
+			const std::vector<StagedId> ids = selectedStagedIds(grid);
 			if (ids.size() == 1)
 				renameStagedItem(ids.front());
 		});
@@ -605,7 +597,6 @@ void ImportDialog::addToStaging(const QStringList& paths)
 
 MediaItemWidget* ImportDialog::buildStagedCard(StagedGridItem* item, const QString& path, const QString& tempPreviewDir, qint64 durationMs)
 {
-	const MediaId& id = item->mediaId;
 	const int imageHeight = stagedCardImageHeight();
 	QSize canvasSize{ imageHeight, imageHeight };
 	const bool isPhoto = isSupportedImageFile(path);
@@ -621,21 +612,20 @@ MediaItemWidget* ImportDialog::buildStagedCard(StagedGridItem* item, const QStri
 	auto* card = new MediaItemWidget(
 		canvasSize,
 		previewPaths, QFileInfo(path).fileName(),
-		id,
 		/*inBest*/ false,
 		[this, item] {
-			auto it = _staged.find(item->mediaId);
+			auto it = _staged.find(item->stagedId);
 			if (it != _staged.end())
 				it->pendingBest = !it->pendingBest;
 		},
-		[this, item] { previewStagedItem(item->mediaId); },
+		[this, item] { previewStagedItem(item->stagedId); },
 		[this, item](QPoint globalPos) { showStagedCardContextMenu(item, globalPos); },
 		/* dynamicSizeHint */ false,
 		/* film strip */ !isPhoto
 	);
 
 	card->setOnLabelDropped([this, item](const QString& labelId) {
-		for (const MediaId& target : effectiveStagedSelection(item))
+		for (const StagedId target : effectiveStagedSelection(item))
 		{
 			auto it = _staged.find(target);
 			if (it != _staged.end() && !it->pendingLabelIds.contains(labelId))
@@ -678,62 +668,49 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 		if (!file.suggestedLabelName.isEmpty())
 			suggestedLabelNameByPath.insert(file.path, file.suggestedLabelName);
 
-	// MediaId is only a name/size gate; byte-compare matches before treating one as a duplicate.
-	QHash<MediaId, QString> stagedPathById;
-	for (auto it = _staged.constBegin(); it != _staged.constEnd(); ++it)
-		stagedPathById.insert(it.key(), it->path);
+	// Content already staged is not staged again; it is reported unless the same file was dropped again.
+	// Size gates the byte compare.
+	QHash<qint64, QStringList> stagedPathsBySize;
+	for (const StagedEntry& entry : std::as_const(_staged))
+		stagedPathsBySize[QFileInfo(entry.path).size()] << entry.path;
 
 	QStringList newPaths;
-	QStringList collisionLines;
+	QStringList duplicateLines;
 	for (const StagedFile& file : mediaFiles)
 	{
 		const QString& path = file.path;
-		const MediaId id = MediaId::fromFile(path);
-		const QString existingPath = stagedPathById.value(id);
-		if (existingPath.isEmpty())
+		QStringList& sameSizePaths = stagedPathsBySize[QFileInfo(path).size()];
+		const auto staged = std::ranges::find_if(sameSizePaths, [&path](const QString& stagedPath) { return filesAreIdentical(path, stagedPath); });
+		if (staged == sameSizePaths.end())
 		{
-			stagedPathById.insert(id, path);
+			sameSizePaths << path;
 			newPaths << path;
 		}
-		else if (QFileInfo(path) != QFileInfo(existingPath) && !filesAreIdentical(path, existingPath))
-			collisionLines << tr("%1\n    collides with %2").arg(QDir::toNativeSeparators(path), QDir::toNativeSeparators(existingPath));
+		else if (QFileInfo(path) != QFileInfo(*staged))
+			duplicateLines << tr("%1\n    is already staged as %2").arg(QDir::toNativeSeparators(path), QDir::toNativeSeparators(*staged));
 	}
 
-	if (!collisionLines.isEmpty())
-		MessageDialog::notice(this, tr("Name collision"),
-			tr("Not staged - same name and size as an already staged file, but different content. "
-			   "Only one item per name+size can be tracked; rename the file if both are wanted."),
-			collisionLines.join("\n\n"));
-
-	if (newPaths.isEmpty())
-		return;
-
-	// Photos use content identity; videos use their name/size MediaId.
 	QStringList videoPaths;
 	QStringList photoPaths;
-	QStringList duplicateLines;
+	const Catalog& catalog = _library.catalog();
 	for (const QString& path : newPaths)
 	{
-		const bool isPhoto = isSupportedImageFile(path);
-		const QString existingPath = isPhoto
-			? _library.catalog().findPhotoBySameContent(path)
-			: _library.catalog().sourcePathForMediaItem(MediaId::fromFile(path));
-		if (!existingPath.isEmpty())
-			duplicateLines << tr("%1\n    is already imported as %2").arg(QDir::toNativeSeparators(path), QDir::toNativeSeparators(existingPath));
+		if (const MediaItemId existing = catalog.findMediaItemWithSameContent(path); existing != MediaItemId::None)
+			duplicateLines << tr("%1\n    is already imported as %2").arg(QDir::toNativeSeparators(path), QDir::toNativeSeparators(catalog.sourcePathForMediaItem(existing)));
 		else
-			(isPhoto ? photoPaths : videoPaths) << path;
+			(isSupportedImageFile(path) ? photoPaths : videoPaths) << path;
 	}
 
 	if (!duplicateLines.isEmpty())
-		MessageDialog::notice(this, tr("Already imported"), tr("Not staged - already in the library:"),
+		MessageDialog::notice(this, tr("Duplicates"), tr("Not staged - the same content is already staged or in the library:"),
 			duplicateLines.join("\n\n"), QMessageBox::Information);
 
 	const int mainWindowFrameCount = QSettings{}.value(Settings::PreviewFrameCount, Defaults::PreviewFrameCount).toInt();
 	const int extractionFrameCount = std::max(stagedPreviewFrameCount(), mainWindowFrameCount);
 
 	const auto stageCard = [this, &suggestedLabelNameByPath](QListWidget* grid, const QString& path, const QString& tempPreviewDir, qint64 durationMs = -1) {
-		const MediaId id = MediaId::fromFile(path);
-		auto* item = new StagedGridItem(id, _sortDirectionToggle->currentIndex() == 1);
+		const StagedId id{ ++_lastStagedId };
+		auto* item = new StagedGridItem(id, QFileInfo(path).fileName(), _sortDirectionToggle->currentIndex() == 1);
 		auto* card = buildStagedCard(item, path, tempPreviewDir, durationMs);
 		item->setSizeHint(card->sizeHint());
 		grid->addItem(item);
@@ -799,7 +776,7 @@ void ImportDialog::suggestLabels()
 	updateAllCardLabelDots();
 }
 
-void ImportDialog::unstage(const MediaId& id)
+void ImportDialog::unstage(StagedId id)
 {
 	auto it = _staged.find(id);
 	if (it == _staged.end())
@@ -811,7 +788,7 @@ void ImportDialog::unstage(const MediaId& id)
 	updateStagedTabTitles();
 }
 
-void ImportDialog::updateCardLabelDots(const MediaId& id)
+void ImportDialog::updateCardLabelDots(StagedId id)
 {
 	const auto it = _staged.constFind(id);
 	if (it == _staged.constEnd())
@@ -853,7 +830,7 @@ void ImportDialog::stagedPreviewFrameCountChanged()
 void ImportDialog::regenerateInsufficientStagedVideoPreviews(int frameCount)
 {
 	std::vector<Ffmpeg::PreviewJob> jobs;
-	std::vector<MediaId> jobIds;
+	std::vector<StagedId> jobIds;
 	QStringList cleanupFailures;
 	for (auto it = _staged.constBegin(); it != _staged.constEnd(); ++it)
 	{
@@ -908,25 +885,33 @@ void ImportDialog::rebuildAllStagedCards()
 	}
 }
 
-std::vector<MediaId> ImportDialog::effectiveStagedSelection(const StagedGridItem* item) const
+ImportDialog::StagedId ImportDialog::stagedIdAtPath(const QString& path) const
+{
+	const QString key = pathComparisonKey(path);
+	for (auto it = _staged.constBegin(); it != _staged.constEnd(); ++it)
+		if (pathComparisonKey(it->path) == key)
+			return it.key();
+	return StagedId::None;
+}
+
+std::vector<ImportDialog::StagedId> ImportDialog::effectiveStagedSelection(const StagedGridItem* item) const
 {
 	const QList<QListWidgetItem*> selected = item->listWidget()->selectedItems();
 	if (selected.size() <= 1 || !item->isSelected())
-		return { item->mediaId };
+		return { item->stagedId };
 
-	std::vector<MediaId> targets;
+	std::vector<StagedId> targets;
 	targets.reserve(selected.size());
 	for (const QListWidgetItem* selectedItem : selected)
-		targets.push_back(static_cast<const StagedGridItem*>(selectedItem)->mediaId);
+		targets.push_back(static_cast<const StagedGridItem*>(selectedItem)->stagedId);
 	return targets;
 }
 
 void ImportDialog::showStagedCardContextMenu(StagedGridItem* item, const QPoint& globalPos)
 {
-	const MediaId id = item->mediaId;
-	if (!_staged.contains(id))
+	if (!_staged.contains(item->stagedId))
 		return;
-	const std::vector<MediaId> selection = effectiveStagedSelection(item);
+	const std::vector<StagedId> selection = effectiveStagedSelection(item);
 
 	QMenu menu(this);
 
@@ -937,19 +922,19 @@ void ImportDialog::showStagedCardContextMenu(StagedGridItem* item, const QPoint&
 		menu.addSeparator();
 	}
 
-	menu.addAction(isPhoto ? tr("Open photo") : tr("Play source video"), this, [this, item] { previewStagedItem(item->mediaId); });
-	menu.addAction(tr("Locate source file"), this, [this, item] { locateStagedSourceFile(item->mediaId); });
-	menu.addAction(tr("Copy source path to clipboard"), this, [this, item] { copyStagedSourcePath(item->mediaId); });
+	menu.addAction(isPhoto ? tr("Open photo") : tr("Play source video"), this, [this, item] { previewStagedItem(item->stagedId); });
+	menu.addAction(tr("Locate source file"), this, [this, item] { locateStagedSourceFile(item->stagedId); });
+	menu.addAction(tr("Copy source path to clipboard"), this, [this, item] { copyStagedSourcePath(item->stagedId); });
 	// Rebuilding the card deletes the widget whose context-menu handler is on the stack.
 	QAction* renameItem = menu.addAction(tr("Rename..."), this, [this, item] {
-		QMetaObject::invokeMethod(this, [this, item] { renameStagedItem(item->mediaId); }, Qt::QueuedConnection);
+		QMetaObject::invokeMethod(this, [this, item] { renameStagedItem(item->stagedId); }, Qt::QueuedConnection);
 	});
 	renameItem->setShortcut(QKeySequence(Shortcuts::Rename));
 	renameItem->setShortcutContext(Qt::WidgetShortcut);
 	menu.addSeparator();
 
 	const bool allBest = std::all_of(selection.cbegin(), selection.cend(),
-		[this](const MediaId& sel) { return _staged.value(sel).pendingBest; });
+		[this](StagedId sel) { return _staged.value(sel).pendingBest; });
 	menu.addAction(allBest ? tr("Remove from Best") : tr("Add to Best"), this, [this, selection, allBest] {
 		setBestForStagedSelection(selection, !allBest);
 	});
@@ -958,14 +943,14 @@ void ImportDialog::showStagedCardContextMenu(StagedGridItem* item, const QPoint&
 	for (const LabelOption& option : _labelOptions)
 	{
 		int haveCount = 0;
-		for (const MediaId& sel : selection)
+		for (const StagedId sel : selection)
 			if (_staged.value(sel).pendingLabelIds.contains(option.id))
 				++haveCount;
 
 		labelRows.push_back({ option.displayName, QColor(option.color),
 			LabelVisuals::presenceForCount(haveCount, static_cast<int>(selection.size())),
 			[this, selection, labelId = option.id](bool addToAll) {
-				for (const MediaId& target : selection)
+				for (const StagedId target : selection)
 				{
 					auto it = _staged.find(target);
 					if (it == _staged.end())
@@ -983,7 +968,7 @@ void ImportDialog::showStagedCardContextMenu(StagedGridItem* item, const QPoint&
 	}
 	QMenu* labelsMenu = menu.addMenu(tr("Labels"));
 	QAction* removeAllLabelsAction = labelsMenu->addAction(tr("Remove all labels"), this, [this, selection] {
-		for (const MediaId& target : selection)
+		for (const StagedId target : selection)
 		{
 			auto it = _staged.find(target);
 			if (it == _staged.end())
@@ -993,7 +978,7 @@ void ImportDialog::showStagedCardContextMenu(StagedGridItem* item, const QPoint&
 		}
 	});
 	removeAllLabelsAction->setEnabled(std::any_of(selection.cbegin(), selection.cend(),
-		[this](const MediaId& target) { return !_staged.value(target).pendingLabelIds.empty(); }));
+		[this](const StagedId target) { return !_staged.value(target).pendingLabelIds.empty(); }));
 	labelsMenu->addSeparator();
 	LabelVisuals::buildChecklistMenu(labelsMenu, std::move(labelRows));
 	menu.addSeparator();
@@ -1013,39 +998,38 @@ void ImportDialog::showStagedCardContextMenu(StagedGridItem* item, const QPoint&
 	menu.exec(globalPos);
 }
 
-std::vector<MediaId> ImportDialog::selectedStagedIds(const QListWidget* grid)
+std::vector<ImportDialog::StagedId> ImportDialog::selectedStagedIds(const QListWidget* grid)
 {
 	const QList<QListWidgetItem*> selected = grid->selectedItems();
-	std::vector<MediaId> ids;
+	std::vector<StagedId> ids;
 	ids.reserve(selected.size());
 	for (const QListWidgetItem* item : selected)
-		ids.push_back(static_cast<const StagedGridItem*>(item)->mediaId);
+		ids.push_back(static_cast<const StagedGridItem*>(item)->stagedId);
 	return ids;
 }
 
-void ImportDialog::previewStagedItem(const MediaId& id)
+void ImportDialog::previewStagedItem(StagedId id)
 {
 	const auto it = _staged.constFind(id);
 	if (it == _staged.constEnd())
 		return;
 
-	// Both return whether the item left the staging list.
-	const auto removeStaged = [this](const MediaId& stagedId) {
+	// Both take the window's current path and return whether the item left the staging list.
+	const auto removeStaged = [this](const QString& path) {
+		const StagedId stagedId = stagedIdAtPath(path);
 		removeStagedItems({ stagedId });
 		return !_staged.contains(stagedId);
 	};
-	const auto deleteStagedSource = [this](const MediaId& stagedId) {
+	const auto deleteStagedSource = [this](const QString& path) {
+		const StagedId stagedId = stagedIdAtPath(path);
 		deleteStagedSourceFiles({ stagedId });
 		return !_staged.contains(stagedId);
 	};
 
-	// Staged ids come from the windows' current paths: renaming a staged file while it is open changes its id.
 	if (!isSupportedImageFile(it->path))
 	{
 		VideoPlayerWindow* const player = LibraryPlayer::open(_library, it->path, this);
-		player->setRemovalActions(
-			{ tr("Remove from staging"), [removeStaged](const MediaId& playedId, const QString&) { return removeStaged(playedId); } },
-			{ tr("Delete source file"), [deleteStagedSource](const MediaId& playedId, const QString&) { return deleteStagedSource(playedId); } });
+		player->setRemovalActions({ tr("Remove from staging"), removeStaged }, { tr("Delete source file"), deleteStagedSource });
 		return;
 	}
 
@@ -1054,22 +1038,20 @@ void ImportDialog::previewStagedItem(const MediaId& id)
 	for (int row = 0; row < _photoGrid->count(); ++row)
 	{
 		const auto* item = static_cast<const StagedGridItem*>(_photoGrid->item(row));
-		if (item->mediaId == id)
+		if (item->stagedId == id)
 			startIndex = static_cast<int>(photoPaths.size());
-		photoPaths << _staged.constFind(item->mediaId)->path;
+		photoPaths << _staged.constFind(item->stagedId)->path;
 	}
 
 	ImageViewerWindow* const viewer = ImageViewerWindow::showForImages(std::move(photoPaths), startIndex, this,
-		[this](const QString& path) { selectAndScrollToStagedItem(MediaId::fromFile(path)); });
+		[this](const QString& path) { selectAndScrollToStagedItem(stagedIdAtPath(path)); });
 	if (!viewer)
 		return;
 
-	viewer->setRemovalActions(
-		{ tr("Remove from staging"), [removeStaged](const QString& path) { return removeStaged(MediaId::fromFile(path)); } },
-		{ tr("Delete source file"), [deleteStagedSource](const QString& path) { return deleteStagedSource(MediaId::fromFile(path)); } });
+	viewer->setRemovalActions({ tr("Remove from staging"), removeStaged }, { tr("Delete source file"), deleteStagedSource });
 }
 
-void ImportDialog::selectAndScrollToStagedItem(const MediaId& id)
+void ImportDialog::selectAndScrollToStagedItem(StagedId id)
 {
 	const auto it = _staged.constFind(id);
 	if (it == _staged.constEnd())
@@ -1081,7 +1063,7 @@ void ImportDialog::selectAndScrollToStagedItem(const MediaId& id)
 	grid->scrollToItem(it->item);
 }
 
-void ImportDialog::locateStagedSourceFile(const MediaId& id)
+void ImportDialog::locateStagedSourceFile(StagedId id)
 {
 	const auto it = _staged.constFind(id);
 	if (it == _staged.constEnd())
@@ -1091,35 +1073,24 @@ void ImportDialog::locateStagedSourceFile(const MediaId& id)
 		reportMissingFile(this, it->path);
 }
 
-void ImportDialog::copyStagedSourcePath(const MediaId& id)
+void ImportDialog::copyStagedSourcePath(StagedId id)
 {
 	const auto it = _staged.constFind(id);
 	if (it != _staged.constEnd())
 		QApplication::clipboard()->setText(QDir::toNativeSeparators(it->path));
 }
 
-void ImportDialog::compareStagedPhotos(const std::vector<MediaId>& photoIds)
+void ImportDialog::compareStagedPhotos(const std::vector<StagedId>& photoIds)
 {
 	QStringList paths;
-	for (const MediaId& id : photoIds)
+	for (const StagedId id : photoIds)
 		paths << _staged.value(id).path;
-	PhotoCompareWindow::showForFiles(_library, paths, this, [this](const QString& removedPath) {
-		const QString removedKey = pathComparisonKey(removedPath);
-		for (auto it = _staged.constBegin(); it != _staged.constEnd(); ++it)
-		{
-			if (pathComparisonKey(it->path) == removedKey)
-			{
-				const MediaId id = it.key();
-				unstage(id);
-				return;
-			}
-		}
-	});
+	PhotoCompareWindow::showForFiles(_library, paths, this, [this](const QString& removedPath) { unstage(stagedIdAtPath(removedPath)); });
 }
 
-void ImportDialog::setBestForStagedSelection(const std::vector<MediaId>& ids, bool inBest)
+void ImportDialog::setBestForStagedSelection(const std::vector<StagedId>& ids, bool inBest)
 {
-	for (const MediaId& id : ids)
+	for (const StagedId id : ids)
 	{
 		auto it = _staged.find(id);
 		if (it == _staged.end())
@@ -1129,13 +1100,13 @@ void ImportDialog::setBestForStagedSelection(const std::vector<MediaId>& ids, bo
 	}
 }
 
-void ImportDialog::removeStagedItems(const std::vector<MediaId>& ids)
+void ImportDialog::removeStagedItems(const std::vector<StagedId>& ids)
 {
-	for (const MediaId& id : ids)
+	for (const StagedId id : ids)
 		unstage(id);
 }
 
-void ImportDialog::deleteStagedSourceFiles(const std::vector<MediaId>& ids)
+void ImportDialog::deleteStagedSourceFiles(const std::vector<StagedId>& ids)
 {
 	if (ids.empty())
 		return;
@@ -1148,23 +1119,24 @@ void ImportDialog::deleteStagedSourceFiles(const std::vector<MediaId>& ids)
 		return;
 
 	QStringList paths;
-	for (const MediaId& id : ids)
+	for (const StagedId id : ids)
 		paths.push_back(_staged.value(id).path);
 	const QSet<QString> removedPaths = PathDeletion::removePathsInteractive(paths, PathDeletion::Mode::Trash, this);
 
-	for (const MediaId& id : ids)
+	for (const StagedId id : ids)
 	{
 		if (removedPaths.contains(_staged.value(id).path))
 			unstage(id);
 	}
 }
 
-void ImportDialog::renameStagedItem(const MediaId& id)
+void ImportDialog::renameStagedItem(StagedId id)
 {
 	const auto it = _staged.constFind(id);
 	if (it == _staged.constEnd())
 		return;
 
+	// Copied: the input dialog's event loop may change _staged.
 	const StagedEntry entry = it.value();
 	const QFileInfo oldInfo(entry.path);
 	const QString oldBase = oldInfo.completeBaseName();
@@ -1184,13 +1156,6 @@ void ImportDialog::renameStagedItem(const MediaId& id)
 
 	const QString newName = suffix.isEmpty() ? newBase : QStringLiteral("%1.%2").arg(newBase, suffix);
 	const QString newPath = oldInfo.dir().filePath(newName);
-	const MediaId newId = MediaId::fromNameAndSize(newName, id.size());
-
-	if (newId != id && _staged.contains(newId))
-	{
-		QMessageBox::warning(this, tr("Rename"), tr("Another staged item already has that name and size."));
-		return;
-	}
 	if (QFileInfo::exists(newPath) && QFileInfo(newPath) != oldInfo)
 	{
 		QMessageBox::warning(this, tr("Rename"), tr("A file named \"%1\" already exists in that folder.").arg(newName));
@@ -1203,26 +1168,24 @@ void ImportDialog::renameStagedItem(const MediaId& id)
 		return;
 	}
 
-	// The staged key and row identity must always equal the current file's MediaId.
-	StagedEntry renamed = entry;
-	renamed.path = newPath;
-	assert_r(renamed.item->mediaId == id);
-	_staged.remove(id);
-	renamed.item->mediaId = newId;
-	_staged.insert(newId, renamed);
-	auto* card = buildStagedCard(renamed.item, newPath, renamed.tempPreviewDir, renamed.durationMs);
-	renamed.item->listWidget()->setItemWidget(renamed.item, card);
+	const auto renamed = _staged.find(id);
+	if (renamed == _staged.end())
+		return;
+	renamed->path = newPath;
+	renamed->item->fileName = newName;
+	auto* card = buildStagedCard(renamed->item, newPath, renamed->tempPreviewDir, renamed->durationMs);
+	renamed->item->listWidget()->setItemWidget(renamed->item, card);
 
-	if (renamed.pendingBest)
+	if (renamed->pendingBest)
 		card->setInBest(true);
-	updateCardLabelDots(newId);
+	updateCardLabelDots(id);
 	resortStagedItems();
 }
 
-void ImportDialog::materializeUsedProvisionalLabels(const std::vector<MediaId>& ids)
+void ImportDialog::materializeUsedProvisionalLabels(const std::vector<StagedId>& ids)
 {
 	QHash<QString, QString> provisionalToReal;
-	for (const MediaId& id : ids)
+	for (const StagedId id : ids)
 	{
 		const QStringList pendingLabelIds = _staged.value(id).pendingLabelIds;
 		for (const QString& labelId : pendingLabelIds)
@@ -1251,41 +1214,23 @@ void ImportDialog::materializeUsedProvisionalLabels(const std::vector<MediaId>& 
 			tr("Some labels could not be created (the name may be reserved or invalid); the affected items were left unlabeled and remain staged."));
 }
 
-void ImportDialog::importPhotoGroup(const QString& labelId, const std::vector<MediaId>& photoIds, Import::PhotoImportMode mode, ImportOutcome& outcome)
+void ImportDialog::importPhotoGroup(const QString& labelId, const std::vector<StagedId>& photoIds, Import::PhotoImportMode mode, ImportOutcome& outcome)
 {
 	QStringList photoPaths;
 	photoPaths.reserve(photoIds.size());
-	for (const MediaId& id : photoIds)
+	for (const StagedId id : photoIds)
 		photoPaths << _staged.value(id).path;
 
 	const std::vector<Import::PhotoResult> results =
 		ImportExecution::importPhotosInteractive(_library.catalog(), labelIdFromString(labelId), photoPaths, mode, this);
 	for (size_t i = 0; i < photoIds.size() && i < results.size(); ++i)
 	{
-		const MediaId& id = photoIds[i];
-		Import::PhotoResult result = results[i];
-
-		// Reference mode can hit an unresolvable name+size clash with an existing item; the escape
-		// hatch imports an owned copy instead, whose auto-rename resolves the clash.
-		if (result.status == Import::PhotoStatus::IdCollision
-			&& QMessageBox::question(this, tr("Already tracked"),
-				tr("%1\n\nhas the same name and size as an item already in the library, so it cannot be referenced in place.\n\n"
-				   "Import a copy into the library instead (renamed automatically to avoid the clash)?")
-				.arg(QDir::toNativeSeparators(_staged.value(id).path)),
-				QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes)
-		{
-			const std::vector<Import::PhotoResult> retried = ImportExecution::importPhotosInteractive(
-				_library.catalog(), labelIdFromString(labelId), { _staged.value(id).path }, Import::PhotoImportMode::Copy, this);
-			if (!retried.empty())
-				result = retried.front();
-		}
-
+		const Import::PhotoResult& result = results[i];
 		if (result.status != Import::PhotoStatus::Success)
 			continue;
 
-		const StagedEntry entry = _staged.value(id);
-		outcome.succeededIds.push_back(id);
-		// An owned copy may be auto-renamed, so apply metadata to the registered id.
+		const StagedEntry entry = _staged.value(photoIds[i]);
+		outcome.succeededIds.push_back(photoIds[i]);
 		if (entry.pendingBest)
 			outcome.bestItems.push_back(result.registeredId);
 		if (entry.pendingLabelIds.size() > 1)
@@ -1293,7 +1238,7 @@ void ImportDialog::importPhotoGroup(const QString& labelId, const std::vector<Me
 	}
 }
 
-void ImportDialog::importVideoGroup(const QString& labelId, const std::vector<MediaId>& videoIds, SourceRelocation::Mode relocateMode, ImportOutcome& outcome)
+void ImportDialog::importVideoGroup(const QString& labelId, const std::vector<StagedId>& videoIds, SourceRelocation::Mode relocateMode, ImportOutcome& outcome)
 {
 	const LabelOption* label = findLabelOption(labelId);
 	if (!label)
@@ -1308,26 +1253,18 @@ void ImportDialog::importVideoGroup(const QString& labelId, const std::vector<Me
 	}
 
 	QStringList paths;
-	QHash<MediaId, QString> stagedPreviewDirs;
-	QHash<MediaId, qint64> stagedDurations;
 	paths.reserve(videoIds.size());
-	stagedPreviewDirs.reserve(videoIds.size());
-	stagedDurations.reserve(videoIds.size());
-	for (const MediaId& id : videoIds)
-	{
-		const StagedEntry entry = _staged.value(id);
-		paths << entry.path;
-		stagedPreviewDirs.insert(id, entry.tempPreviewDir);
-		stagedDurations.insert(id, entry.durationMs);
-	}
+	for (const StagedId id : videoIds)
+		paths << _staged.value(id).path;
 
 	const SourceRelocation::BatchResult relocated = SourceRelocation::relocateIfNeeded(
 		_library, this, paths, relocateMode, _relocateFolderEdit->text());
-	ImportExecution::importVideosInteractive(catalog, relocated.toImport, storageFolder, stagedPreviewDirs, stagedDurations, this);
 
-	for (const MediaId& id : videoIds)
+	std::vector<StagedId> importedIds;
+	std::vector<ImportExecution::StagedVideo> videos;
+	for (const StagedId id : videoIds)
 	{
-		const StagedEntry entry = _staged.value(id);
+		StagedEntry& entry = _staged[id];
 		if (relocated.keepStaged.contains(entry.path))
 			continue;
 
@@ -1339,26 +1276,33 @@ void ImportDialog::importVideoGroup(const QString& labelId, const std::vector<Me
 
 		// Follow relocation so a retry never points at a moved-away source.
 		if (const QString newPath = relocated.relocatedTo.value(entry.path); !newPath.isEmpty())
-			_staged[id].path = newPath;
+			entry.path = newPath;
 
-		if (!isTrackedUnderLabel(catalog, id, labelId))
+		importedIds.push_back(id);
+		videos.push_back({ entry.path, entry.tempPreviewDir, entry.durationMs });
+	}
+
+	const std::vector<MediaItemId> registeredIds = ImportExecution::importVideosInteractive(catalog, videos, storageFolder, this);
+	for (size_t i = 0; i < importedIds.size(); ++i)
+	{
+		if (registeredIds[i] == MediaItemId::None)
 			continue;
 
-		outcome.succeededIds.push_back(id);
-
+		const StagedEntry entry = _staged.value(importedIds[i]);
+		outcome.succeededIds.push_back(importedIds[i]);
 		if (entry.pendingBest)
-			outcome.bestItems.push_back(id);
+			outcome.bestItems.push_back(registeredIds[i]);
 		if (entry.pendingLabelIds.size() > 1)
-			outcome.extraLabelAssignments.push_back(ExtraLabelAssignment{ id, entry.pendingLabelIds.mid(1) });
+			outcome.extraLabelAssignments.push_back(ExtraLabelAssignment{ registeredIds[i], entry.pendingLabelIds.mid(1) });
 	}
 }
 
-std::vector<MediaId> ImportDialog::labeledIdsReadyForImport(const QListWidget* grid, QComboBox* modeCombo)
+std::vector<ImportDialog::StagedId> ImportDialog::labeledIdsReadyForImport(const QListWidget* grid, QComboBox* modeCombo)
 {
-	std::vector<MediaId> ids;
+	std::vector<StagedId> ids;
 	for (int row = 0; row < grid->count(); ++row)
 	{
-		const MediaId& id = static_cast<const StagedGridItem*>(grid->item(row))->mediaId;
+		const StagedId id = static_cast<const StagedGridItem*>(grid->item(row))->stagedId;
 		if (!_staged.value(id).pendingLabelIds.empty())
 			ids.push_back(id);
 	}
@@ -1382,7 +1326,7 @@ std::vector<MediaId> ImportDialog::labeledIdsReadyForImport(const QListWidget* g
 
 void ImportDialog::runPhotoImport()
 {
-	const std::vector<MediaId> ids = labeledIdsReadyForImport(_photoGrid, _photoModeCombo);
+	const std::vector<StagedId> ids = labeledIdsReadyForImport(_photoGrid, _photoModeCombo);
 	if (ids.empty())
 		return;
 
@@ -1398,14 +1342,14 @@ void ImportDialog::runPhotoImport()
 			return;
 	}
 
-	importByDestinationLabel(ids, [this, mode](const QString& labelId, const std::vector<MediaId>& photoIds, ImportOutcome& outcome) {
+	importByDestinationLabel(ids, [this, mode](const QString& labelId, const std::vector<StagedId>& photoIds, ImportOutcome& outcome) {
 		importPhotoGroup(labelId, photoIds, mode, outcome);
 	});
 }
 
 void ImportDialog::runVideoImport()
 {
-	const std::vector<MediaId> ids = labeledIdsReadyForImport(_videoGrid, _videoRelocateModeCombo);
+	const std::vector<StagedId> ids = labeledIdsReadyForImport(_videoGrid, _videoRelocateModeCombo);
 	if (ids.empty())
 		return;
 
@@ -1421,19 +1365,18 @@ void ImportDialog::runVideoImport()
 			return;
 	}
 
-	importByDestinationLabel(ids, [this, relocateMode](const QString& labelId, const std::vector<MediaId>& videoIds, ImportOutcome& outcome) {
+	importByDestinationLabel(ids, [this, relocateMode](const QString& labelId, const std::vector<StagedId>& videoIds, ImportOutcome& outcome) {
 		importVideoGroup(labelId, videoIds, relocateMode, outcome);
 	});
 }
 
-void ImportDialog::importByDestinationLabel(const std::vector<MediaId>& ids, const GroupImporter& importGroup)
+void ImportDialog::importByDestinationLabel(const std::vector<StagedId>& ids, const GroupImporter& importGroup)
 {
 	Catalog::ChangeBatchScope catalogChanges(_library.catalog());
 	materializeUsedProvisionalLabels(ids);
 
-	// Keep the pre-relocation MediaId: Move may delete the path before bookkeeping completes.
-	QHash<QString, std::vector<MediaId>> idsByLabelId;
-	for (const MediaId& id : ids)
+	QHash<QString, std::vector<StagedId>> idsByLabelId;
+	for (const StagedId id : ids)
 		if (const QStringList pendingLabelIds = _staged.value(id).pendingLabelIds; !pendingLabelIds.isEmpty())
 			idsByLabelId[pendingLabelIds.constFirst()].push_back(id);
 
@@ -1452,20 +1395,20 @@ void ImportDialog::importByDestinationLabel(const std::vector<MediaId>& ids, con
 	{
 		Catalog& catalog = _library.catalog();
 		Catalog::BatchScope batch(catalog);
-		for (const MediaId& id : outcome.bestItems)
+		for (const MediaItemId id : outcome.bestItems)
 			if (catalog.containsMediaItem(id))
 				catalog.addLabel(id, Catalog::BestLabelId);
 		for (const ExtraLabelAssignment& assignment : outcome.extraLabelAssignments)
 		{
-			if (!catalog.containsMediaItem(assignment.mediaId))
+			if (!catalog.containsMediaItem(assignment.mediaItemId))
 				continue;
 			for (const QString& labelId : assignment.labelIds)
-				catalog.addLabel(assignment.mediaId, labelIdFromString(labelId));
+				catalog.addLabel(assignment.mediaItemId, labelIdFromString(labelId));
 		}
 	}
 
-	for (const MediaId& id : outcome.succeededIds)
+	for (const StagedId id : outcome.succeededIds)
 		unstage(id);
-	for (const MediaId& id : outcome.skippedIds)
+	for (const StagedId id : outcome.skippedIds)
 		unstage(id);
 }

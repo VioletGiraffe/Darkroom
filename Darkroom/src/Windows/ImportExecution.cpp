@@ -11,7 +11,6 @@ DISABLE_COMPILER_WARNINGS
 #include <QAbstractButton>
 #include <QApplication>
 #include <QDir>
-#include <QFileInfo>
 #include <QMessageBox>
 #include <QObject>
 RESTORE_COMPILER_WARNINGS
@@ -21,13 +20,6 @@ RESTORE_COMPILER_WARNINGS
 #include <vector>
 
 namespace {
-
-[[nodiscard]] QString videoOutputFolder(const QString& storageFolderPath, const QString& videoPath)
-{
-	const QFileInfo videoInfo(videoPath);
-	const MediaId id = MediaId::fromFile(videoPath);
-	return storageFolderPath + "/" + Catalog::frameFolderName(videoInfo.completeBaseName(), id);
-}
 
 void showImportFailures(QWidget* dialogParent, const QString& summary, const QStringList& failures)
 {
@@ -39,12 +31,13 @@ void showImportFailures(QWidget* dialogParent, const QString& summary, const QSt
 
 } // namespace
 
-void ImportExecution::importVideosInteractive(Catalog& catalog, QStringList videoPaths, const QString& storageFolderPath,
-	const QHash<MediaId, QString>& stagedPreviewDirs, const QHash<MediaId, qint64>& stagedDurations, QWidget* dialogParent)
+std::vector<MediaItemId> ImportExecution::importVideosInteractive(Catalog& catalog, const std::vector<StagedVideo>& videos,
+	const QString& storageFolderPath, QWidget* dialogParent)
 {
-	if (videoPaths.empty())
-		return;
-	assert_and_return_r(!storageFolderPath.isEmpty(), );
+	std::vector<MediaItemId> registeredIds(videos.size(), MediaItemId::None);
+	if (videos.empty())
+		return registeredIds;
+	assert_and_return_r(!storageFolderPath.isEmpty(), registeredIds);
 
 	Catalog::BatchScope batch(catalog);
 
@@ -54,40 +47,41 @@ void ImportExecution::importVideosInteractive(Catalog& catalog, QStringList vide
 	progressBox.setModal(true);
 	progressBox.show();
 
-	const auto partition = std::ranges::stable_partition(videoPaths, [&storageFolderPath](const QString& path) {
-		return !QDir{ videoOutputFolder(storageFolderPath, path) }.exists();
+	// Videos whose output folder exists go last, behind a single overwrite choice.
+	std::vector<size_t> order(videos.size());
+	for (size_t i = 0; i < order.size(); ++i)
+		order[i] = i;
+	const auto partition = std::ranges::stable_partition(order, [&](size_t i) {
+		return !QDir{ catalog.frameFolderForNewVideo(storageFolderPath, videos[i].path) }.exists();
 	});
 
 	QStringList failures;
-	const auto processFilesRange = [&catalog, &progressBox, &storageFolderPath, &stagedPreviewDirs, &stagedDurations, dialogParent,
-			&failures, totalSize = videoPaths.size()](auto begin, auto end, qsizetype firstNumber, bool overwriteExisting = false) {
+	const auto processFilesRange = [&catalog, &videos, &registeredIds, &progressBox, &storageFolderPath, dialogParent,
+			&failures](auto begin, auto end, qsizetype firstNumber, bool overwriteExisting = false) {
 		qsizetype displayNumber = firstNumber;
-		for (const QString& videoPath : std::ranges::subrange(begin, end))
+		for (const size_t i : std::ranges::subrange(begin, end))
 		{
-			progressBox.setText(QObject::tr("Adding video %1/%2...").arg(displayNumber++).arg(totalSize));
+			const StagedVideo& video = videos[i];
+			progressBox.setText(QObject::tr("Adding video %1/%2...").arg(displayNumber++).arg(videos.size()));
 			QApplication::processEvents();
 
-			const MediaId id = MediaId::fromFile(videoPath);
-			const QString stagedPreviewDir = stagedPreviewDirs.value(id);
-			const qint64 stagedDurationMs = stagedDurations.value(id, -1);
-			Import::Result result = Import::importVideo(
-				catalog, videoPath, storageFolderPath, stagedPreviewDir, overwriteExisting, stagedDurationMs);
+			Import::Result result = Import::importVideo(catalog, video.path, storageFolderPath, video.previewDir, overwriteExisting, video.durationMs);
 			if (result.status == Import::Status::FolderConflict)
 			{
-				const QString outputFolder = videoOutputFolder(storageFolderPath, videoPath);
+				const QString outputFolder = catalog.frameFolderForNewVideo(storageFolderPath, video.path);
 				if (QMessageBox::question(dialogParent, QObject::tr("Folder Exists"),
 						QObject::tr("Folder already exists:\n%1\n\nOverwrite?").arg(outputFolder),
 						QMessageBox::Yes | QMessageBox::No) != QMessageBox::Yes)
 					continue;
-				result = Import::importVideo(
-					catalog, videoPath, storageFolderPath, stagedPreviewDir, /*overwriteExisting=*/true, stagedDurationMs);
+				result = Import::importVideo(catalog, video.path, storageFolderPath, video.previewDir, /*overwriteExisting=*/true, video.durationMs);
 			}
 			if (result.status == Import::Status::Error)
-				failures << QObject::tr("%1:\n%2").arg(QDir::toNativeSeparators(videoPath), result.errorMessage);
+				failures << QObject::tr("%1:\n%2").arg(QDir::toNativeSeparators(video.path), result.errorMessage);
+			registeredIds[i] = result.registeredId;
 		}
 	};
 
-	processFilesRange(videoPaths.begin(), partition.begin(), 1);
+	processFilesRange(order.begin(), partition.begin(), 1);
 
 	if (partition.begin() != partition.end())
 	{
@@ -103,11 +97,12 @@ void ImportExecution::importVideosInteractive(Catalog& catalog, QStringList vide
 
 		const int choice = conflictChoice.exec();
 		if (choice != QMessageBox::NoToAll)
-			processFilesRange(partition.begin(), partition.end(), partition.begin() - videoPaths.begin() + 1, choice == QMessageBox::YesToAll);
+			processFilesRange(partition.begin(), partition.end(), partition.begin() - order.begin() + 1, choice == QMessageBox::YesToAll);
 	}
 
 	progressBox.hide();
 	showImportFailures(dialogParent, QObject::tr("The following videos could not be imported:"), failures);
+	return registeredIds;
 }
 
 std::vector<Import::PhotoResult> ImportExecution::importPhotosInteractive(

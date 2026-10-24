@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/MediaId.h"
+#include "Core/MediaItemId.h"
 #include "Ffmpeg.h"
 
 #include <vector>
@@ -33,20 +33,20 @@ namespace FrameExtraction
 
 	// No-op success when the catalog already records a complete extraction.
 	[[nodiscard]] bool ensureFramesExtracted(
-		Catalog& catalog, const MediaId& id, int previewFrameCount, QWidget* dialogParent);
+		Catalog& catalog, MediaItemId id, int previewFrameCount, QWidget* dialogParent);
 
 	// One video at a time on the calling thread. Each frame folder is replaced transactionally and marked complete only
 	// after it commits; cancelling rolls back the current video.
-	[[nodiscard]] std::vector<Outcome> reextractVideoFrames(Catalog& catalog, const std::vector<MediaId>& ids,
+	[[nodiscard]] std::vector<Outcome> reextractVideoFrames(Catalog& catalog, const std::vector<MediaItemId>& ids,
 		PreviewHandling previewHandling, int previewFrameCount, QWidget* dialogParent);
 
 	// Regenerates from real frames when available, otherwise from the source video.
-	[[nodiscard]] std::vector<Outcome> regeneratePreviews(Catalog& catalog, const std::vector<MediaId>& ids, int previewFrameCount,
+	[[nodiscard]] std::vector<Outcome> regeneratePreviews(Catalog& catalog, const std::vector<MediaItemId>& ids, int previewFrameCount,
 		QWidget* dialogParent);
 
 	// Returns fully split videos whose real frames are gone to preview-only. Keeps an existing preview, otherwise
 	// generates one from the source video.
-	[[nodiscard]] std::vector<Outcome> keepPreviewOnly(Catalog& catalog, const std::vector<MediaId>& ids, int previewFrameCount,
+	[[nodiscard]] std::vector<Outcome> keepPreviewOnly(Catalog& catalog, const std::vector<MediaItemId>& ids, int previewFrameCount,
 		QWidget* dialogParent);
 
 	// Returns true after a confirmed non-empty batch, even when individual videos fail.

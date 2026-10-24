@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/MediaId.h"
+#include "Core/MediaItemId.h"
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -12,11 +12,16 @@ RESTORE_COMPILER_WARNINGS
 #include <utility>
 #include <vector>
 
-// GUI-thread store for non-derivable per-item metadata. One root JSON document maps MediaIds to named-field
+// GUI-thread store for non-derivable per-item metadata. One root JSON document maps MediaItemIds to named-field
 // records, allowing features to share an item without clobbering one another. All writes use Writer.
 class MetadataStore
 {
 public:
+	// The document is { VersionField: FormatVersion, ItemsField: { "<MediaItemId>": { field: value } } }.
+	static constexpr int FormatVersion = 2;
+	static constexpr QStringView VersionField = u"version";
+	static constexpr QStringView ItemsField = u"items";
+
 	// Writes update memory immediately and flush atomically when the outermost nested Writer dies. Failed
 	// flushes remain dirty for retry. Do not retain a Writer beyond the mutation it batches.
 	class Writer
@@ -26,15 +31,12 @@ public:
 		Writer(const Writer&) = delete;
 		Writer& operator=(const Writer&) = delete;
 
-		void set(const MediaId& id, QStringView field, const QJsonValue& value);
+		void set(MediaItemId id, QStringView field, const QJsonValue& value);
 
-		// Drops the record too when only its reserved "name" field remains.
-		void removeField(const MediaId& id, QStringView field);
+		// Drops the record too when no field remains.
+		void removeField(MediaItemId id, QStringView field);
 
-		void remove(const MediaId& id);
-
-		// Moves the complete record so metadata follows a source rename. No-op if oldId has no record.
-		void rekey(const MediaId& oldId, const MediaId& newId);
+		void remove(MediaItemId id);
 
 	private:
 		friend class MetadataStore;
@@ -43,10 +45,9 @@ public:
 		MetadataStore& _store;
 	};
 
-	QJsonValue get(const MediaId& id, QStringView field) const;
+	QJsonValue get(MediaItemId id, QStringView field) const;
 
-	// Reconstructs ids from each key's size and reserved original-case "name".
-	[[nodiscard]] std::vector<MediaId> allMediaIds() const;
+	[[nodiscard]] std::vector<MediaItemId> allItemIds() const;
 
 	[[nodiscard]] Writer beginBatch();
 
@@ -58,12 +59,12 @@ public:
 
 private:
 	friend class LibraryState;
+	// records is the ItemsField object.
 	explicit MetadataStore(QString rootFolder, QJsonObject records);
 
-	void set(const MediaId& id, QStringView field, const QJsonValue& value);
-	void removeField(const MediaId& id, QStringView field);
-	void remove(const MediaId& id);
-	void rekey(const MediaId& oldId, const MediaId& newId);
+	void set(MediaItemId id, QStringView field, const QJsonValue& value);
+	void removeField(MediaItemId id, QStringView field);
+	void remove(MediaItemId id);
 
 	[[nodiscard]] QString writeRecords() const;
 	[[nodiscard]] bool flushPendingSave(QString* error = nullptr);
