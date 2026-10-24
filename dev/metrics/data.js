@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792788989989,
+  "lastUpdate": 1792842398994,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -17020,6 +17020,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Lines of code (Darkroom)",
             "value": 16970,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1400,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 29707,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 3697.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 3653,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 3095,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 452,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 64,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 48,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 13.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "c3d28b54df7981172cf67d5f794441041e32e62c",
+          "message": "MediaGrid keeps the first visible item in place when a width change reflows the grid (e.g. the import dialog's label list widening on Create label)",
+          "timestamp": "2026-10-24T14:36:07+03:00",
+          "tree_id": "14be6124608091910776efdce39a05bb33fad990",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/c3d28b54df7981172cf67d5f794441041e32e62c"
+        },
+        "date": 1792842396837,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 16994,
             "unit": "LOC"
           },
           {
