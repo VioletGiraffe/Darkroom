@@ -70,6 +70,9 @@ private:
 	void toggleFullScreen();
 	// The pixels for apps that paste images, the file for file managers and apps that take files.
 	void copyImageAndFileToClipboard();
+	void saveImageAs();
+	// Empty on success, otherwise the error. copyFile keeps the metadata and every frame; otherwise the frame shown is encoded.
+	[[nodiscard]] QString writeCurrentImage(const QString& targetPath, const QString& mimeType, bool copyFile) const;
 	void removeCurrentImage(const std::function<bool(const QString& path)>& remove);
 	// Reopens the current image after releaseFilesMatching closed it; no-op otherwise.
 	void resumeReleasedAnimation();

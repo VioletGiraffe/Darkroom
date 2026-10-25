@@ -12,26 +12,62 @@ DISABLE_COMPILER_WARNINGS
 #include <QClipboard>
 #include <QDesktopServices>
 #include <QDir>
+#include <QFile>
+#include <QFileDialog>
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QImage>
+#include <QImageWriter>
 #include <QKeySequence>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QMimeDatabase>
+#include <QMimeType>
 #include <QMouseEvent>
+#include <QSaveFile>
 #include <QSize>
 #include <QTimer>
 #include <QUrl>
 #include <QWheelEvent>
 RESTORE_COMPILER_WARNINGS
 
+#include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <functional>
 #include <utility>
 
 constexpr QSize MinViewSize{ 120, 100 };
+constexpr int LossyEncodeQuality = 90;
+
+struct SaveAsType
+{
+	const char* mimeType;
+	// Only lossy types take LossyEncodeQuality: the PNG writer maps quality to its compression level.
+	bool lossy;
+};
+
+// Offered where a writer plugin for it is present.
+constexpr std::array SaveAsTypes{
+	SaveAsType{ "image/avif", true },
+	SaveAsType{ "image/bmp", false },
+	SaveAsType{ "image/heic", true },
+	SaveAsType{ "image/heif", true },
+	SaveAsType{ "image/jpeg", true },
+	SaveAsType{ "image/jxl", true },
+	SaveAsType{ "image/png", false },
+	SaveAsType{ "image/tiff", false },
+	SaveAsType{ "image/webp", true },
+};
+
+[[nodiscard]] static bool isLossySaveAsType(const QString& mimeType)
+{
+	const auto type = std::ranges::find_if(SaveAsTypes, [&](const SaveAsType& listed) { return mimeType == QLatin1String(listed.mimeType); });
+	assert_and_return_r(type != SaveAsTypes.end(), false);
+	return type->lossy;
+}
 
 ImageViewerWindow* ImageViewerWindow::showForImages(QStringList imagePaths, int startIndex, QWidget* parent,
 	std::function<void(const QString& path)> onImageChanged)
@@ -164,6 +200,8 @@ void ImageViewerWindow::buildMenus()
 	fileMenu->addAction(tr("Open in system app"), this, [this] {
 		QDesktopServices::openUrl(QUrl::fromLocalFile(currentImagePath()));
 	});
+	QAction* saveAsAction = fileMenu->addAction(tr("Save as..."), this, &ImageViewerWindow::saveImageAs);
+	saveAsAction->setShortcut(QKeySequence::SaveAs);
 	fileMenu->addSeparator();
 	QAction* closeAction = fileMenu->addAction(tr("Close"), this, &QWidget::close);
 	closeAction->setShortcuts({ QKeySequence(Qt::Key_Escape), QKeySequence::Close });
@@ -319,6 +357,85 @@ void ImageViewerWindow::copyImageAndFileToClipboard()
 		mime->setImageData(image);
 	mime->setUrls({ QUrl::fromLocalFile(currentImagePath()) });
 	QGuiApplication::clipboard()->setMimeData(mime);
+}
+
+void ImageViewerWindow::saveImageAs()
+{
+	const QFileInfo source{ currentImagePath() };
+	const QMimeDatabase mimeDatabase;
+
+	const QList<QByteArray> supportedTypes = QImageWriter::supportedMimeTypes();
+	QStringList writableTypes;
+	for (const SaveAsType& type : SaveAsTypes)
+	{
+		if (supportedTypes.contains(type.mimeType))
+			writableTypes.push_back(QString::fromLatin1(type.mimeType));
+	}
+
+	// Empty when unlisted. Compares resolved types: a platform's MIME database may know a listed name as an alias.
+	const auto listedTypeOf = [&](const QMimeType& type) {
+		const auto listed = std::ranges::find_if(writableTypes, [&](const QString& name) { return mimeDatabase.mimeTypeForName(name) == type; });
+		return listed != writableTypes.end() ? *listed : QString{};
+	};
+
+	// HEIF is a filter only without HEIC, which writes the same files under the conventional extension.
+	QStringList filterTypes = writableTypes;
+	if (filterTypes.contains(QLatin1String("image/heic")))
+		filterTypes.removeOne(QStringLiteral("image/heif"));
+
+	const QString sourceType = listedTypeOf(mimeDatabase.mimeTypeForFile(source));
+	QFileDialog dialog(this, tr("Save image as"), source.absolutePath());
+	dialog.setAcceptMode(QFileDialog::AcceptSave);
+	dialog.setMimeTypeFilters(filterTypes);
+	dialog.selectMimeTypeFilter(filterTypes.contains(sourceType) ? sourceType : QStringLiteral("image/png"));
+	dialog.selectFile(source.completeBaseName());
+	if (dialog.exec() != QDialog::Accepted)
+		return;
+
+	QString targetPath = dialog.selectedFiles().front();
+	QString targetType = listedTypeOf(mimeDatabase.mimeTypeForFile(targetPath, QMimeDatabase::MatchExtension));
+	if (targetType.isEmpty())
+	{
+		// The dialog checked for overwriting only the name as typed.
+		targetType = dialog.selectedMimeTypeFilter();
+		targetPath += '.' + mimeDatabase.mimeTypeForName(targetType).preferredSuffix();
+		if (QFileInfo::exists(targetPath)
+			&& QMessageBox::question(this, dialog.windowTitle(), tr("%1 already exists.\nReplace it?").arg(QDir::toNativeSeparators(targetPath))) != QMessageBox::Yes)
+			return;
+	}
+
+	if (const QString error = writeCurrentImage(targetPath, targetType, targetType == sourceType); !error.isEmpty())
+		QMessageBox::warning(this, tr("Error"), tr("Failed to save the image:\n%1\n\n%2").arg(QDir::toNativeSeparators(targetPath), error));
+}
+
+QString ImageViewerWindow::writeCurrentImage(const QString& targetPath, const QString& mimeType, bool copyFile) const
+{
+	QSaveFile target{ targetPath };
+	if (!target.open(QIODevice::WriteOnly))
+		return target.errorString();
+
+	if (copyFile)
+	{
+		QFile source{ currentImagePath() };
+		if (!source.open(QIODevice::ReadOnly))
+			return source.errorString();
+
+		const QByteArray bytes = source.readAll();
+		if (bytes.size() != source.size())
+			return source.errorString();
+		if (target.write(bytes) != bytes.size())
+			return target.errorString();
+	}
+	else
+	{
+		QImageWriter writer{ &target, QImageWriter::imageFormatsForMimeType(mimeType.toLatin1()).value(0) };
+		if (isLossySaveAsType(mimeType))
+			writer.setQuality(LossyEncodeQuality);
+		if (!writer.write(_view->sourceImage()))
+			return writer.errorString();
+	}
+
+	return target.commit() ? QString{} : target.errorString();
 }
 
 void ImageViewerWindow::removeCurrentImage(const std::function<bool(const QString& path)>& remove)
