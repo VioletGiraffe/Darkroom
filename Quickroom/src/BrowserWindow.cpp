@@ -345,16 +345,16 @@ void BrowserWindow::setupUi()
 
 void BrowserWindow::setupMainMenu()
 {
-	QMenu* fileMenu = menuBar()->addMenu(tr("File"));
+	QMenu* fileMenu = menuBar()->addMenu(tr("&File"));
 	fileMenu->addAction(tr("Settings..."), QKeySequence("Ctrl+Alt+P"), this, [this] { SettingsDialog(this).exec(); });
 	fileMenu->addSeparator();
 	// Closes every window: video players are top-level and outlive the browser.
 	fileMenu->addAction(tr("Exit"), QKeySequence("Ctrl+Q"), this, &QApplication::closeAllWindows);
 
-	QMenu* toolsMenu = menuBar()->addMenu(tr("Tools"));
+	QMenu* toolsMenu = menuBar()->addMenu(tr("&Tools"));
 	toolsMenu->addAction(tr("Compare photos..."), QKeySequence("Shift+C"), this, [this] { comparePhotos({}); });
 
-	QMenu* helpMenu = menuBar()->addMenu(tr("Help"));
+	QMenu* helpMenu = menuBar()->addMenu(tr("&Help"));
 	helpMenu->addAction(tr("Report a bug..."), this, [this] {
 		ReportBugDialog::show(this, loggerInstance<CLoggerInMemory>(), QUrl(IssueTrackerUrl));
 	});

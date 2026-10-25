@@ -212,18 +212,18 @@ void MainWindow::setupMainMenu()
 	auto* menuBar = new QMenuBar(this);
 	setMenuBar(menuBar);
 
-	QMenu* fileMenu = new QMenu(tr("File"), menuBar);
+	QMenu* fileMenu = new QMenu(tr("&File"), menuBar);
 	fileMenu->addAction(tr("Settings..."), QKeySequence("Ctrl+Alt+P"), this, &MainWindow::openSettings);
 	fileMenu->addSeparator();
 	fileMenu->addAction(tr("Exit"), QKeySequence("Ctrl+Q"), this, &QMainWindow::close);
 
-	_libraryMenu = new QMenu(tr("Library"), menuBar);
+	_libraryMenu = new QMenu(tr("&Library"), menuBar);
 	_libraryMenu->addAction(tr("Open library..."), QKeySequence("Ctrl+O"), this, [this] { pickAndSwitchLibrary(LibraryPickerMode::Open); });
 	_libraryMenu->addAction(tr("Create new library..."), this, [this] { pickAndSwitchLibrary(LibraryPickerMode::CreateNew); });
 	_libraryMenu->addSeparator();
 	connect(_libraryMenu, &QMenu::aboutToShow, this, &MainWindow::rebuildRecentLibraryActions);
 
-	QMenu* editMenu = new QMenu(tr("Edit"), menuBar);
+	QMenu* editMenu = new QMenu(tr("&Edit"), menuBar);
 	_deleteAction = editMenu->addAction(
 		tr("Delete"), QKeySequence(Shortcuts::DeleteFile), _mediaBrowser, &MediaBrowserWidget::deleteSelectedMediaItemsInteractive);
 	_removeFromLibraryAction = editMenu->addAction(tr("Remove from library"), QKeySequence(Shortcuts::RemoveFromList),
@@ -233,7 +233,7 @@ void MainWindow::setupMainMenu()
 	connect(_mediaBrowser, &MediaBrowserWidget::selectionChanged, this, &MainWindow::updateEditActions);
 	updateEditActions();
 
-	QMenu* toolsMenu = new QMenu(tr("Tools"), menuBar);
+	QMenu* toolsMenu = new QMenu(tr("&Tools"), menuBar);
 	toolsMenu->addAction(tr("Import..."), QKeySequence("Ctrl+Shift+A"), this, [this] { openImportDialog(); });
 	toolsMenu->addAction(tr("Scan for untracked files..."), this, &MainWindow::scanForUntrackedFiles);
 	toolsMenu->addAction(tr("Check catalog integrity..."), this, &MainWindow::checkCatalogIntegrity);
@@ -247,7 +247,7 @@ void MainWindow::setupMainMenu()
 	toolsMenu->addSeparator();
 	toolsMenu->addAction(tr("Re-extract frames of all videos"), QKeySequence("Ctrl+Shift+E"), this, &MainWindow::reextractAllVideoFrames);
 
-	QMenu* helpMenu = new QMenu(tr("Help"), menuBar);
+	QMenu* helpMenu = new QMenu(tr("&Help"), menuBar);
 	helpMenu->addAction(tr("Report a bug..."), this, [this] {
 		ReportBugDialog::show(this, loggerInstance<CLoggerInMemory>(), QUrl(IssueTrackerUrl));
 	});
