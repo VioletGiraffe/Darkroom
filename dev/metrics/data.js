@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792935413002,
+  "lastUpdate": 1792947356250,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -17415,6 +17415,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Lines of code (Darkroom)",
             "value": 17074,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1417,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 31482,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 4777.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 4930,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 4166.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 459,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 65,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 48.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 13.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "9e05eb737d95b9323d6209440047219d811a893d",
+          "message": "IoThreadPool: the fast-storage pool has a fixed 6 workers, not one per core up to 6; the image read benchmark gains a thread-count sweep, with SSD results recorded",
+          "timestamp": "2026-10-25T18:43:06+02:00",
+          "tree_id": "b93c4335c042ce470ee9f2917bcfee83ee35da1a",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/9e05eb737d95b9323d6209440047219d811a893d"
+        },
+        "date": 1792947353944,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 17072,
             "unit": "LOC"
           },
           {
