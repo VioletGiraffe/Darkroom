@@ -26,7 +26,7 @@ contains implementation detail. Keep both in sync.
 | `Shared/` | the static library both apps link: `Shared.pro`, `src/`, `res/` (the shared `UI/` icon SVGs, `shared.qrc`) |
 | `tests/` | Catch2 tests over the Core model |
 | `docs/` | this documentation; `mockups/` holds static HTML UI mockups, design input only and not kept in sync with the code |
-| `scripts/` | `build` and `run_tests` (see [build.md](build.md#scripts)), `create_dmg.sh` (macOS packaging), `build-filetype-icons.py` (Quickroom file-type icons) |
+| `scripts/` | `build` and `run_tests` (see [build.md](build.md#scripts)), `create_dmg.sh` (macOS packaging), `build-filetype-icons.py` (Quickroom file-type icons), `image_read_benchmark` (see [build.md](build.md#image-read-benchmark)) |
 | `installer.iss` | Windows installer script (Inno Setup) |
 | `.github/workflows/` | CI |
 | `Darkroom.pro`, `Tests.pro`, `global.pri` | the two qmake roots and their shared compiler settings |

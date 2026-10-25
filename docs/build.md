@@ -51,6 +51,27 @@ Test sources are listed explicitly in `tests/tests.pro`; a new test file must be
 silent breakage: persisted-format compatibility, identity invariants, catalog mutations, case-sensitive filesystem
 behavior, and catalog-integrity verdicts.
 
+## Image read benchmark
+
+`scripts/image_read_benchmark.py` times reading one screenful of image files cold, under the I/O strategies a loader
+can use on slow storage. Windows only; `--help` lists the options. The results and the method's validation:
+[image-read-performance.md](image-read-performance.md).
+
+- `generate <root>` writes two folders of the same synthetic files, random bytes of 250-500 KiB named `*.jpg`:
+  `name-order` is written in name order, as an import lays it out; `shuffled` in random order. A screenful is
+  consecutive names: contiguous on disk in the first, scattered in the second.
+- Variants: serial buffered reads (the loader's current path), the same sorted by first cluster, 4 threads buffered and
+  unbuffered, unbuffered overlapped reads 4 and 8 in flight.
+- `scripts/image_read_benchmark.ps1` owns the fixed VHDX the samples run on and needs an elevated prompt; start it
+  through `powershell -ExecutionPolicy Bypass -File`. `-Setup` creates it and generates the files; `-Samples N -Out <csv>`
+  takes N rounds, each timing every variant on both layouts in a shuffled order.
+- A sample remounts the volume, which discards its file and metadata caches, lists the folder untimed, then reads a
+  batch no earlier sample of the run read. With `--warm-metadata` it first opens every file of the batch untimed: cold
+  data behind warm metadata.
+- The drive's own cache survives a remount: each run first reads a filler file, which must exceed twice that cache.
+- Confirm cold numbers are cold before trusting them: `buffered` on `shuffled` must take HDD time, over 10 ms per file,
+  and the disk's read bytes must about equal the batch's. More bytes means another reader, such as a malware scanner.
+
 ## CI
 
 `.github/workflows/CI.yml` runs on every push (except to `gh-pages`) and pull request, on Windows (MSVC), Ubuntu
