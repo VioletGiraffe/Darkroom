@@ -18,7 +18,9 @@ DISABLE_COMPILER_WARNINGS
 #include <QGuiApplication>
 #include <QImage>
 #include <QImageWriter>
+#include <QKeyEvent>
 #include <QKeySequence>
+#include <QLayout>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -192,7 +194,7 @@ void ImageViewerWindow::buildMenus()
 	auto* menuBar = new QMenuBar(this);
 	setMenuBar(menuBar);
 
-	QMenu* fileMenu = new QMenu(tr("File"), menuBar);
+	QMenu* fileMenu = new QMenu(tr("&File"), menuBar);
 	fileMenu->addAction(revealInFileManagerActionText(), this, [this] {
 		if (!revealInFileManager(currentImagePath()))
 			reportMissingFile(this, currentImagePath());
@@ -206,11 +208,11 @@ void ImageViewerWindow::buildMenus()
 	QAction* closeAction = fileMenu->addAction(tr("Close"), this, &QWidget::close);
 	closeAction->setShortcuts({ QKeySequence(Qt::Key_Escape), QKeySequence::Close });
 
-	QMenu* editMenu = new QMenu(tr("Edit"), menuBar);
+	QMenu* editMenu = new QMenu(tr("&Edit"), menuBar);
 	QAction* copyAction = editMenu->addAction(tr("Copy image"), this, &ImageViewerWindow::copyImageAndFileToClipboard);
 	copyAction->setShortcut(QKeySequence::Copy);
 
-	QMenu* viewMenu = new QMenu(tr("View"), menuBar);
+	QMenu* viewMenu = new QMenu(tr("&View"), menuBar);
 	QAction* fitAction = viewMenu->addAction(tr("Fit to window"), this, [this] { _view->fitToWindow(); });
 	fitAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+0")));
 	QAction* actualPixelsAction = viewMenu->addAction(tr("Actual pixels"), this, [this] { _view->zoomToActualPixels(); });
@@ -225,7 +227,7 @@ void ImageViewerWindow::buildMenus()
 	connect(overlayAction, &QAction::toggled, _view, &CImageViewerWidget::setOverlayVisible);
 	_view->setInfoStripHint(tr("Press %1 to hide").arg(overlayAction->shortcut().toString(QKeySequence::NativeText)));
 
-	_imageMenu = new QMenu(tr("Image"), menuBar);
+	_imageMenu = new QMenu(tr("&Image"), menuBar);
 	_previousAction = _imageMenu->addAction(tr("Previous"), this, [this] { showImage(adjacentIndex(Direction::Previous)); });
 	_previousAction->setShortcuts({ QKeySequence(Qt::Key_Left), QKeySequence(Qt::Key_PageUp) });
 	_nextAction = _imageMenu->addAction(tr("Next"), this, [this] { showImage(adjacentIndex(Direction::Next)); });
@@ -243,6 +245,9 @@ void ImageViewerWindow::buildMenus()
 		for (QAction* action : menu->actions())
 			if (!action->isSeparator())
 				addAction(action);
+
+	for (const QMenu* menu : { fileMenu, editMenu, viewMenu, _imageMenu })
+		connect(menu, &QMenu::aboutToHide, this, &ImageViewerWindow::hideFullScreenMenuBarOnceMenusClose);
 }
 
 void ImageViewerWindow::showImage(int index)
@@ -279,7 +284,10 @@ void ImageViewerWindow::updateTitleAndCaption()
 
 bool ImageViewerWindow::eventFilter(QObject* watched, QEvent* event)
 {
-	if (event->type() == QEvent::MouseButtonDblClick && static_cast<QMouseEvent*>(event)->button() == Qt::LeftButton)
+	if (_trackingAltTap)
+		trackAltTap(event);
+
+	if (watched == _view && event->type() == QEvent::MouseButtonDblClick && static_cast<QMouseEvent*>(event)->button() == Qt::LeftButton)
 	{
 		toggleFullScreen();
 		// Swallowed: the widget's default double-click handling forwards to mousePressEvent and starts a pan.
@@ -287,6 +295,68 @@ bool ImageViewerWindow::eventFilter(QObject* watched, QEvent* event)
 	}
 
 	return QMainWindow::eventFilter(watched, event);
+}
+
+void ImageViewerWindow::keyPressEvent(QKeyEvent* event)
+{
+	// A native menu bar (macOS) is never hidden.
+	if (event->key() == Qt::Key_Alt && event->modifiers() == Qt::AltModifier && !event->isAutoRepeat()
+		&& isFullScreen() && menuBar()->isHidden() && !menuBar()->isNativeMenuBar())
+	{
+		_trackingAltTap = true;
+		qApp->installEventFilter(this);
+	}
+
+	QMainWindow::keyPressEvent(event);
+}
+
+void ImageViewerWindow::trackAltTap(const QEvent* event)
+{
+	switch (event->type())
+	{
+	case QEvent::KeyPress:
+	case QEvent::KeyRelease:
+		if (static_cast<const QKeyEvent*>(event)->key() == Qt::Key_Alt)
+		{
+			if (event->type() == QEvent::KeyPress)
+				return; // auto-repeat
+
+			stopTrackingAltTap();
+			menuBar()->setVisible(true);
+			layout()->activate(); // the menu pops up from the bar's geometry, which the layout has yet to set
+			menuBar()->setActiveAction(menuBar()->actions().front());
+			return;
+		}
+		break;
+	case QEvent::MouseButtonPress:
+	case QEvent::MouseButtonRelease:
+	case QEvent::Wheel:
+	case QEvent::FocusIn:
+	case QEvent::FocusOut:
+	case QEvent::ActivationChange:
+	case QEvent::Shortcut:
+		break;
+	default:
+		return;
+	}
+
+	stopTrackingAltTap();
+}
+
+void ImageViewerWindow::stopTrackingAltTap()
+{
+	_trackingAltTap = false;
+	qApp->removeEventFilter(this);
+}
+
+void ImageViewerWindow::hideFullScreenMenuBarOnceMenusClose()
+{
+	// Deferred: switching menus with the arrow keys closes one before opening the next.
+	QTimer::singleShot(0, this, [this] {
+		const QList<QAction*> menuActions = menuBar()->actions();
+		if (isFullScreen() && std::ranges::none_of(menuActions, [](const QAction* menuAction) { return menuAction->menu()->isVisible(); }))
+			menuBar()->setVisible(false);
+	});
 }
 
 void ImageViewerWindow::wheelEvent(QWheelEvent* event)

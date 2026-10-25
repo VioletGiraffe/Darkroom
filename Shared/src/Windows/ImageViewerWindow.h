@@ -53,6 +53,7 @@ public:
 
 protected:
 	bool eventFilter(QObject* watched, QEvent* event) override;
+	void keyPressEvent(QKeyEvent* event) override;
 	void wheelEvent(QWheelEvent* event) override;
 
 private:
@@ -68,6 +69,10 @@ private:
 	// Skips paths that have left the disk; -1 when the list ends first.
 	[[nodiscard]] int adjacentIndex(Direction direction) const;
 	void toggleFullScreen();
+	// Shows the menu bar on Alt released with no other input since its press.
+	void trackAltTap(const QEvent* event);
+	void stopTrackingAltTap();
+	void hideFullScreenMenuBarOnceMenusClose();
 	// The pixels for apps that paste images, the file for file managers and apps that take files.
 	void copyImageAndFileToClipboard();
 	void saveImageAs();
@@ -86,6 +91,8 @@ private:
 	bool _animationReleased = false;
 	// Touchpads and high-resolution wheels split a notch across several events.
 	int _pendingWheelDelta = 0;
+	// Set from an Alt press in fullscreen until trackAltTap decides; the application event filter is installed meanwhile.
+	bool _trackingAltTap = false;
 
 	std::function<void(const QString& path)> _onImageChanged;
 	std::function<bool()> _exitFullScreenHandler;
