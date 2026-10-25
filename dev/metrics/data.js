@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792923617585,
+  "lastUpdate": 1792935413002,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -17366,6 +17366,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 458.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 65,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 48.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 13.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "43e335b424d751cef85d23c7f8b0e9e25cc9cc2a",
+          "message": "File-manager reveal moved to qtutils; Windows uses shell API instead of explorer.exe /select",
+          "timestamp": "2026-10-25T15:24:04+02:00",
+          "tree_id": "f0c0ff7b771e3044bcffcc64ec04ba9aadfae275",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/43e335b424d751cef85d23c7f8b0e9e25cc9cc2a"
+        },
+        "date": 1792935410103,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 17074,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1417,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 31482,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 4777.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 4930,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 4166.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 459,
             "unit": "KB"
           },
           {
