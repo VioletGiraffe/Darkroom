@@ -98,7 +98,7 @@ void openStartupWindow(const QString& path)
 	const QFileInfo info(path);
 	if (info.isDir())
 	{
-		BrowserWindow::showForFolder(info.absoluteFilePath());
+		BrowserWindow::showForFolder(info.absoluteFilePath(), {}, BrowserWindow::PathFieldHistory::Record);
 		return;
 	}
 

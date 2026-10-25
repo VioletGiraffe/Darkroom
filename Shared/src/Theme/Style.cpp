@@ -61,6 +61,9 @@ constexpr char kComboBoxes[] = R"(
 	/* QSS-owned combo frames do not receive a native focus ring. */
 	QComboBox:hover { border-color: %accent%; }
 	QComboBox:focus { border: 2px solid %accent%; padding: 2px 7px; }
+	/* An editable combo is a text field framed by the combo itself. */
+	QComboBox[editable="true"] { background: palette(base); }
+	QComboBox QLineEdit, QComboBox QLineEdit:focus { border: none; padding: 0; background: transparent; }
 	QComboBox::drop-down {
 		subcontrol-origin: padding;
 		subcontrol-position: center right;

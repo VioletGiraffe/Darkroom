@@ -21,12 +21,14 @@
 #include "compiler/compiler_warnings_control.h"
 #include "logger/cloggerinmemory.h"
 #include "utils/filemanager.h"
+#include "widgets/chistorycombobox.h"
 #include "widgets/cpersistenceenabler.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
+#include <QComboBox>
 #include <QDateTime>
 #include <QDir>
 #include <QDragEnterEvent>
@@ -73,6 +75,8 @@ namespace {
 
 const QString LAST_FOLDER_KEY = QStringLiteral("browser/lastFolder");
 const QString TILE_SIZE_KEY   = QStringLiteral("browser/tileSize");
+const QString PATH_FIELD_HISTORY_KEY = QStringLiteral("browser/pathFieldHistory");
+constexpr int PATH_FIELD_HISTORY_SIZE = 100;
 constexpr int DEFAULT_TILE_SIZE = 160;
 constexpr int MIN_TILE_SIZE  = 80;
 constexpr int MAX_TILE_SIZE  = 400;
@@ -188,9 +192,9 @@ QString nearestExistingFolder(QString path)
 
 } // anonymous namespace
 
-void BrowserWindow::showForFolder(const QString& folder, const QString& selectPath)
+void BrowserWindow::showForFolder(const QString& folder, const QString& selectPath, PathFieldHistory history)
 {
-	auto* window = new BrowserWindow(resolveStartFolder(folder));
+	auto* window = new BrowserWindow(resolveStartFolder(folder), history);
 	window->setAttribute(Qt::WA_DeleteOnClose);
 	window->show();
 	// Scrolling to the item needs the laid-out viewport the window only has once shown.
@@ -198,7 +202,7 @@ void BrowserWindow::showForFolder(const QString& folder, const QString& selectPa
 		window->selectAndScrollToPath(selectPath);
 }
 
-BrowserWindow::BrowserWindow(const QString& folder)
+BrowserWindow::BrowserWindow(const QString& folder, PathFieldHistory history)
 	: _tileSize{ savedTileSize() }
 {
 	setupUi();
@@ -207,7 +211,7 @@ BrowserWindow::BrowserWindow(const QString& folder)
 	resize(1200, 800);
 	enablePersistence(this, "browser/window", CPersistenceEnabler::Delayed{ true }, CPersistenceEnabler::SetDefaultSize{ false });
 
-	navigateTo(folder);
+	navigateTo(folder, history);
 }
 
 void BrowserWindow::setupUi()
@@ -236,17 +240,24 @@ void BrowserWindow::setupUi()
 	_upAction = addNavigationButton(QStyle::SP_ArrowUp, tr("Up"), &BrowserWindow::goUp);
 	_upAction->setShortcut(QKeySequence(Qt::Key_Backspace));
 
-	_pathEdit = new QLineEdit();
-	connect(_pathEdit, &QLineEdit::returnPressed, this, [this] {
-		navigateTo(QDir::fromNativeSeparators(_pathEdit->text().trimmed()));
-	});
-	headerLayout->addWidget(_pathEdit, 1);
+	_pathField = new CHistoryComboBox(header);
+	// Not sized by its items: a long path in the history would set the window's minimum width
+	_pathField->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+	_pathField->setMaxCount(PATH_FIELD_HISTORY_SIZE);
+	_pathField->setSettingsKeyForHistoryPersistence(PATH_FIELD_HISTORY_KEY);
+	const auto navigateToPathFieldText = [this](const QString& text) {
+		navigateTo(QDir::fromNativeSeparators(text.trimmed()), PathFieldHistory::Record);
+	};
+	connect(_pathField, &CHistoryComboBox::itemActivated, this, navigateToPathFieldText);
+	// Queued: navigating rebuilds the items while the combo box is still handling the pick
+	connect(_pathField, &QComboBox::textActivated, this, navigateToPathFieldText, Qt::QueuedConnection);
+	headerLayout->addWidget(_pathField, 1);
 
 	auto* browseButton = new QPushButton(tr("Browse..."));
 	browseButton->setFocusPolicy(Qt::NoFocus);
 	connect(browseButton, &QPushButton::clicked, this, [this] {
 		if (const QString folder = QFileDialog::getExistingDirectory(this, tr("Open folder"), _currentPath); !folder.isEmpty())
-			navigateTo(folder);
+			navigateTo(folder, PathFieldHistory::Record);
 	});
 	headerLayout->addWidget(browseButton);
 	headerLayout->addSpacing(8);
@@ -389,21 +400,25 @@ bool BrowserWindow::listDirectory(const QString& path)
 	_grid->scrollToTop();
 	applyNameFilter();
 
-	_pathEdit->setText(QDir::toNativeSeparators(_currentPath));
-	setWindowTitle((dir.dirName().isEmpty() ? QDir::toNativeSeparators(_currentPath) : dir.dirName()) + QStringLiteral(" - Quickroom"));
+	const QString nativePath = QDir::toNativeSeparators(_currentPath);
+	_pathField->setCurrentIndex(_pathField->findText(nativePath)); // the dropdown highlights the listed folder, or nothing
+	_pathField->setEditText(nativePath);
+	setWindowTitle((dir.dirName().isEmpty() ? nativePath : dir.dirName()) + QStringLiteral(" - Quickroom"));
 	QSettings{}.setValue(LAST_FOLDER_KEY, _currentPath);
 	return true;
 }
 
-void BrowserWindow::navigateTo(const QString& path)
+void BrowserWindow::navigateTo(const QString& path, PathFieldHistory history)
 {
 	const bool samePath = _historyIndex >= 0 && _history[static_cast<size_t>(_historyIndex)] == QDir(path).absolutePath();
 	if (!listDirectory(path))
 	{
 		statusBar()->showMessage(tr("Cannot open \"%1\"").arg(QDir::toNativeSeparators(path)));
-		_pathEdit->setText(QDir::toNativeSeparators(_currentPath));
+		_pathField->setEditText(QDir::toNativeSeparators(_currentPath));
 		return;
 	}
+	if (history == PathFieldHistory::Record)
+		_pathField->addToHistory(QDir::toNativeSeparators(_currentPath));
 	if (!samePath)
 	{
 		// A new navigation discards the forward tail.

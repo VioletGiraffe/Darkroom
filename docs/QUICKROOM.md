@@ -15,10 +15,11 @@ the coding conventions.
 - `main.cpp` - Darkroom's bootstrap shape minus the library, plus the startup routing below. Its own
   application identity ("Quickroom") keeps its QSettings separate from Darkroom's; see
   [settings-and-theme.md](architecture/settings-and-theme.md) for the settings that follow Darkroom's.
-- `BrowserWindow` - the main window: navigation header (back/forward/up, editable path field, Browse button, name filter,
-  `SortControl`), `MediaGrid` of tiles, status-bar counts, main menu. Owns the navigation history. Self-deleting, created through
-  `showForFolder`, which resolves the folder to open and can select one entry in it. The name filter stays set
-  across navigation.
+- `BrowserWindow` - the main window: navigation header (back/forward/up, path field, Browse button, name filter,
+  `SortControl`), `MediaGrid` of tiles, status-bar counts, main menu. Owns the Back/Forward history. The path field's
+  dropdown is a separate, saved history of the folders opened from the field itself, Browse, or a folder on the command
+  line. Self-deleting, created through `showForFolder`, which resolves the folder to open and can select one entry in
+  it. The name filter stays set across navigation.
 - `FolderListing` - the folder's entries, listed through thin_io: folders and supported media files, without hidden
   entries. Also the browser's order: by name or modification time, folders first when ascending and last when
   descending. The viewer and player opened from the command line browse in that order too.

@@ -14,6 +14,7 @@ RESTORE_COMPILER_WARNINGS
 #include <functional>
 #include <vector>
 
+class CHistoryComboBox;
 class MediaGrid;
 class NameFilterField;
 class QAction;
@@ -21,7 +22,6 @@ class QDragEnterEvent;
 class QDragMoveEvent;
 class QDropEvent;
 class QFileSystemWatcher;
-class QLineEdit;
 class QListWidgetItem;
 class QTimer;
 class SortControl;
@@ -31,9 +31,12 @@ class SortControl;
 class BrowserWindow final : public QMainWindow
 {
 public:
+	// Record: a successful navigation adds its folder to the path field's dropdown
+	enum class PathFieldHistory { Skip, Record };
+
 	// Creates a self-deleting browser window at folder, or at the remembered folder when folder is empty.
 	// selectPath, when the listed folder contains it, becomes the current item.
-	static void showForFolder(const QString& folder = {}, const QString& selectPath = {});
+	static void showForFolder(const QString& folder = {}, const QString& selectPath = {}, PathFieldHistory history = PathFieldHistory::Skip);
 
 protected:
 	// Forwards mouse back/forward buttons from the grid viewport to history navigation.
@@ -45,15 +48,15 @@ protected:
 	void dropEvent(QDropEvent* event) override;
 
 private:
-	explicit BrowserWindow(const QString& folder);
+	BrowserWindow(const QString& folder, PathFieldHistory history);
 
 	void setupUi();
 	void setupMainMenu();
 
 	// Lists path into the grid and watches it; false and no state change when path cannot be listed.
 	bool listDirectory(const QString& path);
-	// listDirectory plus a history push; a failed listing reverts the path edit.
-	void navigateTo(const QString& path);
+	// listDirectory plus a Back/Forward history push; a failed listing reverts the path field.
+	void navigateTo(const QString& path, PathFieldHistory history = PathFieldHistory::Skip);
 	void goBack();
 	void goForward();
 	void goUp();
@@ -102,7 +105,7 @@ private:
 
 private:
 	MediaGrid* _grid = nullptr;
-	QLineEdit* _pathEdit = nullptr;
+	CHistoryComboBox* _pathField = nullptr;
 	NameFilterField* _nameFilter = nullptr;
 	SortControl* _sortControl = nullptr;
 	QAction*   _backAction = nullptr;
