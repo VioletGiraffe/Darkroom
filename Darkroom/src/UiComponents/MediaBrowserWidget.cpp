@@ -16,6 +16,7 @@
 #include "Windows/CompareWindow.h"
 #include "Windows/ImageViewerWindow.h"
 #include "Windows/LabelManagement.h"
+#include "Windows/LibraryPhotoCompare.h"
 #include "Windows/LibraryPlayer.h"
 #include "Windows/MediaItemManagement.h"
 #include "Windows/MediaRename.h"
@@ -438,7 +439,8 @@ void MediaBrowserWidget::showMediaItemContextMenu(MediaItemId id, const QPoint& 
 			QStringList paths;
 			for (const MediaItemId selectedId : selection)
 				paths << _library.catalog().sourcePathForMediaItem(selectedId);
-			PhotoCompareWindow::showForFiles(_library, paths, window());
+			if (PhotoCompareWindow* const compareWindow = PhotoCompareWindow::showForFiles(paths, window()))
+				LibraryPhotoCompare::installDeleteAction(*compareWindow, _library);
 		});
 		menu.addSeparator();
 	}

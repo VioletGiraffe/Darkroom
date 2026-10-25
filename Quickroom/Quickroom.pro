@@ -64,8 +64,8 @@ RESOURCES += res/quickroom.qrc
 #                 LIBS
 ###################################################
 
-# GNU ld resolves left to right: shared before the libraries it uses
-LIBS += -L$${DESTDIR} -lshared -lqtutils -lcpputils -limage-processing
+# GNU ld resolves left to right: shared before the libraries it uses, magic-alignment before the cpputils thread pool
+LIBS += -L$${DESTDIR} -lshared -lqtutils -lmagic-alignment -lcpputils -limage-processing
 # The copy/move engine, its dialogs and folder listing, with their dependencies
 include(../file-operations/libraries/fileoperationsui.pri)
 include(../cpputils/dependencies.pri)

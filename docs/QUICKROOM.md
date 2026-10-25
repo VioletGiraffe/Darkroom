@@ -48,6 +48,11 @@ including a folder asks first. The filesystem step is the shared `PathDeletion` 
 through the removal actions `FileOperations` installs, and the browser removes the deleted entries in place instead
 of relisting.
 
+Photo comparison is Darkroom's `PhotoCompareWindow` (see [playback.md](architecture/playback.md#photocomparewindow)),
+opened from the context menu of a selection of two or more images, or empty from Tools > Compare photos to take dropped
+files. It is parentless, for a taskbar button of its own. Its pane menu moves the photo to Trash unasked and removes its
+entry from the grid.
+
 Copy and move:
 
 - Ctrl+C / Ctrl+X put the selection on the clipboard as file URLs, a cut with the marker file managers use for

@@ -68,6 +68,8 @@ private:
 	// Opens the viewer browsing all images the grid currently shows.
 	void viewImage(const QString& path);
 	void playVideo(const QString& path);
+	// Empty paths open the comparison's drop-target state.
+	void comparePhotos(const QStringList& paths);
 	void showEntryContextMenu(const QString& path, bool isFolder, QPoint globalPos);
 	void showBackgroundContextMenu(QPoint globalPos);
 	// Does nothing when the grid does not show the path.

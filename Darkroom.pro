@@ -9,4 +9,4 @@ fileoperationsui.subdir = file-operations/libraries/fileoperationsui
 
 qtutils.depends = cpputils
 Darkroom.depends = Shared qtutils magic-alignment image-processing
-Quickroom.depends = Shared qtutils image-processing thin_io fileoperations fileoperationsui
+Quickroom.depends = Shared qtutils magic-alignment image-processing thin_io fileoperations fileoperationsui

@@ -47,8 +47,7 @@ INCLUDEPATH += \
 	../qtutils \
 	../cpputils \
 	../cpp-template-utils \
-	../image-processing \
-	../magic-alignment/src
+	../image-processing
 
 ###################################################
 #                 SOURCES

@@ -12,6 +12,7 @@
 #include "UiComponents/ThumbnailWidget.h"
 #include "Windows/ImageViewerWindow.h"
 #include "Windows/OpenFileRelease.h"
+#include "Windows/PhotoCompareWindow.h"
 #include "Windows/VideoPlayerWindow.h"
 #include "Utils.h"
 #include "appdialogs/caboutdialog.h"
@@ -349,6 +350,9 @@ void BrowserWindow::setupMainMenu()
 	// Closes every window: video players are top-level and outlive the browser.
 	fileMenu->addAction(tr("Exit"), QKeySequence("Ctrl+Q"), this, &QApplication::closeAllWindows);
 
+	QMenu* toolsMenu = menuBar()->addMenu(tr("Tools"));
+	toolsMenu->addAction(tr("Compare photos..."), QKeySequence("Shift+C"), this, [this] { comparePhotos({}); });
+
 	QMenu* helpMenu = menuBar()->addMenu(tr("Help"));
 	helpMenu->addAction(tr("Report a bug..."), this, [this] {
 		ReportBugDialog::show(this, loggerInstance<CLoggerInMemory>(), QUrl(IssueTrackerUrl));
@@ -550,6 +554,13 @@ void BrowserWindow::playVideo(const QString& path)
 	player->setNavigation(shownPathsOfKind(*_grid, EntryKind::Video), pathSelector());
 }
 
+void BrowserWindow::comparePhotos(const QStringList& paths)
+{
+	// Parentless, for a taskbar button of its own.
+	if (PhotoCompareWindow* const compareWindow = PhotoCompareWindow::showForFiles(paths, nullptr))
+		FileOperations::installDeleteAction(*compareWindow, entryRemover());
+}
+
 std::function<void(const QString& path)> BrowserWindow::entryRemover()
 {
 	return [self = QPointer<BrowserWindow>{ this }](const QString& path) {
@@ -578,6 +589,14 @@ void BrowserWindow::showEntryContextMenu(const QString& path, bool isFolder, QPo
 	QStringList targets = selectedPaths();
 	if (!targets.contains(path))
 		targets = { path };
+
+	// Several targets are the selection.
+	const auto isImage = [](const QListWidgetItem* item) { return static_cast<const GridEntry*>(item)->kind == EntryKind::Image; };
+	if (targets.size() >= 2 && std::ranges::all_of(_grid->selectedItems(), isImage))
+	{
+		menu.addSeparator();
+		menu.addAction(tr("Compare photos"), this, [this, targets] { comparePhotos(targets); });
+	}
 
 	menu.addSeparator();
 	menu.addAction(tr("Cut"), this, [targets] { FileOperations::putPathsOnClipboard(targets, true); });

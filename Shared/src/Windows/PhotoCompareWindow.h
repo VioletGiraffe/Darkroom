@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Windows/RemovalAction.h"
 #include "compiler/compiler_warnings_control.h"
 #include "threading/cthreadpool.h"
 
@@ -11,7 +12,6 @@ DISABLE_COMPILER_WARNINGS
 #include <QWidget>
 RESTORE_COMPILER_WARNINGS
 
-#include <functional>
 #include <memory>
 #include <stdint.h>
 #include <vector>
@@ -22,7 +22,6 @@ class QStackedLayout;
 class MarkerSlider;
 class PhotoComparePane;
 class SegmentedToggle;
-class Library;
 struct AlignmentTransform;
 
 // N-way aligned comparison. Pan/zoom is shared across panes; each photo has a similarity transform into the
@@ -31,16 +30,16 @@ struct AlignmentTransform;
 class PhotoCompareWindow final : public QWidget
 {
 public:
-	using PhotoRemovedHandler = std::function<void(const QString& filePath)>;
-
-	// Empty paths open the drop-target state. Loading omits unreadable files and caps the set at 50.
-	explicit PhotoCompareWindow(Library& library, const QStringList& photoPaths, QWidget* parent = nullptr,
-		PhotoRemovedHandler photoRemovedHandler = {});
+	// Opens a self-deleting window; empty candidatePaths open the drop-target state.
+	// Null after a warning when candidatePaths is not empty but fewer than two of them exist.
+	// Loading omits unreadable files and caps the set at 50.
+	// parent owns the window; a parentless one gets a taskbar button of its own.
+	static PhotoCompareWindow* showForFiles(const QStringList& candidatePaths, QWidget* parent);
 	~PhotoCompareWindow() override;
 
-	// Opens a self-deleting window, or warns when fewer than two existing candidates remain.
-	static void showForFiles(Library& library, const QStringList& candidatePaths, QWidget* parent,
-		PhotoRemovedHandler photoRemovedHandler = {});
+	// The pane menu's command for its photo; the menu offers none until set. Call at most once.
+	// A photo the action reports gone leaves the comparison.
+	void setRemovalAction(RemovalAction action);
 
 protected:
 	void keyPressEvent(QKeyEvent* event) override;
@@ -83,6 +82,8 @@ private:
 		double alignTimeMs = 0.0;
 	};
 
+	PhotoCompareWindow(const QStringList& photoPaths, QWidget* parent);
+
 	// widget = viewZoom * (alignScale * R(alignRotation) * image + alignOffset) + viewPan.
 	[[nodiscard]] QPointF subjectFromWidget(const QPointF& widgetPos) const;
 	[[nodiscard]] QPointF widgetFromImage(const Photo& photo, const QPointF& imagePos) const;
@@ -97,7 +98,6 @@ private:
 	void addPhotosFromFiles(const QStringList& photoPaths);
 	void applyLoadedPhotoBatch(PhotoLoadBatch& batch);
 	void rebuildPaneGrid();
-	void deletePhotoInteractive(int index);
 	void removePhotoFromComparison(int index);
 
 	[[nodiscard]] QRectF referenceSubjectRect() const;
@@ -139,8 +139,7 @@ private:
 	void updateHintText();
 
 private:
-	Library& _library;
-	PhotoRemovedHandler _photoRemovedHandler;
+	RemovalAction _removalAction;
 	std::vector<Photo> _photos;
 	std::vector<PhotoComparePane*> _paneWidgets;
 	QWidget* _gridPage = nullptr;

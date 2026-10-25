@@ -1,6 +1,7 @@
 #include "Windows/MainWindow.h"
 #include "Core/Catalog.h"
 #include "Core/Library.h"
+#include "Windows/LibraryPhotoCompare.h"
 #include "Windows/PhotoCompareWindow.h"
 #include "Windows/FrameExtraction.h"
 #include "Windows/FrameViewerWindow.h"
@@ -238,9 +239,7 @@ void MainWindow::setupMainMenu()
 	toolsMenu->addAction(tr("Check catalog integrity..."), this, &MainWindow::checkCatalogIntegrity);
 	toolsMenu->addSeparator();
 	toolsMenu->addAction(tr("Compare photos..."), QKeySequence("Shift+C"), this, [this] {
-		auto* w = new PhotoCompareWindow(_library, {}, this);
-		w->setAttribute(Qt::WA_DeleteOnClose);
-		w->show();
+		LibraryPhotoCompare::installDeleteAction(*PhotoCompareWindow::showForFiles({}, this), _library);
 	});
 	toolsMenu->addSeparator();
 	toolsMenu->addAction(tr("Restart all videos"), QKeySequence("Shift+R"), this, &VideoPlayerWindow::restartAll);

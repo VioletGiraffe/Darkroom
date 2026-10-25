@@ -18,6 +18,7 @@
 #include "Windows/ImageViewerWindow.h"
 #include "Windows/ImportExecution.h"
 #include "Windows/LabelManagement.h"
+#include "Windows/LibraryPhotoCompare.h"
 #include "Windows/LibraryPlayer.h"
 #include "Windows/OpenFileRelease.h"
 #include "Windows/PathDeletion.h"
@@ -1085,7 +1086,8 @@ void ImportDialog::compareStagedPhotos(const std::vector<StagedId>& photoIds)
 	QStringList paths;
 	for (const StagedId id : photoIds)
 		paths << _staged.value(id).path;
-	PhotoCompareWindow::showForFiles(_library, paths, this, [this](const QString& removedPath) { unstage(stagedIdAtPath(removedPath)); });
+	if (PhotoCompareWindow* const compareWindow = PhotoCompareWindow::showForFiles(paths, this))
+		LibraryPhotoCompare::installDeleteAction(*compareWindow, _library, [this](const QString& removedPath) { unstage(stagedIdAtPath(removedPath)); });
 }
 
 void ImportDialog::setBestForStagedSelection(const std::vector<StagedId>& ids, bool inBest)

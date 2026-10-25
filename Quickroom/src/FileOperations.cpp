@@ -1,6 +1,8 @@
 #include "FileOperations.h"
 #include "Windows/ImageViewerWindow.h"
 #include "Windows/OpenFileRelease.h"
+#include "Windows/PhotoCompareWindow.h"
+#include "Windows/RemovalAction.h"
 #include "Windows/VideoPlayerWindow.h"
 #include "compiler/compiler_warnings_control.h"
 #include "fileoperationsui/cfileoperationdialog.h"
@@ -30,15 +32,15 @@ constexpr uint32_t MOVE_DROP_EFFECT = 2; // DROPEFFECT_MOVE, without the Windows
 const QString KDE_CUT_FORMAT = QStringLiteral("application/x-kde-cutselection");
 const QString GNOME_COPIED_FILES_FORMAT = QStringLiteral("x-special/gnome-copied-files");
 
-// The returned function deletes one path on behalf of window and returns whether it is gone.
-[[nodiscard]] std::function<bool(const QString& path)> pathDeleter(QWidget* window, PathDeletion::Mode mode, std::function<void(const QString& path)> onDeleted)
+// Deletes one path on behalf of window; remove returns whether it is gone.
+[[nodiscard]] RemovalAction deleteAction(QWidget* window, PathDeletion::Mode mode, std::function<void(const QString& path)> onDeleted)
 {
-	return [window, mode, onDeleted = std::move(onDeleted)](const QString& path) {
+	return { FileOperations::deleteActionText(mode), [window, mode, onDeleted = std::move(onDeleted)](const QString& path) {
 		const bool deleted = !FileOperations::deleteWithConfirmation({ path }, mode, window).empty();
 		if (deleted && onDeleted)
 			onDeleted(path);
 		return deleted;
-	};
+	} };
 }
 
 } // namespace
@@ -145,16 +147,15 @@ QString FileOperations::deleteActionText(PathDeletion::Mode mode)
 
 void FileOperations::installDeleteActions(ImageViewerWindow& viewer, std::function<void(const QString& path)> onDeleted)
 {
-	const auto removalAction = [&viewer, &onDeleted](PathDeletion::Mode mode) {
-		return ImageViewerWindow::RemovalAction{ deleteActionText(mode), pathDeleter(&viewer, mode, onDeleted) };
-	};
-	viewer.setRemovalActions(removalAction(PathDeletion::Mode::Trash), removalAction(PathDeletion::Mode::Permanent));
+	viewer.setRemovalActions(deleteAction(&viewer, PathDeletion::Mode::Trash, onDeleted), deleteAction(&viewer, PathDeletion::Mode::Permanent, onDeleted));
 }
 
 void FileOperations::installDeleteActions(VideoPlayerWindow& player, std::function<void(const QString& path)> onDeleted)
 {
-	const auto removalAction = [&player, &onDeleted](PathDeletion::Mode mode) {
-		return VideoPlayerWindow::RemovalAction{ deleteActionText(mode), pathDeleter(&player, mode, onDeleted) };
-	};
-	player.setRemovalActions(removalAction(PathDeletion::Mode::Trash), removalAction(PathDeletion::Mode::Permanent));
+	player.setRemovalActions(deleteAction(&player, PathDeletion::Mode::Trash, onDeleted), deleteAction(&player, PathDeletion::Mode::Permanent, onDeleted));
+}
+
+void FileOperations::installDeleteAction(PhotoCompareWindow& compareWindow, std::function<void(const QString& path)> onDeleted)
+{
+	compareWindow.setRemovalAction(deleteAction(&compareWindow, PathDeletion::Mode::Trash, std::move(onDeleted)));
 }

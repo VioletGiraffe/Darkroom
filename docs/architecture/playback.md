@@ -168,11 +168,14 @@ ways:
 Flicker, difference, and single-photo full-view modes all consume the same aligned image set and shared view; they do
 not maintain independent transforms.
 
-Each pane's context menu can delete its photo from disk through the shared Trash-first workflow. The window borrows
-the stable `Library` so a path currently owned by Catalog is deleted through `MediaItemManagement` and its record is
-removed only after the filesystem operation succeeds. Untracked files use the same filesystem workflow directly.
-Successful deletion removes the pane; deleting the reference resets alignment around a surviving reference. A
-caller-provided notification lets ImportDialog unstage a successfully deleted source.
+The window lives in `Shared`: Quickroom opens it too. Each pane's context menu offers the host's removal action, if
+one is installed. A photo the action reports gone leaves the comparison; removing the reference resets alignment around
+a surviving reference.
+
+- Darkroom's action (`LibraryPhotoCompare`) borrows the stable `Library`: a path Catalog owns is deleted through
+  `MediaItemManagement`, its record removed only after the filesystem operation succeeds. Any other file goes to Trash
+  after its own confirmation. ImportDialog's action also unstages the deleted source.
+- Quickroom's action follows its deletion policy, see [QUICKROOM.md](../QUICKROOM.md).
 
 ### Image loading and worker ownership
 

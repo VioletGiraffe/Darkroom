@@ -6,6 +6,7 @@
 #include <functional>
 
 class ImageViewerWindow;
+class PhotoCompareWindow;
 class QMimeData;
 class QWidget;
 class VideoPlayerWindow;
@@ -35,4 +36,6 @@ namespace FileOperations
 	// Give the window its removal actions: Del is Trash, Shift+Del is permanent. onDeleted receives each deleted path.
 	void installDeleteActions(ImageViewerWindow& viewer, std::function<void(const QString& path)> onDeleted = {});
 	void installDeleteActions(VideoPlayerWindow& player, std::function<void(const QString& path)> onDeleted = {});
+	// The same for the comparison's pane menu, with Trash only.
+	void installDeleteAction(PhotoCompareWindow& compareWindow, std::function<void(const QString& path)> onDeleted = {});
 }

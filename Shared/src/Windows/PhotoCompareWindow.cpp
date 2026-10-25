@@ -1,15 +1,11 @@
 #include "Windows/PhotoCompareWindow.h"
-#include "Core/Catalog.h"
 #include "Core/CpuThreadPool.h"
 #include "Core/IoThreadPool.h"
-#include "Core/Library.h"
 #include "MagicAlignment.h"
 #include "Theme/Theme.h"
 #include "UiComponents/MarkerSlider.h"
 #include "UiComponents/SegmentedToggle.h"
 #include "Utils.h"
-#include "Windows/MediaItemManagement.h"
-#include "Windows/PathDeletion.h"
 
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
@@ -24,7 +20,6 @@ DISABLE_COMPILER_WARNINGS
 #include <QCheckBox>
 #include <QContextMenuEvent>
 #include <QDebug>
-#include <QDir>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QElapsedTimer>
@@ -360,13 +355,18 @@ void PhotoComparePane::contextMenuEvent(QContextMenuEvent* event)
 		_owner.updateAllPanes();
 	});
 	makeReference->setEnabled(index != _owner._refIndex);
-	menu.addSeparator();
-	menu.addAction(tr("Delete this photo from disk"), [this, index] { _owner.deletePhotoInteractive(index); });
+	if (const RemovalAction& removal = _owner._removalAction; removal.remove)
+	{
+		menu.addSeparator();
+		menu.addAction(removal.text, [this, index, &removal] {
+			if (removal.remove(_owner._photos[index].filePath))
+				_owner.removePhotoFromComparison(index);
+		});
+	}
 	menu.exec(event->globalPos());
 }
 
-void PhotoCompareWindow::showForFiles(Library& library, const QStringList& candidatePaths, QWidget* parent,
-	PhotoRemovedHandler photoRemovedHandler)
+PhotoCompareWindow* PhotoCompareWindow::showForFiles(const QStringList& candidatePaths, QWidget* parent)
 {
 	QStringList paths;
 	for (const QString& path : candidatePaths)
@@ -379,21 +379,24 @@ void PhotoCompareWindow::showForFiles(Library& library, const QStringList& candi
 		}
 	}
 
-	if (paths.size() < 2)
+	if (!candidatePaths.empty() && paths.size() < 2)
 	{
 		QMessageBox::warning(parent, tr("Error"), tr("The selected photo files could not be found on disk."));
-		return;
+		return nullptr;
 	}
 
-	auto* w = new PhotoCompareWindow(library, paths, parent, std::move(photoRemovedHandler));
+	auto* w = new PhotoCompareWindow(paths, parent);
 	w->setAttribute(Qt::WA_DeleteOnClose);
 	w->show();
+	return w;
 }
 
-PhotoCompareWindow::PhotoCompareWindow(Library& library, const QStringList& photoPaths, QWidget* parent,
-	PhotoRemovedHandler photoRemovedHandler) : QWidget(parent, Qt::Window),
-	_library(library),
-	_photoRemovedHandler(std::move(photoRemovedHandler)),
+void PhotoCompareWindow::setRemovalAction(RemovalAction action)
+{
+	_removalAction = std::move(action);
+}
+
+PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* parent) : QWidget(parent, Qt::Window),
 	_workerPool(std::max(std::thread::hardware_concurrency(), 2u) - 1, "photo-compare")
 {
 	setWindowTitle(tr("Compare Photos"));
@@ -649,36 +652,8 @@ void PhotoCompareWindow::rebuildPaneGrid()
 		grid->setRowStretch(r, 1);
 }
 
-void PhotoCompareWindow::deletePhotoInteractive(int index)
-{
-	if (index < 0 || index >= static_cast<int>(_photos.size()))
-	{
-		assert_unconditional_r("Invalid photo-comparison index");
-		return;
-	}
-
-	const QString filePath = _photos[index].filePath;
-	Catalog& catalog = _library.catalog();
-	if (const MediaItemId trackedId = catalog.mediaItemAtSourcePath(filePath); trackedId != MediaItemId::None)
-	{
-		const MediaItemManagement::RemovalResult result = MediaItemManagement::deleteItemsInteractive(catalog, { trackedId }, this);
-		if (std::ranges::contains(result.removedItems, trackedId))
-			removePhotoFromComparison(index);
-		return;
-	}
-
-	const QString question = tr("Move this photo to Trash?\n\n%1").arg(QDir::toNativeSeparators(filePath));
-	if (QMessageBox::warning(this, tr("Delete photo"), question,
-			QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
-		return;
-
-	if (PathDeletion::removePathTrashFirstInteractive(filePath, this))
-		removePhotoFromComparison(index);
-}
-
 void PhotoCompareWindow::removePhotoFromComparison(int index)
 {
-	const QString removedPath = _photos[index].filePath;
 	const bool removedReference = index == _refIndex;
 	exitFullView();
 	_flickerIndex = -1;
@@ -710,9 +685,6 @@ void PhotoCompareWindow::removePhotoFromComparison(int index)
 		updateHintText();
 		updateAllPanes();
 	}
-
-	if (_photoRemovedHandler)
-		_photoRemovedHandler(removedPath);
 }
 
 void PhotoCompareWindow::dragEnterEvent(QDragEnterEvent* event)

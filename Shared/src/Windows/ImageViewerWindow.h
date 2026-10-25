@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Windows/RemovalAction.h"
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -39,14 +40,7 @@ public:
 	// Returning false skips the state change: a handler that closes the viewer must not let it reappear windowed.
 	void setExitFullScreenHandler(std::function<bool()> handler);
 
-	// What Del or Shift+Del does to the image shown, in the host's terms.
-	struct RemovalAction
-	{
-		QString text; // menu wording
-		// Returns whether the image left the host's list.
-		std::function<bool(const QString& path)> remove;
-	};
-	// Call at most once. After a removal the viewer shows the nearest remaining image, or closes when none is left.
+	// Del and Shift+Del, for the image shown. Call at most once. After a removal the viewer shows the nearest remaining image, or closes when none is left.
 	void setRemovalActions(RemovalAction onDelete, RemovalAction onShiftDelete);
 
 	// Viewers whose current image matches close its file, keeping the frame shown; see releaseMediaFilesHeldOpen.

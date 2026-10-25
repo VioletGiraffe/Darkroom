@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Windows/RemovalAction.h"
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -58,14 +59,7 @@ public:
 	// Call at most once.
 	void setFrameTarget(FrameTarget target);
 
-	// What Del or Shift+Del does to the playing item, in the host's terms.
-	struct RemovalAction
-	{
-		QString text; // menu wording
-		// Returns whether the item left the host's list.
-		std::function<bool(const QString& videoPath)> remove;
-	};
-	// Call at most once. After a removal the player moves to an adjacent item, or closes when it has none.
+	// Del and Shift+Del, for the playing item. Call at most once. After a removal the player moves to an adjacent item, or closes when it has none.
 	void setRemovalActions(RemovalAction onDelete, RemovalAction onShiftDelete);
 
 	static void restartAll();
