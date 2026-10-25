@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Times reading one screenful of image files cold, under the I/O strategies a loader can use on slow storage.
+"""Times reading image files cold: a screenful under the I/O strategies a loader can use on slow storage (run), and read
+throughput by thread count (threads).
 
 Windows only: every variant is a Win32 I/O strategy. How to run it, and what to verify before trusting the numbers:
 docs/build.md, "Image read benchmark".
@@ -28,8 +29,11 @@ EVICTION_CHUNK = 1 << 20
 MAX_IN_FLIGHT = 8
 
 GENERIC_READ = 0x80000000
+GENERIC_WRITE = 0x40000000
 FILE_SHARE_READ_WRITE = 0x3
+CREATE_ALWAYS = 2
 OPEN_EXISTING = 3
+FILE_FLAG_WRITE_THROUGH = 0x80000000
 FILE_FLAG_NO_BUFFERING = 0x20000000
 FILE_FLAG_OVERLAPPED = 0x40000000
 ERROR_MORE_DATA = 234
@@ -78,6 +82,11 @@ kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
 kernel32.ReadFile.restype = wintypes.BOOL
 kernel32.ReadFile.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD),
                               ctypes.POINTER(OVERLAPPED)]
+kernel32.WriteFile.restype = wintypes.BOOL
+kernel32.WriteFile.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
+kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+kernel32.SetProcessAffinityMask.restype = wintypes.BOOL
+kernel32.SetProcessAffinityMask.argtypes = [wintypes.HANDLE, ctypes.c_size_t]
 kernel32.GetFileSizeEx.restype = wintypes.BOOL
 kernel32.GetFileSizeEx.argtypes = [wintypes.HANDLE, ctypes.POINTER(ctypes.c_longlong)]
 kernel32.DeviceIoControl.restype = wintypes.BOOL
@@ -102,8 +111,8 @@ def raise_last_error(context):
     raise OSError(None, f'{context}: {ctypes.FormatError(code).strip()}', None, code)
 
 
-def open_handle(path, access=GENERIC_READ, flags=0):
-    handle = kernel32.CreateFileW(path, access, FILE_SHARE_READ_WRITE, None, OPEN_EXISTING, flags, None)
+def open_handle(path, access=GENERIC_READ, flags=0, disposition=OPEN_EXISTING):
+    handle = kernel32.CreateFileW(path, access, FILE_SHARE_READ_WRITE, None, disposition, flags, None)
     if handle is None or handle == INVALID_HANDLE_VALUE:
         raise_last_error(path)
     return handle
@@ -386,6 +395,71 @@ def generate(root, file_count, filler_mib, seed):
     print(f'{filler}: {filler_mib} MiB')
 
 
+def write_uncached_files(folder, sizes, content):
+    """Unbuffered writes: the data never enters the OS cache, so the first buffered read of each file is cold."""
+    shutil.rmtree(folder, ignore_errors=True)
+    os.makedirs(folder)
+    paths = []
+    written = wintypes.DWORD()
+    for i, size in enumerate(sizes):
+        path = os.path.join(folder, f'IMG_{i:05}.jpg')
+        ctypes.memmove(content, os.urandom(size), size)
+        handle = open_handle(path, GENERIC_WRITE, FILE_FLAG_NO_BUFFERING | FILE_FLAG_WRITE_THROUGH, CREATE_ALWAYS)
+        try:
+            if not kernel32.WriteFile(handle, content, size, ctypes.byref(written), None) or written.value != size:
+                raise_last_error(path)
+        finally:
+            kernel32.CloseHandle(handle)
+        paths.append(path)
+    return paths
+
+
+def time_threaded_read(paths, buffers, thread_count, flags):
+    """Files/s and CPU cores used: process CPU time, user and kernel, over wall time. CPU time advances in 15.6 ms ticks."""
+    cpu_start = time.process_time()
+    start = time.perf_counter()
+    read_on_threads(paths, buffers, thread_count, flags)
+    wall = time.perf_counter() - start
+    return len(paths) / wall, (time.process_time() - cpu_start) / wall
+
+
+def sweep_thread_counts(args):
+    if os.path.exists(args.folder):
+        fail(f'{args.folder} exists: the sweep deletes its folder afterwards')
+    counts = [int(c) for c in args.counts.split(',')]
+    if args.cpus:
+        mask = sum(1 << int(c) for c in args.cpus.split(','))
+        if not kernel32.SetProcessAffinityMask(kernel32.GetCurrentProcess(), mask):
+            raise_last_error('SetProcessAffinityMask')
+
+    rng = random.Random(1)
+    # Sector multiples: unbuffered writes cannot end mid-sector
+    sizes = [round_up_to_sector(rng.randint(MIN_FILE_SIZE, MAX_FILE_SIZE)) for _ in range(args.files)]
+    content = aligned_buffer(BUFFER_SIZE)
+    buffers = [aligned_buffer(BUFFER_SIZE) for _ in range(max(counts))]
+    results = {(count, kind): [] for count in counts for kind in ('unbuffered', 'buffered')}
+    try:
+        for _ in range(args.rounds):
+            order = counts[:]
+            random.shuffle(order)
+            for count in order:
+                paths = write_uncached_files(os.path.join(args.folder, 'set'), sizes, content)
+                # Unbuffered first: it leaves the OS cache empty for the buffered read
+                results[count, 'unbuffered'].append(time_threaded_read(paths, buffers, count, FILE_FLAG_NO_BUFFERING))
+                results[count, 'buffered'].append(time_threaded_read(paths, buffers, count, 0))
+    finally:
+        shutil.rmtree(args.folder, ignore_errors=True)
+
+    mean_size = sum(sizes) / len(sizes)
+    print(f'{args.files} files of {mean_size / 1000:.0f} KB average, {args.rounds} rounds, CPUs {args.cpus or "all"}; medians')
+    print(f'{"threads":>7} {"unbuffered GB/s":>15} {"buffered files/s":>16} {"buffered GB/s":>13} {"CPU cores":>9}')
+    for count in counts:
+        unbuffered = statistics.median(rate for rate, _ in results[count, 'unbuffered'])
+        buffered = statistics.median(rate for rate, _ in results[count, 'buffered'])
+        cores = statistics.median(c for _, c in results[count, 'buffered'])
+        print(f'{count:>7} {unbuffered * mean_size / 1e9:>15.2f} {buffered:>16.0f} {buffered * mean_size / 1e9:>13.2f} {cores:>9.2f}')
+
+
 def remount_volume(command):
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode != 0:
@@ -514,9 +588,18 @@ def main():
     run_parser.add_argument('--seed', type=int, help='Reproduces the batch and variant order of an earlier run')
     run_parser.add_argument('--out', required=True, help='Per-sample CSV, appended to')
 
+    threads_parser = commands.add_parser('threads', help='Read throughput by thread count: cold data, warm metadata')
+    threads_parser.add_argument('folder', help='Created on the drive to measure, deleted afterwards; must not exist')
+    threads_parser.add_argument('--counts', default='1,2,4,6,8,12,16', help='Thread counts (default 1,2,4,6,8,12,16)')
+    threads_parser.add_argument('--files', type=int, default=400, help='Files per trial (default 400)')
+    threads_parser.add_argument('--rounds', type=int, default=3)
+    threads_parser.add_argument('--cpus', help='Comma-separated logical CPUs to confine the process to; all when omitted')
+
     args = parser.parse_args()
     if args.command == 'generate':
         generate(args.root, args.files, args.filler_mib, args.seed)
+    elif args.command == 'threads':
+        sweep_thread_counts(args)
     else:
         run(args)
 

@@ -1,10 +1,11 @@
-# Image read performance on an HDD
+# Image read performance
 
 [← Back to build, tests, CI, and release](build.md#image-read-benchmark)
 
-Measurements by `scripts/image_read_benchmark.py` and a queue-depth sweep made while validating its method, 2026-10-25.
+Measurements by `scripts/image_read_benchmark.py` and a queue-depth sweep made while validating its method, 2026-10-25,
+on an i5-12600KF.
 
-## Setup
+## HDD setup
 
 | | |
 |---|---|
@@ -14,7 +15,7 @@ Measurements by `scripts/image_read_benchmark.py` and a queue-depth sweep made w
 | Sample | one batch of 40 files after a remount; data cold, metadata cold or warmed by `--warm-metadata` |
 | Cells | 5 samples each |
 
-## Cold metadata
+## HDD, cold metadata
 
 Medians in ms for the batch.
 
@@ -44,7 +45,7 @@ Medians in ms for the batch.
 - A buffered `ReadFile` of a whole file is one disk read.
 - Each file of a scattered batch costs one metadata read before its data read.
 
-## Warm metadata
+## HDD, warm metadata
 
 Medians in ms for the batch; min and max over the 5 samples.
 
@@ -65,7 +66,7 @@ Medians in ms for the batch; min and max over the 5 samples.
 - Serial buffered reads gain nothing from warm metadata: 419 ms against 410 cold.
 - A contiguous batch reads at the sequential rate under every variant.
 
-## Queue depth without metadata
+## HDD queue depth without metadata
 
 Random unbuffered reads at a fixed queue depth over one 4 GiB file on the same disk, outside the VHDX. IOPS:
 
@@ -86,6 +87,47 @@ Random unbuffered reads at a fixed queue depth over one 4 GiB file on the same d
 - Reads inside the VHDX and on its backing file read raw ran at the same rate: 4 KiB at QD1, 139 vs 138 IOPS.
 - The span sets absolute times: 4 KiB random reads at QD1 ran at 68 IOPS over 4 GiB and 138 over 1 GiB.
 
+## SSD read throughput by thread count
+
+The `threads` subcommand's method: 400 files of 391 KB on average, data cold, metadata warm, medians of 3 rounds.
+Buffered reads; unbuffered reads follow the same curves.
+
+| Drive | Interface |
+|---|---|
+| H: WD PC SN720 512 GB | NVMe, PCIe 3.0 x4 |
+| G: Lexar ARES 2 TB | NVMe, a PCIe 4.0 drive linked at PCIe 3.0 x4 |
+| F: Samsung 850 EVO mSATA 1 TB | SATA |
+
+All 16 logical CPUs, GB/s:
+
+| Threads | 1 | 2 | 4 | 6 | 8 | 12 | 16 |
+|---|---|---|---|---|---|---|---|
+| H: | 1.24 | 2.12 | 3.14 | 3.30 | 3.35 | 3.36 | 3.33 |
+| G: | 1.56 | 2.81 | 3.43 | 3.52 | 3.52 | 3.39 | 3.49 |
+| F: | 0.39 | 0.52 | 0.54 | 0.54 | 0.54 | 0.54 | 0.54 |
+
+Confined to fewer CPUs, GB/s. Two cores: logical CPUs 0 and 2, two P-cores. One core: CPUs 0 and 1, the
+hyperthreads of one P-core. One CPU: CPU 0.
+
+| Threads | H: two cores | H: one core | H: one CPU | G: two cores | G: one core | G: one CPU |
+|---|---|---|---|---|---|---|
+| 1 | 1.29 | 1.19 | 1.18 | 1.56 | 1.51 | 1.53 |
+| 2 | 2.14 | 2.07 | 2.02 | 2.83 | 2.52 | 2.64 |
+| 4 | 3.17 | 2.99 | 3.00 | 3.36 | 3.26 | 3.29 |
+| 6 | 3.25 | 3.13 | 3.20 | 3.40 | 3.16 | 3.39 |
+| 8 | 3.31 | 3.22 | 3.10 | 3.45 | 3.32 | 3.42 |
+
+- Every drive saturates at its interface: about 3.4 GB/s for both NVMe drives, 0.54 GB/s for SATA.
+- Above 4 threads the gain is at most 7%; above 6, at most 2%.
+- Confined to one CPU, 6 threads come within 4% of all 16 CPUs.
+- The whole pool used about 0.1-0.2 of one core at full NVMe speed, whatever the thread count: process CPU time over
+  0.25 s passes, counted in 15.6 ms ticks.
+- A pool sized by core count would give a one- or two-core machine 2 workers: 17-37% below 6 workers on the same CPUs,
+  on the NVMe drives.
+
 ## Not covered
 
-- A folder scattered across a large span of a full disk, where longer seeks leave more to reordering.
+- HDD: a folder scattered across a large span of a full disk, where longer seeks leave more to reordering.
+- SSD: cold metadata, and PCIe 4.0 links.
+- SSD: a small CPU busy decoding. The benchmark cannot show it: under load from other processes, its Python threads
+  serialize on the interpreter lock.

@@ -77,8 +77,9 @@ background-only.
 
 `ImageFilesSource` loads in two stages:
 
-1. File reads go through `Core::IoThreadPool`, which routes fast storage to bounded parallel workers and slow,
-   external, network, or unknown storage to a shared serial worker. On fast storage a card's files are read in parallel.
+1. File reads go through `Core::IoThreadPool`, which routes fast storage to 6 parallel workers, whatever the core
+   count, and slow, external, network, or unknown storage to a shared serial worker. On fast storage a card's files are
+   read in parallel.
    On an HDD, threaded and queued reads measured no faster than the serial worker with cold metadata, and at most 12%
    faster with warm metadata: [image-read-performance.md](../image-read-performance.md).
 2. CPU decoding runs on `cpuThreadPool()`, a card's frames in parallel.

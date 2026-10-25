@@ -3,7 +3,6 @@
 #include "system/storagespeed.hpp"
 
 #include <filesystem>
-#include <thread>
 #include <utility>
 
 namespace {
@@ -15,8 +14,8 @@ namespace {
 
 	CThreadPool& parallelPool()
 	{
-		const uint32_t threadCount = qBound(2u, std::thread::hardware_concurrency(), 6u);
-		static CThreadPool instance{ threadCount, "io-fast" };
+		// Not per core: the workers mostly wait on the device; 6 saturated every SSD measured, even on one core (docs/image-read-performance.md)
+		static CThreadPool instance{ 6, "io-fast" };
 		return instance;
 	}
 

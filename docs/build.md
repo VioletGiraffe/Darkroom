@@ -53,9 +53,9 @@ behavior, and catalog-integrity verdicts.
 
 ## Image read benchmark
 
-`scripts/image_read_benchmark.py` times reading one screenful of image files cold, under the I/O strategies a loader
-can use on slow storage. Windows only; `--help` lists the options. The results and the method's validation:
-[image-read-performance.md](image-read-performance.md).
+`scripts/image_read_benchmark.py` times reading image files cold: one screenful under the I/O strategies a loader can
+use on slow storage, and read throughput by thread count. Windows only; `--help` lists the options. The results and the
+method's validation: [image-read-performance.md](image-read-performance.md).
 
 - `generate <root>` writes two folders of the same synthetic files, random bytes of 250-500 KiB named `*.jpg`:
   `name-order` is written in name order, as an import lays it out; `shuffled` in random order. A screenful is
@@ -71,6 +71,9 @@ can use on slow storage. Windows only; `--help` lists the options. The results a
 - The drive's own cache survives a remount: each run first reads a filler file, which must exceed twice that cache.
 - Confirm cold numbers are cold before trusting them: `buffered` on `shuffled` must take HDD time, over 10 ms per file,
   and the disk's read bytes must about equal the batch's. More bytes means another reader, such as a malware scanner.
+- `threads <folder>` sweeps thread counts on the drive holding the folder, without a VHDX or elevation. Each trial
+  writes fresh files unbuffered, so their data is cold and their metadata warm, then reads them unbuffered and buffered.
+  `--cpus` confines the process to some logical CPUs.
 
 ## CI
 
