@@ -66,10 +66,6 @@ win*{
 	DEFINES += WIN32_LEAN_AND_MEAN NOMINMAX _SCL_SECURE_NO_WARNINGS
 }
 
-linux*|freebsd{
-	QT += dbus   # revealInFileManager() talks to org.freedesktop.FileManager1 here (Utils.cpp)
-}
-
 ###################################################
 #      Generic stuff for Linux and Mac
 ###################################################

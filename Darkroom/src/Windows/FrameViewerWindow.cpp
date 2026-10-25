@@ -6,6 +6,7 @@
 #include "UiComponents/ThumbnailWidget.h"
 #include "Utils.h"
 #include "compiler/compiler_warnings_control.h"
+#include "utils/filemanager.h"
 #include "widgets/layouts/cflowlayout.h"
 
 DISABLE_COMPILER_WARNINGS

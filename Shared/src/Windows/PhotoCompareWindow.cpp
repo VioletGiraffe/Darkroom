@@ -9,6 +9,7 @@
 
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
+#include "utils/filemanager.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 #include "utils/scoped_cursor.h"
 #include "widgets/cpersistenceenabler.h"

@@ -10,6 +10,7 @@
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
 #include "dialogs/messagedialog.h"
+#include "utils/filemanager.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QAudio>

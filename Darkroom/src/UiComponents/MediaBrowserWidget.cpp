@@ -24,6 +24,7 @@
 #include "Windows/VideoPlayerWindow.h"
 
 #include "compiler/compiler_warnings_control.h"
+#include "utils/filemanager.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
 DISABLE_COMPILER_WARNINGS

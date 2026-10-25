@@ -3,6 +3,7 @@
 #include "Shortcuts.h"
 #include "Utils.h"
 #include "assert/advanced_assert.h"
+#include "utils/filemanager.h"
 #include "widgets/cimageviewerwidget.h"
 
 DISABLE_COMPILER_WARNINGS

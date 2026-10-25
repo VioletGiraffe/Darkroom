@@ -10,30 +10,18 @@ DISABLE_COMPILER_WARNINGS
 #include <QCoreApplication>
 #include <QCursor>
 #include <QDateTime>
-#include <QDesktopServices>
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QMessageBox>
 #include <QMimeData>
-#include <QProcess>
 #include <QRegularExpression>
 #include <QStandardPaths>
 #include <QStringList>
 #include <QUrl>
 #include <QWidget>
 RESTORE_COMPILER_WARNINGS
-
-// QtDBus is linked on these platforms only (QT += dbus in Shared.pro and both apps), for revealInFileManager.
-#if !defined Q_OS_WIN && !defined Q_OS_MACOS
-DISABLE_COMPILER_WARNINGS
-#include <QDBusConnection>
-#include <QDBusMessage>
-#include <QDBusPendingCall>
-#include <QDBusPendingCallWatcher>
-RESTORE_COMPILER_WARNINGS
-#endif
 
 #include <algorithm>
 #include <functional>
@@ -281,58 +269,6 @@ QDateTime getSourceFileDate(const QString& sourcePath, const QString& folderPath
 	const QFileInfo folderInfo(folderPath);
 	const QDateTime birth = folderInfo.birthTime();
 	return birth.isValid() ? birth : folderInfo.lastModified();
-}
-
-bool revealInFileManager(const QString& path)
-{
-	const QFileInfo fi{ path };
-	if (!fi.exists())
-		return false;
-
-	const QString canonicalPath = fi.canonicalFilePath();
-
-#if defined Q_OS_WIN
-	QProcess::startDetached("explorer.exe", { "/select,", QDir::toNativeSeparators(canonicalPath) });
-#elif defined Q_OS_MACOS
-	QProcess::startDetached("open", { "-R", canonicalPath });
-#else
-	// This D-Bus interface selects the item and activates a supported file manager if necessary. Construct the
-	// call directly to avoid QDBusInterface's blocking introspection.
-	QDBusMessage showItems = QDBusMessage::createMethodCall("org.freedesktop.FileManager1", "/org/freedesktop/FileManager1",
-	                                                        "org.freedesktop.FileManager1", "ShowItems");
-	showItems.setArguments({ QStringList{ QUrl::fromLocalFile(canonicalPath).toString() }, QString{} });
-
-	// Activation can take seconds. qApp bounds the async watcher's lifetime and keeps the fallback on the GUI thread.
-	const QUrl folderUrl = QUrl::fromLocalFile(fi.isDir() ? canonicalPath : fi.absolutePath());
-	auto* watcher = new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(showItems), qApp);
-	QObject::connect(watcher, &QDBusPendingCallWatcher::finished, qApp, [folderUrl](QDBusPendingCallWatcher* self) {
-		if (self->isError())
-			QDesktopServices::openUrl(folderUrl);
-		self->deleteLater();
-	});
-#endif
-
-	return true;
-}
-
-QString revealInFileManagerActionText()
-{
-#if defined Q_OS_WIN
-	return QObject::tr("Open in Explorer");
-#elif defined Q_OS_MACOS
-	return QObject::tr("Reveal in Finder");
-#else
-	return QObject::tr("Show in file manager");
-#endif
-}
-
-bool openFolderInFileManager(const QString& folderPath)
-{
-	if (!QFileInfo(folderPath).isDir())
-		return false;
-
-	QDesktopServices::openUrl(QUrl::fromLocalFile(folderPath));
-	return true;
 }
 
 void reportMissingFile(QWidget* parent, const QString& path)

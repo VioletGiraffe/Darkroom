@@ -69,10 +69,6 @@ win*{
 	LIBS += -lUser32
 }
 
-linux*|freebsd{
-	QT += dbus   # Utils.cpp's revealInFileManager talks to org.freedesktop.FileManager1 here
-}
-
 linux*|mac*|freebsd {
 	QMAKE_CXXFLAGS_WARN_ON = -Wall -Wextra -Wno-missing-field-initializers # omitted aggregate fields take their defaults by design
 

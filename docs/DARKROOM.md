@@ -45,7 +45,7 @@ Each is its own include root except where noted:
 |---|---|
 | `cpputils` | `assert/advanced_assert.h`, `CThreadPool`, interruptible threads, storage-speed detection, `timing/profiler.h` (compiled in when `PROFILING_ENABLED` is defined) |
 | `cpp-template-utils` | header-only: compiler-warning control macros, `macro_utils.h`, hashing |
-| `qtutils` | theme machinery (`CThemeController`, `CBasePalette`, tinted icon engine, `themeicon:/`, style fixups), `CImageViewerWidget`, `CFlowLayout`, natural sort, `CLoggerInMemory`, settings/about dialog bases, message-box helpers |
+| `qtutils` | theme machinery (`CThemeController`, `CBasePalette`, tinted icon engine, `themeicon:/`, style fixups), `CImageViewerWidget`, `CFlowLayout`, natural sort, `CLoggerInMemory`, settings/about dialog bases, message-box helpers, file-manager reveal |
 | `magic-alignment` (root `src/`) | automatic photo alignment fits for PhotoCompareWindow |
 | `image-processing` | SIMD image resize for ImageViewerWindow and Quickroom's icon tiles; has its own tests and a resize-comparison tool |
 | `thin_io` (root `src/`) | native filesystem access for `file-operations` and Quickroom's folder listing |

@@ -93,7 +93,7 @@ mac*{
 }
 
 linux*|freebsd{
-	QT += dbus   # revealInFileManager() talks to org.freedesktop.FileManager1 here (Utils.cpp)
+	QT += dbus   # qtutils' revealInFileManager() calls org.freedesktop.FileManager1 here
 }
 
 ###################################################

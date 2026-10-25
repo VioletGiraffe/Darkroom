@@ -78,16 +78,6 @@ struct PathMove
 // Best-effort recording date: filename timestamp, then source creation time, then frame-folder creation time.
 [[nodiscard]] QDateTime getSourceFileDate(const QString& sourcePath, const QString& folderPath);
 
-// Selects path in the platform file manager. False means only that path did not exist; the handoff itself is best-effort.
-[[nodiscard]] bool revealInFileManager(const QString& path);
-
-// Platform-native menu wording for revealInFileManager.
-[[nodiscard]] QString revealInFileManagerActionText();
-
-// Opens the folder's contents, unlike revealInFileManager, which selects it in its parent.
-// False means only that folderPath is not an existing directory; the handoff itself is best-effort.
-[[nodiscard]] bool openFolderInFileManager(const QString& folderPath);
-
 constexpr const char* IssueTrackerUrl = "https://github.com/VioletGiraffe/Darkroom/issues";
 
 void reportMissingFile(QWidget* parent, const QString& path);
