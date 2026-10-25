@@ -66,6 +66,9 @@ RESOURCES += res/quickroom.qrc
 
 # GNU ld resolves left to right: shared before the libraries it uses, magic-alignment before the cpputils thread pool
 LIBS += -L$${DESTDIR} -lshared -lqtutils -lmagic-alignment -lcpputils -limage-processing
+# Unix only: MSBuild tracks link inputs itself
+mac*|linux*|freebsd: PRE_TARGETDEPS += $${DESTDIR}/libshared.a $${DESTDIR}/libqtutils.a $${DESTDIR}/libmagic-alignment.a \
+	$${DESTDIR}/libcpputils.a $${DESTDIR}/libimage-processing.a
 # The copy/move engine, its dialogs and folder listing, with their dependencies
 include(../file-operations/libraries/fileoperationsui.pri)
 include(../cpputils/dependencies.pri)

@@ -38,9 +38,7 @@ HEADERS += \
 	TestHelpers.h \
 	../Darkroom/src/Core/Library.h
 
-# The sources under test are compiled in directly, not linked from Shared: the tests must build even when the rest of the apps' code does not.
-# Utils.cpp is here because Catalog.cpp calls its path helpers; its error-reporting functions are what pull in the widgets and qtutils
-# dependencies below. SharedSettings.cpp is here because Utils.cpp reads the ffmpeg path through it.
+# The Darkroom sources under test are compiled in: they belong to the app, not to a library.
 SOURCES += \
 	main.cpp \
 	PersistenceTests.cpp \
@@ -52,15 +50,12 @@ SOURCES += \
 	../Darkroom/src/Core/Catalog.cpp \
 	../Darkroom/src/Core/CatalogIntegrity.cpp \
 	../Darkroom/src/Core/Library.cpp \
-	../Darkroom/src/Core/MetadataStore.cpp \
-	../Shared/src/Core/JsonPersistence.cpp \
-	../Shared/src/MJpegParser.cpp \
-	../Shared/src/SharedSettings.cpp \
-	../Shared/src/Utils.cpp \
-	../Shared/src/Windows/OscillationCurve.cpp
+	../Darkroom/src/Core/MetadataStore.cpp
 
-# qtutils before cpputils: it uses cpputils, and GNU ld resolves left to right
-LIBS += -L$${DESTDIR} -lqtutils -lcpputils
+# GNU ld resolves left to right: shared before the libraries it uses, qtutils before cpputils
+LIBS += -L$${DESTDIR} -lshared -lqtutils -lcpputils
+# Unix only: MSBuild tracks link inputs itself
+mac*|linux*|freebsd: PRE_TARGETDEPS += $${DESTDIR}/libshared.a $${DESTDIR}/libqtutils.a $${DESTDIR}/libcpputils.a
 include(../cpputils/dependencies.pri)
 
 win*{

@@ -9,7 +9,7 @@ Toolchain minimums (Qt 6.8, macOS 13.3) and their reasons are stated at the top 
 | Project | Builds | Purpose |
 |---|---|---|
 | `Darkroom.pro` | Darkroom, Quickroom, the `Shared` library they both link, and all six submodule libraries | the product |
-| `Tests.pro` | `cpputils`, `qtutils`, and `tests/` | the test binary builds and runs on its own, including when the app does not compile |
+| `Tests.pro` | `cpputils`, `qtutils`, `Shared`, and `tests/` | the test binary builds and runs on its own, including when the apps' own code does not compile |
 
 Every qmake and msbuild invocation names its project: `qmake -tp vc -r Tests.pro`, `msbuild Darkroom.sln /t:Darkroom`.
 On Unix both roots generate the same top-level `Makefile`, so generating one overwrites the other; each script below
@@ -31,22 +31,21 @@ CI and local builds run the same scripts in `scripts/`; the `.bat` files start t
 
 ## Shared library and tests
 
-- `Shared/` builds a static library both apps link.
+- `Shared/` builds a static library both apps and the tests link.
 - qmake does not pass a static library's `LIBS` on: a library `Shared` starts using must be added to both apps' `LIBS`
   and to their `depends` in `Darkroom.pro`.
+- Every static library a project links is in its `PRE_TARGETDEPS` on Unix, so make relinks when the library changes.
 - Quickroom links the `file-operations` libraries through that submodule's `libraries/fileoperationsui.pri`, which
   adds their dependencies and include paths.
 
-The tests do not link `Shared`: `tests/tests.pro` compiles the sources under test directly, so the tests build even when
-the rest of the apps' code does not. It takes the model half of `Core/` (`Catalog`, `CatalogIntegrity`, `Library`,
-`MetadataStore` from `Darkroom/src`; `JsonPersistence` from `Shared/src`) plus `Utils.cpp` for its path helpers.
-Its `LIBS` are hand-listed too.
+`tests/tests.pro` compiles in the Darkroom sources under test, the model half of `Core/` (`Catalog`, `CatalogIntegrity`,
+`Library`, `MetadataStore`), and links `Shared` for the rest.
 
-**The link trap:** a source the tests compile gaining an `#include` of a submodule library the tests do not link breaks
-the tests' link while the apps still build. CI builds tests before the apps, so the failure appears on every OS and looks
-unrelated to the change. The fix is `tests.pro`'s `LIBS` plus `Tests.pro`'s `depends` (without the latter the library
-is never built first). `Utils.cpp` is the usual entry point: its error-reporting functions are why the tests link
-widgets and qtutils at all. Do not split it to suit the test project.
+**The link trap:** the tests link only the `Shared` objects they reference. One of those, or a compiled-in source,
+gaining a dependency on a library the tests do not link breaks the tests' link while the apps still build. CI builds tests before the apps,
+so the failure appears on every OS and looks unrelated to the change. The fix is `tests.pro`'s `LIBS` plus `Tests.pro`'s
+`depends` (without the latter the library is never built first). `Utils.cpp` is the usual entry point: its
+error-reporting functions are why the tests link widgets and qtutils at all. Do not split it to suit the test project.
 
 Test sources are listed explicitly in `tests/tests.pro`; a new test file must be registered there. Tests protect
 silent breakage: persisted-format compatibility, identity invariants, catalog mutations, case-sensitive filesystem
@@ -58,7 +57,8 @@ behavior, and catalog-integrity verdicts.
 (GCC 14), and macOS (clang), each against Qt 6.11. Per OS, in order:
 
 1. Build and run the tests: `run_tests`.
-2. Build both apps, even when the tests failed: `build`. Windows pins the v143 toolset.
+2. Build both apps, even when the tests failed: `build`. Windows pins the v143 toolset. The libraries the tests step
+   built are reused: both roots build into the same directories.
 3. Package whenever the apps built, so packaging is checked even when the tests failed: `windeployqt` into
    `dist/` and Inno Setup on Windows; `scripts/create_dmg.sh` on macOS. The packages are uploaded as workflow
    artifacts only when every step passed. Linux only builds.
