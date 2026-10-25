@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792921123326,
+  "lastUpdate": 1792923617585,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -17252,6 +17252,85 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/VioletGiraffe/Darkroom/commit/27406b6080a7e014c8b3133a0eb35e79e0388f67"
         },
         "date": 1792921120994,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 17121,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1416,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 30259,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 4777,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 4845,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 4166.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 458.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 65,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 48.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 13.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "eec484d765bd966e6141d2e45cff1bf99c4526fd",
+          "message": "Tests link the Shared library instead of compiling its sources; static libraries are in PRE_TARGETDEPS on Unix so make relinks when one changes",
+          "timestamp": "2026-10-25T12:07:36+02:00",
+          "tree_id": "c89e20ea62294128e73e387e8a4dab948856f380",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/eec484d765bd966e6141d2e45cff1bf99c4526fd"
+        },
+        "date": 1792923615282,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
