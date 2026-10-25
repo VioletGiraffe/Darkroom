@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792959028377,
+  "lastUpdate": 1792965492042,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -17682,6 +17682,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 462,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 65,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 48.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 13.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "1fc23418f7557ed1dc6742bf50819c1c9fe229ee",
+          "message": "Quickroom: the path field keeps a saved history of up to 100 folders opened from it, Browse or a command-line folder; editable combo boxes are themed as text fields",
+          "timestamp": "2026-10-25T23:48:30+02:00",
+          "tree_id": "e74353f9b926ebd3d5de792c954a879abdd20e52",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/1fc23418f7557ed1dc6742bf50819c1c9fe229ee"
+        },
+        "date": 1792965488648,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 17241,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1431,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 31470,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 4787,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 4949,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 4172.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 462.5,
             "unit": "KB"
           },
           {
