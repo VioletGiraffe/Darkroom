@@ -21,6 +21,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QMessageBox>
 #include <QMimeData>
 #include <QMouseEvent>
+#include <QSize>
 #include <QTimer>
 #include <QUrl>
 #include <QWheelEvent>
@@ -29,6 +30,8 @@ RESTORE_COMPILER_WARNINGS
 #include <cstdlib>
 #include <functional>
 #include <utility>
+
+constexpr QSize MinViewSize{ 120, 100 };
 
 ImageViewerWindow* ImageViewerWindow::showForImages(QStringList imagePaths, int startIndex, QWidget* parent,
 	std::function<void(const QString& path)> onImageChanged)
@@ -121,6 +124,7 @@ ImageViewerWindow::ImageViewerWindow(QStringList imagePaths, int startIndex, QWi
 	_instances.push_back(this);
 
 	_view = new CImageViewerWidget(this);
+	_view->setMinimumSize(MinViewSize);
 	setCentralWidget(_view);
 	_view->installEventFilter(this);
 

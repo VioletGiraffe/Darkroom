@@ -28,7 +28,7 @@ which also runs work on the calling thread - the GUI thread is blocked for the d
 
 Each viewer opens fullscreen and is parentless, for a taskbar button of its own; a modal caller owns the window
 instead, Qt blocking input to unparented windows under a modal dialog. Double-click and `F` switch between
-fullscreen and a window sized to the image, and the menu bar shows only outside fullscreen. A caller that defers
+fullscreen and a window sized to the image down to a minimum, and the menu bar shows only outside fullscreen. A caller that defers
 creating the window behind the viewer can install an exit-fullscreen handler: it runs once when the user leaves
 fullscreen and decides whether that switch still happens. A caller can also install removal actions, see below, and
 add its own actions to the Image menu, which the viewer keeps current for the image shown: MediaBrowserWidget adds
