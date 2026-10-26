@@ -28,12 +28,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # vcpkg_triplet: the triplet vcpkg.pri links against on that runner
           - os: windows-latest
             qt_arch: win64_msvc2022_64
+            vcpkg_triplet: x64-windows-static-md
           - os: ubuntu-latest
             qt_arch: linux_gcc_64
+            vcpkg_triplet: x64-linux
           - os: macos-latest
             qt_arch: clang_64
+            vcpkg_triplet: arm64-osx
 
     steps:
     - name: Checkout
@@ -127,6 +131,13 @@ jobs:
         $binaryCache = New-Item -ItemType Directory -Force (Join-Path $env:RUNNER_TEMP 'vcpkg-binary-cache')
         "VCPKG_ROOT=$vcpkgRoot" >> $env:GITHUB_ENV
         "VCPKG_BINARY_SOURCES=clear;files,$($binaryCache.FullName),readwrite" >> $env:GITHUB_ENV
+
+    # The scripts' own install then finds everything installed
+    - name: Install vcpkg packages
+      shell: pwsh
+      run: |
+        & (Join-Path $env:VCPKG_ROOT 'vcpkg') install --triplet ${{ matrix.vcpkg_triplet }}
+        if ($LASTEXITCODE -ne 0) { exit 1 }
 
     - name: Build tests (Windows)
       if: startsWith(matrix.os, 'windows')
