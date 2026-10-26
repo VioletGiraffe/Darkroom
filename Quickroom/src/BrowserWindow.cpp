@@ -270,7 +270,7 @@ void BrowserWindow::setupUi()
 		_nameFilter->selectAll();
 	});
 
-	_sortControl = new SortControl(BROWSER_SORT_SETTINGS_GROUP, {}, /* favoritesEnabled */ false);
+	_sortControl = new SortControl(BROWSER_SORT_SETTINGS_GROUP, {}, BROWSER_SORT_OPTIONS);
 	connect(_sortControl, &SortControl::changed, this, [this] {
 		_grid->sortItems(Qt::AscendingOrder);
 		_grid->ensureVisibleCardsExist();

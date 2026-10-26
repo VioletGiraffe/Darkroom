@@ -1,6 +1,7 @@
 #include "UiComponents/SortControl.h"
 #include "UiComponents/SegmentedToggle.h"
 #include "Theme/Theme.h"
+#include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
 #include "theme/ctintedsvgiconengine.h"
 
@@ -12,10 +13,14 @@ DISABLE_COMPILER_WARNINGS
 #include <QMouseEvent>
 #include <QScreen>
 #include <QSettings>
+#include <QStringList>
 #include <QVBoxLayout>
 RESTORE_COMPILER_WARNINGS
 
+#include <algorithm>
+#include <array>
 #include <functional>
+#include <vector>
 
 namespace {
 
@@ -24,11 +29,30 @@ const QString SORT_BY_KEY         = "/sortBy";
 const QString SORT_DESCENDING_KEY = "/sortDescending";
 const QString FAVORITES_FIRST_KEY = "/favoritesFirst";
 
+constexpr std::array<int, 3> ALL_FIELDS{ SortBy::Name, SortBy::Date, SortBy::Type };
+
+bool offersField(SortControl::Options options, int sortBy)
+{
+	return std::ranges::find(ALL_FIELDS, sortBy) != ALL_FIELDS.end() && options.testFlag(SortControl::Option(1 << sortBy));
+}
+
+QString fieldLabel(int sortBy)
+{
+	switch (sortBy)
+	{
+	case SortBy::Name: return QObject::tr("Name");
+	case SortBy::Date: return QObject::tr("Date");
+	case SortBy::Type: return QObject::tr("Type");
+	}
+	assert_unconditional_r("Unknown sort field");
+	return {};
+}
+
 class SortPopover final : public QWidget
 {
 public:
 	// NoDropShadowWindowHint: the system shadow outlines the whole window, transparent margin included.
-	SortPopover(QWidget* parent, const SortOrder& order, bool favoritesEnabled, std::function<void(const SortOrder& order)> onChanged)
+	SortPopover(QWidget* parent, const SortOrder& order, SortControl::Options options, std::function<void(const SortOrder& order)> onChanged)
 		: QWidget(parent, Qt::Popup | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint), _onChanged(std::move(onChanged))
 	{
 		setAttribute(Qt::WA_DeleteOnClose);
@@ -57,8 +81,16 @@ public:
 		col->setSpacing(6);
 
 		col->addWidget(makeSectionLabel(tr("Sort by"), t));
-		_field = new SegmentedToggle({ tr("Name"), tr("Date") }, card);
-		_field->setCurrentIndex(order.sortBy);
+		QStringList fieldLabels;
+		for (const int field : ALL_FIELDS)
+		{
+			if (!offersField(options, field))
+				continue;
+			_offeredFields.push_back(field);
+			fieldLabels.push_back(fieldLabel(field));
+		}
+		_field = new SegmentedToggle(fieldLabels, card);
+		_field->setCurrentIndex(static_cast<int>(std::ranges::find(_offeredFields, order.sortBy) - _offeredFields.begin()));
 		_field->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 		connect(_field, &SegmentedToggle::currentChanged, this, [this] { notify(); });
 		col->addWidget(_field);
@@ -71,7 +103,7 @@ public:
 		connect(_direction, &SegmentedToggle::currentChanged, this, [this] { notify(); });
 		col->addWidget(_direction);
 
-		if (!favoritesEnabled)
+		if (!options.testFlag(SortControl::FavoritesOption))
 			return;
 
 		auto* divider = new QFrame(card);
@@ -137,24 +169,25 @@ private:
 	void notify()
 	{
 		if (_onChanged)
-			_onChanged({ _field->currentIndex(), _direction->currentIndex() == 1, _favorites && _favorites->isChecked() });
+			_onChanged({ _offeredFields[static_cast<size_t>(_field->currentIndex())], _direction->currentIndex() == 1, _favorites && _favorites->isChecked() });
 	}
 
 	std::function<void(const SortOrder&)> _onChanged;
+	std::vector<int> _offeredFields; // in segment order
 	QWidget*         _anchor    = nullptr;
 	QFrame*          _card      = nullptr;
 	SegmentedToggle* _field     = nullptr;
 	SegmentedToggle* _direction = nullptr;
-	QCheckBox*       _favorites = nullptr; // null without favoritesEnabled
+	QCheckBox*       _favorites = nullptr; // null without FavoritesOption
 };
 
 } // namespace
 
-SortControl::SortControl(const QString& settingsGroup, const SortOrder& defaultOrder, bool favoritesEnabled, QWidget* parent)
+SortControl::SortControl(const QString& settingsGroup, const SortOrder& defaultOrder, Options options, QWidget* parent)
 	: QPushButton(parent)
 	, _settingsGroup{ settingsGroup }
-	, _favoritesEnabled{ favoritesEnabled }
-	, _order{ savedOrder(settingsGroup, defaultOrder, favoritesEnabled) }
+	, _options{ options }
+	, _order{ savedOrder(settingsGroup, defaultOrder, options) }
 {
 	setToolTip(tr("Sort order"));
 	setIcon(tintedSvgIcon(QStringLiteral(":/UI/icon_sort.svg"), [] { return Theme::current().instructionText; }));
@@ -163,30 +196,32 @@ SortControl::SortControl(const QString& settingsGroup, const SortOrder& defaultO
 	connect(this, &QPushButton::clicked, this, &SortControl::openPopover);
 }
 
-SortOrder SortControl::savedOrder(const QString& settingsGroup, const SortOrder& defaultOrder, bool favoritesEnabled)
+SortOrder SortControl::savedOrder(const QString& settingsGroup, const SortOrder& defaultOrder, Options options)
 {
+	assert_r(offersField(options, defaultOrder.sortBy));
 	const QSettings s;
+	const int savedSortBy = s.value(settingsGroup + SORT_BY_KEY, defaultOrder.sortBy).toInt();
 	return {
-		.sortBy         = s.value(settingsGroup + SORT_BY_KEY, defaultOrder.sortBy).toInt(),
+		.sortBy         = offersField(options, savedSortBy) ? savedSortBy : defaultOrder.sortBy,
 		.descending     = s.value(settingsGroup + SORT_DESCENDING_KEY, defaultOrder.descending).toBool(),
-		.favoritesFirst = favoritesEnabled && s.value(settingsGroup + FAVORITES_FIRST_KEY, defaultOrder.favoritesFirst).toBool(),
+		.favoritesFirst = options.testFlag(FavoritesOption) && s.value(settingsGroup + FAVORITES_FIRST_KEY, defaultOrder.favoritesFirst).toBool(),
 	};
 }
 
 void SortControl::updateFace()
 {
-	setText(QStringLiteral("%1  %2").arg(_order.sortBy == SortBy::Date ? tr("Date") : tr("Name"), _order.descending ? "↓" : "↑"));
+	setText(QStringLiteral("%1  %2").arg(fieldLabel(_order.sortBy), _order.descending ? "↓" : "↑"));
 }
 
 void SortControl::openPopover()
 {
-	auto* pop = new SortPopover(this, _order, _favoritesEnabled,
+	auto* pop = new SortPopover(this, _order, _options,
 		[this](const SortOrder& order) {
 			_order = order;
 			QSettings s;
 			s.setValue(_settingsGroup + SORT_BY_KEY, _order.sortBy);
 			s.setValue(_settingsGroup + SORT_DESCENDING_KEY, _order.descending);
-			if (_favoritesEnabled)
+			if (_options.testFlag(FavoritesOption))
 				s.setValue(_settingsGroup + FAVORITES_FIRST_KEY, _order.favoritesFirst);
 			updateFace();
 			emit changed();

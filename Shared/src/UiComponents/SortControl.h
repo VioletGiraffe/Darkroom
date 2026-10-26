@@ -3,12 +3,13 @@
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
+#include <QFlags>
 #include <QPushButton>
 #include <QString>
 RESTORE_COMPILER_WARNINGS
 
 // Persisted values also define the field-toggle segment order.
-namespace SortBy { enum { Name, Date }; }
+namespace SortBy { enum { Name, Date, Type }; }
 
 struct SortOrder
 {
@@ -22,12 +23,21 @@ class SortControl final : public QPushButton
 {
 	Q_OBJECT
 public:
-	// The order persists under settingsGroup; defaultOrder applies until it does.
-	// Without favoritesEnabled the popover has no favorites option, and favoritesFirst stays false.
-	SortControl(const QString& settingsGroup, const SortOrder& defaultOrder, bool favoritesEnabled, QWidget* parent = nullptr);
+	// What the popover offers. A field's bit is 1 << its SortBy value.
+	enum Option {
+		NameField       = 1 << SortBy::Name,
+		DateField       = 1 << SortBy::Date,
+		TypeField       = 1 << SortBy::Type,
+		FavoritesOption = 1 << 8,
+	};
+	Q_DECLARE_FLAGS(Options, Option)
+
+	// The order persists under settingsGroup; defaultOrder applies until it does, and options must offer its field.
+	// Without FavoritesOption, favoritesFirst stays false.
+	SortControl(const QString& settingsGroup, const SortOrder& defaultOrder, Options options, QWidget* parent = nullptr);
 
 	// The order a SortControl constructed with these arguments starts with.
-	[[nodiscard]] static SortOrder savedOrder(const QString& settingsGroup, const SortOrder& defaultOrder, bool favoritesEnabled);
+	[[nodiscard]] static SortOrder savedOrder(const QString& settingsGroup, const SortOrder& defaultOrder, Options options);
 
 	// Keeps its address for the control's lifetime.
 	[[nodiscard]] const SortOrder& order() const { return _order; }
@@ -40,6 +50,8 @@ private:
 	void updateFace();
 
 	const QString _settingsGroup;
-	const bool _favoritesEnabled;
+	const Options _options;
 	SortOrder _order;
 };
+
+Q_DECLARE_OPERATORS_FOR_FLAGS(SortControl::Options)

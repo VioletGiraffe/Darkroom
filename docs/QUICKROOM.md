@@ -21,8 +21,8 @@ the coding conventions.
   line. Self-deleting, created through `showForFolder`, which resolves the folder to open and can select one entry in
   it. The name filter stays set across navigation.
 - `FolderListing` - the folder's entries, listed through thin_io: folders and supported media files, without hidden
-  entries. Also the browser's order: by name or modification time, folders first when ascending and last when
-  descending. The viewer and player opened from the command line browse in that order too.
+  entries. Also the browser's order: by name, modification time or extension, folders first when ascending and last
+  when descending. The viewer and player opened from the command line browse in that order too.
 - `SettingsDialog` - Quickroom's own: ffmpeg path, theming, the video player's frame extraction format.
 - `FileOperations` - file operations with Quickroom's confirmation policy, shared by the browser and the
   standalone viewer: deletion, the file clipboard, and copy/move through the `file-operations` engine.

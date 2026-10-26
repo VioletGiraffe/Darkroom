@@ -40,7 +40,7 @@ QStringList filesInFolder(const QString& folder, EntryKind kind)
 	std::vector<FolderEntry> entries = listFolder(folder).value_or(std::vector<FolderEntry>{});
 	std::erase_if(entries, [kind](const FolderEntry& entry) { return entry.kind != kind; });
 
-	const SortOrder order = SortControl::savedOrder(BROWSER_SORT_SETTINGS_GROUP, {}, /* favoritesEnabled */ false);
+	const SortOrder order = SortControl::savedOrder(BROWSER_SORT_SETTINGS_GROUP, {}, BROWSER_SORT_OPTIONS);
 	std::ranges::sort(entries, [&order](const FolderEntry& a, const FolderEntry& b) { return precedesInOrder(a, b, order); });
 
 	QStringList paths;

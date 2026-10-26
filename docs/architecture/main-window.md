@@ -49,7 +49,8 @@ The browser uses the narrowest update that represents a change:
 3. Sorting reorders existing rows together with their attached cards.
 4. Name filtering only hides or reveals rows.
 
-`SortControl` owns and persists the sort field, direction, and favorites-first choice; the browser performs the sort.
+`SortControl` owns and persists the sort field, direction, and favorites-first choice, offering only the fields and
+options its host enables; the browser performs the sort.
 
 The All/Videos/Photos filter is combined with label and name filtering. Photo and video activation differs, but every
 catalog item admitted by the structural filters receives a row even when its source or preview is unavailable. This

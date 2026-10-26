@@ -273,7 +273,7 @@ void MediaBrowserWidget::setupUi()
 	});
 	headerLayout->addWidget(_previewFrameCountCombo, 0, Qt::AlignVCenter);
 
-	_sortControl = new SortControl(QStringLiteral("mainWindow"), SortOrder{ .sortBy = SortBy::Date, .descending = true }, /* favoritesEnabled */ true);
+	_sortControl = new SortControl(QStringLiteral("mainWindow"), SortOrder{ .sortBy = SortBy::Date, .descending = true }, SortControl::NameField | SortControl::DateField | SortControl::FavoritesOption);
 	connect(_sortControl, &SortControl::changed, this, &MediaBrowserWidget::resortMediaGrid);
 	headerLayout->addWidget(_sortControl, 0, Qt::AlignVCenter);
 

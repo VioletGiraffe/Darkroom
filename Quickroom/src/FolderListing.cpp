@@ -5,6 +5,7 @@
 
 DISABLE_COMPILER_WARNINGS
 #include <QDir>
+#include <QStringView>
 #include <QTimeZone>
 RESTORE_COMPILER_WARNINGS
 
@@ -17,6 +18,13 @@ QDateTime toDateTime(const thin_io::timestamp& time)
 	return QDateTime::fromMSecsSinceEpoch(time.seconds * 1000 + time.nanoseconds / 1'000'000, QTimeZone::UTC);
 }
 
+// Empty without a dot.
+QStringView extension(const QString& name)
+{
+	const qsizetype dot = name.lastIndexOf(u'.');
+	return dot < 0 ? QStringView{} : QStringView{ name }.sliced(dot + 1);
+}
+
 bool precedesAscending(const FolderEntry& a, const FolderEntry& b, int sortBy)
 {
 	const bool aIsFolder = a.kind == EntryKind::Folder;
@@ -24,6 +32,11 @@ bool precedesAscending(const FolderEntry& a, const FolderEntry& b, int sortBy)
 		return aIsFolder;
 	if (sortBy == SortBy::Date && a.lastModified != b.lastModified)
 		return a.lastModified < b.lastModified;
+	if (sortBy == SortBy::Type && !aIsFolder)
+	{
+		if (const int byExtension = NaturalSort::compare(extension(a.name), extension(b.name), /* caseSensitive */ false); byExtension != 0)
+			return byExtension < 0;
+	}
 	return NaturalSort::lessCaseInsensitive(a.name, b.name);
 }
 
