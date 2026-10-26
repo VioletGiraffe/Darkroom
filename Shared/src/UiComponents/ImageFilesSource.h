@@ -11,7 +11,7 @@ RESTORE_COMPILER_WARNINGS
 #include <optional>
 
 // Image files decoded and tiled side by side, each best-fit to its slot of the box. No paths: nothing to show.
-// The result's file type is the format of the first file the reader recognises, decodable or not.
+// The result's file type is the format of the first file recognised, decodable or not.
 class ImageFilesSource final {
 public:
 	explicit ImageFilesSource(QStringList paths);

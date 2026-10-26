@@ -65,6 +65,8 @@ The directories:
 
 - `Core/` - library, catalog, persistence, identity, and the two thread pools (`IoThreadPool` routes disk reads by
   storage speed, `CpuThreadPool` is the process-wide compute pool). UI-free.
+- `ImageDecoding/` - image loading, routed by content: JPEG through libjpeg-turbo, every other format through Qt's image
+  plugins. Reading and decoding are separate calls, for the I/O and CPU pools. UI-free.
 - `UiComponents/` - widgets reused by more than one window.
 - `Windows/` - top-level windows and dialogs, the workflows that prompt the user or pump events (import execution,
   rename, delete, label management, frame extraction, source relocation), and collaborators that serve one window
@@ -119,6 +121,8 @@ by hand and must be extended with them:
   external, network, or unknown storage shares a serial worker to avoid seek thrashing. CPU work follows on the
   process-wide `cpuThreadPool()`. Long-running non-read work owns an appropriate separate worker instead of
   blocking the I/O route.
+- **Every image decode goes through `ImageDecoding`**, never `QImageReader` or `QImage::load` directly. qtutils'
+  viewer widget reaches it through its decoder hook and keeps Qt's formats, animations included, on its own reader.
 - **Language and framework conventions live in [guidelines.md](guidelines.md).**
 
 ## Subsystems

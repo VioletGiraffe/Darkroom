@@ -1,6 +1,7 @@
 #include "Windows/PhotoCompareWindow.h"
 #include "Core/CpuThreadPool.h"
 #include "Core/IoThreadPool.h"
+#include "ImageDecoding/ImageDecoding.h"
 #include "MagicAlignment.h"
 #include "Theme/Theme.h"
 #include "UiComponents/MarkerSlider.h"
@@ -17,19 +18,16 @@
 DISABLE_COMPILER_WARNINGS
 #include "resize/qimage_resize.h"
 
-#include <QBuffer>
 #include <QCheckBox>
 #include <QContextMenuEvent>
 #include <QDebug>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QElapsedTimer>
-#include <QFile>
 #include <QFileInfo>
 #include <QFontMetrics>
 #include <QGridLayout>
 #include <QHBoxLayout>
-#include <QImageReader>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineF>
@@ -552,22 +550,15 @@ void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
 		{
 			if (batch->abort)
 				return;
-			QFile file(batch->paths[i]);
-			QByteArray fileBytes;
-			if (file.open(QIODevice::ReadOnly))
-				fileBytes = file.readAll();
-			else
-				qWarning() << "PhotoCompareWindow: failed to read" << batch->paths[i] << "-" << file.errorString();
-			_workerPool.enqueue([this, batch, i, fileBytes = std::move(fileBytes)]() mutable {
+			ImageDecoding::EncodedImage encoded = ImageDecoding::readEncodedImage(batch->paths[i], ImageDecoding::Intent::Full);
+			_workerPool.enqueue([this, batch, i, encoded = std::move(encoded)] {
 				if (!batch->abort)
 				{
-					QBuffer buffer(&fileBytes);
-					QImageReader reader(&buffer);  // A format hint would suppress content detection.
-					reader.setAutoTransform(true);
-					QImage& image = batch->images[static_cast<size_t>(i)];
-					image = reader.read();
-					if (image.isNull())
-						qWarning() << "PhotoCompareWindow: failed to decode" << batch->paths[i] << "-" << reader.errorString();
+					ImageDecoding::DecodedImage decoded = ImageDecoding::decode(encoded);
+					if (decoded.image.isNull())
+						qWarning() << "PhotoCompareWindow: failed to load" << batch->paths[i] << "-" << decoded.error;
+					ImageDecoding::applyOrientation(decoded.image, decoded.orientation);
+					batch->images[static_cast<size_t>(i)] = std::move(decoded.image);
 				}
 				if (++batch->completedCount == static_cast<int>(batch->paths.size()))
 					QMetaObject::invokeMethod(this, [this, batch] { applyLoadedPhotoBatch(*batch); }, Qt::QueuedConnection);

@@ -1,5 +1,6 @@
 #include "Windows/ImageViewerWindow.h"
 #include "Core/CpuThreadPool.h"
+#include "ImageDecoding/ImageDecoding.h"
 #include "Shortcuts.h"
 #include "Utils.h"
 #include "assert/advanced_assert.h"
@@ -39,6 +40,7 @@ RESTORE_COMPILER_WARNINGS
 #include <array>
 #include <cstdlib>
 #include <functional>
+#include <optional>
 #include <utility>
 
 constexpr QSize MinViewSize{ 120, 100 };
@@ -69,6 +71,18 @@ constexpr std::array SaveAsTypes{
 	const auto type = std::ranges::find_if(SaveAsTypes, [&](const SaveAsType& listed) { return mimeType == QLatin1String(listed.mimeType); });
 	assert_and_return_r(type != SaveAsTypes.end(), false);
 	return type->lossy;
+}
+
+// Formats Qt decodes stay with the viewer widget's own reader, which also plays animations.
+[[nodiscard]] static std::optional<CImageViewerWidget::DecodedFile> decodeWithoutQt(const QString& path)
+{
+	QFile file{ path };
+	if (!file.open(QIODevice::ReadOnly) || ImageDecoding::decoderFor(file.peek(ImageDecoding::SignatureSize)) == ImageDecoding::Decoder::Qt)
+		return std::nullopt;
+
+	ImageDecoding::DecodedImage decoded = ImageDecoding::decode(ImageDecoding::readEncodedImage(file, ImageDecoding::Intent::Full));
+	ImageDecoding::applyOrientation(decoded.image, decoded.orientation);
+	return CImageViewerWidget::DecodedFile{ std::move(decoded.image), QString::fromLatin1(decoded.format) };
 }
 
 ImageViewerWindow* ImageViewerWindow::showForImages(QStringList imagePaths, int startIndex, QWidget* parent,
@@ -171,6 +185,7 @@ ImageViewerWindow::ImageViewerWindow(QStringList imagePaths, int startIndex, QWi
 		if (!ImageProcessing::resize(dest, source, srcRect, cpuParallelFor, kernel))
 			CImageViewerWidget::scaleWithQt(dest, source, srcRect, mode);
 	});
+	_view->setImageDecoder(decodeWithoutQt);
 
 	// The image as the window icon tells several open viewers apart in the taskbar. Restarted per image, so
 	// browsing with the arrow keys scales one icon at the end instead of one per image passed through.

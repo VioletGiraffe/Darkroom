@@ -1,6 +1,7 @@
 #include "Windows/OscillatingPlayback.h"
 
 #include "Windows/VideoPlayerWindow.h"
+#include "ImageDecoding/ImageDecoding.h"
 #include "Utils.h"
 
 #include "assert/advanced_assert.h"
@@ -292,7 +293,7 @@ void OscillatingPlayback::presentCurrentPhase()
 
 bool OscillatingPlayback::presentFrame(int frameIndex, QString* error)
 {
-	QImage image = QImage::fromData(_compressedFrames[frameIndex], "JPG");
+	QImage image = ImageDecoding::decode(_compressedFrames[frameIndex]).image;
 	if (image.isNull())
 	{
 		*error = _window.tr("A cached oscillation frame could not be decoded.");

@@ -1,6 +1,7 @@
 #include "UiComponents/ImageFilesSource.h"
 #include "Core/CpuThreadPool.h"
 #include "Core/IoThreadPool.h"
+#include "ImageDecoding/ImageDecoding.h"
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
 #include "timing/profiler.h"
@@ -8,13 +9,9 @@
 DISABLE_COMPILER_WARNINGS
 #include "resize/qimage_resize.h"
 
-#include <QBuffer>
 #include <QByteArray>
-#include <QFile>
 #include <QImageIOHandler>
-#include <QImageReader>
 #include <QPainter>
-#include <QTransform>
 #include <QtMath>
 RESTORE_COMPILER_WARNINGS
 
@@ -25,7 +22,6 @@ DISABLE_COMPILER_WARNINGS
 RESTORE_COMPILER_WARNINGS
 #endif
 
-#include <algorithm>
 #include <memory>
 #include <mutex>
 #include <utility>
@@ -90,16 +86,14 @@ namespace {
 		LoadJob(QObject* context, std::function<void(ImageSource::Result)> done, QStringList paths, QSize canvasLogical, qreal dpr)
 			: _delivery{ context, std::move(done) }
 			, _paths{ std::move(paths) }
-			, _bytesPerPath(_paths.size())
-			, _readErrorPerPath(_paths.size())
+			, _encodedPerPath(_paths.size())
 			, _canvasLogical{ canvasLogical }
 			, _dpr{ dpr }
 		{}
 
 		ImageSource::Delivery _delivery;
 		const QStringList _paths;
-		std::vector<QByteArray> _bytesPerPath;
-		std::vector<QString> _readErrorPerPath;
+		std::vector<ImageDecoding::EncodedImage> _encodedPerPath;
 		const QSize _canvasLogical;
 		const qreal _dpr;
 #ifdef PROFILING_ENABLED
@@ -107,7 +101,7 @@ namespace {
 #endif
 	};
 
-	void decodeStage(const std::shared_ptr<LoadJob>& jobPtr, std::vector<QByteArray>& bytesPerPath, const QString& readError)
+	void decodeStage(const std::shared_ptr<LoadJob>& jobPtr, const std::vector<ImageDecoding::EncodedImage>& encodedPerPath)
 	{
 #ifdef PROFILING_ENABLED
 		// Declared before the sample: the batch must not end before the sample is counted.
@@ -115,12 +109,12 @@ namespace {
 #endif
 		PROFILE_SAMPLE("Thumbnail decode");
 		LoadJob& job = *jobPtr;
-		if (job._delivery.isCancelled() || bytesPerPath.empty() || job._canvasLogical.isEmpty() || job._dpr <= 0.0)
+		if (job._delivery.isCancelled() || encodedPerPath.empty() || job._canvasLogical.isEmpty() || job._dpr <= 0.0)
 			return;
 
 		// Laid out in device pixels, so every image lands 1:1 on whole canvas pixels.
 		// Floored: the delivered logical size must not exceed the box.
-		const int n = static_cast<int>(bytesPerPath.size());
+		const int n = static_cast<int>(encodedPerPath.size());
 		const int gapPx = qRound(FOLDER_PREVIEW_GAP * job._dpr);
 		const int slotWidth = (qFloor(job._canvasLogical.width() * job._dpr) - (n - 1) * gapPx) / n;
 		const int slotHeight = qFloor(job._canvasLogical.height() * job._dpr);
@@ -133,30 +127,27 @@ namespace {
 			QByteArray format;
 		};
 
-		// Decoded at full resolution: all scaling goes through ImageProcessing::resize, not the reader's own (JPEG DCT reduction, QImage::scaled).
-		std::vector<DecodedFrame> frames(bytesPerPath.size());
+		// Decoded at full resolution: all scaling goes through ImageProcessing::resize, not the decoder's own (JPEG DCT reduction, QImage::scaled).
+		std::vector<DecodedFrame> frames(encodedPerPath.size());
 		cpuParallelFor(frames.size(), [&](size_t i) {
 			if (job._delivery.isCancelled())
 				return;
 
 			DecodedFrame& frame = frames[i];
-			QBuffer buffer(&bytesPerPath[i]);
-			buffer.open(QIODevice::ReadOnly);
-			QImageReader reader(&buffer); // A format hint would suppress content detection.
-			frame.format = reader.format();
-
-			const QImage src = [&] {
+			ImageDecoding::DecodedImage decoded = [&] {
 				PROFILE_SAMPLE("Thumbnail image decode");
-				return reader.read();
+				return ImageDecoding::decode(encodedPerPath[i]);
 			}();
-			if (src.isNull())
+			frame.format = std::move(decoded.format);
+			if (decoded.image.isNull())
 			{
-				frame.error = reader.errorString();
+				frame.error = std::move(decoded.error);
 				return;
 			}
 
 			// src is as stored: the orientation is applied after the resize, at thumbnail size
-			const QImageIOHandler::Transformations orientation = reader.transformation();
+			const QImage& src = decoded.image;
+			const QImageIOHandler::Transformations orientation = decoded.orientation;
 			const bool rotates90 = orientation.testFlag(QImageIOHandler::TransformationRotate90);
 
 			// At least 1 px: an extreme aspect ratio fits the slot at zero width or height
@@ -169,15 +160,7 @@ namespace {
 					frame.fitted = src.scaled(sizePx, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
 			}
 
-			// The transformation flags compose as flips first, then the 90-degree turn
-			Qt::Orientations flips;
-			if (orientation.testFlag(QImageIOHandler::TransformationMirror))
-				flips |= Qt::Horizontal;
-			if (orientation.testFlag(QImageIOHandler::TransformationFlip))
-				flips |= Qt::Vertical;
-			frame.fitted.flip(flips);
-			if (rotates90)
-				frame.fitted = frame.fitted.transformed(QTransform{}.rotate(90));
+			ImageDecoding::applyOrientation(frame.fitted, orientation);
 		});
 
 		// A frame skipped on cancellation has neither an image nor an error
@@ -186,7 +169,7 @@ namespace {
 
 		std::vector<QImage> fitted;
 		fitted.reserve(n);
-		QString firstError = readError;
+		QString firstError;
 		QByteArray firstFormat;
 		for (DecodedFrame& frame : frames)
 		{
@@ -249,11 +232,7 @@ namespace {
 			return;
 
 		PROFILE_SAMPLE("Thumbnail read");
-		QFile file(job._paths[static_cast<qsizetype>(index)]);
-		if (file.open(QIODevice::ReadOnly))
-			job._bytesPerPath[index] = file.readAll();
-		else
-			job._readErrorPerPath[index] = file.errorString();
+		job._encodedPerPath[index] = ImageDecoding::readEncodedImage(job._paths[static_cast<qsizetype>(index)], ImageDecoding::Intent::Thumbnail);
 	}
 
 	// Only called once every read has returned: their samples are counted before the decode can end the batch.
@@ -263,11 +242,9 @@ namespace {
 		if (job._delivery.isCancelled())
 			return;
 
-		const auto firstReadError = std::ranges::find_if(job._readErrorPerPath, [](const QString& error) { return !error.isEmpty(); });
-		QString readError = firstReadError != job._readErrorPerPath.end() ? *firstReadError : QString{};
 		// Moved out of the job: the Request keeps the job alive past delivery
-		cpuThreadPool().enqueue([jobPtr, bytes = std::move(job._bytesPerPath), readError = std::move(readError)]() mutable {
-			decodeStage(jobPtr, bytes, readError);
+		cpuThreadPool().enqueue([jobPtr, encoded = std::move(job._encodedPerPath)] {
+			decodeStage(jobPtr, encoded);
 		});
 	}
 

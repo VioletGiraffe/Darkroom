@@ -47,6 +47,7 @@ done
 
 echo "${MYSELF}: creating ${DMG}"
 
+cp LICENSE NOTICE "${STAGE}/"
 ln -s /Applications "${STAGE}/"
 
 # -srcfolder populates via a private nobrowse mount - no volume appears under /Volumes for Spotlight to grab and pin.

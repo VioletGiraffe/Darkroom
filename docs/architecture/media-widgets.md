@@ -84,7 +84,7 @@ background-only.
    faster with warm metadata: [image-read-performance.md](../image-read-performance.md).
 2. CPU decoding runs on `cpuThreadPool()`, a card's frames in parallel.
 
-`QImageReader` decodes at full resolution; `ImageProcessing::resize` then scales to the target size, its slices also on
+`ImageDecoding` decodes at full resolution; `ImageProcessing::resize` then scales to the target size, its slices also on
 `cpuThreadPool()`. Orientation metadata is applied after the resize, at thumbnail size.
 
 With `PROFILING_ENABLED` defined, each batch of overlapping loads logs its wall time and the read and decode totals:
