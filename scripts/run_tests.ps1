@@ -12,7 +12,7 @@ param(
 	[switch]$BuildOnly,
 	[switch]$NoBuild,
 
-	# Overrides the toolset qmake writes into the projects, e.g. v143 to build with an older one than the newest installed
+	# Overrides the toolset qmake writes into the projects; not older than the vcpkg triplet's (vcpkg-triplets/)
 	[string]$PlatformToolset,
 
 	# Arguments for DarkroomTests, e.g. a Catch2 test spec
@@ -24,6 +24,7 @@ param(
 
 if (-not $NoBuild)
 {
+	Install-VcpkgDependencies
 	Invoke-Qmake 'Tests.pro'
 	Invoke-MSBuild 'Tests.sln' @('DarkroomTests') $Configuration $PlatformToolset
 }

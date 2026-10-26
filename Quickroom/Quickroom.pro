@@ -69,6 +69,7 @@ LIBS += -L$${DESTDIR} -lshared -lqtutils -lmagic-alignment -lcpputils -limage-pr
 # Unix only: MSBuild tracks link inputs itself
 mac*|linux*|freebsd: PRE_TARGETDEPS += $${DESTDIR}/libshared.a $${DESTDIR}/libqtutils.a $${DESTDIR}/libmagic-alignment.a \
 	$${DESTDIR}/libcpputils.a $${DESTDIR}/libimage-processing.a
+include(../vcpkg.pri)
 # The copy/move engine, its dialogs and folder listing, with their dependencies
 include(../file-operations/libraries/fileoperationsui.pri)
 include(../cpputils/dependencies.pri)

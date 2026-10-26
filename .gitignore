@@ -13,6 +13,7 @@
 # Build results
 /bin/
 /build/
+/vcpkg_installed/
 .qtc_clangd/
 
 # qmake-generated

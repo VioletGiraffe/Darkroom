@@ -30,6 +30,7 @@ fi
 
 . "$(cd "$(dirname "$0")" && pwd)/environment.sh"
 
+install_vcpkg_dependencies
 run_qmake Darkroom.pro "${CONFIG}"
 if [ -n "${REBUILD}" ]; then
 	make clean || exit 1

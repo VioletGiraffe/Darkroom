@@ -16,7 +16,7 @@ param(
 	[ValidateSet('release', 'debug')]
 	[string]$Configuration = 'release',
 
-	# Overrides the toolset qmake writes into the projects, e.g. v143 to build with an older one than the newest installed
+	# Overrides the toolset qmake writes into the projects; not older than the vcpkg triplet's (vcpkg-triplets/)
 	[string]$PlatformToolset
 )
 
@@ -33,6 +33,7 @@ $msbuildTargets = if ($Rebuild) { @('Rebuild') } else
 	}
 }
 
+Install-VcpkgDependencies
 Invoke-Qmake 'Darkroom.pro'
 Invoke-MSBuild 'Darkroom.sln' $msbuildTargets $Configuration $PlatformToolset
 exit 0

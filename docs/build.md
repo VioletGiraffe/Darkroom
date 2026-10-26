@@ -29,6 +29,22 @@ CI and local builds run the same scripts in `scripts/`; the `.bat` files start t
 - On Windows the scripts set up the MSVC environment through vswhere when `cl` is not on `PATH`.
 - Exit codes: 1 for a build or test failure, 2 for an incomplete environment.
 
+## vcpkg libraries
+
+`vcpkg.json` lists the third-party libraries, LibRaw and libjpeg-turbo, at exact versions in its `overrides`; its
+`builtin-baseline` pins their dependencies. Every platform links them statically.
+
+- The scripts run `vcpkg install` into `vcpkg_installed/` before qmake. vcpkg comes from `VCPKG_ROOT`, else from `PATH`.
+  A build started from an IDE needs that install done first.
+- `vcpkg.pri` gives `Shared` the include path and the apps the libraries, debug or release by configuration. It selects
+  the same triplet as the scripts.
+- `vcpkg-triplets/` overrides the built-in triplets:
+  - Windows builds with the v145 toolset; the apps must not use an older one.
+  - macOS targets 13.3, as `global.pri` does.
+  - x64 Linux and macOS fail rather than build libjpeg-turbo without SIMD, which needs `nasm` installed.
+- Updating a library changes its override; a version newer than the baseline's also needs the baseline moved to a vcpkg
+  commit that has it, which the local vcpkg checkout must contain.
+
 ## Shared library and tests
 
 - `Shared/` builds a static library both apps and the tests link.
@@ -80,13 +96,14 @@ method's validation: [image-read-performance.md](image-read-performance.md).
 `.github/workflows/CI.yml` runs on every push (except to `gh-pages`) and pull request, on Windows (MSVC), Ubuntu
 (GCC 14), and macOS (clang), each against Qt 6.11. Per OS, in order:
 
-1. Build and run the tests: `run_tests`.
-2. Build both apps, even when the tests failed: `build`. Windows pins the v143 toolset. The libraries the tests step
+1. Set up vcpkg at `vcpkg.json`'s baseline. Its built packages are cached across runs.
+2. Build and run the tests: `run_tests`.
+3. Build both apps, even when the tests failed: `build`. Windows pins the v145 toolset. The libraries the tests step
    built are reused: both roots build into the same directories.
-3. Package whenever the apps built, so packaging is checked even when the tests failed: `windeployqt` into
+4. Package whenever the apps built, so packaging is checked even when the tests failed: `windeployqt` into
    `dist/` and Inno Setup on Windows; `scripts/create_dmg.sh` on macOS. The packages are uploaded as workflow
    artifacts only when every step passed. Linux only builds.
-4. Record metrics: LOC per project and executable sizes (per PE section on Windows) go to the `gh-pages` branch under
+5. Record metrics: LOC per project and executable sizes (per PE section on Windows) go to the `gh-pages` branch under
    `dev/metrics` through github-action-benchmark, which regenerates the chart there.
 
 `cleanup.yml` is a manual run that deletes old workflow runs.

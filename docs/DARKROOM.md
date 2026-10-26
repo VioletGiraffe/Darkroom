@@ -30,6 +30,7 @@ contains implementation detail. Keep both in sync.
 | `installer.iss` | Windows installer script (Inno Setup) |
 | `.github/workflows/` | CI |
 | `Darkroom.pro`, `Tests.pro`, `global.pri` | the two qmake roots and their shared compiler settings |
+| `vcpkg.json`, `vcpkg-configuration.json`, `vcpkg-triplets/`, `vcpkg.pri` | the third-party libraries and how the projects link them (see [build.md](build.md#vcpkg-libraries)) |
 | `update_repository.sh` / `.bat` | fast-forwards the default branch and moves every submodule to its own default branch |
 | `gh-pages/` | when present, a git worktree of the CI metrics branch; excluded through `.git/info/exclude` |
 

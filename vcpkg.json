@@ -1,0 +1,11 @@
+{
+  "dependencies": [
+    "libjpeg-turbo",
+    "libraw"
+  ],
+  "overrides": [
+    { "name": "libjpeg-turbo", "version": "3.2.0", "port-version": 1 },
+    { "name": "libraw", "version": "0.22.2", "port-version": 1 }
+  ],
+  "builtin-baseline": "817892b0ecbc6af994dd6df999c73faf795adbf2"
+}

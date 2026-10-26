@@ -41,6 +41,8 @@ INCLUDEPATH += \
 	../image-processing \
 	../magic-alignment/src
 
+include(../vcpkg.pri)
+
 ###################################################
 #                 SOURCES
 ###################################################

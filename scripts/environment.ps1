@@ -1,9 +1,11 @@
 # Dot-sourced by build.ps1 and run_tests.ps1. Puts the Qt kit and the MSVC environment in place and sets:
 #   $repositoryRoot - the Darkroom checkout
 #   $qmake          - the kit's qmake.exe
+#   $vcpkg          - vcpkg.exe
 # Exits with code 2 when the environment is incomplete.
 #
 # The Qt kit comes from QT_ROOT_DIR, or from a git-ignored local-env.ps1 beside this script that sets it.
+# vcpkg comes from VCPKG_ROOT, else from PATH.
 # MSBuild and qmake need the MSVC environment: qmake probes cl for the compiler version and writes the matching toolset
 # into the projects it generates.
 
@@ -29,6 +31,10 @@ if (-not (Test-Path $qmake)) { Fail-Environment "No qmake.exe under `"$env:QT_RO
 # The test executable needs the Qt DLLs
 $env:PATH = (Join-Path $env:QT_ROOT_DIR 'bin') + ';' + $env:PATH
 
+# Before the MSVC environment, which can set VCPKG_ROOT to Visual Studio's own vcpkg
+$vcpkg = if ($env:VCPKG_ROOT) { Join-Path $env:VCPKG_ROOT 'vcpkg.exe' } else { (Get-Command vcpkg -ErrorAction SilentlyContinue).Source }
+if (-not $vcpkg -or -not (Test-Path $vcpkg)) { Fail-Environment 'vcpkg was not found: set VCPKG_ROOT to its directory or put it on PATH.' }
+
 if (-not (Get-Command cl -ErrorAction SilentlyContinue))
 {
 	$installerDirectory = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer'
@@ -46,6 +52,13 @@ if (-not (Get-Command cl -ErrorAction SilentlyContinue))
 	cmd /c "`"$vcvars`" >nul && set" | ForEach-Object {
 		if ($_ -match '^([^=]+)=(.*)$') { Set-Item -Path "env:$($Matches[1])" -Value $Matches[2] }
 	}
+}
+
+# Installs vcpkg.json's dependencies for the triplet vcpkg.pri links against. Exits with code 1 when the install fails.
+function Install-VcpkgDependencies
+{
+	& $vcpkg install --triplet x64-windows-static-md "--x-manifest-root=$repositoryRoot"
+	if ($LASTEXITCODE -ne 0) { exit 1 }
 }
 
 # Runs qmake on a top-level project in the repository root. Exits with code 1 when qmake fails.

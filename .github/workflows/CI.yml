@@ -99,15 +99,39 @@ jobs:
     - name: Linux - install toolchain
       if: startsWith(matrix.os, 'ubuntu')
       run: |
-        sudo apt update -y; sudo apt install -qq gcc-14 g++-14 libgl1-mesa-dev
+        sudo apt update -y; sudo apt install -qq gcc-14 g++-14 libgl1-mesa-dev nasm
         sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 50
         sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 50
         g++ --version
 
+    # vcpkg's built packages, so a run rebuilds only what vcpkg.json or the triplets changed
+    - name: Cache vcpkg packages
+      uses: actions/cache@v4
+      with:
+        path: ${{ runner.temp }}/vcpkg-binary-cache
+        key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-triplets/**') }}
+        restore-keys: vcpkg-${{ runner.os }}-
+
+    # After the MSVC environment, which can point VCPKG_ROOT at Visual Studio's own vcpkg
+    - name: Set up vcpkg at the manifest's baseline
+      shell: pwsh
+      run: |
+        $vcpkgRoot = Join-Path $env:RUNNER_TEMP 'vcpkg'
+        $baseline = (Get-Content vcpkg.json -Raw | ConvertFrom-Json).'builtin-baseline'
+        git clone --quiet https://github.com/microsoft/vcpkg $vcpkgRoot
+        git -C $vcpkgRoot checkout --quiet $baseline
+        $bootstrap = if ($IsWindows) { 'bootstrap-vcpkg.bat' } else { 'bootstrap-vcpkg.sh' }
+        & (Join-Path $vcpkgRoot $bootstrap) -disableMetrics
+        if ($LASTEXITCODE -ne 0) { exit 1 }
+
+        $binaryCache = New-Item -ItemType Directory -Force (Join-Path $env:RUNNER_TEMP 'vcpkg-binary-cache')
+        "VCPKG_ROOT=$vcpkgRoot" >> $env:GITHUB_ENV
+        "VCPKG_BINARY_SOURCES=clear;files,$($binaryCache.FullName),readwrite" >> $env:GITHUB_ENV
+
     - name: Build tests (Windows)
       if: startsWith(matrix.os, 'windows')
       shell: cmd
-      run: scripts\run_tests.bat -BuildOnly -PlatformToolset v143
+      run: scripts\run_tests.bat -BuildOnly -PlatformToolset v145
 
     - name: Run tests (Windows)
       if: startsWith(matrix.os, 'windows')
@@ -126,7 +150,7 @@ jobs:
       id: build_app_windows
       if: ${{ !cancelled() && startsWith(matrix.os, 'windows') }}
       shell: cmd
-      run: scripts\build.bat -PlatformToolset v143
+      run: scripts\build.bat -PlatformToolset v145
 
     # Keyed on the app build alone: packaging is still checked when the tests failed.
     - name: Build installer (Windows)

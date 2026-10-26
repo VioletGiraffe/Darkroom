@@ -28,6 +28,7 @@ fi
 . "$(cd "$(dirname "$0")" && pwd)/environment.sh"
 
 if [ -n "${BUILD}" ]; then
+	install_vcpkg_dependencies
 	run_qmake Tests.pro "${CONFIG}"
 	make -j"${JOBS}" sub-tests || exit 1
 fi
