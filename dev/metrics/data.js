@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793030065751,
+  "lastUpdate": 1793034334375,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -18067,6 +18067,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Quickroom.exe size",
             "value": 4999,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 4249,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 446,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 65,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 45,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 13.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "bd75cbcdafc5aec87c66156a3d97f8eaaa5051d2",
+          "message": "qtutils updated: Enter in a history combo box activates again",
+          "timestamp": "2026-10-26T18:54:30+02:00",
+          "tree_id": "1a37a0bb0493d008fd70ab6dde8c6f709d74c6b2",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/bd75cbcdafc5aec87c66156a3d97f8eaaa5051d2"
+        },
+        "date": 1793034331440,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 17282,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1443,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 31561,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 4843.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 4998,
             "unit": "KB"
           },
           {
