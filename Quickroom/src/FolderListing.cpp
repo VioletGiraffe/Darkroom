@@ -1,6 +1,7 @@
 #include "FolderListing.h"
 #include "Utils.h"
 #include "directoryscan/thinioqstring.h"
+#include "qt_paths.hpp" // thin_io
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -52,7 +53,7 @@ std::optional<std::vector<FolderEntry>> listFolder(const QString& folder)
 	std::vector<FolderEntry> entries;
 	for (const thin_io::directory_entry& listed : *listing)
 	{
-		QString name = nativeNameToQString(listed.name);
+		QString name = thin_io::to_qstring(listed.name);
 		bool hidden = listed.attributes.hidden;
 #ifndef _WIN32
 		hidden = hidden || name.startsWith(u'.'); // thin_io never infers hidden from the name
