@@ -167,6 +167,7 @@ TEST_CASE("isSupportedVideoFile / isSupportedImageFile: by suffix, case-insensit
 {
 	REQUIRE(isSupportedVideoFile("C:/v/clip.MP4"));
 	REQUIRE(isSupportedImageFile("C:/p/photo.JPEG"));
+	REQUIRE(isSupportedImageFile("C:/p/raw.NEF"));
 	REQUIRE_FALSE(isSupportedImageFile("C:/v/clip.mp4"));
 	REQUIRE_FALSE(isSupportedVideoFile("C:/p/photo.jpg"));
 	REQUIRE_FALSE(isSupportedMediaFile("C:/a/archive.mp4.zip"));

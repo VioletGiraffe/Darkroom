@@ -35,7 +35,8 @@ is its row's card and fills the cell; the view paints no cell background, and th
 the `selected` property the grid keeps on every card.
 
 A file tile's caption is its name without the extension, followed by the file type's icon from `FileTypeIcons`: for
-images the format detected from the decoded data, so a misnamed file shows its real type; for videos the suffix.
+images the format detected from the decoded data, so a misnamed file shows its real type; for camera raws and videos the
+suffix.
 
 Activation: double-click or Enter. Folders navigate in place (queued: the rebuild would delete the tile whose
 handler is still running); images open `ImageViewerWindow` browsing the images shown, and videos open

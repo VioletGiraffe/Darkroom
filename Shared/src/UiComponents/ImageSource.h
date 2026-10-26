@@ -25,7 +25,7 @@ namespace ImageSource {
 struct Result {
 	QImage image;        // null with an empty error: nothing to show
 	QString error;       // non-empty: why there is no image
-	QByteArray fileType; // detected from the data for decoded images, given by the caller otherwise; empty when unknown
+	QByteArray fileType; // ImageDecoding's format for decoded images, given by the caller otherwise; empty when unknown
 };
 
 // Shared by an asynchronous render's stages, on any thread, and its Request.

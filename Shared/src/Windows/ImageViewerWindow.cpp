@@ -4,6 +4,8 @@
 #include "Shortcuts.h"
 #include "Utils.h"
 #include "assert/advanced_assert.h"
+#include "buffered_reader.hpp" // thin_io
+#include "qt_paths.hpp"        // thin_io
 #include "utils/filemanager.h"
 #include "widgets/cimageviewerwidget.h"
 
@@ -38,9 +40,11 @@ RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdlib>
 #include <functional>
 #include <optional>
+#include <span>
 #include <utility>
 
 constexpr QSize MinViewSize{ 120, 100 };
@@ -76,11 +80,15 @@ constexpr std::array SaveAsTypes{
 // Formats Qt decodes stay with the viewer widget's own reader, which also plays animations.
 [[nodiscard]] static std::optional<CImageViewerWidget::DecodedFile> decodeWithoutQt(const QString& path)
 {
-	QFile file{ path };
-	if (!file.open(QIODevice::ReadOnly) || ImageDecoding::decoderFor(file.peek(ImageDecoding::SignatureSize)) == ImageDecoding::Decoder::Qt)
+	thin_io::buffered_reader file;
+	if (!file.open(thin_io::native_path(path).data()))
 		return std::nullopt;
 
-	ImageDecoding::DecodedImage decoded = ImageDecoding::decode(ImageDecoding::readEncodedImage(file, ImageDecoding::Intent::Full));
+	const std::optional<std::span<const std::byte>> signature = file.peek(ImageDecoding::SignatureSize);
+	if (!signature || ImageDecoding::decoderFor(path, QByteArrayView{ signature->data(), static_cast<qsizetype>(signature->size()) }) == ImageDecoding::Decoder::Qt)
+		return std::nullopt;
+
+	ImageDecoding::DecodedImage decoded = ImageDecoding::decode(ImageDecoding::readEncodedImage(file, path, ImageDecoding::Intent::Full));
 	ImageDecoding::applyOrientation(decoded.image, decoded.orientation);
 	return CImageViewerWidget::DecodedFile{ std::move(decoded.image), QString::fromLatin1(decoded.format) };
 }

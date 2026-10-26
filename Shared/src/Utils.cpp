@@ -1,5 +1,6 @@
 #include "Utils.h"
 #include "Ffmpeg.h"
+#include "ImageDecoding/ImageDecoding.h"
 #include "Settings.h"
 #include "SharedSettings.h"
 
@@ -62,8 +63,9 @@ static const QStringList SUPPORTED_VIDEO_SUFFIXES {
 	"mp4", "m4v", "mov", "avi", "mkv", "flv", "webm", "wmv", "mpg", "mpeg", "m2ts", "mts", "ts"
 };
 
-// Keep this to formats the deployed Qt image plugins decode.
-static const QStringList SUPPORTED_IMAGE_SUFFIXES { "jpg", "jpeg", "jfif", "png", "tif", "tiff", "webp", "gif", "bmp", "svg" };
+// Formats the deployed Qt image plugins decode, then the camera raws
+static const QStringList SUPPORTED_IMAGE_SUFFIXES = QStringList{ "jpg", "jpeg", "jfif", "png", "tif", "tiff", "webp", "gif", "bmp", "svg" }
+	+ ImageDecoding::rawFileSuffixes();
 
 static QString suffixesToGlobs(const QStringList& suffixes)
 {

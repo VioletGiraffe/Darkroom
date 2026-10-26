@@ -1,17 +1,52 @@
 #include "ImageDecoding/ImageDecoding.h"
+#include "ImageDecoding/LibRawDecoder.h"
 #include "ImageDecoding/TurboJpegDecoder.h"
+#include "buffered_reader.hpp" // thin_io
+#include "qt_paths.hpp"        // thin_io
 
 DISABLE_COMPILER_WARNINGS
 #include <QBuffer>
-#include <QFile>
+#include <QFileInfo>
 #include <QImageReader>
 #include <QTransform>
 RESTORE_COMPILER_WARNINGS
 
+#include <cstdint>
 #include <optional>
 #include <utility>
 
 namespace ImageDecoding {
+
+static Decoder decoderForContent(QByteArrayView encoded) noexcept
+{
+	// JPEG: SOI, then the next marker
+	if (encoded.startsWith("\xFF\xD8\xFF"))
+		return Decoder::TurboJpeg;
+	return Decoder::Qt;
+}
+
+// Lowercase; empty unless the path has a camera raw's extension
+static QString rawFileSuffix(const QString& path)
+{
+	QString suffix = QFileInfo{ path }.suffix().toLower();
+	return rawFileSuffixes().contains(suffix) ? suffix : QString{};
+}
+
+static EncodedImage readWholeFile(thin_io::buffered_reader& file)
+{
+	const std::optional<uint64_t> size = file.size();
+	if (!size)
+		return { .error = QString::fromStdString(thin_io::buffered_reader::text_for_last_error()) };
+
+	QByteArray bytes{ static_cast<qsizetype>(*size), Qt::Uninitialized };
+	file.set_pos(0);
+	const std::optional<uint64_t> bytesRead = file.read(bytes.data(), *size);
+	if (!bytesRead)
+		return { .error = QString::fromStdString(thin_io::buffered_reader::text_for_last_error()) };
+
+	bytes.truncate(static_cast<qsizetype>(*bytesRead)); // the file shrank
+	return { .bytes = std::move(bytes) };
+}
 
 static DecodedImage decodeWithQt(const QByteArray& encoded)
 {
@@ -29,37 +64,43 @@ static DecodedImage decodeWithQt(const QByteArray& encoded)
 	return decoded;
 }
 
-EncodedImage readEncodedImage(QIODevice& device, [[maybe_unused]] Intent intent)
+EncodedImage readEncodedImage(thin_io::buffered_reader& file, const QString& path, [[maybe_unused]] Intent intent)
 {
-	return { .bytes = device.readAll() };
+	const QString rawSuffix = rawFileSuffix(path);
+	if (rawSuffix.isEmpty())
+		return readWholeFile(file);
+
+	EncodedImage preview = readRawPreview(file);
+	preview.format = rawSuffix.toLatin1();
+	return preview;
 }
 
 EncodedImage readEncodedImage(const QString& path, Intent intent)
 {
-	QFile file{ path };
-	if (!file.open(QIODevice::ReadOnly))
-		return { .error = file.errorString() };
-	return readEncodedImage(file, intent);
+	thin_io::buffered_reader file;
+	if (!file.open(thin_io::native_path(path).data()))
+		return { .error = QString::fromStdString(thin_io::buffered_reader::text_for_last_error()) };
+	return readEncodedImage(file, path, intent);
 }
 
-Decoder decoderFor(QByteArrayView encoded) noexcept
+Decoder decoderFor(const QString& path, QByteArrayView signature)
 {
-	// JPEG: SOI, then the next marker
-	if (encoded.startsWith("\xFF\xD8\xFF"))
-		return Decoder::TurboJpeg;
-	return Decoder::Qt;
+	return rawFileSuffix(path).isEmpty() ? decoderForContent(signature) : Decoder::LibRaw;
 }
 
 DecodedImage decode(const EncodedImage& encoded)
 {
-	if (!encoded.error.isEmpty())
-		return { .error = encoded.error };
-	return decode(encoded.bytes);
+	DecodedImage decoded = encoded.error.isEmpty() ? decode(encoded.bytes) : DecodedImage{ .error = encoded.error };
+	if (!encoded.format.isEmpty())
+		decoded.format = encoded.format;
+	if (encoded.orientation)
+		decoded.orientation = *encoded.orientation;
+	return decoded;
 }
 
 DecodedImage decode(const QByteArray& encoded)
 {
-	if (decoderFor(encoded) == Decoder::TurboJpeg)
+	if (decoderForContent(encoded) == Decoder::TurboJpeg)
 	{
 		if (std::optional<DecodedImage> decoded = decodeJpeg(encoded))
 			return std::move(*decoded);

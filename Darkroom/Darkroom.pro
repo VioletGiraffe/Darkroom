@@ -64,10 +64,10 @@ RESOURCES += res/resources.qrc
 ###################################################
 
 # GNU ld resolves left to right: shared before the libraries it uses, magic-alignment before the cpputils thread pool
-LIBS += -L$${DESTDIR} -lshared -lqtutils -lmagic-alignment -lcpputils -limage-processing
+LIBS += -L$${DESTDIR} -lshared -lqtutils -lmagic-alignment -lcpputils -limage-processing -lthin_io
 # Unix only: MSBuild tracks link inputs itself
 mac*|linux*|freebsd: PRE_TARGETDEPS += $${DESTDIR}/libshared.a $${DESTDIR}/libqtutils.a $${DESTDIR}/libmagic-alignment.a \
-	$${DESTDIR}/libcpputils.a $${DESTDIR}/libimage-processing.a
+	$${DESTDIR}/libcpputils.a $${DESTDIR}/libimage-processing.a $${DESTDIR}/libthin_io.a
 include(../vcpkg.pri)
 include(../cpputils/dependencies.pri)
 
