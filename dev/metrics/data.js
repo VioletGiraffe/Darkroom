@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793034334375,
+  "lastUpdate": 1793046126782,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -18176,6 +18176,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .reloc",
             "value": 13.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "be623b92944c86b01cae5ee958cdabf123750edf",
+          "message": "New ImageDecoding interface; all JPEGs go through the app's own libjpeg-turbo",
+          "timestamp": "2026-10-26T22:11:22+02:00",
+          "tree_id": "2a8022daff8c9a5843924f2db4eacdbc08df6227",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/be623b92944c86b01cae5ee958cdabf123750edf"
+        },
+        "date": 1793046123106,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 17480,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1443,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 31585,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 5393.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 5547.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 4607,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 625,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 67,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 55.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 14,
             "unit": "KB"
           }
         ]
