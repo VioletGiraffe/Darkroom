@@ -36,6 +36,7 @@ INCLUDEPATH += \
 
 HEADERS += \
 	TestHelpers.h \
+	JpegTestData.h \
 	../Darkroom/src/Core/Library.h
 
 # The Darkroom sources under test are compiled in: they belong to the app, not to a library.
@@ -47,15 +48,18 @@ SOURCES += \
 	UtilsTests.cpp \
 	OscillationCurveTests.cpp \
 	MJpegParserTests.cpp \
+	ExifOrientationTests.cpp \
+	ImageDecodingTests.cpp \
 	../Darkroom/src/Core/Catalog.cpp \
 	../Darkroom/src/Core/CatalogIntegrity.cpp \
 	../Darkroom/src/Core/Library.cpp \
 	../Darkroom/src/Core/MetadataStore.cpp
 
 # GNU ld resolves left to right: shared before the libraries it uses, qtutils before cpputils
-LIBS += -L$${DESTDIR} -lshared -lqtutils -lcpputils
+LIBS += -L$${DESTDIR} -lshared -lqtutils -lcpputils -lthin_io
 # Unix only: MSBuild tracks link inputs itself
-mac*|linux*|freebsd: PRE_TARGETDEPS += $${DESTDIR}/libshared.a $${DESTDIR}/libqtutils.a $${DESTDIR}/libcpputils.a
+mac*|linux*|freebsd: PRE_TARGETDEPS += $${DESTDIR}/libshared.a $${DESTDIR}/libqtutils.a $${DESTDIR}/libcpputils.a $${DESTDIR}/libthin_io.a
+include(../vcpkg.pri)
 include(../cpputils/dependencies.pri)
 
 win*{
