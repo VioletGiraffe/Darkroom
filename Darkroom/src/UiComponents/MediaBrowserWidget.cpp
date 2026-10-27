@@ -12,6 +12,7 @@
 #include "UiComponents/PreviewFrameCountCombo.h"
 #include "UiComponents/SegmentedToggle.h"
 #include "UiComponents/SortControl.h"
+#include "UiComponents/ThumbnailWidget.h"
 #include "Utils.h"
 #include "Windows/CompareWindow.h"
 #include "Windows/ImageViewerWindow.h"
@@ -68,14 +69,13 @@ const QString MEDIA_TYPE_FILTER_KEY = QStringLiteral("mainWindow/mediaTypeFilter
 constexpr int DEFAULT_CARD_IMAGE_HEIGHT = 120;
 constexpr int MIN_CARD_IMAGE_HEIGHT = 60;
 constexpr int MAX_CARD_IMAGE_HEIGHT = 360;
-constexpr int CARD_IMAGE_HEIGHT_STEP = 20;
 
 // Bounds the auto-fit only; a manual drag can exceed it.
 constexpr int LABEL_SIDEBAR_MAX_WIDTH = 400;
 
 int cardImageHeight()
 {
-	return QSettings{}.value(CARD_IMAGE_HEIGHT_KEY, DEFAULT_CARD_IMAGE_HEIGHT).toInt();
+	return qBound(MIN_CARD_IMAGE_HEIGHT, QSettings{}.value(CARD_IMAGE_HEIGHT_KEY, DEFAULT_CARD_IMAGE_HEIGHT).toInt(), MAX_CARD_IMAGE_HEIGHT);
 }
 
 // Cached so sorting never performs filesystem I/O.
@@ -655,7 +655,7 @@ bool MediaBrowserWidget::isGridDragSource(const QObject* source) const
 void MediaBrowserWidget::zoomCards(int steps)
 {
 	const int current = cardImageHeight();
-	const int next = qBound(MIN_CARD_IMAGE_HEIGHT, current + steps * CARD_IMAGE_HEIGHT_STEP, MAX_CARD_IMAGE_HEIGHT);
+	const int next = ThumbnailWidget::zoomedSize(current, steps, MIN_CARD_IMAGE_HEIGHT, MAX_CARD_IMAGE_HEIGHT);
 	if (next == current)
 		return;
 

@@ -110,7 +110,8 @@ ImportDialog use it to produce label-id payloads rather than implementing separa
 ## Preview sizing
 
 Ctrl+wheel over a thumbnail requests a presentation-size change while ordinary wheel input remains available to the
-containing view. Each owner bounds and persists its setting, then debounces card reconstruction:
+containing view. Each step scales the size by 10% (`ThumbnailWidget::zoomedSize`). Each owner bounds and persists its
+setting, then debounces card reconstruction:
 
 - The main browser preserves rows and recreates attached cards.
 - ImportDialog rebuilds staged cards while preserving pending state.

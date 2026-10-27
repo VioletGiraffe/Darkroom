@@ -27,7 +27,6 @@ RESTORE_COMPILER_WARNINGS
 static constexpr int DEFAULT_THUMBNAIL_SIZE = 200;
 static constexpr int MIN_THUMBNAIL_SIZE = 60;
 static constexpr int MAX_THUMBNAIL_SIZE = 600;
-static constexpr int THUMBNAIL_SIZE_STEP = 20;
 static const QString SETTINGS_KEY_THUMBNAIL_SIZE = "frameViewer/thumbnailSize";
 
 FrameViewerWindow::FrameViewerWindow(QWidget* parent)
@@ -36,7 +35,7 @@ FrameViewerWindow::FrameViewerWindow(QWidget* parent)
 	setWindowTitle(tr("Frame Viewer"));
 	resize(1200, 800);
 
-	_thumbnailSize = QSettings{}.value(SETTINGS_KEY_THUMBNAIL_SIZE, DEFAULT_THUMBNAIL_SIZE).toInt();
+	_thumbnailSize = qBound(MIN_THUMBNAIL_SIZE, QSettings{}.value(SETTINGS_KEY_THUMBNAIL_SIZE, DEFAULT_THUMBNAIL_SIZE).toInt(), MAX_THUMBNAIL_SIZE);
 
 	auto* layout = new QVBoxLayout(this);
 	layout->setContentsMargins(0, 0, 0, 0);
@@ -157,9 +156,8 @@ void FrameViewerWindow::showInstruction(const QString& text)
 
 void FrameViewerWindow::zoomThumbnails(int steps)
 {
-	const int current = _thumbnailSize;
-	const int next = qBound(MIN_THUMBNAIL_SIZE, current + steps * THUMBNAIL_SIZE_STEP, MAX_THUMBNAIL_SIZE);
-	if (next == current)
+	const int next = ThumbnailWidget::zoomedSize(_thumbnailSize, steps, MIN_THUMBNAIL_SIZE, MAX_THUMBNAIL_SIZE);
+	if (next == _thumbnailSize)
 		return;
 
 	_thumbnailSize = next;

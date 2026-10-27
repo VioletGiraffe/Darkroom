@@ -16,6 +16,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QtMath>
 RESTORE_COMPILER_WARNINGS
 
+#include <cmath>
 #include <optional>
 #include <utility>
 #include <variant>
@@ -145,6 +146,11 @@ int ThumbnailWidget::filmStripBandHeight(int imageAreaHeight)
 {
 	// Scale with zoom but cap the bands at both extremes.
 	return qBound(7, imageAreaHeight / 11, 18);
+}
+
+int ThumbnailWidget::zoomedSize(int size, int steps, int minSize, int maxSize)
+{
+	return qBound(minSize, static_cast<int>(std::lround(size * std::pow(1.1, steps))), maxSize);
 }
 
 bool ThumbnailWidget::isRenderedFor(QSize box, qreal dpr) const

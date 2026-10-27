@@ -79,8 +79,7 @@ const QString PATH_FIELD_HISTORY_KEY = QStringLiteral("browser/pathFieldHistory"
 constexpr int PATH_FIELD_HISTORY_SIZE = 100;
 constexpr int DEFAULT_TILE_SIZE = 160;
 constexpr int MIN_TILE_SIZE  = 80;
-constexpr int MAX_TILE_SIZE  = 400;
-constexpr int TILE_SIZE_STEP = 20;
+constexpr int MAX_TILE_SIZE  = 800;
 
 int savedTileSize()
 {
@@ -860,7 +859,7 @@ QWidget* BrowserWindow::buildTile(QListWidgetItem* item)
 
 void BrowserWindow::zoomTiles(int steps)
 {
-	const int next = qBound(MIN_TILE_SIZE, _tileSize + steps * TILE_SIZE_STEP, MAX_TILE_SIZE);
+	const int next = ThumbnailWidget::zoomedSize(_tileSize, steps, MIN_TILE_SIZE, MAX_TILE_SIZE);
 	if (next == _tileSize)
 		return;
 

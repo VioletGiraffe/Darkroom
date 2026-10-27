@@ -11,6 +11,7 @@
 #include "UiComponents/MediaGrid.h"
 #include "UiComponents/PreviewFrameCountCombo.h"
 #include "UiComponents/SegmentedToggle.h"
+#include "UiComponents/ThumbnailWidget.h"
 #include "DarkroomSettings.h"
 #include "Shortcuts.h"
 #include "DarkroomShortcuts.h"
@@ -87,7 +88,6 @@ const QString STAGED_PREVIEW_FRAME_COUNT_KEY = QStringLiteral("importDialog/prev
 constexpr int DEFAULT_STAGED_CARD_IMAGE_HEIGHT = 120;
 constexpr int MIN_STAGED_CARD_IMAGE_HEIGHT = 60;
 constexpr int MAX_STAGED_CARD_IMAGE_HEIGHT = 360;
-constexpr int STAGED_CARD_IMAGE_HEIGHT_STEP = 20;
 
 constexpr int LABEL_LIST_MAX_WIDTH = 300;
 
@@ -96,7 +96,7 @@ constexpr int TEMP_PREVIEW_DELETE_RETRY_MS = 20;
 
 int stagedCardImageHeight()
 {
-	return QSettings{}.value(STAGED_CARD_IMAGE_HEIGHT_KEY, DEFAULT_STAGED_CARD_IMAGE_HEIGHT).toInt();
+	return qBound(MIN_STAGED_CARD_IMAGE_HEIGHT, QSettings{}.value(STAGED_CARD_IMAGE_HEIGHT_KEY, DEFAULT_STAGED_CARD_IMAGE_HEIGHT).toInt(), MAX_STAGED_CARD_IMAGE_HEIGHT);
 }
 
 QString uniqueTempPreviewDir()
@@ -867,7 +867,7 @@ void ImportDialog::regenerateInsufficientStagedVideoPreviews(int frameCount)
 void ImportDialog::zoomStagedCards(int steps)
 {
 	const int current = stagedCardImageHeight();
-	const int next = qBound(MIN_STAGED_CARD_IMAGE_HEIGHT, current + steps * STAGED_CARD_IMAGE_HEIGHT_STEP, MAX_STAGED_CARD_IMAGE_HEIGHT);
+	const int next = ThumbnailWidget::zoomedSize(current, steps, MIN_STAGED_CARD_IMAGE_HEIGHT, MAX_STAGED_CARD_IMAGE_HEIGHT);
 	if (next == current)
 		return;
 

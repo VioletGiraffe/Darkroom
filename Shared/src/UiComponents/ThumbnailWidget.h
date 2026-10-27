@@ -58,6 +58,9 @@ public:
 	// Exposed so MediaItemWidget can keep corner badges clear of proportional film bands.
 	[[nodiscard]] static int filmStripBandHeight(int imageAreaHeight);
 
+	// size scaled by 10% per mouse-wheel step, clamped to [minSize, maxSize]
+	[[nodiscard]] static int zoomedSize(int size, int steps, int minSize, int maxSize);
+
 protected:
 	void mouseDoubleClickEvent(QMouseEvent* event) override;
 	void mousePressEvent(QMouseEvent* event) override;
