@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793138214509,
+  "lastUpdate": 1793139429228,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -18516,6 +18516,85 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/VioletGiraffe/Darkroom/commit/2b363d014f0d8be2c1d5628325ed4ac5258182cb"
         },
         "date": 1793138212255,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 17888,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1448,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 31810,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6888,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7039.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5464.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 955.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 340.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 84.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "27090e426639b26dc495be7b6b238f15960c680a",
+          "message": "macOS DMG: universal Qt binaries thinned to each bundle's own architecture, bundles re-signed ad-hoc afterwards",
+          "timestamp": "2026-10-28T00:08:35+02:00",
+          "tree_id": "66445d9c504104e0e6e8f6e43c2123de457b009b",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/27090e426639b26dc495be7b6b238f15960c680a"
+        },
+        "date": 1793139426604,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
