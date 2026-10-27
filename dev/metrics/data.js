@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793060748405,
+  "lastUpdate": 1793136321452,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -18413,6 +18413,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .reloc",
             "value": 17,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "b9bf1b58a2ed8826f7e057409067e377ece18087",
+          "message": "Decoding raw file data through libraw in the viewer and photo compare; .nefx added to supported formats",
+          "timestamp": "2026-10-27T23:15:27+02:00",
+          "tree_id": "cb502c3b3c24f3f04a8ba42849a305017d9819af",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/b9bf1b58a2ed8826f7e057409067e377ece18087"
+        },
+        "date": 1793136317728,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 17888,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1448,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 31810,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6882,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7033.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5460,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 954.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 340.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 84,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
             "unit": "KB"
           }
         ]
