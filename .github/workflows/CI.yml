@@ -108,6 +108,11 @@ jobs:
         sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 50
         g++ --version
 
+    # LibRaw's OpenMP runtime: vcpkg-triplets/arm64-osx.cmake and vcpkg.pri point at it
+    - name: macOS - install libomp
+      if: startsWith(matrix.os, 'macos')
+      run: brew install libomp
+
     # vcpkg's built packages, so a run rebuilds only what vcpkg.json or the triplets changed
     - name: Cache vcpkg packages
       uses: actions/cache@v4

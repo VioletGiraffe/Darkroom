@@ -42,13 +42,10 @@ fi
 
 # Installs vcpkg.json's dependencies for the triplet vcpkg.pri links against. Exits with code 1 when the install fails.
 install_vcpkg_dependencies() {
-	case "$(uname -m)" in
-		arm64|aarch64) arch=arm64 ;;
-		*) arch=x64 ;;
-	esac
-	case "$(uname -s)" in
-		Darwin) triplet="${arch}-osx" ;;
-		*) triplet="${arch}-linux" ;;
+	case "$(uname -s)-$(uname -m)" in
+		Darwin-*) triplet=arm64-osx ;; # Apple Silicon only
+		*-arm64|*-aarch64) triplet=arm64-linux ;;
+		*) triplet=x64-linux ;;
 	esac
 	"${VCPKG}" install --triplet "${triplet}" --x-manifest-root="${REPOSITORY_ROOT}" || exit 1
 }

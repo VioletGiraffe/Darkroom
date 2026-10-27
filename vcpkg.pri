@@ -4,11 +4,10 @@
 
 # The build scripts install the same triplet: see scripts/environment.*
 win*: VCPKG_TRIPLET = x64-windows-static-md
-else {
-	contains(QMAKE_HOST.arch, arm64|aarch64): VCPKG_ARCH = arm64
-	else: VCPKG_ARCH = x64
-	mac*: VCPKG_TRIPLET = $${VCPKG_ARCH}-osx
-	else: VCPKG_TRIPLET = $${VCPKG_ARCH}-linux
+mac*: VCPKG_TRIPLET = arm64-osx # Apple Silicon only
+linux*|freebsd {
+	contains(QMAKE_HOST.arch, arm64|aarch64): VCPKG_TRIPLET = arm64-linux
+	else: VCPKG_TRIPLET = x64-linux
 }
 VCPKG_INSTALLED = $$PWD/vcpkg_installed/$${VCPKG_TRIPLET}
 
@@ -34,4 +33,9 @@ INCLUDEPATH += $${VCPKG_INSTALLED}/include
 		LIBS += $${VCPKG_LIB_FILE}
 		mac*|linux*|freebsd: PRE_TARGETDEPS += $${VCPKG_LIB_FILE}
 	}
+
+	# LibRaw's OpenMP runtime (vcpkg.json). MSVC's arrives through the library's default-library directive.
+	linux*|freebsd: LIBS += -fopenmp
+	# The libomp LibRaw was built against (vcpkg-triplets/arm64-osx.cmake), linked statically: nothing to bundle
+	mac*: LIBS += /opt/homebrew/opt/libomp/lib/libomp.a
 }

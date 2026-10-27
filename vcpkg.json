@@ -1,7 +1,7 @@
 {
   "dependencies": [
     "libjpeg-turbo",
-    "libraw"
+    { "name": "libraw", "features": [ "openmp" ] }
   ],
   "overrides": [
     { "name": "libjpeg-turbo", "version": "3.2.0", "port-version": 1 },
