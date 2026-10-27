@@ -58,7 +58,7 @@ SOURCES += $$files(src/*.cpp, true)
 # A static library's resources need Q_INIT_RESOURCE(shared) in each app's main().
 RESOURCES += res/shared.qrc
 
-DEFINES += PROFILING_ENABLED=1
+#DEFINES += PROFILING_ENABLED=1
 
 ###################################################
 #    Platform-specific compiler options
