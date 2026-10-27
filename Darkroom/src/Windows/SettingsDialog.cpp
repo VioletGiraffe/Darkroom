@@ -4,6 +4,7 @@
 #include "Theme/Style.h"
 #include "Theme/Theme.h"
 #include "theme/cthemecontroller.h"
+#include "UiComponents/ImagesSettingsPage.h"
 #include "UiComponents/SegmentedToggle.h"
 #include "Utils.h"
 #include "compiler/compiler_warnings_control.h"
@@ -190,5 +191,6 @@ void EncodingSettingsPage::acceptSettings()
 SettingsDialog::SettingsDialog(QWidget* parent) : CSettingsDialog(parent)
 {
 	addSettingsPage(new GeneralSettingsPage(this), tr("General"));
+	addSettingsPage(new ImagesSettingsPage(this), tr("Images"));
 	addSettingsPage(new EncodingSettingsPage(this), tr("Encoding"));
 }

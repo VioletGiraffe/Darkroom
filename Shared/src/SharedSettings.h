@@ -26,6 +26,7 @@ namespace Settings {
 	constexpr const char* VideoPlayerMuted            = "VideoPlayer/Muted";
 	constexpr const char* VideoPlayerOscillationCurve = "VideoPlayer/OscillationCurve";
 	constexpr const char* PhotoCompareIgnoreRotation  = "photoCompare/ignoreRotation";
+	constexpr const char* RawRendering                = "settings/rawRendering"; // read through rawRenderingSetting()
 }
 
 namespace Defaults {
@@ -36,4 +37,5 @@ namespace Defaults {
 	constexpr bool        VideoPlayerMuted            = false;
 	constexpr const char* VideoPlayerOscillationCurve = "cosine";
 	constexpr bool        PhotoCompareIgnoreRotation  = false;
+	constexpr const char* RawRendering                = "halfSize";
 }

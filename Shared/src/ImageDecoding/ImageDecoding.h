@@ -20,7 +20,12 @@ namespace thin_io { class buffered_reader; }
 // Split in two for the pipelines that read on the I/O pool and decode on the CPU pool: readEncodedImage, then decode.
 namespace ImageDecoding {
 
-enum class Intent { Thumbnail, Full };
+// How a camera raw becomes an image; other files ignore it
+enum class RawRendering {
+	EmbeddedPreview, // the largest embedded JPEG; HalfSize for a raw without one
+	HalfSize,        // LibRaw's rendering without demosaicing: each 2x2 sensor block is one pixel
+	Full,            // LibRaw's demosaiced rendering
+};
 enum class Decoder { Qt, TurboJpeg, LibRaw };
 
 // Lowercase extensions of the camera raw formats. Inline: callers that only list files link no decoder.
@@ -28,7 +33,7 @@ enum class Decoder { Qt, TurboJpeg, LibRaw };
 {
 	static const QStringList suffixes{
 		"3fr", "ari", "arw", "bay", "cr2", "cr3", "crw", "dcr", "dng", "erf", "fff", "iiq", "k25", "kdc", "mdc", "mef",
-		"mos", "mrw", "nef", "nrw", "orf", "pef", "raf", "raw", "rw2", "rwl", "sr2", "srf", "srw"
+		"mos", "mrw", "nef", "nefx", "nrw", "orf", "pef", "raf", "raw", "rw2", "rwl", "sr2", "srf", "srw"
 	};
 	return suffixes;
 }
@@ -37,9 +42,11 @@ enum class Decoder { Qt, TurboJpeg, LibRaw };
 struct EncodedImage {
 	QByteArray bytes;
 	QString error; // set when the read failed
-	// Set for a camera raw's embedded preview: they replace what decode() finds in the bytes
+	// Set for camera raws, the orientation only with the embedded preview: they replace what decode() finds in the bytes
 	QByteArray format;
 	std::optional<QImageIOHandler::Transformations> orientation;
+	// Set for a camera raw read whole, never to EmbeddedPreview: decode() renders it through LibRaw
+	std::optional<RawRendering> rawRendering;
 };
 
 struct DecodedImage {
@@ -53,9 +60,9 @@ struct DecodedImage {
 constexpr qsizetype SignatureSize = 3;
 
 // Reads from the start of the file, whatever its position: a caller that sniffed it with peek() pays for no second open.
-// A camera raw yields its largest embedded JPEG preview, other files are read whole; the same for either intent.
-[[nodiscard]] EncodedImage readEncodedImage(thin_io::buffered_reader& file, const QString& path, Intent intent);
-[[nodiscard]] EncodedImage readEncodedImage(const QString& path, Intent intent);
+// Camera raws are read as rawRendering prescribes, other files whole.
+[[nodiscard]] EncodedImage readEncodedImage(thin_io::buffered_reader& file, const QString& path, RawRendering rawRendering);
+[[nodiscard]] EncodedImage readEncodedImage(const QString& path, RawRendering rawRendering);
 [[nodiscard]] Decoder decoderFor(const QString& path, QByteArrayView signature);
 [[nodiscard]] DecodedImage decode(const EncodedImage& encoded);
 [[nodiscard]] DecodedImage decode(const QByteArray& encoded);

@@ -545,12 +545,12 @@ void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
 	updateHintText();
 
 	// Serialize reads per storage device, then decode each completed read in the compute pool.
-	IoThreadPool::enqueue(batch->paths.front(), [this, batch] {
+	IoThreadPool::enqueue(batch->paths.front(), [this, batch, rawRendering = rawRenderingSetting()] {
 		for (qsizetype i = 0; i < batch->paths.size(); ++i)
 		{
 			if (batch->abort)
 				return;
-			ImageDecoding::EncodedImage encoded = ImageDecoding::readEncodedImage(batch->paths[i], ImageDecoding::Intent::Full);
+			ImageDecoding::EncodedImage encoded = ImageDecoding::readEncodedImage(batch->paths[i], rawRendering);
 			_workerPool.enqueue([this, batch, i, encoded = std::move(encoded)] {
 				if (!batch->abort)
 				{

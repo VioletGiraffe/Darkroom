@@ -64,23 +64,30 @@ static DecodedImage decodeWithQt(const QByteArray& encoded)
 	return decoded;
 }
 
-EncodedImage readEncodedImage(thin_io::buffered_reader& file, const QString& path, [[maybe_unused]] Intent intent)
+EncodedImage readEncodedImage(thin_io::buffered_reader& file, const QString& path, RawRendering rawRendering)
 {
 	const QString rawSuffix = rawFileSuffix(path);
 	if (rawSuffix.isEmpty())
 		return readWholeFile(file);
 
-	EncodedImage preview = readRawPreview(file);
-	preview.format = rawSuffix.toLatin1();
-	return preview;
+	EncodedImage encoded;
+	if (std::optional<EncodedImage> preview = rawRendering == RawRendering::EmbeddedPreview ? readRawPreview(file) : std::nullopt)
+		encoded = std::move(*preview);
+	else
+	{
+		encoded = readWholeFile(file);
+		encoded.rawRendering = rawRendering == RawRendering::EmbeddedPreview ? RawRendering::HalfSize : rawRendering;
+	}
+	encoded.format = rawSuffix.toLatin1();
+	return encoded;
 }
 
-EncodedImage readEncodedImage(const QString& path, Intent intent)
+EncodedImage readEncodedImage(const QString& path, RawRendering rawRendering)
 {
 	thin_io::buffered_reader file;
 	if (!file.open(thin_io::native_path(path).data()))
 		return { .error = QString::fromStdString(thin_io::buffered_reader::text_for_last_error()) };
-	return readEncodedImage(file, path, intent);
+	return readEncodedImage(file, path, rawRendering);
 }
 
 Decoder decoderFor(const QString& path, QByteArrayView signature)
@@ -90,7 +97,9 @@ Decoder decoderFor(const QString& path, QByteArrayView signature)
 
 DecodedImage decode(const EncodedImage& encoded)
 {
-	DecodedImage decoded = encoded.error.isEmpty() ? decode(encoded.bytes) : DecodedImage{ .error = encoded.error };
+	DecodedImage decoded = !encoded.error.isEmpty() ? DecodedImage{ .error = encoded.error }
+		: encoded.rawRendering                     ? decodeRaw(encoded.bytes, *encoded.rawRendering)
+		                                           : decode(encoded.bytes);
 	if (!encoded.format.isEmpty())
 		decoded.format = encoded.format;
 	if (encoded.orientation)

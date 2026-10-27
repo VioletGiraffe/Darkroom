@@ -23,7 +23,7 @@ the coding conventions.
 - `FolderListing` - the folder's entries, listed through thin_io: folders and supported media files, without hidden
   entries. Also the browser's order: by name, modification time or extension, folders first when ascending and last
   when descending. The viewer and player opened from the command line browse in that order too.
-- `SettingsDialog` - Quickroom's own: ffmpeg path, theming, the video player's frame extraction format.
+- `SettingsDialog` - Quickroom's own: ffmpeg path, theming, camera raw rendering, the video player's frame extraction format.
 - `FileOperations` - file operations with Quickroom's confirmation policy, shared by the browser and the
   standalone viewer: deletion, the file clipboard, and copy/move through the `file-operations` engine.
 

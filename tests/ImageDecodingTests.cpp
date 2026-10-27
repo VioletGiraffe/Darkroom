@@ -6,7 +6,10 @@
 
 #include <QBuffer>
 #include <QByteArray>
+#include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
+#include <QFileInfo>
 #include <QImage>
 #include <QPoint>
 #include <QSize>
@@ -253,27 +256,81 @@ TEST_CASE("ImageDecoding::readEncodedImage: files are read whole, camera raws th
 	};
 
 	const QByteArray jpeg = encodeJpeg(JpegKind::Rgb);
-	const EncodedImage photo = readEncodedImage(writeFile("photo.jpg", jpeg), Intent::Thumbnail);
-	REQUIRE(photo.error.isEmpty());
-	REQUIRE(photo.bytes == jpeg);
-	REQUIRE(photo.format.isEmpty());
-	REQUIRE_FALSE(photo.orientation.has_value());
+	const QString photoPath = writeFile("photo.jpg", jpeg);
+	for (const RawRendering rawRendering : { RawRendering::EmbeddedPreview, RawRendering::HalfSize, RawRendering::Full })
+	{
+		CAPTURE(static_cast<int>(rawRendering));
+		const EncodedImage photo = readEncodedImage(photoPath, rawRendering);
+		REQUIRE(photo.error.isEmpty());
+		REQUIRE(photo.bytes == jpeg);
+		REQUIRE(photo.format.isEmpty());
+		REQUIRE_FALSE(photo.orientation.has_value());
+		REQUIRE_FALSE(photo.rawRendering.has_value());
+	}
 
 	// Larger than buffered_reader's window
 	QByteArray large(300 * 1024, Qt::Uninitialized);
 	for (qsizetype i = 0; i < large.size(); ++i)
 		large[i] = static_cast<char>(i * 7 + i / 251);
-	REQUIRE(readEncodedImage(writeFile("large.bin", large), Intent::Full).bytes == large);
+	REQUIRE(readEncodedImage(writeFile("large.bin", large), RawRendering::Full).bytes == large);
 
-	const EncodedImage missing = readEncodedImage(dir.filePath("missing.jpg"), Intent::Thumbnail);
+	const EncodedImage missing = readEncodedImage(dir.filePath("missing.jpg"), RawRendering::EmbeddedPreview);
 	REQUIRE_FALSE(missing.error.isEmpty());
 	REQUIRE(missing.bytes.isEmpty());
 
 	// A JPEG is no raw to LibRaw, whatever its extension
-	const EncodedImage notRaw = readEncodedImage(writeFile("photo.nef", jpeg), Intent::Thumbnail);
-	REQUIRE_FALSE(notRaw.error.isEmpty());
-	REQUIRE(notRaw.bytes.isEmpty());
-	REQUIRE(notRaw.format == "nef");
+	const QString notRawPath = writeFile("photo.nef", jpeg);
+	const EncodedImage notRawPreview = readEncodedImage(notRawPath, RawRendering::EmbeddedPreview);
+	REQUIRE_FALSE(notRawPreview.error.isEmpty());
+	REQUIRE(notRawPreview.bytes.isEmpty());
+	REQUIRE(notRawPreview.format == "nef");
+
+	// Rendered raws are read whole and fail only in decode()
+	for (const RawRendering rawRendering : { RawRendering::HalfSize, RawRendering::Full })
+	{
+		CAPTURE(static_cast<int>(rawRendering));
+		const EncodedImage notRaw = readEncodedImage(notRawPath, rawRendering);
+		REQUIRE(notRaw.error.isEmpty());
+		REQUIRE(notRaw.bytes == jpeg);
+		REQUIRE(notRaw.format == "nef");
+		REQUIRE(notRaw.rawRendering == rawRendering);
+
+		const DecodedImage decoded = decode(notRaw);
+		REQUIRE(decoded.image.isNull());
+		REQUIRE_FALSE(decoded.error.isEmpty());
+		REQUIRE(decoded.format == "nef");
+	}
+}
+
+// Hidden: renders every camera raw in the folder named by DARKROOM_RAW_SAMPLES in each way, reporting size and time
+TEST_CASE("ImageDecoding: camera raw samples", "[.][rawsamples]")
+{
+	const QString folder = qEnvironmentVariable("DARKROOM_RAW_SAMPLES");
+	REQUIRE_FALSE(folder.isEmpty());
+
+	const QFileInfoList files = QDir{ folder }.entryInfoList(QDir::Files, QDir::Name);
+	for (const QFileInfo& file : files)
+	{
+		if (!rawFileSuffixes().contains(file.suffix().toLower()))
+			continue;
+
+		for (const RawRendering rawRendering : { RawRendering::EmbeddedPreview, RawRendering::HalfSize, RawRendering::Full })
+		{
+			QElapsedTimer timer;
+			timer.start();
+			const EncodedImage encoded = readEncodedImage(file.filePath(), rawRendering);
+			const qint64 readMs = timer.restart();
+			const DecodedImage decoded = decode(encoded);
+			const qint64 decodeMs = timer.elapsed();
+
+			const QString report = QStringLiteral("%1, rendering %2: %3x%4, read %5 ms, decode %6 ms %7")
+				.arg(file.fileName()).arg(static_cast<int>(rawRendering)).arg(decoded.image.width()).arg(decoded.image.height())
+				.arg(readMs).arg(decodeMs).arg(decoded.error);
+			WARN(report.toStdString());
+			CHECK_FALSE(decoded.image.isNull());
+			CHECK(decoded.format == file.suffix().toLower().toLatin1());
+		}
+	}
 }
 
 TEST_CASE("ImageDecoding::applyOrientation: every transformation as EXIF defines it", "[imagedecoding]")

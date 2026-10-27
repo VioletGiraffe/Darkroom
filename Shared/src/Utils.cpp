@@ -3,6 +3,7 @@
 #include "ImageDecoding/ImageDecoding.h"
 #include "SharedSettings.h"
 
+#include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
 #include "dialogs/messagedialog.h"
 
@@ -25,6 +26,8 @@ RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 #include <functional>
+#include <iterator>
+#include <optional>
 
 void clearStuckHoverIfCursorLeft(QWidget* w)
 {
@@ -343,4 +346,40 @@ QString ffmpegPath()
 {
 	const QString configured = sharedSettings().value(Settings::FfmpegPath).toString();
 	return (!configured.isEmpty() && QFile::exists(configured)) ? configured : autoDetectedFfmpegPath();
+}
+
+namespace {
+
+struct RawRenderingSettingValue
+{
+	ImageDecoding::RawRendering rawRendering;
+	const char* value;
+};
+
+constexpr RawRenderingSettingValue RawRenderingSettingValues[]{
+	{ ImageDecoding::RawRendering::EmbeddedPreview, "embeddedPreview" },
+	{ ImageDecoding::RawRendering::HalfSize,        "halfSize" },
+	{ ImageDecoding::RawRendering::Full,            "full" },
+};
+
+std::optional<ImageDecoding::RawRendering> rawRenderingFromSettingValue(const QString& value)
+{
+	const auto entry = std::ranges::find_if(RawRenderingSettingValues, [&](const RawRenderingSettingValue& e) { return value == QLatin1StringView{ e.value }; });
+	return entry != std::end(RawRenderingSettingValues) ? std::optional{ entry->rawRendering } : std::nullopt;
+}
+
+} // namespace
+
+ImageDecoding::RawRendering rawRenderingSetting()
+{
+	const QString stored = sharedSettings().value(Settings::RawRendering, Defaults::RawRendering).toString();
+	// An unknown stored value means the default
+	return rawRenderingFromSettingValue(stored).value_or(*rawRenderingFromSettingValue(Defaults::RawRendering));
+}
+
+void saveRawRenderingSetting(ImageDecoding::RawRendering rawRendering)
+{
+	const auto entry = std::ranges::find(RawRenderingSettingValues, rawRendering, &RawRenderingSettingValue::rawRendering);
+	assert_and_return_r(entry != std::end(RawRenderingSettingValues), );
+	sharedSettings().setValue(Settings::RawRendering, QString::fromLatin1(entry->value));
 }

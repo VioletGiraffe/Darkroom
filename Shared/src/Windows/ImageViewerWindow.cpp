@@ -88,7 +88,7 @@ constexpr std::array SaveAsTypes{
 	if (!signature || ImageDecoding::decoderFor(path, QByteArrayView{ signature->data(), static_cast<qsizetype>(signature->size()) }) == ImageDecoding::Decoder::Qt)
 		return std::nullopt;
 
-	ImageDecoding::DecodedImage decoded = ImageDecoding::decode(ImageDecoding::readEncodedImage(file, path, ImageDecoding::Intent::Full));
+	ImageDecoding::DecodedImage decoded = ImageDecoding::decode(ImageDecoding::readEncodedImage(file, path, rawRenderingSetting()));
 	ImageDecoding::applyOrientation(decoded.image, decoded.orientation);
 	return CImageViewerWidget::DecodedFile{ std::move(decoded.image), QString::fromLatin1(decoded.format) };
 }

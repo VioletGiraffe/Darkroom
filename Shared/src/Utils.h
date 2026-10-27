@@ -92,3 +92,9 @@ void reportFfmpegFailure(QWidget* parent, const Ffmpeg::SplitResult& result, con
 
 // Auto-detects beside the app, on PATH, or in common macOS package-manager locations.
 [[nodiscard]] QString autoDetectedFfmpegPath();
+
+namespace ImageDecoding { enum class RawRendering; }
+
+// The shared Settings::RawRendering: how camera raws open in the viewer and in photo compare
+[[nodiscard]] ImageDecoding::RawRendering rawRenderingSetting();
+void saveRawRenderingSetting(ImageDecoding::RawRendering rawRendering);

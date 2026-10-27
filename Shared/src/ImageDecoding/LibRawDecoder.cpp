@@ -1,7 +1,9 @@
 #include "ImageDecoding/LibRawDecoder.h"
+#include "assert/advanced_assert.h"
 #include "buffered_reader.hpp" // thin_io
 
 DISABLE_COMPILER_WARNINGS
+#include <QObject>
 #include <libraw/libraw.h>
 RESTORE_COMPILER_WARNINGS
 
@@ -175,11 +177,11 @@ int unpackLargestJpegPreview(LibRaw& raw)
 
 } // namespace
 
-EncodedImage readRawPreview(thin_io::buffered_reader& file)
+std::optional<EncodedImage> readRawPreview(thin_io::buffered_reader& file)
 {
 	const std::optional<uint64_t> size = file.size();
 	if (!size)
-		return { .error = QString::fromStdString(thin_io::buffered_reader::text_for_last_error()) };
+		return EncodedImage{ .error = QString::fromStdString(thin_io::buffered_reader::text_for_last_error()) };
 
 	// Declared first: LibRaw reads from it until destroyed
 	BufferedReaderStream stream{ file, *size };
@@ -188,14 +190,65 @@ EncodedImage readRawPreview(thin_io::buffered_reader& file)
 	int result = raw->open_datastream(&stream);
 	if (result == LIBRAW_SUCCESS)
 		result = unpackLargestJpegPreview(*raw);
+	if (!stream.ioError().isEmpty())
+		return EncodedImage{ .error = stream.ioError() };
+	if (result == LIBRAW_NO_THUMBNAIL || result == LIBRAW_UNSUPPORTED_THUMBNAIL)
+		return std::nullopt;
 	if (result != LIBRAW_SUCCESS)
-		return { .error = stream.ioError().isEmpty() ? QString::fromLatin1(LibRaw::strerror(result)) : stream.ioError() };
+		return EncodedImage{ .error = QString::fromLatin1(LibRaw::strerror(result)) };
 
 	const libraw_thumbnail_t& preview = raw->imgdata.thumbnail;
-	return {
+	return EncodedImage{
 		.bytes = QByteArray{ preview.thumb, static_cast<qsizetype>(preview.tlength) },
 		.orientation = orientationForFlip(raw->imgdata.sizes.flip),
 	};
+}
+
+DecodedImage decodeRaw(const QByteArray& file, RawRendering rawRendering)
+{
+	assert_r(rawRendering != RawRendering::EmbeddedPreview);
+
+	const auto raw = std::make_unique<LibRaw>();
+	libraw_output_params_t& params = raw->imgdata.params;
+	params.use_camera_wb = 1;
+	params.half_size = rawRendering == RawRendering::HalfSize;
+	// The sRGB tone curve, matching the sRGB primaries LibRaw outputs by default; LibRaw's default curve is BT.709's
+	params.gamm[0] = 1 / 2.4;
+	params.gamm[1] = 12.92;
+	params.user_flip = 0; // the orientation is reported, as for previews
+
+	int result = raw->open_buffer(file.constData(), static_cast<size_t>(file.size()));
+	// Read before processing: user_flip replaces it
+	const int flip = raw->imgdata.sizes.flip;
+	if (result == LIBRAW_SUCCESS)
+		result = raw->unpack();
+	if (result == LIBRAW_SUCCESS)
+		result = raw->dcraw_process();
+	if (result != LIBRAW_SUCCESS)
+		return { .error = QString::fromLatin1(LibRaw::strerror(result)) };
+
+	int width = 0, height = 0, colors = 0, bitsPerSample = 0;
+	raw->get_mem_image_format(&width, &height, &colors, &bitsPerSample);
+	if (bitsPerSample != 8 || (colors != 1 && colors != 3))
+		return { .error = QObject::tr("Unsupported raw image layout: %1 colors, %2 bits per sample").arg(colors).arg(bitsPerSample) };
+
+	const QString outOfMemory = QObject::tr("Not enough memory to decode a %1x%2 image").arg(width).arg(height);
+	QImage image{ width, height, colors == 1 ? QImage::Format_Grayscale8 : QImage::Format_RGB888 };
+	if (image.isNull())
+		return { .error = outOfMemory };
+
+	result = raw->copy_mem_image(image.bits(), static_cast<int>(image.bytesPerLine()), 0);
+	if (result != LIBRAW_SUCCESS)
+		return { .error = QString::fromLatin1(LibRaw::strerror(result)) };
+
+	raw->recycle(); // frees LibRaw's buffers before the conversion allocates
+	// Format_RGB32, as decodeJpeg() delivers
+	if (colors == 3)
+		image.convertTo(QImage::Format_RGB32);
+	if (image.isNull())
+		return { .error = outOfMemory };
+
+	return { .image = std::move(image), .orientation = orientationForFlip(flip) };
 }
 
 } // namespace ImageDecoding

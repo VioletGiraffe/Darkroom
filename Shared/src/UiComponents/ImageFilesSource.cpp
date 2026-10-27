@@ -232,7 +232,7 @@ namespace {
 			return;
 
 		PROFILE_SAMPLE("Thumbnail read");
-		job._encodedPerPath[index] = ImageDecoding::readEncodedImage(job._paths[static_cast<qsizetype>(index)], ImageDecoding::Intent::Thumbnail);
+		job._encodedPerPath[index] = ImageDecoding::readEncodedImage(job._paths[static_cast<qsizetype>(index)], ImageDecoding::RawRendering::EmbeddedPreview);
 	}
 
 	// Only called once every read has returned: their samples are counted before the decode can end the batch.
