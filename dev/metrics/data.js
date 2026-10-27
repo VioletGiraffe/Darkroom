@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793136321452,
+  "lastUpdate": 1793138214509,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -18482,6 +18482,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 84,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "2b363d014f0d8be2c1d5628325ed4ac5258182cb",
+          "message": "LibRaw built with OpenMP, macOS through Homebrew's libomp: full raw rendering about 3x faster on 16 threads; Intel macOS support removed",
+          "timestamp": "2026-10-27T23:45:53+02:00",
+          "tree_id": "187c8e9361b5451b06a4d0b0c66fe188cd623d9f",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/2b363d014f0d8be2c1d5628325ed4ac5258182cb"
+        },
+        "date": 1793138212255,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 17888,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1448,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 31810,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6888,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7039.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5464.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 955.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 340.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 84.5,
             "unit": "KB"
           },
           {
