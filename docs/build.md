@@ -122,3 +122,4 @@ method's validation: [image-read-performance.md](image-read-performance.md).
   folders, folder backgrounds and drives.
 - **macOS:** `scripts/create_dmg.sh <Qt dir>` runs `macdeployqt` on both already-built release bundles and packages
   them into one `Darkroom.dmg`. It treats macdeployqt's `ERROR` output as failure, since the tool exits 0 regardless.
+  It thins each bundle's universal Qt binaries to its executable's architecture, then re-signs the bundle ad-hoc.

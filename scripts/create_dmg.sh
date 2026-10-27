@@ -42,6 +42,31 @@ for app in ${APPS}; do
 		exit 1
 	fi
 
+	# The Qt kit is universal: macdeployqt copies slices for every architecture, and the app loads only its own
+	APP_ARCHS="$(lipo -archs "${BUNDLE}/Contents/MacOS/${app}")"
+	case "${APP_ARCHS}" in
+		*" "*)
+			echo "${MYSELF}: ${app} is universal (${APP_ARCHS}), keeping every slice"
+			;;
+		*)
+			echo "${MYSELF}: thinning ${BUNDLE} to ${APP_ARCHS}"
+			find "${BUNDLE}" -type f | while IFS= read -r FILE; do
+				if lipo -archs "${FILE}" 2>/dev/null | grep -q " "; then
+					lipo "${FILE}" -thin "${APP_ARCHS}" -output "${FILE}"
+				fi
+			done
+			;;
+	esac
+
+	# Thinning invalidates the ad-hoc signatures macdeployqt applied: Apple Silicon kills arm64 code without a valid one at load.
+	# Ad-hoc ("-") needs no certificate.
+	echo "${MYSELF}: re-signing ${BUNDLE} ad-hoc"
+	codesign --force --deep --sign - "${BUNDLE}"
+	if ! codesign --verify --deep --strict "${BUNDLE}"; then
+		echo "${MYSELF}: ${BUNDLE} fails signature verification, refusing to package it" >&2
+		exit 1
+	fi
+
 	cp -R "${BUNDLE}" "${STAGE}/"
 done
 
