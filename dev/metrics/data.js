@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793058818970,
+  "lastUpdate": 1793060748405,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -18284,6 +18284,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Lines of code (Darkroom)",
             "value": 17700,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1444,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 31793,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6235,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 6385,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5142,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 908.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 73,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 69.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 17,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "f07767c270b8f0379a247a0c795fb7422be6bc83",
+          "message": "EXIF orientation reader moved to its own ImageDecoding/ExifOrientation module; unit tests for it and for ImageDecoding (JPEG decoding, Qt fallback, routing, file reads, orientation), the tests now linking thin_io and the vcpkg libraries",
+          "timestamp": "2026-10-27T02:05:24+02:00",
+          "tree_id": "d06ef7ad8e81bc294a0f6220990e030bb284e070",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/f07767c270b8f0379a247a0c795fb7422be6bc83"
+        },
+        "date": 1793060745832,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 17718,
             "unit": "LOC"
           },
           {
