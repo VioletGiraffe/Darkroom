@@ -75,10 +75,11 @@ The directories:
 - `Theme/` - the selectable themes and application styling.
 - `crashhandler/` - Windows-only minidump writer, a no-op elsewhere; both apps install it in `main()` with the temp
   directory as the dump location.
-- Root - app-wide modules: `Settings.h` (keys and defaults), `Shortcuts.h` (shortcut strings shared by several
-  windows), each with a Darkroom-only counterpart (`DarkroomSettings.h`, `DarkroomShortcuts.h`), `Ffmpeg` (process
-  wrapper, UI-free), `Import` (per-item import workers, UI-free), `Utils` (path and file helpers, the
-  supported-extension lists, ffmpeg discovery, error-reporting message boxes), and `main.cpp`.
+- Root - app-wide modules: `SharedSettings.h` (the shared settings store, its keys and defaults), `Shortcuts.h`
+  (shortcut strings shared by several windows), each with a Darkroom-only counterpart (`DarkroomSettings.h`,
+  `DarkroomShortcuts.h`), `Ffmpeg` (process wrapper, UI-free), `Import` (per-item import workers, UI-free), `Utils`
+  (path and file helpers, the supported-extension lists, ffmpeg discovery, error-reporting message boxes), and
+  `main.cpp`.
 
 Placement rule: a file that prompts or pumps events belongs in `Windows/`; a UI-free worker at the root or in
 `Core/`; a widget shared by several windows in `UiComponents/`.

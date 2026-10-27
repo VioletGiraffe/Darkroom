@@ -1,6 +1,5 @@
 #include "Windows/SettingsDialog.h"
 #include "DarkroomSettings.h"
-#include "Settings.h"
 #include "SharedSettings.h"
 #include "Theme/Style.h"
 #include "Theme/Theme.h"
@@ -53,7 +52,7 @@ GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent
 {
 	setWindowTitle(tr("General"));
 
-	_ffmpegPath = new QLineEdit(readSharedSetting(Settings::FfmpegPath).toString(), this);
+	_ffmpegPath = new QLineEdit(sharedSettings().value(Settings::FfmpegPath).toString(), this);
 
 	// Show the empty-field fallback, not the configured path.
 	const QString detectedFfmpeg = autoDetectedFfmpegPath();
@@ -119,7 +118,7 @@ GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent
 
 void GeneralSettingsPage::acceptSettings()
 {
-	writeSharedSetting(Settings::FfmpegPath, _ffmpegPath->text().trimmed());
+	sharedSettings().setValue(Settings::FfmpegPath, _ffmpegPath->text().trimmed());
 }
 
 void GeneralSettingsPage::rejectSettings()
@@ -134,8 +133,9 @@ EncodingSettingsPage::EncodingSettingsPage(QWidget* parent) : CSettingsPage(pare
 {
 	setWindowTitle(tr("Encoding"));
 
-	const bool useTiff  = readSettingOrDarkroomDefault(Settings::UseTiff,     Defaults::UseTiff).toBool();
-	const int  quality  = readSettingOrDarkroomDefault(Settings::JpegQuality, Defaults::JpegQuality).toInt();
+	const QSettings settings = sharedSettings();
+	const bool useTiff  = settings.value(Settings::UseTiff,     Defaults::UseTiff).toBool();
+	const int  quality  = settings.value(Settings::JpegQuality, Defaults::JpegQuality).toInt();
 	const int  step     = QSettings{}.value(Settings::FrameStep,   Defaults::FrameStep).toInt();
 
 	_formatToggle = new SegmentedToggle({ tr("JPEG"), tr("TIFF") }, this);
@@ -181,10 +181,10 @@ EncodingSettingsPage::EncodingSettingsPage(QWidget* parent) : CSettingsPage(pare
 
 void EncodingSettingsPage::acceptSettings()
 {
-	QSettings s;
-	s.setValue(Settings::UseTiff,     _formatToggle->currentIndex() == 1);
-	s.setValue(Settings::JpegQuality, _quality->value());
-	s.setValue(Settings::FrameStep,   _frameStep->value());
+	QSettings shared = sharedSettings();
+	shared.setValue(Settings::UseTiff,     _formatToggle->currentIndex() == 1);
+	shared.setValue(Settings::JpegQuality, _quality->value());
+	QSettings{}.setValue(Settings::FrameStep, _frameStep->value());
 }
 
 SettingsDialog::SettingsDialog(QWidget* parent) : CSettingsDialog(parent)

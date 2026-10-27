@@ -4,12 +4,16 @@
 
 ## Settings ownership
 
-`QSettings` keys and defaults are matching `Settings::Foo` and `Defaults::Foo` constants:
+`QSettings` keys and defaults are matching `Settings::Foo` and `Defaults::Foo` constants. There are two stores:
 
-- `Settings.h` holds the keys both apps read, of two kinds:
-  - shared (the ffmpeg path): one value in Darkroom's store, through `readSharedSetting` / `writeSharedSetting`;
-  - each app's own: read through `readSettingOrDarkroomDefault`, so Quickroom follows Darkroom's value until it
-    stores its own.
+- shared (`sharedSettings()`): preferences that mean the same in both apps - the ffmpeg path, the frame encoding,
+  the theming choices, the video player's and photo compare's behavior toggles;
+- each app's own (`QSettings{}`): everything else, including the shared windows' remembered state.
+
+`initSharedSettings()` runs at startup, before the theme is first used: it points `CThemeController` at the shared
+store and moves shared values that earlier versions left in the apps' own stores.
+
+- `SharedSettings.h` holds every shared-store key.
 - `DarkroomSettings.h` holds Darkroom's app-wide keys. A few have no UI and are edited in the settings file; the
   header marks them.
 - Narrow settings used by one implementation remain local to that owner.

@@ -1,7 +1,6 @@
 #include "Windows/SingleFrameExtraction.h"
 
 #include "Ffmpeg.h"
-#include "Settings.h"
 #include "SharedSettings.h"
 #include "Utils.h"
 #include "compiler/compiler_warnings_control.h"
@@ -73,8 +72,9 @@ QString SingleFrameExtraction::extractFrame(const QString& videoPath, qint64 tim
 		return {};
 	}
 
-	const bool tiff       = readSettingOrDarkroomDefault(Settings::UseTiff, Defaults::UseTiff).toBool();
-	const int jpegQuality = readSettingOrDarkroomDefault(Settings::JpegQuality, Defaults::JpegQuality).toInt();
+	const QSettings settings = sharedSettings();
+	const bool tiff       = settings.value(Settings::UseTiff, Defaults::UseTiff).toBool();
+	const int jpegQuality = settings.value(Settings::JpegQuality, Defaults::JpegQuality).toInt();
 	const QString filePath = firstAvailableFramePath(videoPath, timestampMs, folder, tiff);
 
 	const Ffmpeg::SplitResult result = Ffmpeg::extractSingleFrame(videoPath, timestampMs, filePath, jpegQuality);

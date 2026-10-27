@@ -3,6 +3,7 @@
 #include "Windows/OscillatingPlayback.h"
 #include "Windows/OscillationCurve.h"
 #include "UiComponents/MarkerSlider.h"
+#include "SharedSettings.h"
 #include "Shortcuts.h"
 #include "Theme/Theme.h"
 #include "theme/ctintedsvgiconengine.h"
@@ -58,18 +59,6 @@ RESTORE_COMPILER_WARNINGS
 #include <stdint.h>
 #include <utility>
 
-namespace Settings {
-	constexpr const char* PauseOnSeek  = "VideoPlayer/PauseOnSeek";
-	constexpr const char* Volume       = "VideoPlayer/Volume";
-	constexpr const char* Muted        = "VideoPlayer/Muted";
-}
-
-namespace Defaults {
-	constexpr bool PauseOnSeek = true;
-	constexpr int  Volume      = 100;
-	constexpr bool Muted       = false;
-}
-
 namespace {
 // A zero speed preserves legacy loops saved before speed became an attribute.
 enum LoopItemDataRole { LoopStartRole = Qt::UserRole, LoopEndRole = Qt::UserRole + 1, LoopNameRole = Qt::UserRole + 2, LoopSpeedRole = Qt::UserRole + 3 };
@@ -94,8 +83,6 @@ constexpr qint64 MaxOscillationDurationMs = 30000;
 constexpr qreal MaxOscillationFrameRate = 60.0;
 constexpr QSize MaxOscillationFrameSize{ 1920, 1080 };
 constexpr int ExpectedFrameCountAllowance = 2;
-constexpr const char* OscillationCurveSettingKey = "VideoPlayer/OscillationCurve";
-constexpr const char* DefaultOscillationCurveSetting = "cosine";
 
 OscillationCurve oscillationCurveFromSetting(const QString& value)
 {
@@ -139,7 +126,7 @@ VideoPlayerWindow::VideoPlayerWindow(const QString& videoPath, PlaybackSettingsS
 {
 	setAttribute(Qt::WA_DeleteOnClose);
 
-	const QSettings settings;
+	const QSettings settings = sharedSettings();
 
 	_instances.push_back(this);
 	_videoWidget = new QVideoWidget(this);
@@ -169,7 +156,7 @@ VideoPlayerWindow::VideoPlayerWindow(const QString& videoPath, PlaybackSettingsS
 	for (const auto& s : speeds)
 		_speedCombo->addItem(QString::number(s) + "×", s);
 
-	_pauseOnSeek = settings.value(Settings::PauseOnSeek, Defaults::PauseOnSeek).toBool();
+	_pauseOnSeek = settings.value(Settings::VideoPlayerPauseOnSeek, Defaults::VideoPlayerPauseOnSeek).toBool();
 
 	connect(_speedCombo, &QComboBox::currentIndexChanged, this, [this](int index) {
 		if (index < 0)
@@ -184,7 +171,7 @@ VideoPlayerWindow::VideoPlayerWindow(const QString& videoPath, PlaybackSettingsS
 
 	connect(pauseOnSeekCheck, &QCheckBox::toggled, this, [this](bool checked) {
 		_pauseOnSeek = checked;
-		QSettings{}.setValue(Settings::PauseOnSeek, checked);
+		sharedSettings().setValue(Settings::VideoPlayerPauseOnSeek, checked);
 	});
 
 	_volumeSlider = new QSlider(Qt::Horizontal, this);
@@ -205,8 +192,8 @@ VideoPlayerWindow::VideoPlayerWindow(const QString& videoPath, PlaybackSettingsS
 	};
 
 	{
-		const int savedVolume = settings.value(Settings::Volume, Defaults::Volume).toInt();
-		_userMuted = settings.value(Settings::Muted, Defaults::Muted).toBool();
+		const int savedVolume = settings.value(Settings::VideoPlayerVolume, Defaults::VideoPlayerVolume).toInt();
+		_userMuted = settings.value(Settings::VideoPlayerMuted, Defaults::VideoPlayerMuted).toBool();
 		_volumeSlider->setValue(savedVolume);
 		applyVolume(savedVolume);
 		muteButton->setChecked(_userMuted);
@@ -216,13 +203,13 @@ VideoPlayerWindow::VideoPlayerWindow(const QString& videoPath, PlaybackSettingsS
 
 	connect(_volumeSlider, &QAbstractSlider::valueChanged, this, [applyVolume](int position) {
 		applyVolume(position);
-		QSettings{}.setValue(Settings::Volume, position);
+		sharedSettings().setValue(Settings::VideoPlayerVolume, position);
 	});
 	connect(muteButton, &QPushButton::toggled, this, [this, updateMuteIcon](bool muted) {
 		_userMuted = muted;
 		applyEffectiveMute();
 		updateMuteIcon();
-		QSettings{}.setValue(Settings::Muted, muted);
+		sharedSettings().setValue(Settings::VideoPlayerMuted, muted);
 	});
 
 	_loopStartButton = new QPushButton("A", this);
@@ -251,7 +238,7 @@ VideoPlayerWindow::VideoPlayerWindow(const QString& videoPath, PlaybackSettingsS
 	_oscillationCurveCombo->addItem(tr("Smooth"), "smoothstep");
 	_oscillationCurveCombo->addItem(tr("Extra smooth"), "smootherstep");
 	const OscillationCurve savedCurve = oscillationCurveFromSetting(settings.value(
-		OscillationCurveSettingKey, DefaultOscillationCurveSetting).toString());
+		Settings::VideoPlayerOscillationCurve, Defaults::VideoPlayerOscillationCurve).toString());
 	const QString savedCurveSetting = oscillationCurveSetting(savedCurve);
 	_oscillationCurveCombo->setCurrentIndex(_oscillationCurveCombo->findData(savedCurveSetting));
 	_oscillatingPlayback->setCurve(savedCurve);
@@ -388,7 +375,7 @@ VideoPlayerWindow::VideoPlayerWindow(const QString& videoPath, PlaybackSettingsS
 			return;
 		const OscillationCurve curve = oscillationCurveFromSetting(_oscillationCurveCombo->itemData(index).toString());
 		_oscillatingPlayback->setCurve(curve);
-		QSettings{}.setValue(OscillationCurveSettingKey, oscillationCurveSetting(curve));
+		sharedSettings().setValue(Settings::VideoPlayerOscillationCurve, oscillationCurveSetting(curve));
 	});
 	connect(_oscillationCheck, &QCheckBox::toggled, this, [this](bool checked) {
 		if (checked)

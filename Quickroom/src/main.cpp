@@ -4,6 +4,7 @@
 #include "FileOperations.h"
 #include "FolderListing.h"
 #include "MemoryLog.h"
+#include "SharedSettings.h"
 #include "Theme/Style.h"
 #include "UiComponents/SortControl.h"
 #include "Utils.h"
@@ -131,7 +132,7 @@ int main(int argc, char* argv[])
 
 	QApplication app(argc, argv);
 	app.setOrganizationName("VioletGiraffe");
-	app.setApplicationName("Quickroom");
+	app.setApplicationName(QuickroomApplicationName);
 	app.setApplicationVersion(STRINGIFY_EXPANDED_ARGUMENT(QUICKROOM_VERSION));
 	app.setWindowIcon(QIcon(":/quickroom.svg"));
 
@@ -142,6 +143,7 @@ int main(int argc, char* argv[])
 
 	QImageReader::setAllocationLimit(2048);  // raise Qt's 256 MB decode cap; 67 MP at 3x8 bits already exceeds it
 
+	initSharedSettings();
 	Style::install();
 
 	// Take the first argument as a path to open, if any

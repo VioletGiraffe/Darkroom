@@ -1,7 +1,6 @@
 #include "Utils.h"
 #include "Ffmpeg.h"
 #include "ImageDecoding/ImageDecoding.h"
-#include "Settings.h"
 #include "SharedSettings.h"
 
 #include "compiler/compiler_warnings_control.h"
@@ -342,6 +341,6 @@ QString autoDetectedFfmpegPath()
 
 QString ffmpegPath()
 {
-	const QString configured = readSharedSetting(Settings::FfmpegPath).toString();
+	const QString configured = sharedSettings().value(Settings::FfmpegPath).toString();
 	return (!configured.isEmpty() && QFile::exists(configured)) ? configured : autoDetectedFfmpegPath();
 }

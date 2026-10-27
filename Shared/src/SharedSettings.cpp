@@ -1,26 +1,59 @@
 #include "SharedSettings.h"
+#include "theme/cthemecontroller.h"
 
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QCoreApplication>
-#include <QSettings>
 RESTORE_COMPILER_WARNINGS
 
-QVariant readSharedSetting(const char* key, const QVariant& defaultValue)
+namespace {
+
+constexpr const char* SharedSettingsApplicationName = "DarkroomShared";
+
+void moveSharedValuesOutOfAppStores()
 {
-	return QSettings{ QCoreApplication::organizationName(), DarkroomApplicationName }.value(key, defaultValue);
+	constexpr const char* sharedKeys[] {
+		Settings::FfmpegPath,
+		Settings::UseTiff,
+		Settings::JpegQuality,
+		Settings::VideoPlayerPauseOnSeek,
+		Settings::VideoPlayerVolume,
+		Settings::VideoPlayerMuted,
+		Settings::VideoPlayerOscillationCurve,
+		Settings::PhotoCompareIgnoreRotation,
+		// CThemeController's
+		"Theme/ColorScheme",
+		"Theme/LightTheme",
+		"Theme/DarkTheme",
+	};
+
+	QSettings shared = sharedSettings();
+	// Darkroom first: its value wins where both apps stored one.
+	for (const char* application : { DarkroomApplicationName, QuickroomApplicationName })
+	{
+		QSettings appStore{ QCoreApplication::organizationName(), application };
+		for (const char* key : sharedKeys)
+		{
+			if (!appStore.contains(key))
+				continue;
+
+			if (!shared.contains(key))
+				shared.setValue(key, appStore.value(key));
+			appStore.remove(key);
+		}
+	}
 }
 
-void writeSharedSetting(const char* key, const QVariant& value)
+} // namespace
+
+QSettings sharedSettings()
 {
-	QSettings{ QCoreApplication::organizationName(), DarkroomApplicationName }.setValue(key, value);
+	return QSettings{ QCoreApplication::organizationName(), SharedSettingsApplicationName };
 }
 
-QVariant readSettingOrDarkroomDefault(const char* key, const QVariant& defaultValue)
+void initSharedSettings()
 {
-	if (const QSettings own; own.contains(key))
-		return own.value(key);
-
-	return readSharedSetting(key, defaultValue);
+	moveSharedValuesOutOfAppStores();
+	CThemeController::setSettingsLocation(QCoreApplication::organizationName(), SharedSettingsApplicationName);
 }

@@ -1,6 +1,6 @@
 #pragma once
 
-// Darkroom-only keys; the shared ones are in Settings.h.
+// Darkroom-only keys; the shared ones are in SharedSettings.h.
 namespace Settings {
 	constexpr const char* RootFolder    = "settings/rootFolder";
 	constexpr const char* RecentLibraries = "settings/recentLibraries";

@@ -2,7 +2,6 @@
 #include "Core/Catalog.h"
 #include "Ffmpeg.h"
 #include "DarkroomSettings.h"
-#include "Settings.h"
 #include "SharedSettings.h"
 #include "Utils.h"
 
@@ -32,8 +31,8 @@ namespace {
 Ffmpeg::SplitOptions configuredSplitOptions()
 {
 	return {
-		.tiff = readSettingOrDarkroomDefault(Settings::UseTiff, Defaults::UseTiff).toBool(),
-		.jpegQuality = readSettingOrDarkroomDefault(Settings::JpegQuality, Defaults::JpegQuality).toInt(),
+		.tiff = sharedSettings().value(Settings::UseTiff, Defaults::UseTiff).toBool(),
+		.jpegQuality = sharedSettings().value(Settings::JpegQuality, Defaults::JpegQuality).toInt(),
 		.frameStep = QSettings{}.value(Settings::FrameStep, Defaults::FrameStep).toInt(),
 	};
 }

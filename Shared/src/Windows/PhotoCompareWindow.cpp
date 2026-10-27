@@ -3,6 +3,7 @@
 #include "Core/IoThreadPool.h"
 #include "ImageDecoding/ImageDecoding.h"
 #include "MagicAlignment.h"
+#include "SharedSettings.h"
 #include "Theme/Theme.h"
 #include "UiComponents/MarkerSlider.h"
 #include "UiComponents/SegmentedToggle.h"
@@ -56,7 +57,6 @@ RESTORE_COMPILER_WARNINGS
 #include <utility>
 
 namespace Settings {
-	constexpr const char* PhotoCompareIgnoreRotation = "photoCompare/ignoreRotation";
 	constexpr const char* PhotoCompareAoi = "photoCompare/aoiNormalized";
 }
 
@@ -430,9 +430,9 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 	_ignoreRotationCheck->setToolTip(tr("Auto-align fits scale and offset only, treating any apparent rotation as spurious\n"
 	                                     "(e.g. depth parallax between focus-stack slices can read as a slight tilt)"));
 	_ignoreRotationCheck->setFocusPolicy(Qt::NoFocus);
-	_ignoreRotationCheck->setChecked(QSettings{}.value(Settings::PhotoCompareIgnoreRotation, false).toBool());
+	_ignoreRotationCheck->setChecked(sharedSettings().value(Settings::PhotoCompareIgnoreRotation, Defaults::PhotoCompareIgnoreRotation).toBool());
 	connect(_ignoreRotationCheck, &QCheckBox::toggled, this,
-	        [](bool checked) { QSettings{}.setValue(Settings::PhotoCompareIgnoreRotation, checked); });
+	        [](bool checked) { sharedSettings().setValue(Settings::PhotoCompareIgnoreRotation, checked); });
 	toolbar->addWidget(_ignoreRotationCheck, 0);
 
 	_diffToggle = new SegmentedToggle({ tr("Normal"), tr("Difference") }, this);

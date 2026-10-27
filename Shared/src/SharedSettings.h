@@ -3,15 +3,37 @@
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
-#include <QVariant>
+#include <QSettings>
 RESTORE_COMPILER_WARNINGS
 
-// Darkroom's QSettings application name: the store of shared settings and the defaults of Quickroom's own.
 constexpr const char* DarkroomApplicationName = "Darkroom";
+constexpr const char* QuickroomApplicationName = "Quickroom";
 
-// One value for both apps, kept in Darkroom's store.
-[[nodiscard]] QVariant readSharedSetting(const char* key, const QVariant& defaultValue = {});
-void writeSharedSetting(const char* key, const QVariant& value);
+// Preferences that mean the same in both apps; everything else stays in each app's own store.
+[[nodiscard]] QSettings sharedSettings();
 
-// Reads this app's own store, else Darkroom's, else returns defaultValue. Writes go to the app's own store.
-[[nodiscard]] QVariant readSettingOrDarkroomDefault(const char* key, const QVariant& defaultValue);
+// Must run at startup before the theme is first used: points CThemeController at the shared store.
+// Also moves shared values left in the apps' own stores by earlier versions.
+void initSharedSettings();
+
+// Every key of the shared store except CThemeController's.
+namespace Settings {
+	constexpr const char* FfmpegPath                  = "settings/ffmpegPath";
+	constexpr const char* UseTiff                     = "settings/useTiff";
+	constexpr const char* JpegQuality                 = "settings/jpegQuality";
+	constexpr const char* VideoPlayerPauseOnSeek      = "VideoPlayer/PauseOnSeek";
+	constexpr const char* VideoPlayerVolume           = "VideoPlayer/Volume";
+	constexpr const char* VideoPlayerMuted            = "VideoPlayer/Muted";
+	constexpr const char* VideoPlayerOscillationCurve = "VideoPlayer/OscillationCurve";
+	constexpr const char* PhotoCompareIgnoreRotation  = "photoCompare/ignoreRotation";
+}
+
+namespace Defaults {
+	constexpr bool        UseTiff                     = false;
+	constexpr int         JpegQuality                 = 1;
+	constexpr bool        VideoPlayerPauseOnSeek      = true;
+	constexpr int         VideoPlayerVolume           = 100;
+	constexpr bool        VideoPlayerMuted            = false;
+	constexpr const char* VideoPlayerOscillationCurve = "cosine";
+	constexpr bool        PhotoCompareIgnoreRotation  = false;
+}

@@ -40,6 +40,7 @@ int main(int argc, char* argv[])
 
 	QImageReader::setAllocationLimit(2048);  // raise Qt's 256 MB decode cap; 67 MP at 3x8 bits already exceeds it
 
+	initSharedSettings();
 	Style::install();
 
 	MainWindow window;

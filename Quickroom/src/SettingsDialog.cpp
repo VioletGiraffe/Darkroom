@@ -1,5 +1,4 @@
 #include "SettingsDialog.h"
-#include "Settings.h"
 #include "SharedSettings.h"
 #include "Theme/Style.h"
 #include "Theme/Theme.h"
@@ -52,7 +51,7 @@ GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent
 {
 	setWindowTitle(tr("General"));
 
-	_ffmpegPath = new QLineEdit(readSharedSetting(Settings::FfmpegPath).toString(), this);
+	_ffmpegPath = new QLineEdit(sharedSettings().value(Settings::FfmpegPath).toString(), this);
 
 	// Show the empty-field fallback, not the configured path.
 	const QString detectedFfmpeg = autoDetectedFfmpegPath();
@@ -118,7 +117,7 @@ GeneralSettingsPage::GeneralSettingsPage(QWidget* parent) : CSettingsPage(parent
 
 void GeneralSettingsPage::acceptSettings()
 {
-	writeSharedSetting(Settings::FfmpegPath, _ffmpegPath->text().trimmed());
+	sharedSettings().setValue(Settings::FfmpegPath, _ffmpegPath->text().trimmed());
 }
 
 void GeneralSettingsPage::rejectSettings()
@@ -133,8 +132,9 @@ FrameExtractionSettingsPage::FrameExtractionSettingsPage(QWidget* parent) : CSet
 {
 	setWindowTitle(tr("Frame extraction"));
 
-	const bool useTiff  = readSettingOrDarkroomDefault(Settings::UseTiff,     Defaults::UseTiff).toBool();
-	const int  quality  = readSettingOrDarkroomDefault(Settings::JpegQuality, Defaults::JpegQuality).toInt();
+	const QSettings settings = sharedSettings();
+	const bool useTiff  = settings.value(Settings::UseTiff,     Defaults::UseTiff).toBool();
+	const int  quality  = settings.value(Settings::JpegQuality, Defaults::JpegQuality).toInt();
 
 	_formatToggle = new SegmentedToggle({ tr("JPEG"), tr("TIFF") }, this);
 	_formatToggle->setCurrentIndex(useTiff ? 1 : 0);
@@ -173,7 +173,7 @@ FrameExtractionSettingsPage::FrameExtractionSettingsPage(QWidget* parent) : CSet
 
 void FrameExtractionSettingsPage::acceptSettings()
 {
-	QSettings s;
+	QSettings s = sharedSettings();
 	s.setValue(Settings::UseTiff,     _formatToggle->currentIndex() == 1);
 	s.setValue(Settings::JpegQuality, _quality->value());
 }
