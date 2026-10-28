@@ -25,6 +25,11 @@ static constexpr int THUMBNAIL_LABEL_HEIGHT = 20;
 static constexpr int FILE_TYPE_ICON_SIDE = 16; // logical; the native size drawn is the largest that fits
 static constexpr int FILE_TYPE_ICON_GAP = 3;
 
+// QWidget does not derive contentsMargins from QSS border/padding; mirror the central sheet manually.
+static constexpr int THUMBNAIL_BORDER_WIDTH = 1;
+static constexpr int THUMBNAIL_PADDING = 2;
+static constexpr int FRAMED_MARGIN = THUMBNAIL_BORDER_WIDTH + THUMBNAIL_PADDING;
+
 // Avoid reading cards merely flicked past during scrolling.
 static constexpr int LOAD_DWELL_MS = 100;
 
@@ -240,11 +245,14 @@ QSize ThumbnailWidget::sizeHint() const
 		return _options.canvasSize.isEmpty() ? QWidget::sizeHint() : _options.canvasSize;
 
 	// Dynamic consumers tighten after load; QListWidget callers must update their cached item hint themselves.
-	const QMargins m = contentsMargins();
-	const int labelHeight = _caption.isEmpty() ? 0 : THUMBNAIL_LABEL_HEIGHT;
 	const QSize imageArea = _image.isNull() ? imageAreaBounds() : _image.deviceIndependentSize().toSize();
-	return QSize(imageArea.width() + m.left() + m.right(),
-	            imageArea.height() + labelHeight + m.top() + m.bottom());
+	return imageArea + chromeSize(_options, !_caption.isEmpty());
+}
+
+QSize ThumbnailWidget::chromeSize(const Options& options, bool captioned)
+{
+	const int margins = options.framed ? 2 * FRAMED_MARGIN : 0;
+	return { margins, margins + (captioned ? THUMBNAIL_LABEL_HEIGHT : 0) };
 }
 
 void ThumbnailWidget::mouseDoubleClickEvent(QMouseEvent* event)
@@ -367,10 +375,6 @@ void ThumbnailWidget::paintEvent(QPaintEvent*)
 
 void ThumbnailWidget::applyStyleSettings()
 {
-	// QWidget does not derive contentsMargins from QSS border/padding; mirror the central sheet manually.
-	static constexpr int THUMBNAIL_BORDER_WIDTH = 1;
-	static constexpr int THUMBNAIL_PADDING = 2;
-
 	setAttribute(Qt::WA_StyledBackground);
 
 	// Object-name rules in the central sheet avoid per-instance polish across hundreds of thumbnails.
@@ -383,9 +387,5 @@ void ThumbnailWidget::applyStyleSettings()
 
 	setObjectName("framedThumbnail");
 	setAttribute(Qt::WA_Hover);
-	setContentsMargins(
-		THUMBNAIL_BORDER_WIDTH + THUMBNAIL_PADDING,
-		THUMBNAIL_BORDER_WIDTH + THUMBNAIL_PADDING,
-		THUMBNAIL_BORDER_WIDTH + THUMBNAIL_PADDING,
-		THUMBNAIL_BORDER_WIDTH + THUMBNAIL_PADDING);
+	setContentsMargins(FRAMED_MARGIN, FRAMED_MARGIN, FRAMED_MARGIN, FRAMED_MARGIN);
 }

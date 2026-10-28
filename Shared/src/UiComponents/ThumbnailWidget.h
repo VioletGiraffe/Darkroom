@@ -55,6 +55,9 @@ public:
 
 	QSize sizeHint() const override;
 
+	// The widget's extent around its image area: the frame's margins and the caption band
+	[[nodiscard]] static QSize chromeSize(const Options& options, bool captioned);
+
 	// Exposed so MediaItemWidget can keep corner badges clear of proportional film bands.
 	[[nodiscard]] static int filmStripBandHeight(int imageAreaHeight);
 

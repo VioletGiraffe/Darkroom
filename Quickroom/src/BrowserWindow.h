@@ -7,6 +7,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QFileIconProvider>
 #include <QMainWindow>
 #include <QSet>
+#include <QSize>
 #include <QString>
 #include <QStringList>
 RESTORE_COMPILER_WARNINGS
@@ -100,6 +101,9 @@ private:
 	[[nodiscard]] Qt::DropAction dropAction(const QDropEvent& event) const;
 
 	[[nodiscard]] QWidget* buildTile(QListWidgetItem* item);
+	// The zoomed width; the height gives the image area the first image's aspect, square without one
+	[[nodiscard]] QSize tileSize() const;
+	void setTileSizeHints();
 	void zoomTiles(int steps);
 	void applyTileSize();
 
@@ -116,7 +120,8 @@ private:
 	QFileSystemWatcher* _folderWatcher = nullptr;
 	QFileIconProvider _iconProvider;
 
-	int _tileSize = -1;
+	int _tileWidth = -1;
+	QSize _firstImageSize; // upright, of the listed folder's first image in sort order; empty when unknown
 	QString _currentPath;
 	std::vector<QString> _history;
 	int _historyIndex = -1;

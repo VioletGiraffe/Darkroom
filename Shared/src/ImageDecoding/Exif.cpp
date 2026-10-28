@@ -112,13 +112,22 @@ ExifMetadata readJpegExif(QByteArrayView jpeg) noexcept
 		if (length < 2 || pos + 2 + length > jpeg.size())
 			break;
 
-		const QByteArrayView payload = jpeg.sliced(pos + 4, length - 2);
-		if (marker == 0xE1 && payload.startsWith(QByteArrayView{ "Exif\0\0", 6 })) // APP1
-			return metadataFromExifTiff(payload.sliced(6));
+		if (marker == 0xE1) // APP1
+		{
+			if (const std::optional<ExifMetadata> metadata = readExifApp1(jpeg.sliced(pos + 4, length - 2)))
+				return *metadata;
+		}
 
 		pos += 2 + length;
 	}
 	return {};
+}
+
+std::optional<ExifMetadata> readExifApp1(QByteArrayView payload) noexcept
+{
+	if (!payload.startsWith(QByteArrayView{ "Exif\0\0", 6 }))
+		return std::nullopt;
+	return metadataFromExifTiff(payload.sliced(6));
 }
 
 } // namespace ImageDecoding

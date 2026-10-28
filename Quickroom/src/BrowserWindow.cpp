@@ -2,6 +2,7 @@
 #include "FileOperations.h"
 #include "FileTypeIcons.h"
 #include "FolderListing.h"
+#include "ImageDecoding/ImageDecoding.h"
 #include "SettingsDialog.h"
 #include "Theme/Theme.h"
 #include "UiComponents/IconSource.h"
@@ -65,6 +66,7 @@ DISABLE_COMPILER_WARNINGS
 RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
+#include <cmath>
 #include <optional>
 #include <ranges>
 #include <unordered_map>
@@ -77,13 +79,14 @@ const QString LAST_FOLDER_KEY = QStringLiteral("browser/lastFolder");
 const QString TILE_SIZE_KEY   = QStringLiteral("browser/tileSize");
 const QString PATH_FIELD_HISTORY_KEY = QStringLiteral("browser/pathFieldHistory");
 constexpr int PATH_FIELD_HISTORY_SIZE = 100;
-constexpr int DEFAULT_TILE_SIZE = 160;
-constexpr int MIN_TILE_SIZE  = 80;
-constexpr int MAX_TILE_SIZE  = 800;
+constexpr int DEFAULT_TILE_WIDTH = 160;
+constexpr int MIN_TILE_WIDTH  = 80;
+constexpr int MAX_TILE_WIDTH  = 800;
+const ThumbnailWidget::Options TILE_OPTIONS{};
 
-int savedTileSize()
+int savedTileWidth()
 {
-	return qBound(MIN_TILE_SIZE, QSettings{}.value(TILE_SIZE_KEY, DEFAULT_TILE_SIZE).toInt(), MAX_TILE_SIZE);
+	return qBound(MIN_TILE_WIDTH, QSettings{}.value(TILE_SIZE_KEY, DEFAULT_TILE_WIDTH).toInt(), MAX_TILE_WIDTH);
 }
 
 // A cut file's tile is drawn faded, as file managers draw theirs.
@@ -202,7 +205,7 @@ void BrowserWindow::showForFolder(const QString& folder, const QString& selectPa
 }
 
 BrowserWindow::BrowserWindow(const QString& folder, PathFieldHistory history)
-	: _tileSize{ savedTileSize() }
+	: _tileWidth{ savedTileWidth() }
 {
 	setupUi();
 	setupMainMenu();
@@ -388,14 +391,13 @@ bool BrowserWindow::listDirectory(const QString& path)
 		_folderWatcher->removePaths(watched);
 	_folderWatcher->addPath(_currentPath);
 
-	const QSize cell{ _tileSize, _tileSize };
 	for (FolderEntry& entry : *entries)
-	{
-		auto* item = new GridEntry(std::move(entry), _sortControl->order());
-		item->setSizeHint(cell);
-		_grid->addItem(item);
-	}
+		_grid->addItem(new GridEntry(std::move(entry), _sortControl->order()));
 	_grid->sortItems(Qt::AscendingOrder);
+
+	const QStringList images = shownPathsOfKind(*_grid, EntryKind::Image);
+	_firstImageSize = images.empty() ? QSize{} : ImageDecoding::readUprightImageSize(images.front());
+	setTileSizeHints();
 	_grid->scrollToTop();
 	applyNameFilter();
 
@@ -502,7 +504,7 @@ void BrowserWindow::refresh()
 		changed = true;
 	}
 
-	const QSize cell{ _tileSize, _tileSize };
+	const QSize cell = tileSize();
 	for (auto& [path, entry] : onDisk)
 	{
 		auto* item = new GridEntry(std::move(entry), _sortControl->order());
@@ -834,8 +836,8 @@ QWidget* BrowserWindow::buildTile(QListWidgetItem* item)
 		: ThumbnailWidget::Source{ IconSource{ _iconProvider.icon(fileInfo), videoType } };
 
 	// No drag of its own: the grid drags the whole selection.
-	auto* tile = new ThumbnailWidget(std::move(source), tileCaption(entry), {}, nullptr);
-	tile->setFixedSize(_tileSize, _tileSize);
+	auto* tile = new ThumbnailWidget(std::move(source), tileCaption(entry), TILE_OPTIONS, nullptr);
+	tile->setFixedSize(tileSize());
 	switch (entry.kind)
 	{
 	case EntryKind::Folder:
@@ -857,22 +859,38 @@ QWidget* BrowserWindow::buildTile(QListWidgetItem* item)
 	return tile;
 }
 
+QSize BrowserWindow::tileSize() const
+{
+	if (_firstImageSize.isEmpty())
+		return { _tileWidth, _tileWidth };
+
+	// Bounded: a panorama or a tall strip would squeeze every other tile's image
+	const double heightPerWidth = std::clamp(static_cast<double>(_firstImageSize.height()) / _firstImageSize.width(), 0.5, 2.0);
+	const QSize chrome = ThumbnailWidget::chromeSize(TILE_OPTIONS, true); // tileCaption is never empty
+	return { _tileWidth, chrome.height() + static_cast<int>(std::lround((_tileWidth - chrome.width()) * heightPerWidth)) };
+}
+
+void BrowserWindow::setTileSizeHints()
+{
+	const QSize cell = tileSize();
+	for (int row = 0, rows = _grid->count(); row < rows; ++row)
+		_grid->item(row)->setSizeHint(cell);
+}
+
 void BrowserWindow::zoomTiles(int steps)
 {
-	const int next = ThumbnailWidget::zoomedSize(_tileSize, steps, MIN_TILE_SIZE, MAX_TILE_SIZE);
-	if (next == _tileSize)
+	const int next = ThumbnailWidget::zoomedSize(_tileWidth, steps, MIN_TILE_WIDTH, MAX_TILE_WIDTH);
+	if (next == _tileWidth)
 		return;
 
-	_tileSize = next;
+	_tileWidth = next;
 	QSettings{}.setValue(TILE_SIZE_KEY, next);
 	_zoomDebounce->start();
 }
 
 void BrowserWindow::applyTileSize()
 {
-	const QSize cell{ _tileSize, _tileSize };
-	for (int row = 0, rows = _grid->count(); row < rows; ++row)
-		_grid->item(row)->setSizeHint(cell);
+	setTileSizeHints();
 	_grid->discardAllCards();
 	_grid->ensureVisibleCardsExist();
 }

@@ -6,6 +6,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QByteArray>
 #include <QImage>
 #include <QImageIOHandler>
+#include <QSize>
 #include <QString>
 #include <QStringList>
 RESTORE_COMPILER_WARNINGS
@@ -61,5 +62,9 @@ struct DecodedImage {
 [[nodiscard]] DecodedImage decode(const EncodedImage& encoded);
 [[nodiscard]] DecodedImage decode(const QByteArray& encoded);
 void applyOrientation(QImage& image, QImageIOHandler::Transformations orientation);
+
+// The image's size once turned upright, read from the file's headers only; empty when they do not state it.
+// A camera raw's is the size LibRaw renders it at.
+[[nodiscard]] QSize readUprightImageSize(const QString& path);
 
 } // namespace ImageDecoding

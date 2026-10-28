@@ -7,6 +7,8 @@ DISABLE_COMPILER_WARNINGS
 #include <QImageIOHandler>
 RESTORE_COMPILER_WARNINGS
 
+#include <optional>
+
 namespace ImageDecoding {
 
 // What decoding takes from a JPEG's EXIF
@@ -19,5 +21,7 @@ struct ExifMetadata
 
 // jpeg starts with SOI. What the file's EXIF does not state keeps its default.
 [[nodiscard]] ExifMetadata readJpegExif(QByteArrayView jpeg) noexcept;
+// payload is an APP1 segment's, after its length field. Empty unless it holds EXIF.
+[[nodiscard]] std::optional<ExifMetadata> readExifApp1(QByteArrayView payload) noexcept;
 
 } // namespace ImageDecoding

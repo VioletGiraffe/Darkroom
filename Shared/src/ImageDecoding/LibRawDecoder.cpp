@@ -252,4 +252,20 @@ DecodedImage decodeRaw(const QByteArray& file, RawRendering rawRendering)
 	return { .image = std::move(image), .orientation = orientationForFlip(flip) };
 }
 
+QSize readRawUprightSize(thin_io::buffered_reader& file)
+{
+	const std::optional<uint64_t> size = file.size();
+	if (!size)
+		return {};
+
+	BufferedReaderStream stream{ file, *size };
+	const auto raw = std::make_unique<LibRaw>();
+	if (raw->open_datastream(&stream) != LIBRAW_SUCCESS)
+		return {};
+
+	const libraw_image_sizes_t& sizes = raw->imgdata.sizes;
+	const QSize stored{ sizes.width, sizes.height };
+	return orientationForFlip(sizes.flip).testFlag(QImageIOHandler::TransformationRotate90) ? stored.transposed() : stored;
+}
+
 } // namespace ImageDecoding

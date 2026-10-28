@@ -1,5 +1,6 @@
 #include "ImageDecoding/ImageDecoding.h"
 #include "ImageDecoding/ColorManagement.h"
+#include "ImageDecoding/Exif.h"
 #include "ImageDecoding/LibRawDecoder.h"
 #include "ImageDecoding/TurboJpegDecoder.h"
 #include "buffered_reader.hpp" // thin_io
@@ -11,11 +12,15 @@ DISABLE_COMPILER_WARNINGS
 #include <QColorSpace>
 #include <QFileInfo>
 #include <QImageReader>
+#include <QSize>
 #include <QTransform>
+#include <QtEndian>
 RESTORE_COMPILER_WARNINGS
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <utility>
 
 namespace ImageDecoding {
@@ -67,6 +72,63 @@ static DecodedImage decodeWithQt(const QByteArray& encoded)
 		decoded.animated = reader.supportsAnimation();
 	}
 	return decoded;
+}
+
+// The file is at SOI. Empty unless an SOF segment precedes the image data.
+static QSize readJpegUprightSize(thin_io::buffered_reader& file)
+{
+	// EXIF, in APP1, precedes SOF
+	QImageIOHandler::Transformations orientation = QImageIOHandler::TransformationNone;
+	// After SOI, each marker is FF, its code and a big-endian length that counts itself; the image data starts at SOS
+	for (uint64_t pos = 2;;)
+	{
+		file.set_pos(pos);
+		const std::optional<std::span<const std::byte>> header = file.peek(4);
+		if (!header || header->size() < 4 || (*header)[0] != std::byte{ 0xFF })
+			return {};
+
+		const auto marker = static_cast<uint8_t>((*header)[1]);
+		if (marker == 0xFF) // fill byte
+		{
+			++pos;
+			continue;
+		}
+		if (marker == 0xDA || marker == 0xD9) // SOS, EOI
+			return {};
+
+		const uint16_t length = qFromBigEndian<uint16_t>(header->data() + 2);
+		if (length < 2)
+			return {};
+
+		file.set_pos(pos + 4);
+		if (marker == 0xE1) // APP1
+		{
+			const std::optional<std::span<const std::byte>> payload = file.peek(length - 2u);
+			if (!payload)
+				return {};
+			if (const std::optional<ExifMetadata> exif = readExifApp1(QByteArrayView{ payload->data(), static_cast<qsizetype>(payload->size()) }))
+				orientation = exif->orientation;
+		}
+		// SOF0 to SOF15, except DHT, JPG and DAC: precision, height, width
+		else if (marker >= 0xC0 && marker <= 0xCF && marker != 0xC4 && marker != 0xC8 && marker != 0xCC)
+		{
+			const std::optional<std::span<const std::byte>> frame = file.peek(5);
+			if (!frame || frame->size() < 5)
+				return {};
+			const QSize stored{ qFromBigEndian<uint16_t>(frame->data() + 3), qFromBigEndian<uint16_t>(frame->data() + 1) };
+			return orientation.testFlag(QImageIOHandler::TransformationRotate90) ? stored.transposed() : stored;
+		}
+
+		pos += 2u + length;
+	}
+}
+
+static QSize readUprightSizeWithQt(const QString& path)
+{
+	QImageReader reader{ path };
+	reader.setDecideFormatFromContent(true); // as decodeWithQt, which gives no format hint
+	const QSize stored = reader.size();
+	return reader.transformation().testFlag(QImageIOHandler::TransformationRotate90) ? stored.transposed() : stored;
 }
 
 EncodedImage readEncodedImage(const QString& path, RawRendering rawRendering)
@@ -126,6 +188,20 @@ void applyOrientation(QImage& image, QImageIOHandler::Transformations orientatio
 	image.flip(flips);
 	if (orientation.testFlag(QImageIOHandler::TransformationRotate90))
 		image = image.transformed(QTransform{}.rotate(90));
+}
+
+QSize readUprightImageSize(const QString& path)
+{
+	thin_io::buffered_reader file;
+	if (!file.open(thin_io::native_path(path).data()))
+		return {};
+	if (!rawFileSuffix(path).isEmpty())
+		return readRawUprightSize(file);
+
+	const std::optional<std::span<const std::byte>> start = file.peek(3);
+	if (start && isJpeg(QByteArrayView{ start->data(), static_cast<qsizetype>(start->size()) }))
+		return readJpegUprightSize(file);
+	return readUprightSizeWithQt(path);
 }
 
 } // namespace ImageDecoding

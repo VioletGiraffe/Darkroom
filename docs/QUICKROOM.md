@@ -34,6 +34,10 @@ a multi-selection exports all selected paths as file URLs - so tiles offer no si
 is its row's card and fills the cell; the view paints no cell background, and the tile shows selection itself through
 the `selected` property the grid keeps on every card.
 
+All tiles share one size, as the grid's uniform item sizes require. Zoom sets the width; the height gives the image area
+the aspect of the folder's first image in sort order, within 1:2 to 2:1, read from its headers when the folder is listed.
+Without an image the tiles are square. Re-sorting, filtering and refreshing keep the size.
+
 A file tile's caption is its name without the extension, followed by the file type's icon from `FileTypeIcons`: for
 images the format detected from the decoded data, so a misnamed file shows its real type; for camera raws and videos the
 suffix.
@@ -73,7 +77,7 @@ appear without F5. A refresh compares the listing with the grid: unchanged entri
 rewritten in place gets a new one. When the shown folder disappears, the browser moves to its nearest existing
 ancestor.
 
-Browser state (last folder, tile size, sort order, window geometry) persists under `browser/*` settings keys.
+Browser state (last folder, tile width, sort order, window geometry) persists under `browser/*` settings keys.
 
 ## Startup
 
