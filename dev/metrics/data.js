@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793142813568,
+  "lastUpdate": 1793201995265,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -18719,6 +18719,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 82.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "15d9da01b73ad2b3838cb7926b41a0888fd80cb0",
+          "message": "Color management through Little CMS: decoded images carry their ICC profile (embedded, read by Qt, or Adobe RGB declared in EXIF), and the viewer, thumbnails and photo compare convert it to sRGB behind a shared setting, on by default; macOS windows tagged sRGB\n\nQt's own conversion is not used: it rejects valid profiles, such as a tone curve that dips.",
+          "timestamp": "2026-10-28T17:29:20+02:00",
+          "tree_id": "a7a8f2702a2923a6cd2ce8849d5cf7086e20b417",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/15d9da01b73ad2b3838cb7926b41a0888fd80cb0"
+        },
+        "date": 1793201992473,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 18158,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1449,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 31842,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6697,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 6848.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5416,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 815,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 340,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 83,
             "unit": "KB"
           },
           {
