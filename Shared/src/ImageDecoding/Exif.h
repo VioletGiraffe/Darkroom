@@ -1,0 +1,23 @@
+#pragma once
+
+#include "compiler/compiler_warnings_control.h"
+
+DISABLE_COMPILER_WARNINGS
+#include <QByteArrayView>
+#include <QImageIOHandler>
+RESTORE_COMPILER_WARNINGS
+
+namespace ImageDecoding {
+
+// What decoding takes from a JPEG's EXIF
+struct ExifMetadata
+{
+	QImageIOHandler::Transformations orientation = QImageIOHandler::TransformationNone;
+	// ColorSpace 2, or uncalibrated with the DCF interoperability index R03: cameras mark Adobe RGB so without embedding a profile
+	bool adobeRgb = false;
+};
+
+// jpeg starts with SOI. What the file's EXIF does not state keeps its default.
+[[nodiscard]] ExifMetadata readJpegExif(QByteArrayView jpeg) noexcept;
+
+} // namespace ImageDecoding

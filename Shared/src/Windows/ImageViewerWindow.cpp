@@ -1,11 +1,10 @@
 #include "Windows/ImageViewerWindow.h"
 #include "Core/CpuThreadPool.h"
+#include "ImageDecoding/ColorManagement.h"
 #include "ImageDecoding/ImageDecoding.h"
 #include "Shortcuts.h"
 #include "Utils.h"
 #include "assert/advanced_assert.h"
-#include "buffered_reader.hpp" // thin_io
-#include "qt_paths.hpp"        // thin_io
 #include "utils/filemanager.h"
 #include "widgets/cimageviewerwidget.h"
 
@@ -13,6 +12,7 @@ DISABLE_COMPILER_WARNINGS
 #include "resize/qimage_resize.h"
 
 #include <QClipboard>
+#include <QColorSpace>
 #include <QDesktopServices>
 #include <QDir>
 #include <QFile>
@@ -40,11 +40,9 @@ RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 #include <array>
-#include <cstddef>
 #include <cstdlib>
 #include <functional>
 #include <optional>
-#include <span>
 #include <utility>
 
 constexpr QSize MinViewSize{ 120, 100 };
@@ -77,20 +75,18 @@ constexpr std::array SaveAsTypes{
 	return type->lossy;
 }
 
-// Formats Qt decodes stay with the viewer widget's own reader, which also plays animations.
-[[nodiscard]] static std::optional<CImageViewerWidget::DecodedFile> decodeWithoutQt(const QString& path)
+// Animated files stay with the viewer widget's own reader, which plays them.
+[[nodiscard]] static std::optional<CImageViewerWidget::DecodedFile> decodeStill(const QString& path)
 {
-	thin_io::buffered_reader file;
-	if (!file.open(thin_io::native_path(path).data()))
+	ImageDecoding::DecodedImage decoded = ImageDecoding::decode(ImageDecoding::readEncodedImage(path, rawRenderingSetting()));
+	if (decoded.animated)
 		return std::nullopt;
 
-	const std::optional<std::span<const std::byte>> signature = file.peek(ImageDecoding::SignatureSize);
-	if (!signature || ImageDecoding::decoderFor(path, QByteArrayView{ signature->data(), static_cast<qsizetype>(signature->size()) }) == ImageDecoding::Decoder::Qt)
-		return std::nullopt;
-
-	ImageDecoding::DecodedImage decoded = ImageDecoding::decode(ImageDecoding::readEncodedImage(file, path, rawRenderingSetting()));
 	ImageDecoding::applyOrientation(decoded.image, decoded.orientation);
-	return CImageViewerWidget::DecodedFile{ std::move(decoded.image), QString::fromLatin1(decoded.format) };
+	// Save as: Qt's writers embed the profile from the color space, which Qt parses only from some profiles
+	if (!decoded.image.colorSpace().isValid() && !decoded.iccProfile.isEmpty())
+		decoded.image.setColorSpace(QColorSpace::fromIccProfile(decoded.iccProfile));
+	return CImageViewerWidget::DecodedFile{ std::move(decoded.image), QString::fromLatin1(decoded.format), std::move(decoded.iccProfile) };
 }
 
 ImageViewerWindow* ImageViewerWindow::showForImages(QStringList imagePaths, int startIndex, QWidget* parent,
@@ -193,7 +189,9 @@ ImageViewerWindow::ImageViewerWindow(QStringList imagePaths, int startIndex, QWi
 		if (!ImageProcessing::resize(dest, source, srcRect, cpuParallelFor, kernel))
 			CImageViewerWidget::scaleWithQt(dest, source, srcRect, mode);
 	});
-	_view->setImageDecoder(decodeWithoutQt);
+	_view->setImageDecoder(decodeStill);
+	if (colorManagementSetting())
+		_view->setDisplayColorConverter(ImageDecoding::convertToSrgb);
 
 	// The image as the window icon tells several open viewers apart in the taskbar. Restarted per image, so
 	// browsing with the arrow keys scales one icon at the end instead of one per image passed through.

@@ -1,7 +1,9 @@
 #include "UiComponents/ImageFilesSource.h"
 #include "Core/CpuThreadPool.h"
 #include "Core/IoThreadPool.h"
+#include "ImageDecoding/ColorManagement.h"
 #include "ImageDecoding/ImageDecoding.h"
+#include "Utils.h"
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
 #include "timing/profiler.h"
@@ -83,12 +85,13 @@ namespace {
 	// Shared lifetime spans I/O, decode and the Request.
 	// Immutable after posting except the token, the delivery's own state, and the read results, each slot written by its own read.
 	struct LoadJob {
-		LoadJob(QObject* context, std::function<void(ImageSource::Result)> done, QStringList paths, QSize canvasLogical, qreal dpr)
+		LoadJob(QObject* context, std::function<void(ImageSource::Result)> done, QStringList paths, QSize canvasLogical, qreal dpr, bool colorManaged)
 			: _delivery{ context, std::move(done) }
 			, _paths{ std::move(paths) }
 			, _encodedPerPath(_paths.size())
 			, _canvasLogical{ canvasLogical }
 			, _dpr{ dpr }
+			, _colorManaged{ colorManaged }
 		{}
 
 		ImageSource::Delivery _delivery;
@@ -96,6 +99,7 @@ namespace {
 		std::vector<ImageDecoding::EncodedImage> _encodedPerPath;
 		const QSize _canvasLogical;
 		const qreal _dpr;
+		const bool _colorManaged;
 #ifdef PROFILING_ENABLED
 		std::unique_ptr<LoadBatchToken> _batchToken;
 #endif
@@ -145,7 +149,7 @@ namespace {
 				return;
 			}
 
-			// src is as stored: the orientation is applied after the resize, at thumbnail size
+			// src is as stored: the orientation and the color conversion are applied after the resize, at thumbnail size
 			const QImage& src = decoded.image;
 			const QImageIOHandler::Transformations orientation = decoded.orientation;
 			const bool rotates90 = orientation.testFlag(QImageIOHandler::TransformationRotate90);
@@ -160,6 +164,8 @@ namespace {
 					frame.fitted = src.scaled(sizePx, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
 			}
 
+			if (job._colorManaged)
+				ImageDecoding::convertToSrgb(frame.fitted, decoded.iccProfile);
 			ImageDecoding::applyOrientation(frame.fitted, orientation);
 		});
 
@@ -266,7 +272,7 @@ ImageSource::Request ImageFilesSource::renderAsync(QSize box, qreal dpr, QObject
 {
 	assert_and_return_r(!_paths.empty(), {});
 
-	auto job = std::make_shared<LoadJob>(context, std::move(done), _paths, box, dpr);
+	auto job = std::make_shared<LoadJob>(context, std::move(done), _paths, box, dpr, colorManagementSetting());
 #ifdef PROFILING_ENABLED
 	job->_batchToken = std::make_unique<LoadBatchToken>();
 #endif

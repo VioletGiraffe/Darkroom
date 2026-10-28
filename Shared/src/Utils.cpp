@@ -383,3 +383,8 @@ void saveRawRenderingSetting(ImageDecoding::RawRendering rawRendering)
 	assert_and_return_r(entry != std::end(RawRenderingSettingValues), );
 	sharedSettings().setValue(Settings::RawRendering, QString::fromLatin1(entry->value));
 }
+
+bool colorManagementSetting()
+{
+	return sharedSettings().value(Settings::ColorManagement, Defaults::ColorManagement).toBool();
+}

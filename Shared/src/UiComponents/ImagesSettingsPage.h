@@ -2,6 +2,7 @@
 
 #include "appdialogs/csettingspage.h"
 
+class QCheckBox;
 class QComboBox;
 
 // Image settings of the shared store, a page of both apps' settings dialogs
@@ -13,4 +14,5 @@ public:
 
 private:
 	QComboBox* _rawRendering = nullptr;
+	QCheckBox* _colorManagement = nullptr;
 };

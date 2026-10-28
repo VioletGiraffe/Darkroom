@@ -4,7 +4,6 @@
 
 DISABLE_COMPILER_WARNINGS
 #include <QByteArray>
-#include <QByteArrayView>
 #include <QImage>
 #include <QImageIOHandler>
 #include <QString>
@@ -12,8 +11,6 @@ DISABLE_COMPILER_WARNINGS
 RESTORE_COMPILER_WARNINGS
 
 #include <optional>
-
-namespace thin_io { class buffered_reader; }
 
 // Image loading: camera raws through LibRaw, chosen by extension; other files by content, JPEG through libjpeg-turbo and
 // every other format through Qt's image plugins.
@@ -26,7 +23,6 @@ enum class RawRendering {
 	HalfSize,        // LibRaw's rendering without demosaicing: each 2x2 sensor block is one pixel
 	Full,            // LibRaw's demosaiced rendering
 };
-enum class Decoder { Qt, TurboJpeg, LibRaw };
 
 // Lowercase extensions of the camera raw formats. Inline: callers that only list files link no decoder.
 [[nodiscard]] inline const QStringList& rawFileSuffixes()
@@ -47,23 +43,21 @@ struct EncodedImage {
 	std::optional<QImageIOHandler::Transformations> orientation;
 	// Set for a camera raw read whole, never to EmbeddedPreview: decode() renders it through LibRaw
 	std::optional<RawRendering> rawRendering;
+	// Set for a camera raw's preview when the raw's EXIF declares Adobe RGB: applies when the preview embeds no profile
+	bool adobeRgb = false;
 };
 
 struct DecodedImage {
 	QImage image;                                                                       // as stored; null on failure
 	QImageIOHandler::Transformations orientation = QImageIOHandler::TransformationNone; // turns the image upright: see applyOrientation()
+	QByteArray iccProfile;                                                              // the color profile of the pixels, for convertToSrgb(); empty when unknown
 	QByteArray format;                                                                  // QImageReader's name for it, e.g. "jpeg", or a camera raw's suffix; empty when unrecognized
 	QString error;                                                                      // set when image is null
+	bool animated = false;                                                              // the file may hold more frames: Qt's reader supports animation for it
 };
 
-// The leading bytes decoderFor() inspects
-constexpr qsizetype SignatureSize = 3;
-
-// Reads from the start of the file, whatever its position: a caller that sniffed it with peek() pays for no second open.
 // Camera raws are read as rawRendering prescribes, other files whole.
-[[nodiscard]] EncodedImage readEncodedImage(thin_io::buffered_reader& file, const QString& path, RawRendering rawRendering);
 [[nodiscard]] EncodedImage readEncodedImage(const QString& path, RawRendering rawRendering);
-[[nodiscard]] Decoder decoderFor(const QString& path, QByteArrayView signature);
 [[nodiscard]] DecodedImage decode(const EncodedImage& encoded);
 [[nodiscard]] DecodedImage decode(const QByteArray& encoded);
 void applyOrientation(QImage& image, QImageIOHandler::Transformations orientation);

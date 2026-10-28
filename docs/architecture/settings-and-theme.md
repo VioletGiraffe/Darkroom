@@ -7,7 +7,7 @@
 `QSettings` keys and defaults are matching `Settings::Foo` and `Defaults::Foo` constants. There are two stores:
 
 - shared (`sharedSettings()`): preferences that mean the same in both apps - the ffmpeg path, the frame encoding,
-  the theming choices, the camera raw rendering, the video player's and photo compare's behavior toggles;
+  the theming choices, the camera raw rendering, color management, the video player's and photo compare's behavior toggles;
 - each app's own (`QSettings{}`): everything else, including the shared windows' remembered state.
 
 `initSharedSettings()` runs at startup, before the theme is first used: it points `CThemeController` at the shared

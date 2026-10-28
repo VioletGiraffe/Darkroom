@@ -46,6 +46,34 @@ template <typename T>
 	return QByteArray{ "\xFF" } + static_cast<char>(marker) + bytesOf(static_cast<uint16_t>(payload.size() + 2), ByteOrder::Big) + payload;
 }
 
+// IFD0 points to an Exif IFD holding ColorSpace, which points to an interoperability IFD holding interoperabilityIndex if given
+[[nodiscard]] inline QByteArray exifTiffWithColorSpace(ByteOrder order, uint16_t colorSpace, const QByteArray& interoperabilityIndex = {})
+{
+	constexpr uint16_t Ascii = 2, Short = 3, Long = 4;
+	const auto entry = [&](uint16_t tag, uint16_t type, const QByteArray& value) {
+		return bytesOf(tag, order) + bytesOf(type, order) + bytesOf<uint32_t>(type == Ascii ? 4 : 1, order) + value.leftJustified(4, '\0', true);
+	};
+	const auto ifd = [&](const std::vector<QByteArray>& entries) {
+		QByteArray bytes = bytesOf(static_cast<uint16_t>(entries.size()), order);
+		for (const QByteArray& e : entries)
+			bytes += e;
+		return bytes + bytesOf<uint32_t>(0, order);
+	};
+
+	const bool withInteroperability = !interoperabilityIndex.isEmpty();
+	const uint32_t exifIfd = 8 + 2 + 12 + 4;
+	const uint32_t interoperabilityIfd = exifIfd + 2 + 12 * (withInteroperability ? 2 : 1) + 4;
+	std::vector<QByteArray> exifEntries{ entry(0xA001, Short, bytesOf(colorSpace, order)) };
+	if (withInteroperability)
+		exifEntries.push_back(entry(0xA005, Long, bytesOf(interoperabilityIfd, order)));
+
+	QByteArray tiff = (order == ByteOrder::Little ? "II" : "MM") + bytesOf<uint16_t>(42, order) + bytesOf<uint32_t>(8, order)
+		+ ifd({ entry(0x8769, Long, bytesOf(exifIfd, order)) }) + ifd(exifEntries);
+	if (withInteroperability)
+		tiff += ifd({ entry(0x0001, Ascii, interoperabilityIndex) });
+	return tiff;
+}
+
 [[nodiscard]] inline QByteArray exifSegment(const QByteArray& tiff)
 {
 	return segment(0xE1, QByteArray{ "Exif\0\0", 6 } + tiff);

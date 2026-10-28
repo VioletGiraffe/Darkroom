@@ -98,3 +98,6 @@ namespace ImageDecoding { enum class RawRendering; }
 // The shared Settings::RawRendering: how camera raws open in the viewer and in photo compare
 [[nodiscard]] ImageDecoding::RawRendering rawRenderingSetting();
 void saveRawRenderingSetting(ImageDecoding::RawRendering rawRendering);
+
+// The shared Settings::ColorManagement: whether images are converted to sRGB for display
+[[nodiscard]] bool colorManagementSetting();

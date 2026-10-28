@@ -48,8 +48,9 @@ SOURCES += \
 	UtilsTests.cpp \
 	OscillationCurveTests.cpp \
 	MJpegParserTests.cpp \
-	ExifOrientationTests.cpp \
+	ExifTests.cpp \
 	ImageDecodingTests.cpp \
+	ColorManagementTests.cpp \
 	../Darkroom/src/Core/Catalog.cpp \
 	../Darkroom/src/Core/CatalogIntegrity.cpp \
 	../Darkroom/src/Core/Library.cpp \

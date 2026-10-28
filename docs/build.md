@@ -31,7 +31,7 @@ CI and local builds run the same scripts in `scripts/`; the `.bat` files start t
 
 ## vcpkg libraries
 
-`vcpkg.json` lists the third-party libraries, LibRaw and libjpeg-turbo, at exact versions in its `overrides`; its
+`vcpkg.json` lists the third-party libraries, LibRaw, Little CMS and libjpeg-turbo, at exact versions in its `overrides`; its
 `builtin-baseline` pins their dependencies. Every platform links them statically.
 
 - The scripts run `vcpkg install` into `vcpkg_installed/` before qmake. vcpkg comes from `VCPKG_ROOT`, else from `PATH`.

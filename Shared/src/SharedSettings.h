@@ -27,6 +27,7 @@ namespace Settings {
 	constexpr const char* VideoPlayerOscillationCurve = "VideoPlayer/OscillationCurve";
 	constexpr const char* PhotoCompareIgnoreRotation  = "photoCompare/ignoreRotation";
 	constexpr const char* RawRendering                = "settings/rawRendering"; // read through rawRenderingSetting()
+	constexpr const char* ColorManagement             = "settings/colorManagement";
 }
 
 namespace Defaults {
@@ -38,4 +39,5 @@ namespace Defaults {
 	constexpr const char* VideoPlayerOscillationCurve = "cosine";
 	constexpr bool        PhotoCompareIgnoreRotation  = false;
 	constexpr const char* RawRendering                = "halfSize";
+	constexpr bool        ColorManagement             = true;
 }

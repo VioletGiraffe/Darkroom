@@ -1,6 +1,7 @@
 #include "Windows/PhotoCompareWindow.h"
 #include "Core/CpuThreadPool.h"
 #include "Core/IoThreadPool.h"
+#include "ImageDecoding/ColorManagement.h"
 #include "ImageDecoding/ImageDecoding.h"
 #include "MagicAlignment.h"
 #include "SharedSettings.h"
@@ -545,18 +546,21 @@ void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
 	updateHintText();
 
 	// Serialize reads per storage device, then decode each completed read in the compute pool.
-	IoThreadPool::enqueue(batch->paths.front(), [this, batch, rawRendering = rawRenderingSetting()] {
+	IoThreadPool::enqueue(batch->paths.front(), [this, batch, rawRendering = rawRenderingSetting(), colorManaged = colorManagementSetting()] {
 		for (qsizetype i = 0; i < batch->paths.size(); ++i)
 		{
 			if (batch->abort)
 				return;
 			ImageDecoding::EncodedImage encoded = ImageDecoding::readEncodedImage(batch->paths[i], rawRendering);
-			_workerPool.enqueue([this, batch, i, encoded = std::move(encoded)] {
+			_workerPool.enqueue([this, batch, i, encoded = std::move(encoded), colorManaged] {
 				if (!batch->abort)
 				{
 					ImageDecoding::DecodedImage decoded = ImageDecoding::decode(encoded);
 					if (decoded.image.isNull())
 						qWarning() << "PhotoCompareWindow: failed to load" << batch->paths[i] << "-" << decoded.error;
+					// Converted at full size: the photos are drawn through painter transforms, with no display buffer to convert
+					if (colorManaged)
+						ImageDecoding::convertToSrgb(decoded.image, decoded.iccProfile);
 					ImageDecoding::applyOrientation(decoded.image, decoded.orientation);
 					batch->images[static_cast<size_t>(i)] = std::move(decoded.image);
 				}

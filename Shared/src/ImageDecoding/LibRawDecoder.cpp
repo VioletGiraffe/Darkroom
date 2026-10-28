@@ -201,6 +201,7 @@ std::optional<EncodedImage> readRawPreview(thin_io::buffered_reader& file)
 	return EncodedImage{
 		.bytes = QByteArray{ preview.thumb, static_cast<qsizetype>(preview.tlength) },
 		.orientation = orientationForFlip(raw->imgdata.sizes.flip),
+		.adobeRgb = raw->imgdata.color.ExifColorSpace == LIBRAW_COLORSPACE_AdobeRGB,
 	};
 }
 

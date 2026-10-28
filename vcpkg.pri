@@ -1,4 +1,4 @@
-# LibRaw and libjpeg-turbo with their dependencies, installed from vcpkg.json into vcpkg_installed/.
+# LibRaw, Little CMS and libjpeg-turbo with their dependencies, installed from vcpkg.json into vcpkg_installed/.
 # A static library gets the include path only: qmake does not pass its LIBS on.
 # Must be included after the LIBS of anything that links against them: GNU ld resolves static libraries in command-line order.
 

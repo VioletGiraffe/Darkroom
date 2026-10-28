@@ -4,6 +4,8 @@
 
 #include <optional>
 
+namespace thin_io { class buffered_reader; }
+
 namespace ImageDecoding {
 
 // The largest JPEG preview a camera raw embeds, oriented as the raw is; format is left to the caller.

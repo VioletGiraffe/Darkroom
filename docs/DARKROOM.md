@@ -46,7 +46,7 @@ Each is its own include root except where noted:
 |---|---|
 | `cpputils` | `assert/advanced_assert.h`, `CThreadPool`, interruptible threads, storage-speed detection, `timing/profiler.h` (compiled in when `PROFILING_ENABLED` is defined) |
 | `cpp-template-utils` | header-only: compiler-warning control macros, `macro_utils.h`, hashing |
-| `qtutils` | theme machinery (`CThemeController`, `CBasePalette`, tinted icon engine, `themeicon:/`, style fixups), `CImageViewerWidget`, `CFlowLayout`, natural sort, `CLoggerInMemory`, settings/about dialog bases, message-box helpers, file-manager reveal |
+| `qtutils` | theme machinery (`CThemeController`, `CBasePalette`, tinted icon engine, `themeicon:/`, style fixups), `CImageViewerWidget`, `CFlowLayout`, natural sort, `CLoggerInMemory`, settings/about dialog bases, message-box helpers, file-manager reveal, sRGB window tagging on macOS |
 | `magic-alignment` (root `src/`) | automatic photo alignment fits for PhotoCompareWindow |
 | `image-processing` | SIMD image resize for ImageViewerWindow and Quickroom's icon tiles; has its own tests and a resize-comparison tool |
 | `thin_io` (root `src/`) | native filesystem access for `file-operations`, Quickroom's folder listing, and `ImageDecoding`'s reads |
@@ -126,7 +126,12 @@ by hand and must be extended with them:
   process-wide `cpuThreadPool()`. Long-running non-read work owns an appropriate separate worker instead of
   blocking the I/O route.
 - **Every image decode goes through `ImageDecoding`**, never `QImageReader` or `QImage::load` directly. qtutils'
-  viewer widget reaches it through its decoder hook and keeps Qt's formats, animations included, on its own reader.
+  viewer widget reaches it through its decoder hook and keeps animated files on its own reader.
+- **Decoders carry the color profile, displays convert.** A decoded image comes with its ICC profile: the one a JPEG
+  embeds, the one Qt reads for the formats it decodes, or Adobe RGB when only EXIF declares it. With the shared color
+  management setting on, each display converts to sRGB at its own resolution: the viewer widget its display buffer,
+  thumbnails after their resize, photo compare on load. Conversion goes through Little CMS, never Qt: Qt rejects valid
+  profiles. macOS windows are tagged sRGB, so the system converts them to the display.
 - **Language and framework conventions live in [guidelines.md](guidelines.md).**
 
 ## Subsystems

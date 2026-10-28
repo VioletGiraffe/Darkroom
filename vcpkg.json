@@ -1,9 +1,11 @@
 {
   "dependencies": [
+    "lcms",
     "libjpeg-turbo",
     { "name": "libraw", "features": [ "openmp" ] }
   ],
   "overrides": [
+    { "name": "lcms", "version": "2.19.1", "port-version": 1 },
     { "name": "libjpeg-turbo", "version": "3.2.0", "port-version": 1 },
     { "name": "libraw", "version": "0.22.2", "port-version": 1 }
   ],

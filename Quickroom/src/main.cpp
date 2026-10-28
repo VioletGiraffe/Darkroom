@@ -13,6 +13,7 @@
 #include "crashhandler/CCrashHandler.h"
 #include "compiler/compiler_warnings_control.h"
 #include "utility/macro_utils.h"
+#include "widgets/widgetutils.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QApplication>
@@ -130,6 +131,7 @@ int main(int argc, char* argv[])
 
 	Q_INIT_RESOURCE(shared);
 
+	WidgetUtils::tagWindowsAsSrgb();
 	QApplication app(argc, argv);
 	app.setOrganizationName("VioletGiraffe");
 	app.setApplicationName(QuickroomApplicationName);

@@ -1,3 +1,4 @@
+#include "ImageDecoding/ColorManagement.h"
 #include "ImageDecoding/ImageDecoding.h"
 #include "ImageDecoding/TurboJpegDecoder.h"
 #include "JpegTestData.h"
@@ -6,6 +7,7 @@
 
 #include <QBuffer>
 #include <QByteArray>
+#include <QColorSpace>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
@@ -46,10 +48,12 @@ constexpr QSize JpegSize{ 64, 32 };
 	}
 }
 
-[[nodiscard]] QByteArray encodeJpeg(JpegKind kind)
+[[nodiscard]] QByteArray encodeJpeg(JpegKind kind, QByteArray iccProfile = {})
 {
 	const std::unique_ptr<void, decltype(&tj3Destroy)> handle{ tj3Init(TJINIT_COMPRESS), &tj3Destroy };
 	REQUIRE(handle != nullptr);
+	if (!iccProfile.isEmpty())
+		REQUIRE(tj3SetICCProfile(handle.get(), reinterpret_cast<unsigned char*>(iccProfile.data()), static_cast<size_t>(iccProfile.size())) == 0);
 
 	const bool gray = kind == JpegKind::Gray;
 	const bool cmyk = kind == JpegKind::Cmyk || kind == JpegKind::Ycck;
@@ -125,8 +129,6 @@ TEST_CASE("ImageDecoding::decode: JPEGs through libjpeg-turbo", "[imagedecoding]
 	SECTION("colour")
 	{
 		const QByteArray jpeg = encodeJpeg(JpegKind::Rgb);
-		REQUIRE(decoderFor("C:/p/photo.jpg", jpeg.first(SignatureSize)) == Decoder::TurboJpeg);
-
 		const DecodedImage decoded = decode(jpeg);
 		REQUIRE(decoded.error.isEmpty());
 		REQUIRE(decoded.format == "jpeg");
@@ -146,6 +148,55 @@ TEST_CASE("ImageDecoding::decode: JPEGs through libjpeg-turbo", "[imagedecoding]
 		const int y = JpegSize.height() / 2;
 		REQUIRE(std::abs(qGray(decoded.image.pixel(JpegSize.width() / 4, y)) - qGray(LeftColor)) <= 4);
 		REQUIRE(std::abs(qGray(decoded.image.pixel(JpegSize.width() * 3 / 4, y)) - qGray(RightColor)) <= 4);
+	}
+}
+
+TEST_CASE("ImageDecoding::decode: the color profile comes with the image", "[imagedecoding]")
+{
+	const QByteArray displayP3 = QColorSpace{ QColorSpace::DisplayP3 }.iccProfile();
+	const QByteArray adobeRgbExif = exifSegment(exifTiffWithColorSpace(ByteOrder::Big, 0xFFFF, "R03"));
+	const auto withSegment = [](const QByteArray& jpeg, const QByteArray& segment) { return jpeg.first(2) + segment + jpeg.sliced(2); };
+
+	SECTION("embedded in a JPEG")
+	{
+		const DecodedImage decoded = decode(encodeJpeg(JpegKind::Rgb, displayP3));
+		REQUIRE(decoded.error.isEmpty());
+		REQUIRE(decoded.iccProfile == displayP3);
+		REQUIRE(showsBothHalves(decoded.image)); // unconverted
+	}
+
+	SECTION("Adobe RGB declared in a JPEG's EXIF, a profile it embeds taking precedence")
+	{
+		REQUIRE(decode(withSegment(encodeJpeg(JpegKind::Rgb), adobeRgbExif)).iccProfile == adobeRgbIccProfile());
+		REQUIRE(decode(withSegment(encodeJpeg(JpegKind::Rgb, displayP3), adobeRgbExif)).iccProfile == displayP3);
+	}
+
+	SECTION("Adobe RGB declared for a camera raw's preview, a profile it embeds taking precedence")
+	{
+		REQUIRE(decode(EncodedImage{ .bytes = encodeJpeg(JpegKind::Rgb), .adobeRgb = true }).iccProfile == adobeRgbIccProfile());
+		REQUIRE(decode(EncodedImage{ .bytes = encodeJpeg(JpegKind::Rgb, displayP3), .adobeRgb = true }).iccProfile == displayP3);
+		REQUIRE(decode(EncodedImage{ .error = "read failed", .adobeRgb = true }).iccProfile.isEmpty());
+	}
+
+	SECTION("through Qt")
+	{
+		QImage source{ 8, 4, QImage::Format_RGB32 };
+		source.fill(LeftColor);
+		source.setColorSpace(QColorSpace::DisplayP3);
+		QByteArray png;
+		QBuffer buffer{ &png };
+		REQUIRE(buffer.open(QIODevice::WriteOnly));
+		REQUIRE(source.save(&buffer, "PNG"));
+
+		const DecodedImage decoded = decode(png);
+		REQUIRE(decoded.error.isEmpty());
+		REQUIRE(QColorSpace::fromIccProfile(decoded.iccProfile) == QColorSpace{ QColorSpace::DisplayP3 });
+		REQUIRE_FALSE(decoded.animated);
+	}
+
+	SECTION("none")
+	{
+		REQUIRE(decode(encodeJpeg(JpegKind::Rgb)).iccProfile.isEmpty());
 	}
 }
 
@@ -183,7 +234,7 @@ TEST_CASE("ImageDecoding::decode: damaged JPEGs", "[imagedecoding]")
 
 	SECTION("a damaged header fails")
 	{
-		const DecodedImage decoded = decode(jpeg.first(SignatureSize) + QByteArray(64, '\x55'));
+		const DecodedImage decoded = decode(jpeg.first(3) + QByteArray(64, '\x55')); // SOI, then a marker's FF
 		REQUIRE(decoded.image.isNull());
 		REQUIRE_FALSE(decoded.error.isEmpty());
 		REQUIRE(decoded.format == "jpeg");
@@ -199,7 +250,6 @@ TEST_CASE("ImageDecoding::decode: other formats through Qt", "[imagedecoding]")
 	QBuffer buffer{ &png };
 	REQUIRE(buffer.open(QIODevice::WriteOnly));
 	REQUIRE(source.save(&buffer, "PNG"));
-	REQUIRE(decoderFor("C:/p/image.png", png.first(SignatureSize)) == Decoder::Qt);
 
 	const DecodedImage decoded = decode(png);
 	REQUIRE(decoded.error.isEmpty());
@@ -229,18 +279,6 @@ TEST_CASE("ImageDecoding::decode: an EncodedImage's format and orientation repla
 	REQUIRE(failed.image.isNull());
 	REQUIRE(failed.error == "read failed");
 	REQUIRE(failed.format == "nef");
-}
-
-TEST_CASE("ImageDecoding::decoderFor: camera raws by extension, other files by content", "[imagedecoding]")
-{
-	const QByteArray jpegSignature{ "\xFF\xD8\xFF" };
-	const QByteArray pngSignature{ "\x89PN" };
-
-	REQUIRE(decoderFor("C:/p/raw.NEF", pngSignature) == Decoder::LibRaw);
-	REQUIRE(decoderFor("C:/p/raw.dng", jpegSignature) == Decoder::LibRaw);
-	REQUIRE(decoderFor("C:/p/misnamed.png", jpegSignature) == Decoder::TurboJpeg);
-	REQUIRE(decoderFor("C:/p/misnamed.jpg", pngSignature) == Decoder::Qt);
-	REQUIRE(decoderFor("C:/raws.nef/photo", jpegSignature) == Decoder::TurboJpeg);
 }
 
 TEST_CASE("ImageDecoding::readEncodedImage: files are read whole, camera raws through LibRaw", "[imagedecoding]")
