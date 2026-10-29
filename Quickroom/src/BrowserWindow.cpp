@@ -1,4 +1,5 @@
 #include "BrowserWindow.h"
+#include "ExplorerContextMenuItem.h"
 #include "FileOperations.h"
 #include "FileTypeIcons.h"
 #include "FolderListing.h"
@@ -630,6 +631,11 @@ void BrowserWindow::showEntryContextMenu(const QString& path, bool isFolder, QPo
 	menu.addSeparator();
 	addDeleteAction(PathDeletion::Mode::Trash);
 	addDeleteAction(PathDeletion::Mode::Permanent);
+
+#ifdef Q_OS_WIN
+	menu.addSeparator();
+	addExplorerContextMenuItem(menu, targets, *this);
+#endif
 
 	menu.exec(globalPos);
 }

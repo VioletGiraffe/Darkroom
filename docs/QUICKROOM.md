@@ -72,6 +72,10 @@ Copy and move:
 - The `file-operations` engine runs each transfer in its own progress dialog, which asks about collisions. Before a
   move, open players and viewers release the files moved. The folder watch shows the result.
 
+On Windows a tile's menu ends with "Explorer context menu": Explorer's own (classic) menu for the same files, opened beside
+the item like a submenu, on hover or click, while Quickroom's menu stays open behind it. The shell side is cpputils'
+`system/shellcontextmenu`.
+
 The browser watches the folder it shows and refreshes it shortly after a change, so changes made by other programs
 appear without F5. A refresh compares the listing with the grid: unchanged entries keep their tiles, and a file
 rewritten in place gets a new one. When the shown folder disappears, the browser moves to its nearest existing
