@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793300050037,
+  "lastUpdate": 1793301273420,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -19390,6 +19390,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Lines of code (Darkroom)",
             "value": 18364,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1613,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 32043,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6715,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7511,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5426,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 820,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 342.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 83.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "700e103bd1dce771703924b5d52239fc4754f8cb",
+          "message": "Darkroom: MainWindow is destroyed before the thread pools stop, so its state is saved before they wait out a read stuck on unreachable storage; the library-check pool notes that its tasks can outlive main()",
+          "timestamp": "2026-10-29T21:03:11+02:00",
+          "tree_id": "81ae379639a28e9458d6f7157b30e1ea4a11f230",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/700e103bd1dce771703924b5d52239fc4754f8cb"
+        },
+        "date": 1793301270640,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 18368,
             "unit": "LOC"
           },
           {
