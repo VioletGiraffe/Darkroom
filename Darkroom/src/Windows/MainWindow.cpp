@@ -155,6 +155,19 @@ struct LibraryChoice
 	Library::OpenMode mode;
 };
 
+// ExistingOnly when folder holds a library. Otherwise asks whether to create one there: CreateIfAbsent on yes, empty on no.
+[[nodiscard]] std::optional<Library::OpenMode> chooseOpenModeForFolder(const QString& folder, QWidget* dialogParent)
+{
+	if (Library::holdsLibrary(folder))
+		return Library::OpenMode::ExistingOnly;
+
+	const QMessageBox::StandardButton answer = QMessageBox::question(dialogParent, QObject::tr("Open library"),
+		QObject::tr("This folder does not hold a library:\n\n%1\n\nCreate a new library in it?").arg(QDir::toNativeSeparators(folder)));
+	if (answer != QMessageBox::Yes)
+		return std::nullopt;
+	return Library::OpenMode::CreateIfAbsent;
+}
+
 // Unparented for the same reason as chooseFirstRunLibraryFolder. Empty when the user quits.
 [[nodiscard]] std::optional<LibraryChoice> chooseLibraryAfterLoadFailure(const QString& failedRoot, const QString& error)
 {
@@ -176,7 +189,10 @@ struct LibraryChoice
 		const QString root = QFileDialog::getExistingDirectory(&dialog, QObject::tr("Open library"), libraryPickerStartFolder(failedRoot));
 		if (root.isEmpty())
 			return;
-		choice = LibraryChoice{ root, Library::OpenMode::CreateIfAbsent };
+		const std::optional<Library::OpenMode> mode = chooseOpenModeForFolder(root, &dialog);
+		if (!mode)
+			return;
+		choice = LibraryChoice{ root, *mode };
 		dialog.accept();
 	});
 
@@ -429,16 +445,22 @@ void MainWindow::pickAndSwitchLibrary(LibraryPickerMode mode)
 					.arg(QDir::toNativeSeparators(requestedRoot)));
 			continue;
 		}
-		// Treat aliases of the current library as the current library.
+		Library::OpenMode openMode = Library::OpenMode::CreateIfAbsent;
 		if (!creating)
 		{
+			// Treat aliases of the current library as the current library.
 			const QString requestedReal = QFileInfo(requestedRoot).canonicalFilePath();
 			const QString currentReal   = QFileInfo(_library.rootFolder()).canonicalFilePath();
 			if (!requestedReal.isEmpty() && requestedReal.compare(currentReal, Qt::CaseInsensitive) == 0)
 				return;
+
+			const std::optional<Library::OpenMode> chosenMode = chooseOpenModeForFolder(requestedRoot, this);
+			if (!chosenMode)
+				continue;
+			openMode = *chosenMode;
 		}
 
-		if (switchLibraryToOrReport(requestedRoot, Library::OpenMode::CreateIfAbsent, title))
+		if (switchLibraryToOrReport(requestedRoot, openMode, title))
 			return;
 	}
 }

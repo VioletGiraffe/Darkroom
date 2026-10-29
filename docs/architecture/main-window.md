@@ -26,8 +26,9 @@ never rebind.
 Library switching and settings changes are refused while a shell-owned long-running workflow pumps events. The
 application-modal Import dialog provides the equivalent exclusion for import-owned interactive work.
 
-Create and Open use the same switch transaction. Creation differs only by refusing a folder that already holds a
-library; both open with `CreateIfAbsent`, which accepts an absent root and absent persistence files as a new library.
+Create and Open use the same switch transaction. Creation refuses a folder that already holds a library and opens with
+`CreateIfAbsent`, which accepts an absent root and absent persistence files as a new library. Open, from the menu or
+the startup dialog, asks before creating a library in a folder that holds none.
 
 ### Recent libraries
 
