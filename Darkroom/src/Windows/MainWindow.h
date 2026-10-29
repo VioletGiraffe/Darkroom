@@ -50,8 +50,8 @@ private:
 	enum class LibraryPickerMode { Open, CreateNew };
 	void pickAndSwitchLibrary(LibraryPickerMode mode);
 	void openRecentLibrary(const QString& root);
-	[[nodiscard]] bool switchLibraryTo(const QString& root, QString* error);
-	bool switchLibraryToOrReport(const QString& root, const QString& dialogTitle);
+	[[nodiscard]] bool switchLibraryTo(const QString& root, Library::OpenMode mode, QString* error);
+	bool switchLibraryToOrReport(const QString& root, Library::OpenMode mode, const QString& dialogTitle);
 	// Event-pumping work must not outlive its catalog/store borrows.
 	[[nodiscard]] bool refuseLibraryChangeWhileProcessing();
 	void rebuildRecentLibraryActions();

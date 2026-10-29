@@ -14,7 +14,9 @@ renames or removes its current item.
 
 Startup loads a library before constructing the browser because the browser and sidebar retain `Library&`. First-run
 selection, normal startup, and later switching all converge on `Library::setRoot`; there is no separate startup
-loader. Cancelling the first-run choice leaves the window unbuilt.
+loader. A saved or recent root must already hold a library: an unreachable or emptied root is reported, never recreated
+as an empty library. When the startup library fails to load, a dialog offers the recent libraries or another folder.
+Quitting the first-run choice or that dialog leaves the window unbuilt.
 
 `setRoot` fully loads a candidate before publishing it and first flushes the current library, so save failure blocks
 replacement. After a successful switch MainWindow closes player windows, clears the persistent frame viewer, and asks
@@ -25,7 +27,7 @@ Library switching and settings changes are refused while a shell-owned long-runn
 application-modal Import dialog provides the equivalent exclusion for import-owned interactive work.
 
 Create and Open use the same switch transaction. Creation differs only by refusing a folder that already holds a
-library; `Library::setRoot` itself accepts an absent root and absent persistence files as a new library.
+library; both open with `CreateIfAbsent`, which accepts an absent root and absent persistence files as a new library.
 
 ### Recent libraries
 

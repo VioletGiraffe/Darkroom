@@ -21,7 +21,7 @@ namespace
 		IntegrityFixture()
 		{
 			REQUIRE(tempDir.isValid());
-			REQUIRE(library.setRoot(tempDir.path()));
+			REQUIRE(library.setRoot(tempDir.path(), Library::OpenMode::CreateIfAbsent));
 			root = library.rootFolder();
 		}
 

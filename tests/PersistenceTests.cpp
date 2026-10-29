@@ -42,7 +42,7 @@ TEST_CASE("A new empty library seeds Best and persists the registry", "[persiste
 	Library library;
 	REQUIRE_FALSE(library.isLoaded());
 	QString error;
-	REQUIRE(library.setRoot(dir.path(), &error));
+	REQUIRE(library.setRoot(dir.path(), Library::OpenMode::CreateIfAbsent, &error));
 	REQUIRE(error.isEmpty());
 	REQUIRE(library.isLoaded());
 
@@ -83,7 +83,7 @@ TEST_CASE("Every first-format record converts and loads correctly", "[persistenc
 
 	Library library;
 	QString error;
-	REQUIRE(library.setRoot(root, &error));
+	REQUIRE(library.setRoot(root, Library::OpenMode::ExistingOnly, &error));
 	const Catalog& catalog = library.catalog();
 	const QString rootFolder = library.rootFolder();
 
@@ -146,7 +146,7 @@ TEST_CASE("Every first-format record converts and loads correctly", "[persistenc
 
 	// The converted library reloads to the same state, ids included.
 	Library reloaded;
-	REQUIRE(reloaded.setRoot(root));
+	REQUIRE(reloaded.setRoot(root, Library::OpenMode::ExistingOnly));
 	REQUIRE(dumpCatalog(reloaded.catalog()) == dumpCatalog(catalog));
 }
 
@@ -167,7 +167,7 @@ TEST_CASE("Current-format records load under their stored ids", "[persistence]")
 	})").arg(outsideLibraryPath("videos")).toUtf8());
 
 	Library library;
-	REQUIRE(library.setRoot(root));
+	REQUIRE(library.setRoot(root, Library::OpenMode::ExistingOnly));
 	const Catalog& catalog = library.catalog();
 	const QString rootFolder = library.rootFolder();
 	REQUIRE(catalog.mediaItemCount() == 2);
@@ -194,7 +194,7 @@ TEST_CASE("An API-built library round-trips through disk unchanged", "[persisten
 	QString firstDump;
 	{
 		Library library;
-		REQUIRE(library.setRoot(dir.path()));
+		REQUIRE(library.setRoot(dir.path(), Library::OpenMode::CreateIfAbsent));
 		Catalog& catalog = library.catalog();
 		const QString root = library.rootFolder();
 
@@ -223,7 +223,7 @@ TEST_CASE("An API-built library round-trips through disk unchanged", "[persisten
 	}
 
 	Library reloaded;
-	REQUIRE(reloaded.setRoot(dir.path()));
+	REQUIRE(reloaded.setRoot(dir.path(), Library::OpenMode::ExistingOnly));
 	REQUIRE(dumpCatalog(reloaded.catalog()) == firstDump);
 }
 
@@ -240,7 +240,7 @@ TEST_CASE("A library opens intact after its folder moves", "[persistence]")
 
 	{
 		Library library;
-		REQUIRE(library.setRoot(original.path()));
+		REQUIRE(library.setRoot(original.path(), Library::OpenMode::ExistingOnly));
 		Catalog& catalog = library.catalog();
 		const QString root = library.rootFolder();
 		REQUIRE(catalog.addPhoto(root + "/Photos/Trip/New.jpg", root + "/Photos/Trip", false) != MediaItemId::None);
@@ -251,7 +251,7 @@ TEST_CASE("A library opens intact after its folder moves", "[persistence]")
 		REQUIRE(QFile::copy(original.path() + "/" + file, moved.path() + "/" + file));
 
 	Library library;
-	REQUIRE(library.setRoot(moved.path()));
+	REQUIRE(library.setRoot(moved.path(), Library::OpenMode::ExistingOnly));
 	const Catalog& catalog = library.catalog();
 	const QString root = library.rootFolder();
 	const MediaItemId oldPhoto = catalog.mediaItemAtSourcePath(root + "/Photos/Trip/Old.jpg");
@@ -277,7 +277,7 @@ TEST_CASE("A legacy library moved before its first load rebases its paths onto t
 	})").arg(previousRoot, outsideLibraryPath("videos"), outsideLibraryPath("elsewhere")).toUtf8());
 
 	Library library;
-	REQUIRE(library.setRoot(moved.path()));
+	REQUIRE(library.setRoot(moved.path(), Library::OpenMode::ExistingOnly));
 	const Catalog& catalog = library.catalog();
 	const QString root = library.rootFolder();
 
@@ -307,9 +307,34 @@ TEST_CASE("setRoot on a fresh Library fails cleanly on corrupt data", "[persiste
 
 	Library library;
 	QString error;
-	REQUIRE_FALSE(library.setRoot(dir.path(), &error));
+	REQUIRE_FALSE(library.setRoot(dir.path(), Library::OpenMode::CreateIfAbsent, &error));
 	REQUIRE_FALSE(error.isEmpty());
 	REQUIRE_FALSE(library.isLoaded());
+}
+
+TEST_CASE("setRoot(ExistingOnly) opens only a folder that holds a library", "[persistence]")
+{
+	QTemporaryDir dir;
+	REQUIRE(dir.isValid());
+	const QString missingRoot = dir.path() + "/missing";
+
+	Library library;
+	QString error;
+	REQUIRE_FALSE(library.setRoot(missingRoot, Library::OpenMode::ExistingOnly, &error));
+	REQUIRE_FALSE(error.isEmpty());
+	REQUIRE_FALSE(QFileInfo::exists(missingRoot));
+
+	REQUIRE_FALSE(library.setRoot(dir.path(), Library::OpenMode::ExistingOnly, &error));
+	REQUIRE_FALSE(error.isEmpty());
+	REQUIRE_FALSE(Library::holdsLibrary(dir.path()));
+	REQUIRE_FALSE(library.isLoaded());
+
+	{
+		Library creator;
+		REQUIRE(creator.setRoot(dir.path(), Library::OpenMode::CreateIfAbsent));
+	}
+	REQUIRE(library.setRoot(dir.path(), Library::OpenMode::ExistingOnly, &error));
+	REQUIRE(error.isEmpty());
 }
 
 TEST_CASE("A failed setRoot leaves the current library untouched", "[persistence]")
@@ -319,7 +344,7 @@ TEST_CASE("A failed setRoot leaves the current library untouched", "[persistence
 	REQUIRE(badDir.isValid());
 
 	Library library;
-	REQUIRE(library.setRoot(goodDir.path()));
+	REQUIRE(library.setRoot(goodDir.path(), Library::OpenMode::CreateIfAbsent));
 	const QString goodRoot = library.rootFolder();
 	const uint64_t generation = library.generation();
 
@@ -362,7 +387,7 @@ TEST_CASE("A failed setRoot leaves the current library untouched", "[persistence
 	}
 
 	QString error;
-	REQUIRE_FALSE(library.setRoot(badDir.path(), &error));
+	REQUIRE_FALSE(library.setRoot(badDir.path(), Library::OpenMode::CreateIfAbsent, &error));
 	REQUIRE_FALSE(error.isEmpty());
 	REQUIRE(library.isLoaded());
 	REQUIRE(library.rootFolder() == goodRoot);

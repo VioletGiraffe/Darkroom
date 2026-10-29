@@ -105,7 +105,7 @@ struct LoadedLibraryData
 	return QFileInfo::exists(backupPath) || QFile::copy(path, backupPath);
 }
 
-[[nodiscard]] std::optional<LoadedLibraryData> loadLibraryData(const QString& root, QString* error)
+[[nodiscard]] std::optional<LoadedLibraryData> loadLibraryData(const QString& root, Library::OpenMode mode, QString* error)
 {
 	if (error)
 		error->clear();
@@ -123,6 +123,14 @@ struct LoadedLibraryData
 	{
 		if (error)
 			*error = QObject::tr("The library path is not a folder:\n%1").arg(QDir::toNativeSeparators(normalized));
+		return std::nullopt;
+	}
+	if (mode == Library::OpenMode::ExistingOnly && !Library::holdsLibrary(normalized))
+	{
+		if (error)
+			*error = rootInfo.exists()
+				? QObject::tr("The folder does not hold a library:\n%1").arg(QDir::toNativeSeparators(normalized))
+				: QObject::tr("The library folder does not exist or is not accessible:\n%1").arg(QDir::toNativeSeparators(normalized));
 		return std::nullopt;
 	}
 	if (!QDir{}.mkpath(normalized))
@@ -250,9 +258,9 @@ private:
 
 namespace {
 
-[[nodiscard]] std::unique_ptr<LibraryState> loadLibraryState(const QString& root, QString* error)
+[[nodiscard]] std::unique_ptr<LibraryState> loadLibraryState(const QString& root, Library::OpenMode mode, QString* error)
 {
-	std::optional<LoadedLibraryData> data = loadLibraryData(root, error);
+	std::optional<LoadedLibraryData> data = loadLibraryData(root, mode, error);
 	if (!data)
 		return {};
 
@@ -287,7 +295,7 @@ QStringList Library::persistenceFilePaths(const QString& root)
 	return { MetadataStore::filePathFor(root), Catalog::registryFilePathFor(root) };
 }
 
-bool Library::setRoot(const QString& root, QString* error)
+bool Library::setRoot(const QString& root, OpenMode mode, QString* error)
 {
 	QString currentSaveError;
 	if (!flushPendingWrites(&currentSaveError))
@@ -297,7 +305,7 @@ bool Library::setRoot(const QString& root, QString* error)
 		return false;
 	}
 
-	std::unique_ptr<LibraryState> replacement = loadLibraryState(root, error);
+	std::unique_ptr<LibraryState> replacement = loadLibraryState(root, mode, error);
 	if (!replacement)
 		return false;
 	replacement->setPersistenceFailureHandler(_persistenceFailureHandler);

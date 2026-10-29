@@ -30,10 +30,14 @@ DISABLE_COMPILER_WARNINGS
 #include <QAbstractButton>
 #include <QApplication>
 #include <QCloseEvent>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QDir>
 #include <QDragEnterEvent>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QLabel>
+#include <QListWidget>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -43,9 +47,11 @@ DISABLE_COMPILER_WARNINGS
 #include <QSettings>
 #include <QStandardPaths>
 #include <QUrl>
+#include <QVBoxLayout>
 RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -105,36 +111,85 @@ void recordCurrentLibrary(const QString& root)
 	settings.setValue(Settings::RecentLibraries, recents);
 }
 
+struct LibraryChoice
+{
+	QString root;
+	Library::OpenMode mode;
+};
+
+// Unparented for the same reason as chooseFirstRunLibraryFolder. Empty when the user quits.
+[[nodiscard]] std::optional<LibraryChoice> chooseLibraryAfterLoadFailure(const QString& failedRoot, const QString& error)
+{
+	const QStringList recentRoots = recentLibraries();
+
+	QDialog dialog;
+	dialog.setWindowTitle(QObject::tr("Open library"));
+	auto* layout = new QVBoxLayout(&dialog);
+	layout->addWidget(new QLabel(recentRoots.isEmpty()
+		? QObject::tr("Could not open the library:\n\n%1\n\nChoose another library folder.").arg(error)
+		: QObject::tr("Could not open the library:\n\n%1\n\nOpen a recent library or choose another folder.").arg(error), &dialog));
+
+	std::optional<LibraryChoice> choice;
+	auto* buttons = new QDialogButtonBox(&dialog);
+	QPushButton* chooseFolder = buttons->addButton(QObject::tr("Choose Folder..."), QDialogButtonBox::ActionRole);
+	buttons->addButton(QObject::tr("Quit"), QDialogButtonBox::RejectRole);
+	QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+	QObject::connect(chooseFolder, &QPushButton::clicked, &dialog, [&dialog, &choice, &failedRoot] {
+		const QString root = QFileDialog::getExistingDirectory(&dialog, QObject::tr("Open library"), libraryPickerStartFolder(failedRoot));
+		if (root.isEmpty())
+			return;
+		choice = LibraryChoice{ root, Library::OpenMode::CreateIfAbsent };
+		dialog.accept();
+	});
+
+	if (!recentRoots.isEmpty())
+	{
+		auto* recentList = new QListWidget(&dialog);
+		for (const QString& root : recentRoots)
+			recentList->addItem(QDir::toNativeSeparators(root));
+		recentList->setCurrentRow(0);
+		layout->addWidget(recentList);
+
+		QPushButton* openRecent = buttons->addButton(QObject::tr("Open"), QDialogButtonBox::AcceptRole);
+		openRecent->setDefault(true);
+		const auto acceptRecent = [&dialog, &choice, &recentRoots, recentList] {
+			choice = LibraryChoice{ recentRoots.at(recentList->currentRow()), Library::OpenMode::ExistingOnly };
+			dialog.accept();
+		};
+		QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, acceptRecent);
+		QObject::connect(recentList, &QListWidget::itemActivated, &dialog, acceptRecent);
+	}
+	layout->addWidget(buttons);
+
+	dialog.exec();
+	return choice;
+}
+
 } // namespace
 
 bool MainWindow::loadInitialLibrary()
 {
 	QSettings settings;
-	QString requestedRoot;
-	if (settings.contains(Settings::RootFolder))
-	{
-		requestedRoot = settings.value(Settings::RootFolder).toString();
-	}
-	else
-	{
-		requestedRoot = chooseFirstRunLibraryFolder();
-		if (requestedRoot.isEmpty())
-			return false;
-	}
+	const bool firstRun = !settings.contains(Settings::RootFolder);
+	LibraryChoice choice = firstRun
+		? LibraryChoice{ chooseFirstRunLibraryFolder(), Library::OpenMode::CreateIfAbsent }
+		: LibraryChoice{ settings.value(Settings::RootFolder).toString(), Library::OpenMode::ExistingOnly };
+	if (firstRun && choice.root.isEmpty())
+		return false;
 
 	for(;;)
 	{
 		QString error;
-		if (_library.setRoot(requestedRoot, &error))
+		if (_library.setRoot(choice.root, choice.mode, &error))
 		{
 			recordCurrentLibrary(_library.rootFolder());
 			return true;
 		}
 
-		QMessageBox::warning(nullptr, tr("Open library"), tr("Could not open the library:\n\n%1\n\nChoose another library folder.").arg(error));
-		requestedRoot = QFileDialog::getExistingDirectory(nullptr, tr("Open library"), libraryPickerStartFolder(requestedRoot));
-		if (requestedRoot.isEmpty())
+		std::optional<LibraryChoice> nextChoice = chooseLibraryAfterLoadFailure(choice.root, error);
+		if (!nextChoice)
 			return false;
+		choice = std::move(*nextChoice);
 	}
 }
 
@@ -297,10 +352,10 @@ bool MainWindow::refuseLibraryChangeWhileProcessing()
 	return true;
 }
 
-bool MainWindow::switchLibraryToOrReport(const QString& root, const QString& dialogTitle)
+bool MainWindow::switchLibraryToOrReport(const QString& root, Library::OpenMode mode, const QString& dialogTitle)
 {
 	QString error;
-	if (switchLibraryTo(root, &error))
+	if (switchLibraryTo(root, mode, &error))
 		return true;
 
 	QMessageBox::warning(this, dialogTitle, error);
@@ -338,7 +393,7 @@ void MainWindow::pickAndSwitchLibrary(LibraryPickerMode mode)
 				return;
 		}
 
-		if (switchLibraryToOrReport(requestedRoot, title))
+		if (switchLibraryToOrReport(requestedRoot, Library::OpenMode::CreateIfAbsent, title))
 			return;
 	}
 }
@@ -348,7 +403,7 @@ void MainWindow::openRecentLibrary(const QString& root)
 	if (refuseLibraryChangeWhileProcessing())
 		return;
 
-	switchLibraryToOrReport(root, tr("Open library"));
+	switchLibraryToOrReport(root, Library::OpenMode::ExistingOnly, tr("Open library"));
 }
 
 void MainWindow::rebuildRecentLibraryActions()
@@ -376,9 +431,9 @@ void MainWindow::rebuildRecentLibraryActions()
 	}
 }
 
-bool MainWindow::switchLibraryTo(const QString& root, QString* error)
+bool MainWindow::switchLibraryTo(const QString& root, Library::OpenMode mode, QString* error)
 {
-	if (!_library.setRoot(root, error))
+	if (!_library.setRoot(root, mode, error))
 		return false;
 
 	// Finish invalidating users of the old catalog before returning to the event loop.

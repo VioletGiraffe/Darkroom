@@ -25,11 +25,14 @@ class Library : public QObject
 public:
 	Library();
 
-	// Flushes first, then loads a complete candidate before replacement. Failure preserves the current state.
-	// Missing roots/files create a new library; failure to persist its initial registry fails the load.
-	[[nodiscard]] bool setRoot(const QString& root, QString* error = nullptr);
+	enum class OpenMode { ExistingOnly, CreateIfAbsent };
 
-	// Distinguishes "create here" from adopting an existing library; setRoot() accepts either.
+	// Flushes first, then loads a complete candidate before replacement. Failure preserves the current state.
+	// ExistingOnly fails unless holdsLibrary(root); CreateIfAbsent makes a missing root or missing files a new library.
+	// Failure to persist the initial registry fails the load.
+	[[nodiscard]] bool setRoot(const QString& root, OpenMode mode, QString* error = nullptr);
+
+	// Distinguishes "create here" from adopting an existing library; setRoot(CreateIfAbsent) accepts either.
 	[[nodiscard]] static bool holdsLibrary(const QString& folder);
 	// The library's own persistence files under a normalized root.
 	[[nodiscard]] static QStringList persistenceFilePaths(const QString& root);

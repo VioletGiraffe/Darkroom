@@ -17,7 +17,7 @@ namespace
 		LibraryFixture()
 		{
 			REQUIRE(tempDir.isValid());
-			REQUIRE(library.setRoot(tempDir.path()));
+			REQUIRE(library.setRoot(tempDir.path(), Library::OpenMode::CreateIfAbsent));
 			root = library.rootFolder();
 			Catalog& catalog = library.catalog();
 			QString error;
@@ -88,7 +88,7 @@ TEST_CASE("Library forwards coalesced Catalog change notifications", "[catalog]"
 
 	QTemporaryDir replacement;
 	REQUIRE(replacement.isValid());
-	REQUIRE(f.library.setRoot(replacement.path()));
+	REQUIRE(f.library.setRoot(replacement.path(), Library::OpenMode::CreateIfAbsent));
 	REQUIRE(notificationCount == 4);
 }
 
@@ -423,7 +423,7 @@ TEST_CASE("A mutated library reloads to an identical state", "[catalog][persiste
 	REQUIRE(f.library.flushPendingWrites());
 
 	Library reloaded;
-	REQUIRE(reloaded.setRoot(f.tempDir.path()));
+	REQUIRE(reloaded.setRoot(f.tempDir.path(), Library::OpenMode::ExistingOnly));
 	REQUIRE(dumpCatalog(reloaded.catalog()) == dumpCatalog(catalog));
 }
 
