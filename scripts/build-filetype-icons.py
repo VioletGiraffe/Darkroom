@@ -2,11 +2,13 @@
 """Generates Quickroom's per-file-type icons: one .ico per image, camera raw and video format.
 
 Windows draws these wherever Quickroom owns a type, and Quickroom's tile captions draw them at native sizes, so a
-file's format has to be readable at a glance in a crowded list. One design carries that: a coloured body, a cream
-mark, and an ink band across it holding the extension as a condensed wordmark. Three bodies distinguish the families:
-  PAPER - images; the mark is a landscape.
-  FILM - videos; wider, a sprocket run down both edges besides the landscape.
-  CARD - camera raws; an SD card as wide as FILM, its top-right corner clipped, contact pads for the mark.
+file's format has to be readable at a glance in a crowded list. One design carries that: a body, a mark on it, and a
+band across it holding the extension as a cream condensed wordmark. Three bodies distinguish the families, each
+colouring its parts from the type's hue:
+  PAPER - images; a tint of the hue, an ink landscape, the band in the hue's shade.
+  FILM - videos; coloured as PAPER, with an ink sprocket run down both edges; wider than PAPER.
+  CARD - camera raws; the hue, cream contact pads for the mark, an ink band; an SD card as wide as FILM, its
+    top-right corner clipped.
 Each entry in TYPES names the body it uses.
 
 What the script is arranged around:
@@ -57,6 +59,26 @@ WORDMARK_FONT = Path("C:/Windows/Fonts/bahnschrift.ttf")
 WORDMARK_AXES = {"wght": 700, "wdth": 75}   # the "Bold Condensed" instance; both axes are at their extreme
 
 CREAM, INK = (240, 234, 224, 255), (36, 29, 21, 255)
+TINT, SHADE = 0.72, 0.35   # pale's mix of the hue toward white and toward black
+
+
+def hx(colour):
+    return tuple(int(colour[i:i + 2], 16) for i in (1, 3, 5)) + (255,)
+
+
+def mix(colour, toward, f):
+    return tuple(round(a + (b - a) * f) for a, b in zip(hx(colour), toward)) + (255,)
+
+
+# A body's scheme maps the type's hue to its body, mark and band colours.
+# pale's band is the silhouette on a light desktop: the tinted body fades into it.
+def pale(hue):
+    return mix(hue, (255, 255, 255), TINT), INK, mix(hue, (0, 0, 0), SHADE)
+
+
+def deep(hue):
+    return hx(hue), CREAM, INK
+
 
 # Explorer's 16, 32 and 48 at 100%, 125% and 150% scale (72 excepted), plus 64 for 32 at 200%.
 # Windows scales every other size down from 256. That resamples cleanly from far above and badly from just
@@ -71,7 +93,7 @@ BMP_UPTO = 48         # largest size stored uncompressed; see write_ico
 BODY_X, BODY_W = 3 / 16, 10 / 16
 BODY_X_FILM = 1 / 16   # the film body is wider, so the band overhangs it by 1px rather than 3
 BAND_Y = 6 / 16
-BAND_H = 8.6 / 16    # rounds to 9 at 16px, the floor: a 7-row face plus one ink row above and below it
+BAND_H = 8.6 / 16    # rounds to 9 at 16px, the floor: a 7-row face plus one band row above and below it
 CAP_OF_BAND = 7 / 9  # vector tier only; below VECTOR_FROM the cap is FACE_ROWS
 TEXT_W = 15 / 16     # wordmark width budget; a fixed pixel margin would
                      # make the squeeze size-dependent and the design non-scalable
@@ -108,22 +130,21 @@ PAD_X, PAD_W, PAD_PITCH = 2 / 18, 3 / 18, 4 / 18   # of the card width
 PAD_H = 4 / 8                                      # of the body above the band; the pads centre in it
 
 # w=None means the width is derived so the body stays symmetric; see geom.
-PAPER = dict(x=BODY_X, w=BODY_W, sprocket=None, card=False)
-FILM = dict(x=BODY_X_FILM, w=None, sprocket=SPROCKET, card=False)
-CARD = dict(x=BODY_X_FILM, w=None, sprocket=None, card=True)
+PAPER = dict(x=BODY_X, w=BODY_W, sprocket=None, card=False, scheme=pale)
+FILM = dict(x=BODY_X_FILM, w=None, sprocket=SPROCKET, card=False, scheme=pale)
+CARD = dict(x=BODY_X_FILM, w=None, sprocket=None, card=True, scheme=deep)
 
 # m4v -> MP4, mpeg -> MPG and m2ts/mts/ts -> MTS, so the 13 supported video suffixes need nine icons.
-# WEBP's and SVG's colours are too light for cream sprockets to show: paper bodies only.
 # Indigo, purple and blue are the closest three, so only one of them (MP4) is on a common video format.
 TYPES = [("jpg", "JPG", "#c10500", PAPER), ("png", "PNG", "#c70ea9", PAPER),
-         ("webp", "WEBP", "#e8a800", PAPER), ("tiff", "TIF", "#210641", PAPER),
-         ("gif", "GIF", "#2ba100", PAPER), ("bmp", "BMP", "#3e507a", PAPER),
-         ("svg", "SVG", "#00e796", PAPER),
+         ("webp", "WEBP", "#e8a800", PAPER), ("tiff", "TIF", "#401970", PAPER),
+         ("gif", "GIF", "#2ba100", PAPER), ("bmp", "BMP", "#4a6fb5", PAPER),
+         ("svg", "SVG", "#00b377", PAPER),
          ("mp4", "MP4", "#004dc4", FILM), ("mov", "MOV", "#0096b6", FILM),
-         ("avi", "AVI", "#002120", FILM), ("mkv", "MKV", "#de4600", FILM),
-         ("webm", "WEBM", "#460314", FILM), ("wmv", "WMV", "#170089", FILM),
-         ("mpg", "MPG", "#8131b4", FILM), ("mts", "MTS", "#7c1c1a", FILM),
-         ("flv", "FLV", "#334a01", FILM)]
+         ("avi", "AVI", "#1f8a70", FILM), ("mkv", "MKV", "#de4600", FILM),
+         ("webm", "WEBM", "#a3133a", FILM), ("wmv", "WMV", "#3a2fc0", FILM),
+         ("mpg", "MPG", "#8131b4", FILM), ("mts", "MTS", "#b5302c", FILM),
+         ("flv", "FLV", "#6b8e00", FILM)]
 
 # Camera raws: colours after the maker's brand colour where it has a recognisable one, shades of it for its other formats.
 # Legacy formats share one muted colour.
@@ -238,10 +259,6 @@ MARK_SUN = (0.8690, 0.1131, 0.1131)                     # cx, cy, r
 MARK_RIDGE = [(0.0, 0.6012), (0.2976, 0.1845), (0.4702, 0.4286), (0.6607, 0.2381), (1.0, 0.6012)]
 
 
-def hx(colour):
-    return tuple(int(colour[i:i + 2], 16) for i in (1, 3, 5)) + (255,)
-
-
 def geom(size, body=PAPER):
     """Pixel geometry for one size. Rounded per size rather than scaled from a single drawing: that is what
     keeps the band and body edges on whole pixels.
@@ -343,7 +360,7 @@ def card_layout(size, g):
     return round(CARD_CLIP * size), [(x0 + i * pitch, y, w, h) for i in range(CARD_PADS)]
 
 
-def draw_card(d, size, g):
+def draw_card(d, size, g, pad_colour):
     """Cuts the clip out of the body and draws the pads on a supersampled icon. The hand-tuned sizes cut the clip
     as a staircase, a pixel per row, so it has no antialiased edge."""
     k = SS
@@ -356,7 +373,7 @@ def draw_card(d, size, g):
         d.polygon([((right - clip) * k, 0), (right * k, 0), (right * k, clip * k)], fill=(0, 0, 0, 0))
     for x, y, w, h in pads:
         assert x + w < right - max(0, clip - y), f"{size}px: a pad reaches the clip"
-        d.rectangle([x * k, y * k, (x + w) * k - 1, (y + h) * k - 1], fill=CREAM)
+        d.rectangle([x * k, y * k, (x + w) * k - 1, (y + h) * k - 1], fill=pad_colour)
 
 
 def _load_wordmark_font():
@@ -480,14 +497,15 @@ def render(label, colour, size, body=PAPER):
     d = ImageDraw.Draw(im)
     g = geom(size, body)
     holes, perf, rim = sprockets(size, g, body["sprocket"]) if body["sprocket"] else ([], 0, 0)
+    fill, mark, band = body["scheme"](colour)
 
-    d.rectangle([g["bx"] * k, 0, (g["bx"] + g["bw"]) * k - 1, size * k - 1], fill=hx(colour))
+    d.rectangle([g["bx"] * k, 0, (g["bx"] + g["bw"]) * k - 1, size * k - 1], fill=fill)
     for x, y in holes:
-        d.rectangle([x * k, y * k, (x + perf) * k - 1, (y + perf) * k - 1], fill=CREAM)
+        d.rectangle([x * k, y * k, (x + perf) * k - 1, (y + perf) * k - 1], fill=mark)
 
     f = mark_frame(g, perf, rim)
     if body["card"]:
-        draw_card(d, size, g)
+        draw_card(d, size, g, mark)
     elif size == PIXEL_MARK_AT:
         cell = f["bw"] * k / 10
         x0 = f["bx"] * k + (f["bw"] * k - 10 * cell) / 2
@@ -495,16 +513,16 @@ def render(label, colour, size, body=PAPER):
             for i, ch in enumerate(row):
                 if ch == "#":
                     d.rectangle([x0 + i * cell, r * cell, x0 + (i + 1) * cell - 1, (r + 1) * cell - 1],
-                                fill=CREAM)
+                                fill=mark)
     else:
         mx, my, mw = mark_box(size, f)
         mx, my, mw = mx * k, my * k, mw * k
-        d.polygon([(mx + a * mw, my + b * mw) for a, b in MARK_RIDGE], fill=CREAM)
+        d.polygon([(mx + a * mw, my + b * mw) for a, b in MARK_RIDGE], fill=mark)
         cx, cy, r = MARK_SUN
         d.ellipse([mx + (cx - r) * mw, my + (cy - r) * mw,
-                   mx + (cx + r) * mw, my + (cy + r) * mw], fill=CREAM)
+                   mx + (cx + r) * mw, my + (cy + r) * mw], fill=mark)
 
-    d.rectangle([0, g["band_y"] * k, size * k - 1, (g["band_y"] + g["band_h"]) * k - 1], fill=INK)
+    d.rectangle([0, g["band_y"] * k, size * k - 1, (g["band_y"] + g["band_h"]) * k - 1], fill=band)
 
     if size < VECTOR_FROM:
         glyphs = resolve_glyphs(label, size)
