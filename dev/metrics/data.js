@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793302252549,
+  "lastUpdate": 1793305719555,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -19578,6 +19578,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 819.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 342,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 83.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "ba659421afb2da66ca203b12f9aaaf457c88f736",
+          "message": "cpputils updated: test fixes for retail macOS and GCC -Wvolatile",
+          "timestamp": "2026-10-29T22:20:52+02:00",
+          "tree_id": "bddf6f09078480acdd2a01a9612e9a3a5c81a735",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/ba659421afb2da66ca203b12f9aaaf457c88f736"
+        },
+        "date": 1793305716904,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 18354,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1606,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 32272,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6716.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7509.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5428,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 820,
             "unit": "KB"
           },
           {
