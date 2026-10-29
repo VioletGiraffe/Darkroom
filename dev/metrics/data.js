@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793288831765,
+  "lastUpdate": 1793292961060,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -19188,6 +19188,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .data",
             "value": 340,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 82.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "81ad546fd82b85a578bc9825bb951049304140e3",
+          "message": "Ctrl+wheel zoom handled by MediaGrid for its whole area instead of by each ThumbnailWidget; FrameViewerWindow migrated from CFlowLayout to MediaGrid (selection, multi-frame drag, lazy cards, zoom without re-listing)",
+          "timestamp": "2026-10-29T18:40:07+02:00",
+          "tree_id": "a127aebae8255e698a2095d2b6d3a17b0d0352a2",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/81ad546fd82b85a578bc9825bb951049304140e3"
+        },
+        "date": 1793292957059,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 18244,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1614,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 32048,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6691.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7509.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5413.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 812,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 340.5,
             "unit": "KB"
           },
           {
