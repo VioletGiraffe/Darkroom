@@ -125,6 +125,41 @@ Root: HKA; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueNa
 #emit ProgIdEntries("flv", "Flash Video", "flv")
 #emit SuffixEntries("flv", "flv")
 
+; Camera raws: every suffix is its own format, ProgID and icon.
+#define RawEntries(str Suffix, str TypeName) \
+  ProgIdEntries(Suffix, TypeName, Suffix) + NewLine + SuffixEntries(Suffix, Suffix)
+
+#emit RawEntries("cr3",  "Canon CR3 Raw Image")
+#emit RawEntries("cr2",  "Canon CR2 Raw Image")
+#emit RawEntries("crw",  "Canon CRW Raw Image")
+#emit RawEntries("nef",  "Nikon NEF Raw Image")
+#emit RawEntries("nefx", "Nikon NEFX Raw Image")
+#emit RawEntries("nrw",  "Nikon NRW Raw Image")
+#emit RawEntries("arw",  "Sony ARW Raw Image")
+#emit RawEntries("sr2",  "Sony SR2 Raw Image")
+#emit RawEntries("srf",  "Sony SRF Raw Image")
+#emit RawEntries("raf",  "Fujifilm RAF Raw Image")
+#emit RawEntries("dng",  "DNG Raw Image")
+#emit RawEntries("orf",  "Olympus ORF Raw Image")
+#emit RawEntries("rw2",  "Panasonic RW2 Raw Image")
+#emit RawEntries("raw",  "Panasonic Raw Image")
+#emit RawEntries("rwl",  "Leica RWL Raw Image")
+#emit RawEntries("pef",  "Pentax PEF Raw Image")
+#emit RawEntries("3fr",  "Hasselblad 3FR Raw Image")
+#emit RawEntries("fff",  "Hasselblad FFF Raw Image")
+#emit RawEntries("iiq",  "Phase One IIQ Raw Image")
+#emit RawEntries("ari",  "ARRIRAW Image")
+#emit RawEntries("srw",  "Samsung SRW Raw Image")
+#emit RawEntries("mrw",  "Minolta MRW Raw Image")
+#emit RawEntries("mdc",  "Minolta MDC Raw Image")
+#emit RawEntries("mos",  "Leaf MOS Raw Image")
+#emit RawEntries("mef",  "Mamiya MEF Raw Image")
+#emit RawEntries("dcr",  "Kodak DCR Raw Image")
+#emit RawEntries("kdc",  "Kodak KDC Raw Image")
+#emit RawEntries("k25",  "Kodak K25 Raw Image")
+#emit RawEntries("erf",  "Epson ERF Raw Image")
+#emit RawEntries("bay",  "Casio BAY Raw Image")
+
 ; "Browse with Quickroom" in the classic context menu; Windows 11 shows it under "Show more options".
 #define BrowseVerbEntries(str ClassKey) \
   'Root: HKA; Subkey: "Software\Classes\' + ClassKey + '\shell\' + QuickroomName + '"; ValueType: string; ValueName: ""; ValueData: "Browse with ' + QuickroomName + '"; Flags: uninsdeletekey' + NewLine + \

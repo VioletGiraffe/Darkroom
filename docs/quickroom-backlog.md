@@ -11,8 +11,5 @@
 - Video thumbnails: needs per-file ffmpeg extraction and a cache; tiles show the shell icon today.
 - Pasting a clipboard bitmap as a new file.
 - Deduplicate the logging/message-handler block shared verbatim by both apps' `main.cpp`.
-- File-type icons for camera raws (DNG, CR2/CR3, NEF, ARW, ...). Needs a third icon family: sRGB has no room
-  for a dozen more body colours, so reuse colours across body shapes or vary formats within one family hue;
-  light bodies would need ink marks and a 1px darker-shade frame.
 - SVG opens through the raster image path; zooming should re-render from the vector.
 - AVIF, HEIC and JPEG XL are unsupported; all need the `kimageformats` plugins.

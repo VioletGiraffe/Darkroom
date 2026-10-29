@@ -2,17 +2,47 @@
 <RCC version="1.0">
 	<qresource prefix="/">
 		<file>quickroom.svg</file>
+		<file>filetypes/3fr.ico</file>
+		<file>filetypes/ari.ico</file>
+		<file>filetypes/arw.ico</file>
 		<file>filetypes/avi.ico</file>
+		<file>filetypes/bay.ico</file>
 		<file>filetypes/bmp.ico</file>
+		<file>filetypes/cr2.ico</file>
+		<file>filetypes/cr3.ico</file>
+		<file>filetypes/crw.ico</file>
+		<file>filetypes/dcr.ico</file>
+		<file>filetypes/dng.ico</file>
+		<file>filetypes/erf.ico</file>
+		<file>filetypes/fff.ico</file>
 		<file>filetypes/flv.ico</file>
 		<file>filetypes/gif.ico</file>
+		<file>filetypes/iiq.ico</file>
 		<file>filetypes/jpg.ico</file>
+		<file>filetypes/k25.ico</file>
+		<file>filetypes/kdc.ico</file>
+		<file>filetypes/mdc.ico</file>
+		<file>filetypes/mef.ico</file>
 		<file>filetypes/mkv.ico</file>
+		<file>filetypes/mos.ico</file>
 		<file>filetypes/mov.ico</file>
 		<file>filetypes/mp4.ico</file>
 		<file>filetypes/mpg.ico</file>
+		<file>filetypes/mrw.ico</file>
 		<file>filetypes/mts.ico</file>
+		<file>filetypes/nef.ico</file>
+		<file>filetypes/nefx.ico</file>
+		<file>filetypes/nrw.ico</file>
+		<file>filetypes/orf.ico</file>
+		<file>filetypes/pef.ico</file>
 		<file>filetypes/png.ico</file>
+		<file>filetypes/raf.ico</file>
+		<file>filetypes/raw.ico</file>
+		<file>filetypes/rw2.ico</file>
+		<file>filetypes/rwl.ico</file>
+		<file>filetypes/sr2.ico</file>
+		<file>filetypes/srf.ico</file>
+		<file>filetypes/srw.ico</file>
 		<file>filetypes/svg.ico</file>
 		<file>filetypes/tiff.ico</file>
 		<file>filetypes/webm.ico</file>

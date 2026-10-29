@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Generates Quickroom's per-file-type icons: one .ico per image and video format.
+"""Generates Quickroom's per-file-type icons: one .ico per image, camera raw and video format.
 
 Windows draws these wherever Quickroom owns a type, and Quickroom's tile captions draw them at native sizes, so a
 file's format has to be readable at a glance in a crowded list. One design carries that: a coloured body, a cream
-landscape, and an ink band across it holding the extension as a condensed wordmark. Two bodies distinguish the
-families - PAPER for images, and FILM, which is wider and carries a sprocket run down both edges. Each entry in TYPES
-names the body it uses.
+mark, and an ink band across it holding the extension as a condensed wordmark. Three bodies distinguish the families:
+  PAPER - images; the mark is a landscape.
+  FILM - videos; wider, a sprocket run down both edges besides the landscape.
+  CARD - camera raws; an SD card as wide as FILM, its top-right corner clipped, contact pads for the mark.
+Each entry in TYPES names the body it uses.
 
 What the script is arranged around:
   16px is the critical size. The design was hand-tuned there and every other size derives from it by
@@ -22,8 +24,8 @@ Adding a format:
   Look at the label at 16 and 20: where a full-height stem touches the band edge, add a GLYPH_CHOICES spec.
   Judge the colour on rendered icons beside the others, not by colour distance: CIE76 rated JPG/MKV the
     closest pair here, and by eye they are not close at all.
-  Mirror the suffix in Utils.cpp's lists, in installer.iss and in Quickroom's FileTypeIcons.h; list the icon in
-    quickroom.qrc.
+  Mirror the suffix in Utils.cpp's lists (camera raws: ImageDecoding::rawFileSuffixes), in installer.iss and in
+    Quickroom's FileTypeIcons.h; list the icon in quickroom.qrc.
 
 Two tiers, split at VECTOR_FROM:
   Below it the wordmark is hand-drawn in GLYPHS, a pixel per cell, so no edge is ever antialiased.
@@ -95,9 +97,20 @@ SPROCKET = dict(holes=3, duty=0.6, rim=1 / 32)
 SPROCKET_FROM = 32
 HOLES_ABOVE = 3       # per side, below SPROCKET_FROM
 
+# The SD card: three pads, and a 45-degree clip at the top-right. Hand-tuned at the sizes in CARD_PIXEL: clip depth,
+# pad x offsets from the card's left edge, pad width, pad top row and height.
+CARD_PIXEL = {16: dict(clip=3, pads=(2, 5, 8), pad_w=2, pad_y=1, pad_h=3),
+              20: dict(clip=3, pads=(2, 6, 10), pad_w=3, pad_y=2, pad_h=4)}
+# Every other size derives from the 20px design, not the 16px one: its pads are centred above the band.
+CARD_PADS = 3
+CARD_CLIP = 3 / 20                                 # of the icon
+PAD_X, PAD_W, PAD_PITCH = 2 / 18, 3 / 18, 4 / 18   # of the card width
+PAD_H = 4 / 8                                      # of the body above the band; the pads centre in it
+
 # w=None means the width is derived so the body stays symmetric; see geom.
-PAPER = dict(x=BODY_X, w=BODY_W, sprocket=None)
-FILM = dict(x=BODY_X_FILM, w=None, sprocket=SPROCKET)
+PAPER = dict(x=BODY_X, w=BODY_W, sprocket=None, card=False)
+FILM = dict(x=BODY_X_FILM, w=None, sprocket=SPROCKET, card=False)
+CARD = dict(x=BODY_X_FILM, w=None, sprocket=None, card=True)
 
 # m4v -> MP4, mpeg -> MPG and m2ts/mts/ts -> MTS, so the 13 supported video suffixes need nine icons.
 # WEBP's and SVG's colours are too light for cream sprockets to show: paper bodies only.
@@ -111,6 +124,19 @@ TYPES = [("jpg", "JPG", "#c10500", PAPER), ("png", "PNG", "#c70ea9", PAPER),
          ("webm", "WEBM", "#460314", FILM), ("wmv", "WMV", "#170089", FILM),
          ("mpg", "MPG", "#8131b4", FILM), ("mts", "MTS", "#7c1c1a", FILM),
          ("flv", "FLV", "#334a01", FILM)]
+
+# Camera raws: colours after the maker's brand colour where it has a recognisable one, shades of it for its other formats.
+# Legacy formats share one muted colour.
+# ORF, FFF, ARI and LEGACY lose the card's outline on a dark background: accepted, the pads still show.
+LEGACY = "#00201a"
+TYPES += [("cr3", "CR3", "#990000", CARD), ("cr2", "CR2", "#e52b1c", CARD),
+          ("nef", "NEF", "#d1aa00", CARD), ("nefx", "NEFX", "#d18800", CARD), ("nrw", "NRW", "#d18800", CARD),
+          ("arw", "ARW", "#e94e09", CARD), ("raf", "RAF", "#00a651", CARD), ("dng", "DNG", "#54858f", CARD),
+          ("orf", "ORF", "#120d7d", CARD), ("rw2", "RW2", "#0041c0", CARD), ("rwl", "RWL", "#bf0031", CARD),
+          ("pef", "PEF", "#455902", CARD), ("3fr", "3FR", "#7d2693", CARD), ("fff", "FFF", "#310226", CARD),
+          ("iiq", "IIQ", "#8c98e9", CARD), ("ari", "ARI", "#581108", CARD)]
+TYPES += [(label.lower(), label, LEGACY, CARD) for label in
+          ("CRW", "SR2", "SRF", "MRW", "MOS", "MEF", "DCR", "KDC", "K25", "ERF", "BAY", "MDC", "SRW", "RAW")]
 
 FACE = {
     "J": ["...#", "...#", "...#", "...#", "...#", "#..#", ".##."],
@@ -141,6 +167,19 @@ FACE_FILM = {
     "L": ["#..", "#..", "#..", "#..", "#..", "#..", "###"],
     "4": ["..#.", ".##.", "#.#.", "####", "..#.", "..#.", "..#."],
 }
+# Letters the camera raw labels added. The digits have round shoulders: a flat-topped 2 reads as Z.
+FACE_RAW = {
+    "C": [".##.", "#..#", "#...", "#...", "#...", "#..#", ".##."],
+    "D": ["###.", "#..#", "#..#", "#..#", "#..#", "#..#", "###."],
+    "R": ["###.", "#..#", "#..#", "###.", "#.#.", "#..#", "#..#"],
+    "E": ["####", "#...", "#...", "###.", "#...", "#...", "####"],
+    "Q": [".###.", "#...#", "#...#", "#...#", "#.#.#", "#..#.", ".##.#"],
+    "X": ["#.#", "#.#", ".#.", ".#.", ".#.", "#.#", "#.#"],
+    "Y": ["#...#", "#...#", "#...#", ".#.#.", "..#..", "..#..", "..#.."],
+    "2": [".##.", "#..#", "...#", "..#.", ".#..", "#...", "####"],
+    "3": [".##.", "#..#", "...#", "..#.", "...#", "#..#", ".##."],
+    "5": ["####", "#...", "###.", "...#", "...#", "#..#", ".##."],
+}
 # Extra widths, drawn where a label needs a letter narrower than any face above offers.
 # W5: outer walls full height, inner vee nested one row lower, feet inset off the baseline.
 # V4 ends off-centre: four columns cannot reach a 1px point symmetrically, and every symmetric 4-wide V
@@ -148,6 +187,7 @@ FACE_FILM = {
 NARROW = {"W3": ["#.#", "#.#", "#.#", "###", "###", "###", "#.#"],
           "W5": ["#...#", "#...#", "#...#", "#.#.#", "#.#.#", "#.#.#", ".#.#."],
           "E2": ["##", "#.", "#.", "##", "#.", "#.", "##"],
+          "F2": ["##", "#.", "#.", "##", "#.", "#.", "#."],
           "M3": ["#.#", "###", "###", "#.#", "#.#", "#.#", "#.#"],
           "V4": ["#..#", "#..#", "#..#", "#..#", "#..#", ".##.", ".#.."]}
 
@@ -165,19 +205,28 @@ def _build_variants(*tables):
 
 # One flat table: only widths coexist, so where two shapes of one width were weighed the loser was dropped.
 # NARROW is merged as-is, its keys already carrying the width.
-GLYPHS = {**_build_variants(FACE, FACE_CONDENSED, FACE_FILM), **NARROW}
+GLYPHS = {**_build_variants(FACE, FACE_CONDENSED, FACE_FILM, FACE_RAW), **NARROW}
 
 # Per-size glyph choices; an absent size, or an absent label, means the widest variant of every letter.
 # Specs exist only where 15 columns force a judgement.
 # MOV and MKV take V4 at 16: on V5 the run fills the canvas exactly, and M must not sit flush against the
 # band edge. V touching the right edge is accepted - its outer column is short, so it already reads as space.
 # SVG takes V4 at 16 to keep S off the band edge.
+# The raw labels with a W take W4 at 16: on W5 the first letter's stem sits flush with the band edge. MRW takes M3
+# instead, so W keeps its fifth column.
+# MEF takes E3 at 16 to keep F off the band edge.
+# NEFX needs E2 F2 at 16; at 20 the default E4 F4 crowds the gaps, so E drops to E3.
 GLYPH_CHOICES = {"WEBP": {16: "W4 E2 B3 P3", 20: "W5 E2 B4 P4"},
                  "WEBM": {16: "W3 E2 B3 M3", 20: "W5 E2 B3 M5"},
                  "WMV": {16: "W5 M3 V5"},
                  "MOV": {16: "M5 O4 V4"},
                  "MKV": {16: "M5 K4 V4"},
-                 "SVG": {16: "S4 V4 G4"}}
+                 "SVG": {16: "S4 V4 G4"},
+                 "ARW": {16: "A4 R4 W4"}, "CRW": {16: "C4 R4 W4"}, "NRW": {16: "N4 R4 W4"},
+                 "RAW": {16: "R4 A4 W4"}, "RW2": {16: "R4 W4 24"}, "SRW": {16: "S4 R4 W4"},
+                 "MRW": {16: "M3 R4 W5"},
+                 "MEF": {16: "M5 E3 F4"},
+                 "NEFX": {16: "N4 E2 F2 X3", 20: "N4 E3 F4 X3"}}
 
 # The 16px landscape, on a grid of tenths of the body width.
 MARK_PX = [".......##.", ".......##.", "....#.....", "..#####...", ".########."]
@@ -282,6 +331,32 @@ def mark_box(size, g):
         w = avail_h / MARK_ASPECT
     h = w * MARK_ASPECT
     return x0 + (avail_w - w) / 2, y0 + (avail_h - h) / 2, w
+
+
+def card_layout(size, g):
+    """Clip depth and pad rectangles (x, y, w, h) in pixels for one size."""
+    if size in CARD_PIXEL:
+        c = CARD_PIXEL[size]
+        return c["clip"], [(g["bx"] + x, c["pad_y"], c["pad_w"], c["pad_h"]) for x in c["pads"]]
+    w, pitch, h = round(PAD_W * g["bw"]), round(PAD_PITCH * g["bw"]), round(PAD_H * g["band_y"])
+    x0, y = g["bx"] + round(PAD_X * g["bw"]), (g["band_y"] - h) // 2
+    return round(CARD_CLIP * size), [(x0 + i * pitch, y, w, h) for i in range(CARD_PADS)]
+
+
+def draw_card(d, size, g):
+    """Cuts the clip out of the body and draws the pads on a supersampled icon. The hand-tuned sizes cut the clip
+    as a staircase, a pixel per row, so it has no antialiased edge."""
+    k = SS
+    clip, pads = card_layout(size, g)
+    right = g["bx"] + g["bw"]
+    if size in CARD_PIXEL:
+        for y in range(clip):
+            d.rectangle([(right - clip + y) * k, y * k, right * k - 1, (y + 1) * k - 1], fill=(0, 0, 0, 0))
+    else:
+        d.polygon([((right - clip) * k, 0), (right * k, 0), (right * k, clip * k)], fill=(0, 0, 0, 0))
+    for x, y, w, h in pads:
+        assert x + w < right - max(0, clip - y), f"{size}px: a pad reaches the clip"
+        d.rectangle([x * k, y * k, (x + w) * k - 1, (y + h) * k - 1], fill=CREAM)
 
 
 def _load_wordmark_font():
@@ -411,7 +486,9 @@ def render(label, colour, size, body=PAPER):
         d.rectangle([x * k, y * k, (x + perf) * k - 1, (y + perf) * k - 1], fill=CREAM)
 
     f = mark_frame(g, perf, rim)
-    if size == PIXEL_MARK_AT:
+    if body["card"]:
+        draw_card(d, size, g)
+    elif size == PIXEL_MARK_AT:
         cell = f["bw"] * k / 10
         x0 = f["bx"] * k + (f["bw"] * k - 10 * cell) / 2
         for r, row in enumerate(MARK_PX):
