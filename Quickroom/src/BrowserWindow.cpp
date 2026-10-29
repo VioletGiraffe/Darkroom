@@ -325,7 +325,10 @@ void BrowserWindow::setupUi()
 	setCentralWidget(central);
 	setAcceptDrops(true);
 
+	connect(_grid, &QListWidget::itemActivated, this, &BrowserWindow::activateEntry);
+
 	// Grid-only: the path field keeps its own keys.
+	// Enter activates on macOS too: item views there activate with Cmd+O and leave Enter to editing.
 	const auto activateCurrent = [this] { activateEntry(_grid->currentItem()); };
 	new QShortcut(QKeySequence(Qt::Key_Return), _grid, activateCurrent, Qt::WidgetShortcut);
 	new QShortcut(QKeySequence(Qt::Key_Enter), _grid, activateCurrent, Qt::WidgetShortcut);
@@ -541,7 +544,10 @@ void BrowserWindow::activateEntry(const QListWidgetItem* item)
 	const auto& entry = static_cast<const GridEntry&>(*item);
 	switch (entry.kind)
 	{
-	case EntryKind::Folder: navigateTo(entry.path); break;
+	case EntryKind::Folder:
+		// Queued: navigating rebuilds the grid, deleting the row and tile whose activation is still being handled.
+		QMetaObject::invokeMethod(this, [this, path = entry.path] { navigateTo(path); }, Qt::QueuedConnection);
+		break;
 	case EntryKind::Image:  viewImage(entry.path);  break;
 	case EntryKind::Video:  playVideo(entry.path);  break;
 	}
@@ -624,7 +630,7 @@ void BrowserWindow::showEntryContextMenu(QListWidgetItem& item, QPoint globalPos
 	if (entry.kind == EntryKind::Folder)
 		menu.addAction(tr("Paste into folder"), this, [this, path] { pasteInto(path); })->setEnabled(clipboardHasFiles());
 
-	// Queued, like folder activation in buildTile: the tile showing this menu may be among those removed.
+	// Queued, like folder activation in activateEntry: the tile showing this menu may be among those removed.
 	const auto addDeleteAction = [this, &menu, targets](PathDeletion::Mode mode) {
 		menu.addAction(FileOperations::deleteActionText(mode), this, [this, targets, mode] {
 			QMetaObject::invokeMethod(this, [this, targets, mode] { deletePaths(targets, mode); }, Qt::QueuedConnection);
@@ -843,20 +849,9 @@ QWidget* BrowserWindow::buildTile(QListWidgetItem* item)
 		? ThumbnailWidget::Source{ ImageFilesSource{ QStringList{ entry.path } } }
 		: ThumbnailWidget::Source{ IconSource{ _iconProvider.icon(fileInfo), videoType } };
 
-	// No drag of its own: the grid drags the whole selection.
+	// No drag or activation of its own: the grid drags the selection and activates the row.
 	auto* tile = new ThumbnailWidget(std::move(source), tileCaption(entry), TILE_OPTIONS, nullptr);
 	tile->setFixedSize(tileSize());
-	switch (entry.kind)
-	{
-	case EntryKind::Folder:
-		// Queued: navigating rebuilds the grid, which would delete this tile mid-handler.
-		tile->setOnActivatedCallback([this, path = entry.path] {
-			QMetaObject::invokeMethod(this, [this, path] { navigateTo(path); }, Qt::QueuedConnection);
-		});
-		break;
-	case EntryKind::Image: tile->setOnActivatedCallback([this, path = entry.path] { viewImage(path); }); break;
-	case EntryKind::Video: tile->setOnActivatedCallback([this, path = entry.path] { playVideo(path); }); break;
-	}
 	tile->setFileTypeIconLookup(&FileTypeIcons::forType);
 	setCutMark(tile, isCut(entry.path));
 	return tile;

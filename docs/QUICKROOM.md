@@ -42,9 +42,10 @@ A file tile's caption is its name without the extension, followed by the file ty
 images the format detected from the decoded data, so a misnamed file shows its real type; for camera raws and videos the
 suffix.
 
-Activation: double-click or Enter. Folders navigate in place (queued: the rebuild would delete the tile whose
-handler is still running); images open `ImageViewerWindow` browsing the images shown, and videos open
-`VideoPlayerWindow` browsing the videos shown, each with the browse position reflected back into the grid selection.
+Activation: the grid's (double-click, or Cmd+O on macOS) and Enter on every platform. Folders navigate in place
+(queued: the rebuild would delete the row whose activation is still being handled); images open `ImageViewerWindow`
+browsing the images shown, and videos open `VideoPlayerWindow` browsing the videos shown, each with the browse
+position reflected back into the grid selection.
 Neither window gets Darkroom's library features: no Best action, no persisted speed or saved loops, no frame target
 (see [playback.md](architecture/playback.md)).
 

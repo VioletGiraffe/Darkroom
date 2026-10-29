@@ -22,6 +22,8 @@ public:
 private:
 	void refreshDisplay();
 	[[nodiscard]] QWidget* buildThumbnail(QListWidgetItem* item);
+	// Browses all frames, starting from item's.
+	void openInImageViewer(const QListWidgetItem& item);
 	// Copies the paths of MediaGrid::effectiveSelection(item); reveals item alone.
 	void showThumbnailContextMenu(QListWidgetItem& item, QPoint globalPos);
 	// Reveals the frame folder; nothing without an existing one.

@@ -7,8 +7,8 @@
 `FrameViewerWindow` is a persistent, reusable top-level thumbnail viewer owned by MainWindow. MainWindow updates or
 clears it when browser workflows rename, remove, or replace its current media item. Its frames are rows of a
 `MediaGrid`, which supplies selection, keyboard navigation and dragging the selected frames as files (see
-[main-window.md](main-window.md#media-grid--multi-select)). Double-clicking a thumbnail opens ImageViewerWindow on
-that frame, through an activation callback the window supplies. The grid's context menu reveals the clicked frame and
+[main-window.md](main-window.md#media-grid--multi-select)). The grid's activation (double-click, or Cmd+O on macOS)
+and Enter on every platform open ImageViewerWindow on the frame. The grid's context menu reveals the clicked frame and
 copies the paths of its effective selection; on empty space it reveals the frame folder.
 
 ## CompareWindow

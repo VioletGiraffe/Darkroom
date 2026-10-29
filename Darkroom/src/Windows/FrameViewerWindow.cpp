@@ -58,6 +58,14 @@ FrameViewerWindow::FrameViewerWindow(QWidget* parent)
 		else
 			showBackgroundContextMenu(globalPos);
 	});
+	connect(_grid, &QListWidget::itemActivated, this, [this](QListWidgetItem* item) { openInImageViewer(*item); });
+	// Enter opens on macOS too: item views there open with Cmd+O and leave Enter to editing
+	const auto openCurrentFrame = [this] {
+		if (const QListWidgetItem* current = _grid->currentItem())
+			openInImageViewer(*current);
+	};
+	new QShortcut(QKeySequence(Qt::Key_Return), _grid, openCurrentFrame, Qt::WidgetShortcut);
+	new QShortcut(QKeySequence(Qt::Key_Enter), _grid, openCurrentFrame, Qt::WidgetShortcut);
 	layout->addWidget(_grid);
 
 	// Coalesce wheel steps into one rebuild.
@@ -117,15 +125,16 @@ void FrameViewerWindow::refreshDisplay()
 
 QWidget* FrameViewerWindow::buildThumbnail(QListWidgetItem* item)
 {
-	const int index = _grid->row(item);
-	const QString& filePath = _imagePaths.at(index);
-	// No drag of its own: the grid drags the whole selection.
+	const QString& filePath = _imagePaths.at(_grid->row(item));
+	// No drag or activation of its own: the grid drags the selection and activates the row.
 	auto* thumbnail = new ThumbnailWidget(ImageFilesSource{ QStringList{ filePath } }, QFileInfo{ filePath }.completeBaseName(), {}, nullptr);
 	thumbnail->setFixedSize(_thumbnailSize, _thumbnailSize);
-	thumbnail->setOnActivatedCallback([this, index] {
-		ImageViewerWindow::showForImages(_imagePaths, index, this);
-	});
 	return thumbnail;
+}
+
+void FrameViewerWindow::openInImageViewer(const QListWidgetItem& item)
+{
+	ImageViewerWindow::showForImages(_imagePaths, _grid->row(&item), this);
 }
 
 void FrameViewerWindow::zoomThumbnails(int steps)
