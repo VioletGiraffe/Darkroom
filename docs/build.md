@@ -113,9 +113,11 @@ method's validation: [image-read-performance.md](image-read-performance.md).
 
 ## Packaging
 
-- **Windows:** `installer.iss` installs both exes from `dist/`, the VC++ redistributable, and the file-type icons
-  from `Quickroom/res/filetypes/`. The version is read from the built `Darkroom.exe`, so `VERSION` in `Darkroom.pro` is the
-  single source. `AppId` is fixed: changing it makes an upgrade install beside the old copy. The `[Registry]` section
+- **Windows:** `installer.iss` installs the exes from `dist/`, the VC++ redistributable, and the file-type icons
+  from `Quickroom/res/filetypes/`. Darkroom and Quickroom are components, at least one required; the shared runtime is
+  always installed, and a component unticked on reinstall has its files and registry entries removed. The version is
+  read from the built `Darkroom.exe`, so `VERSION` in `Darkroom.pro` is the single source.
+  `AppId` is fixed: changing it makes an upgrade install beside the old copy. The `[Registry]` section
   registers Quickroom as an eligible handler per supported type under a distinct ProgID each, so every type keeps its
   own icon; Windows forbids claiming the default handler programmatically, so the finish page offers an opt-in
   checkbox that opens Settings for the user to choose. It also adds "Browse with Quickroom" to the context menu of

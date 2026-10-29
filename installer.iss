@@ -27,7 +27,8 @@ OutputBaseFilename={#MyAppName}
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
-UninstallDisplayIcon={app}\{#MyAppExeName}
+; Carries SetupIconFile's icon whichever apps are installed
+UninstallDisplayIcon={uninstallexe}
 ; Makes Setup notify the shell of the [Registry] associations, so icons appear without a logoff
 ChangesAssociations=yes
 
@@ -37,51 +38,78 @@ Compression=lzma2/ultra64
 LZMAUseSeparateProcess=yes
 LZMABlockSize=8192
 
+[Types]
+; Only a custom type: the components page shows the checkboxes without a type list
+Name: custom; Description: "Custom"; Flags: iscustom
+
+[Components]
+; NextButtonClick requires at least one selected.
+Name: darkroom;  Description: "{#MyAppName} - organize, label and compare photos and videos"; Types: custom
+Name: quickroom; Description: "{#QuickroomName} - fast image and video browser and viewer"; Types: custom
+
+[InstallDelete]
+; Removes the files of a component unticked on reinstall
+Type: files; Name: "{app}\{#MyAppExeName}"; Components: not darkroom
+Type: files; Name: "{autoprograms}\{#MyAppName}.lnk"; Components: not darkroom
+Type: files; Name: "{autodesktop}\{#MyAppName}.lnk"; Components: not darkroom
+Type: files; Name: "{app}\{#QuickroomExeName}"; Components: not quickroom
+Type: files; Name: "{autoprograms}\{#QuickroomName}.lnk"; Components: not quickroom
+Type: files; Name: "{autodesktop}\{#QuickroomName}.lnk"; Components: not quickroom
+Type: filesandordirs; Name: "{app}\{#IconDir}"; Components: not quickroom
+
 [Files]
 ; Each app exe has its own entry so ignoreversion forces overwrite on same-version rebuilds. Being non-wildcard
 ; Sources, they also make a missing exe (e.g. a failed build) a hard compile error instead of a silent broken installer.
-Source: "{#SourcePath}\dist\{#MyAppExeName}";    DestDir: "{app}"; Flags: ignoreversion
-Source: "{#SourcePath}\dist\{#QuickroomExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourcePath}\dist\{#MyAppExeName}";    DestDir: "{app}"; Flags: ignoreversion; Components: darkroom
+Source: "{#SourcePath}\dist\{#QuickroomExeName}"; DestDir: "{app}"; Flags: ignoreversion; Components: quickroom
+; The runtime both apps share
 Source: "{#SourcePath}\dist\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs; Excludes: "{#VCRedistExeName},{#MyAppExeName},{#QuickroomExeName}"
 Source: "{#SourcePath}\dist\{#VCRedistExeName}";  DestDir: "{tmp}"; Flags: deleteafterinstall
 Source: "{#SourcePath}\LICENSE"; DestDir: "{app}"
 Source: "{#SourcePath}\NOTICE";  DestDir: "{app}"
 ; Committed source assets, not build output, so they come from the repo rather than dist.
 ; ignoreversion: .ico files carry no version info, so an upgrade would otherwise compare timestamps.
-Source: "{#SourcePath}\quickroom\res\filetypes\*.ico"; DestDir: "{app}\{#IconDir}"; Flags: ignoreversion
+Source: "{#SourcePath}\quickroom\res\filetypes\*.ico"; DestDir: "{app}\{#IconDir}"; Flags: ignoreversion; Components: quickroom
 
 [Icons]
-Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{autoprograms}\{#QuickroomName}"; Filename: "{app}\{#QuickroomExeName}"
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Components: darkroom
+Name: "{autoprograms}\{#QuickroomName}"; Filename: "{app}\{#QuickroomExeName}"; Components: quickroom
 Name: "{autoprograms}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 Name: "{autodesktop}\{#QuickroomName}"; Filename: "{app}\{#QuickroomExeName}"; Tasks: quickroomdesktopicon
 
 [Tasks]
 ; Literal descriptions, not {cm:CreateDesktopIcon}: that message takes no parameter, so two tasks using it read identically.
-Name: desktopicon; Description: "Create a desktop icon for &{#MyAppName}"; GroupDescription: {cm:AdditionalIcons};
-Name: quickroomdesktopicon; Description: "Create a desktop icon for &{#QuickroomName}"; GroupDescription: {cm:AdditionalIcons};
+Name: desktopicon; Description: "Create a desktop icon for &{#MyAppName}"; GroupDescription: {cm:AdditionalIcons}; Components: darkroom
+Name: quickroomdesktopicon; Description: "Create a desktop icon for &{#QuickroomName}"; GroupDescription: {cm:AdditionalIcons}; Components: quickroom
 
 [Registry]
 ; A file's icon comes from whichever ProgID currently handles its extension, so a distinct icon per format
 ; requires a distinct ProgID per format. Windows 8+ forbids claiming the default handler programmatically:
 ; these entries only make Quickroom eligible, and the [Run] entry sends the user to Settings to choose.
+; "not quickroom" entries remove the keys of a component unticked on reinstall.
 #define ProgIdEntries(str ProgId, str TypeName, str IconStem) \
-  'Root: HKA; Subkey: "Software\Classes\Quickroom.' + ProgId + '"; ValueType: string; ValueName: ""; ValueData: "' + TypeName + '"; Flags: uninsdeletekey' + NewLine + \
-  'Root: HKA; Subkey: "Software\Classes\Quickroom.' + ProgId + '\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\' + IconDir + '\' + IconStem + '.ico"' + NewLine + \
-  'Root: HKA; Subkey: "Software\Classes\Quickroom.' + ProgId + '\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\' + QuickroomExeName + '"" ""%1"""'
+  'Root: HKA; Subkey: "Software\Classes\Quickroom.' + ProgId + '"; ValueType: string; ValueName: ""; ValueData: "' + TypeName + '"; Flags: uninsdeletekey; Components: quickroom' + NewLine + \
+  'Root: HKA; Subkey: "Software\Classes\Quickroom.' + ProgId + '\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\' + IconDir + '\' + IconStem + '.ico"; Components: quickroom' + NewLine + \
+  'Root: HKA; Subkey: "Software\Classes\Quickroom.' + ProgId + '\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\' + QuickroomExeName + '"" ""%1"""; Components: quickroom' + NewLine + \
+  'Root: HKA; Subkey: "Software\Classes\Quickroom.' + ProgId + '"; Flags: deletekey; Components: not quickroom'
 
 ; uninsdeletevalue, not uninsdeletekey: the extension keys are shared with every other app that opens the
 ; type, and we own only our own value inside them.
+; FileAssociations needs no deletion entry: deleting Software\Quickroom removes it.
 #define SuffixEntries(str Suffix, str ProgId) \
-  'Root: HKA; Subkey: "Software\Classes\.' + Suffix + '\OpenWithProgids"; ValueType: string; ValueName: "Quickroom.' + ProgId + '"; ValueData: ""; Flags: uninsdeletevalue' + NewLine + \
-  'Root: HKA; Subkey: "Software\' + QuickroomName + '\Capabilities\FileAssociations"; ValueType: string; ValueName: ".' + Suffix + '"; ValueData: "Quickroom.' + ProgId + '"'
+  'Root: HKA; Subkey: "Software\Classes\.' + Suffix + '\OpenWithProgids"; ValueType: string; ValueName: "Quickroom.' + ProgId + '"; ValueData: ""; Flags: uninsdeletevalue; Components: quickroom' + NewLine + \
+  'Root: HKA; Subkey: "Software\' + QuickroomName + '\Capabilities\FileAssociations"; ValueType: string; ValueName: ".' + Suffix + '"; ValueData: "Quickroom.' + ProgId + '"; Components: quickroom' + NewLine + \
+  'Root: HKA; Subkey: "Software\Classes\.' + Suffix + '\OpenWithProgids"; ValueName: "Quickroom.' + ProgId + '"; Flags: deletevalue; Components: not quickroom'
 
 ; Capabilities plus RegisteredApplications are what list Quickroom in Settings > Default apps at all.
-Root: HKA; Subkey: "Software\{#QuickroomName}"; Flags: uninsdeletekeyifempty
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities"; ValueType: string; ValueName: "ApplicationName"; ValueData: "{#QuickroomName}"; Flags: uninsdeletekey
-Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities"; ValueType: string; ValueName: "ApplicationDescription"; ValueData: "Fast image and video browser and viewer"
-Root: HKA; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueName: "{#QuickroomName}"; ValueData: "Software\{#QuickroomName}\Capabilities"; Flags: uninsdeletevalue
+; Software\Quickroom is the installer's own: the app's settings live under its organization's key.
+Root: HKA; Subkey: "Software\{#QuickroomName}"; Flags: uninsdeletekeyifempty; Components: quickroom
+Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities"; ValueType: string; ValueName: "ApplicationName"; ValueData: "{#QuickroomName}"; Flags: uninsdeletekey; Components: quickroom
+Root: HKA; Subkey: "Software\{#QuickroomName}\Capabilities"; ValueType: string; ValueName: "ApplicationDescription"; ValueData: "Fast image and video browser and viewer"; Components: quickroom
+Root: HKA; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueName: "{#QuickroomName}"; ValueData: "Software\{#QuickroomName}\Capabilities"; Flags: uninsdeletevalue; Components: quickroom
+Root: HKA; Subkey: "Software\{#QuickroomName}"; Flags: deletekey; Components: not quickroom
+Root: HKA; Subkey: "Software\RegisteredApplications"; ValueName: "{#QuickroomName}"; Flags: deletevalue; Components: not quickroom
 
 ; One ProgID per icon, then every suffix that maps to it.
 ; No .ico suffix, deliberately: Explorer draws each .ico from its own contents, and a type icon would replace that.
@@ -162,9 +190,10 @@ Root: HKA; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueNa
 
 ; "Browse with Quickroom" in the classic context menu; Windows 11 shows it under "Show more options".
 #define BrowseVerbEntries(str ClassKey) \
-  'Root: HKA; Subkey: "Software\Classes\' + ClassKey + '\shell\' + QuickroomName + '"; ValueType: string; ValueName: ""; ValueData: "Browse with ' + QuickroomName + '"; Flags: uninsdeletekey' + NewLine + \
-  'Root: HKA; Subkey: "Software\Classes\' + ClassKey + '\shell\' + QuickroomName + '"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\' + QuickroomExeName + ',0"' + NewLine + \
-  'Root: HKA; Subkey: "Software\Classes\' + ClassKey + '\shell\' + QuickroomName + '\command"; ValueType: string; ValueName: ""; ValueData: """{app}\' + QuickroomExeName + '"" ""%V"""'
+  'Root: HKA; Subkey: "Software\Classes\' + ClassKey + '\shell\' + QuickroomName + '"; ValueType: string; ValueName: ""; ValueData: "Browse with ' + QuickroomName + '"; Flags: uninsdeletekey; Components: quickroom' + NewLine + \
+  'Root: HKA; Subkey: "Software\Classes\' + ClassKey + '\shell\' + QuickroomName + '"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\' + QuickroomExeName + ',0"; Components: quickroom' + NewLine + \
+  'Root: HKA; Subkey: "Software\Classes\' + ClassKey + '\shell\' + QuickroomName + '\command"; ValueType: string; ValueName: ""; ValueData: """{app}\' + QuickroomExeName + '"" ""%V"""; Components: quickroom' + NewLine + \
+  'Root: HKA; Subkey: "Software\Classes\' + ClassKey + '\shell\' + QuickroomName + '"; Flags: deletekey; Components: not quickroom'
 
 ; Directory\Background: the empty space inside an open folder.
 #emit BrowseVerbEntries("Directory")
@@ -182,12 +211,22 @@ Root: HKLM; Subkey: "Software\Classes\Applications\{#QuickroomExeName}"; Flags: 
 
 [Run]
 Filename: "{tmp}\{#VCRedistExeName}"; Parameters: "/install /quiet /norestart"; StatusMsg: Installing Microsoft C++ Runtime...; Flags: runhidden waituntilterminated skipifdoesntexist
-Filename: "{app}\{#MyAppExeName}"; Description: {cm:LaunchProgram,{#MyAppName}}; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: {cm:LaunchProgram,{#MyAppName}}; Flags: nowait postinstall skipifsilent; Components: darkroom
+Filename: "{app}\{#QuickroomExeName}"; Description: {cm:LaunchProgram,{#QuickroomName}}; Flags: nowait postinstall skipifsilent; Components: quickroom and not darkroom
 ; shellexec: ms-settings: is a URI, not an exe. runasoriginaluser: Setup is elevated and Settings will not
 ; launch under an elevated token. The registeredAppMachine query needs Windows 11 22H2; older builds ignore
 ; it and open the plain Default apps page.
-Filename: "ms-settings:defaultapps?registeredAppMachine={#QuickroomName}"; Description: "Choose which file types &{#QuickroomName} opens"; Flags: shellexec nowait postinstall skipifsilent runasoriginaluser unchecked
+Filename: "ms-settings:defaultapps?registeredAppMachine={#QuickroomName}"; Description: "Choose which file types &{#QuickroomName} opens"; Flags: shellexec nowait postinstall skipifsilent runasoriginaluser unchecked; Components: quickroom
 
 [UninstallDelete]
 Type: dirifempty; Name: "{app}\{#IconDir}"
 Type: dirifempty; Name: "{app}"
+
+[Code]
+// Also runs on silent installs, which then exit when it returns False.
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := (CurPageID <> wpSelectComponents) or WizardIsComponentSelected('darkroom') or WizardIsComponentSelected('quickroom');
+  if not Result then
+    SuppressibleMsgBox('Select at least one application to install.', mbError, MB_OK, IDOK);
+end;
