@@ -25,6 +25,9 @@ namespace FileOperations
 	// Copies or moves sources into destinationFolder in a progress dialog that blocks parent's window while in the foreground.
 	// Before a move, open players and viewers release the files moved.
 	void startTransfer(TransferKind kind, const QStringList& sources, const QString& destinationFolder, QWidget* parent);
+	// Whether moving source into destinationFolder is predicted to be a rename; false when that cannot be determined.
+	// Reads both paths' filesystem metadata.
+	[[nodiscard]] bool isOnSameVolume(const QString& source, const QString& destinationFolder);
 
 	// Asks first when deleting permanently or when paths include a folder; files go to Trash unasked.
 	// Returns the paths that are gone afterwards.

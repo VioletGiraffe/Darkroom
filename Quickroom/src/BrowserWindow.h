@@ -99,7 +99,8 @@ private:
 	// The folder a drop lands in. Empty where it makes no sense: the grid's own items back into their folder or into themselves.
 	[[nodiscard]] QString dropTargetFolder(const QDropEvent& event, const QStringList& sources) const;
 	// Follows file managers: a move within one volume and a copy across volumes, unless the copy or move key is held.
-	[[nodiscard]] Qt::DropAction dropAction(const QDropEvent& event) const;
+	// The volume is compared between source and targetFolder.
+	[[nodiscard]] Qt::DropAction dropAction(const QDropEvent& event, const QString& source, const QString& targetFolder);
 
 	[[nodiscard]] QWidget* buildTile(QListWidgetItem* item);
 	// The zoomed width; the height gives the image area the first image's aspect, square without one
@@ -128,6 +129,7 @@ private:
 	int _historyIndex = -1;
 
 	QSet<QString> _cutPathKeys; // pathComparisonKey of each cut file
-	// Taken when a drag enters; folder tiles count as the shown folder's volume.
-	bool _dropSourcesOnShownVolume = false;
+	// The drop folder whose volume dropAction last compared, and the result; cleared when a drag enters.
+	QString _volumeCheckedDropFolder;
+	bool _dropFolderOnSourceVolume = false;
 };

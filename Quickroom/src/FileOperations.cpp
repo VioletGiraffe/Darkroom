@@ -5,6 +5,7 @@
 #include "Windows/RemovalAction.h"
 #include "Windows/VideoPlayerWindow.h"
 #include "compiler/compiler_warnings_control.h"
+#include "fileoperations/cfilesystemmutator.h"
 #include "fileoperationsui/cfileoperationdialog.h"
 #include "fileoperationsui/fileoperationtexts.h"
 
@@ -20,6 +21,7 @@ RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 #include <cstring>
+#include <optional>
 #include <stdint.h>
 #include <utility>
 
@@ -113,6 +115,13 @@ void FileOperations::startTransfer(TransferKind kind, const QStringList& sources
 
 	auto* dialog = new CFileOperationDialog(std::move(*request), {}, parent);
 	dialog->start();
+}
+
+bool FileOperations::isOnSameVolume(const QString& source, const QString& destinationFolder)
+{
+	const std::optional<CEntryPath> sourcePath = parseOperationPath(source);
+	const std::optional<CEntryPath> folderPath = parseOperationPath(destinationFolder);
+	return sourcePath && folderPath && !crossDevicePredicted(*sourcePath, *folderPath);
 }
 
 QSet<QString> FileOperations::deleteWithConfirmation(const QStringList& paths, PathDeletion::Mode mode, QWidget* dialogParent)

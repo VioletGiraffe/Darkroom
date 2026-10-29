@@ -57,7 +57,6 @@ DISABLE_COMPILER_WARNINGS
 #include <QShortcut>
 #include <QStandardPaths>
 #include <QStatusBar>
-#include <QStorageInfo>
 #include <QStyle>
 #include <QTimer>
 #include <QToolButton>
@@ -707,7 +706,7 @@ QString BrowserWindow::dropTargetFolder(const QDropEvent& event, const QStringLi
 	return intoASource ? QString() : target;
 }
 
-Qt::DropAction BrowserWindow::dropAction(const QDropEvent& event) const
+Qt::DropAction BrowserWindow::dropAction(const QDropEvent& event, const QString& source, const QString& targetFolder)
 {
 	const Qt::KeyboardModifiers modifiers = event.modifiers();
 #ifdef Q_OS_MACOS
@@ -718,7 +717,12 @@ Qt::DropAction BrowserWindow::dropAction(const QDropEvent& event) const
 	const bool copyKey = modifiers.testFlag(Qt::ControlModifier);
 	const bool moveKey = modifiers.testFlag(Qt::ShiftModifier);
 #endif
-	const bool move = !copyKey && (moveKey || _dropSourcesOnShownVolume);
+	if (!copyKey && !moveKey && targetFolder != _volumeCheckedDropFolder)
+	{
+		_volumeCheckedDropFolder = targetFolder;
+		_dropFolderOnSourceVolume = FileOperations::isOnSameVolume(source, targetFolder);
+	}
+	const bool move = !copyKey && (moveKey || _dropFolderOnSourceVolume);
 	const Qt::DropAction preferred = move ? Qt::MoveAction : Qt::CopyAction;
 	if (event.possibleActions().testFlag(preferred))
 		return preferred;
@@ -727,18 +731,19 @@ Qt::DropAction BrowserWindow::dropAction(const QDropEvent& event) const
 
 void BrowserWindow::dragEnterEvent(QDragEnterEvent* event)
 {
-	const QStringList sources = FileOperations::localFilePaths(*event->mimeData());
-	if (sources.empty())
+	if (FileOperations::localFilePaths(*event->mimeData()).empty())
 		return;
 
-	_dropSourcesOnShownVolume = QStorageInfo(sources.front()).rootPath() == QStorageInfo(_currentPath).rootPath();
+	_volumeCheckedDropFolder.clear();
 	dragMoveEvent(event);
 }
 
 void BrowserWindow::dragMoveEvent(QDragMoveEvent* event)
 {
-	const Qt::DropAction action = dropAction(*event);
-	if (action == Qt::IgnoreAction || dropTargetFolder(*event, FileOperations::localFilePaths(*event->mimeData())).isEmpty())
+	const QStringList sources = FileOperations::localFilePaths(*event->mimeData());
+	const QString target = dropTargetFolder(*event, sources);
+	const Qt::DropAction action = sources.empty() || target.isEmpty() ? Qt::IgnoreAction : dropAction(*event, sources.front(), target);
+	if (action == Qt::IgnoreAction)
 	{
 		event->ignore();
 		return;
@@ -751,8 +756,8 @@ void BrowserWindow::dropEvent(QDropEvent* event)
 {
 	const QStringList sources = FileOperations::localFilePaths(*event->mimeData());
 	const QString target = dropTargetFolder(*event, sources);
-	const Qt::DropAction action = dropAction(*event);
-	if (sources.empty() || target.isEmpty() || action == Qt::IgnoreAction)
+	const Qt::DropAction action = sources.empty() || target.isEmpty() ? Qt::IgnoreAction : dropAction(*event, sources.front(), target);
+	if (action == Qt::IgnoreAction)
 	{
 		event->ignore();
 		return;
