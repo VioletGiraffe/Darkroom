@@ -76,8 +76,10 @@ The directories:
   rename, delete, label management, frame extraction, source relocation), and collaborators that serve one window
   (`OscillatingPlayback`).
 - `Theme/` - the selectable themes and application styling.
-- `crashhandler/` - Windows-only minidump writer, a no-op elsewhere; both apps install it in `main()` with the temp
-  directory as the dump location.
+- `App/` - `Application`, the startup and shutdown both apps' `main()` share, and `MemoryLog`, the in-memory log sink
+  it installs.
+- `crashhandler/` - Windows-only minidump writer, a no-op elsewhere; `Application` installs it with the temp directory
+  as the dump location.
 - Root - app-wide modules: `SharedSettings.h` (the shared settings store, its keys and defaults), `Shortcuts.h`
   (shortcut strings shared by several windows), each with a Darkroom-only counterpart (`DarkroomSettings.h`,
   `DarkroomShortcuts.h`), `Ffmpeg` (process wrapper, UI-free), `Import` (per-item import workers, UI-free), `Utils`
@@ -103,7 +105,7 @@ camera raws from `ImageDecoding::rawFileSuffixes`. Three artifacts mirror them b
 - Resources are not globbed: an icon added to a `res/UI/` folder must be listed in that tree's `.qrc`.
 - An icon goes with the code using it: the theme's and the shared windows' icons are in `Shared/res/UI/`.
 - Both trees' icons are under `:/UI`.
-- Each app's `main()` registers the shared resources with `Q_INIT_RESOURCE(shared)`, which a static library requires.
+- `Application` registers the shared resources with `Q_INIT_RESOURCE(shared)`, which a static library requires.
 
 ## Cross-cutting principles
 

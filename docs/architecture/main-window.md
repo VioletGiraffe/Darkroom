@@ -152,7 +152,8 @@ action in a `BatchScope`; actions that may run ffmpeg persist per item.
 
 ## Logging and diagnostics
 
-`main()` calls Shared's `installMemoryLog` before constructing `QApplication`, capturing early platform and plugin
-diagnostics while chaining to the previous handler so normal stderr output remains. The shared
+Shared's `Application` calls `installMemoryLog` before constructing `QApplication`, capturing early platform and plugin
+diagnostics while chaining to the previous handler so normal stderr output remains. It then logs the application name
+and version with the CPU model and core count, so every bug report carries them. The shared
 `CLoggerInMemory` sink is thread-safe and surfaced by the Help menu's bug report dialog. It is memory-only and currently
 unbounded.

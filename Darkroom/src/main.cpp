@@ -1,21 +1,11 @@
-#include "Core/CpuThreadPool.h"
-#include "Core/IoThreadPool.h"
+#include "App/Application.h"
 #include "Windows/MainWindow.h"
-#include "MemoryLog.h"
 #include "SharedSettings.h"
-#include "Theme/Style.h"
-#include "crashhandler/CCrashHandler.h"
 #include "compiler/compiler_warnings_control.h"
 #include "utility/macro_utils.h"
-#include "widgets/widgetutils.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QApplication>
-#include <QDebug>
-#include <QDir>
-#include <QIcon>
-#include <QImageReader>
-#include <QString>
 RESTORE_COMPILER_WARNINGS
 
 #ifndef DARKROOM_VERSION
@@ -24,39 +14,13 @@ RESTORE_COMPILER_WARNINGS
 
 int main(int argc, char* argv[])
 {
-	installMemoryLog();
+	const Application app{ argc, argv, DarkroomApplicationName, STRINGIFY_EXPANDED_ARGUMENT(DARKROOM_VERSION), ":/darkroom.svg" };
 
-	Q_INIT_RESOURCE(shared);
+	// Destroyed before app stops the pools, so its state is saved before they wait out a read stuck on unreachable storage
+	MainWindow window;
+	if (!window.isLibraryLoaded())
+		return 0;
 
-	WidgetUtils::tagWindowsAsSrgb();
-	QApplication app(argc, argv);
-	app.setOrganizationName("VioletGiraffe");
-	app.setApplicationName(DarkroomApplicationName);
-	app.setApplicationVersion(STRINGIFY_EXPANDED_ARGUMENT(DARKROOM_VERSION));
-	app.setWindowIcon(QIcon(":/darkroom.svg"));
-
-	CCrashHandler::setMinidumpsStorageFolderPath(QDir::tempPath().toStdString());
-	CCrashHandler crashHandler([](const wchar_t* msg) {
-		qInfo() << QString::fromWCharArray(msg);
-	});
-
-	QImageReader::setAllocationLimit(2048);  // raise Qt's 256 MB decode cap; 67 MP at 3x8 bits already exceeds it
-
-	initSharedSettings();
-	Style::install();
-
-	int result = 0;
-	{
-		// Destroyed before the pools stop, so its state is saved before they wait out a read stuck on unreachable storage
-		MainWindow window;
-		if (window.isLibraryLoaded())
-		{
-			window.show();
-			result = app.exec();
-		}
-	}
-	// Image reads transition from the IO pool to the CPU pool, so IO has to be shut down first
-	IoThreadPool::finishAllThreads();
-	cpuThreadPool().finishAllThreads();
-	return result;
+	window.show();
+	return QApplication::exec();
 }

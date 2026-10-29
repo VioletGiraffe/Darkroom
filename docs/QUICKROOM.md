@@ -12,7 +12,7 @@ the coding conventions.
 
 `Quickroom/src/` holds the Quickroom-only code:
 
-- `main.cpp` - Darkroom's bootstrap shape minus the library, plus the startup routing below. Its own
+- `main.cpp` - Shared's `Application` startup, plus the startup routing below. Its own
   application identity ("Quickroom") keeps its QSettings separate from Darkroom's; see
   [settings-and-theme.md](architecture/settings-and-theme.md) for the store both apps share.
 - `BrowserWindow` - the main window: navigation header (back/forward/up, path field, Browse button, name filter,

@@ -1,27 +1,19 @@
+#include "App/Application.h"
 #include "BrowserWindow.h"
-#include "Core/CpuThreadPool.h"
-#include "Core/IoThreadPool.h"
 #include "FileOperations.h"
 #include "FolderListing.h"
-#include "MemoryLog.h"
 #include "SharedSettings.h"
-#include "Theme/Style.h"
 #include "UiComponents/SortControl.h"
 #include "Utils.h"
 #include "Windows/ImageViewerWindow.h"
 #include "Windows/VideoPlayerWindow.h"
-#include "crashhandler/CCrashHandler.h"
 #include "compiler/compiler_warnings_control.h"
 #include "utility/macro_utils.h"
-#include "widgets/widgetutils.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QApplication>
-#include <QDebug>
 #include <QDir>
 #include <QFileInfo>
-#include <QIcon>
-#include <QImageReader>
 #include <QString>
 #include <QStringList>
 RESTORE_COMPILER_WARNINGS
@@ -127,29 +119,10 @@ void openStartupWindow(const QString& path)
 
 int main(int argc, char* argv[])
 {
-	installMemoryLog();
-
-	Q_INIT_RESOURCE(shared);
-
-	WidgetUtils::tagWindowsAsSrgb();
-	QApplication app(argc, argv);
-	app.setOrganizationName("VioletGiraffe");
-	app.setApplicationName(QuickroomApplicationName);
-	app.setApplicationVersion(STRINGIFY_EXPANDED_ARGUMENT(QUICKROOM_VERSION));
-	app.setWindowIcon(QIcon(":/quickroom.svg"));
-
-	CCrashHandler::setMinidumpsStorageFolderPath(QDir::tempPath().toStdString());
-	CCrashHandler crashHandler([](const wchar_t* msg) {
-		qInfo() << QString::fromWCharArray(msg);
-	});
-
-	QImageReader::setAllocationLimit(2048);  // raise Qt's 256 MB decode cap; 67 MP at 3x8 bits already exceeds it
-
-	initSharedSettings();
-	Style::install();
+	const Application app{ argc, argv, QuickroomApplicationName, STRINGIFY_EXPANDED_ARGUMENT(QUICKROOM_VERSION), ":/quickroom.svg" };
 
 	// Take the first argument as a path to open, if any
-	QString startupPath = app.arguments().value(1, /*default:*/{});
+	QString startupPath = QApplication::arguments().value(1, /*default:*/{});
 #ifdef Q_OS_WIN
 	// Windows argv parsing reads \" as an escaped quote: a quoted drive root "C:\" arrives as C:"
 	if (startupPath.endsWith('"'))
@@ -157,9 +130,5 @@ int main(int argc, char* argv[])
 #endif
 	openStartupWindow(QDir::fromNativeSeparators(startupPath));
 
-	const int result = app.exec();
-	// Image reads transition from the IO pool to the CPU pool, so IO has to be shut down first
-	IoThreadPool::finishAllThreads();
-	cpuThreadPool().finishAllThreads();
-	return result;
+	return QApplication::exec();
 }

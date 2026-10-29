@@ -1,4 +1,4 @@
-#include "MemoryLog.h"
+#include "App/MemoryLog.h"
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
 #include "logger/cloggerinmemory.h"
