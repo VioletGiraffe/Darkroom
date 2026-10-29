@@ -8,7 +8,6 @@ DISABLE_COMPILER_WARNINGS
 RESTORE_COMPILER_WARNINGS
 
 class MediaGrid;
-class QLabel;
 class QListWidgetItem;
 class QTimer;
 
@@ -22,11 +21,10 @@ public:
 
 private:
 	void refreshDisplay();
-	void showInstruction(const QString& text);
 	[[nodiscard]] QWidget* buildThumbnail(QListWidgetItem* item);
 	// Copies the paths of MediaGrid::effectiveSelection(item); reveals item alone.
 	void showThumbnailContextMenu(QListWidgetItem& item, QPoint globalPos);
-	// Reveals the frame folder.
+	// Reveals the frame folder; nothing without an existing one.
 	void showBackgroundContextMenu(QPoint globalPos);
 	void zoomThumbnails(int steps);
 	void applyThumbnailSize();
@@ -35,7 +33,6 @@ private:
 	QString       _folderPath;
 	QStringList   _imagePaths;            // one per grid row, in row order
 	int           _thumbnailSize        = 200;
-	QLabel*       _instructionLabel     = nullptr;
 	MediaGrid*    _grid                 = nullptr;
 	QTimer*       _zoomDebounce         = nullptr;
 };

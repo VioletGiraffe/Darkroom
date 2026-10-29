@@ -29,6 +29,7 @@ namespace {
 
 static constexpr int MAX_DRAG_IMAGE_EDGE = 180;
 static constexpr int PRELOAD_VISUAL_ROWS_PER_SIDE = 3;
+static constexpr int EMPTY_MESSAGE_POINT_SIZE = 16;
 
 void paintDragCountBadge(QPixmap& pixmap, int count)
 {
@@ -203,7 +204,7 @@ void MediaGrid::paintEvent(QPaintEvent* event)
 	QPainter p{ viewport() };
 	p.setPen(Theme::current().instructionText);
 	QFont font = p.font();
-	font.setPointSizeF(font.pointSizeF() + 2);
+	font.setPointSize(EMPTY_MESSAGE_POINT_SIZE);
 	p.setFont(font);
 	p.drawText(viewport()->rect().adjusted(20, 20, -20, -20), Qt::AlignCenter | Qt::TextWordWrap, _emptyMessage);
 }

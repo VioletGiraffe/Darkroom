@@ -1,7 +1,5 @@
 #include "Windows/FrameViewerWindow.h"
 #include "Windows/ImageViewerWindow.h"
-#include "Theme/Style.h"
-#include "Theme/Theme.h"
 #include "UiComponents/ImageFilesSource.h"
 #include "UiComponents/MediaGrid.h"
 #include "UiComponents/ThumbnailWidget.h"
@@ -14,7 +12,6 @@ DISABLE_COMPILER_WARNINGS
 #include <QClipboard>
 #include <QDir>
 #include <QFileInfo>
-#include <QLabel>
 #include <QListWidgetItem>
 #include <QMenu>
 #include <QSettings>
@@ -39,14 +36,6 @@ FrameViewerWindow::FrameViewerWindow(QWidget* parent)
 
 	auto* layout = new QVBoxLayout(this);
 	layout->setContentsMargins(0, 0, 0, 0);
-
-	_instructionLabel = new QLabel(this);
-	_instructionLabel->setAlignment(Qt::AlignCenter);
-	Style::applyThemedSheet(_instructionLabel, [] {
-		return QStringLiteral("font-size: 16pt; color: %1;").arg(Theme::current().instructionText.name());
-	});
-	_instructionLabel->hide();
-	layout->addWidget(_instructionLabel);
 
 	_grid = new MediaGrid(this);
 	_grid->setObjectName("tileGrid");   // the central sheet leaves this grid's cells unpainted: framed thumbnails show their own selection
@@ -101,27 +90,19 @@ void FrameViewerWindow::refreshDisplay()
 
 	if (_folderPath.isEmpty())
 	{
-		showInstruction(tr("Select a video to view its frames"));
+		_grid->setEmptyMessage(tr("Select a video to view its frames"));
 		return;
 	}
 
 	QDir dir(_folderPath);
 	if (!dir.exists())
 	{
-		showInstruction(tr("Folder not found: %1").arg(_folderPath));
+		_grid->setEmptyMessage(tr("Folder not found: %1").arg(_folderPath));
 		return;
 	}
 
+	_grid->setEmptyMessage(tr("No images found in this folder"));
 	const QStringList imageFiles = listFrameImageFiles(dir);
-	if (imageFiles.isEmpty())
-	{
-		showInstruction(tr("No images found in this folder"));
-		return;
-	}
-
-	_instructionLabel->hide();
-	_grid->show();
-
 	_imagePaths.reserve(imageFiles.size());
 	const QSize cell{ _thumbnailSize, _thumbnailSize };
 	for (const QString& fileName : std::as_const(imageFiles))
@@ -132,13 +113,6 @@ void FrameViewerWindow::refreshDisplay()
 
 	_grid->scrollToTop();
 	_grid->ensureVisibleCardsExist();
-}
-
-void FrameViewerWindow::showInstruction(const QString& text)
-{
-	_instructionLabel->setText(text);
-	_instructionLabel->show();
-	_grid->hide();
 }
 
 QWidget* FrameViewerWindow::buildThumbnail(QListWidgetItem* item)
@@ -198,6 +172,9 @@ void FrameViewerWindow::showThumbnailContextMenu(QListWidgetItem& item, QPoint g
 
 void FrameViewerWindow::showBackgroundContextMenu(QPoint globalPos)
 {
+	if (!QFileInfo(_folderPath).isDir())
+		return;
+
 	QMenu menu;
 	menu.addAction(revealInFileManagerActionText(), [this] {
 		if (!revealInFileManager(_folderPath))
