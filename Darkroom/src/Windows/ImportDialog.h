@@ -23,6 +23,7 @@ class QSplitter;
 class QTabWidget;
 class QTimer;
 class QWidget;
+class MediaGrid;
 class MediaItemWidget;
 class Library;
 class PreviewFrameCountCombo;
@@ -152,8 +153,8 @@ private:
 
 	ContentWidthListWidget* _labelList = nullptr;
 	QTabWidget* _stagedTabs = nullptr;
-	QListWidget* _videoGrid = nullptr;
-	QListWidget* _photoGrid = nullptr;
+	MediaGrid* _videoGrid = nullptr;
+	MediaGrid* _photoGrid = nullptr;
 
 	QComboBox* _photoModeCombo = nullptr;
 	QComboBox* _videoRelocateModeCombo = nullptr;

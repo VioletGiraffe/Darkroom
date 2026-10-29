@@ -11,7 +11,6 @@
 #include "UiComponents/MediaGrid.h"
 #include "UiComponents/PreviewFrameCountCombo.h"
 #include "UiComponents/SegmentedToggle.h"
-#include "UiComponents/ThumbnailWidget.h"
 #include "DarkroomSettings.h"
 #include "Shortcuts.h"
 #include "DarkroomShortcuts.h"
@@ -345,6 +344,8 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 	_stagedCardZoomDebounce->setSingleShot(true);
 	_stagedCardZoomDebounce->setInterval(80);
 	connect(_stagedCardZoomDebounce, &QTimer::timeout, this, &ImportDialog::rebuildAllStagedCards);
+	for (MediaGrid* grid : { _videoGrid, _photoGrid })
+		grid->setZoomHandler([this](int steps) { zoomStagedCards(steps); });
 
 	_splitter->addWidget(_stagedTabs);
 
@@ -637,7 +638,6 @@ MediaItemWidget* ImportDialog::buildStagedCard(StagedGridItem* item, const QStri
 	});
 
 	card->setDuration(durationMs);
-	card->setOnMouseWheelCallback([this](int steps) { zoomStagedCards(steps); });
 
 	return card;
 }
@@ -867,7 +867,7 @@ void ImportDialog::regenerateInsufficientStagedVideoPreviews(int frameCount)
 void ImportDialog::zoomStagedCards(int steps)
 {
 	const int current = stagedCardImageHeight();
-	const int next = ThumbnailWidget::zoomedSize(current, steps, MIN_STAGED_CARD_IMAGE_HEIGHT, MAX_STAGED_CARD_IMAGE_HEIGHT);
+	const int next = MediaGrid::zoomedSize(current, steps, MIN_STAGED_CARD_IMAGE_HEIGHT, MAX_STAGED_CARD_IMAGE_HEIGHT);
 	if (next == current)
 		return;
 

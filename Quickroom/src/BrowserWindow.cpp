@@ -289,6 +289,7 @@ void BrowserWindow::setupUi()
 	_grid->setUniformItemSizes(true);
 	_grid->setDragEnabled(true);
 	_grid->setCardFactory([this](QListWidgetItem* item) { return buildTile(item); });
+	_grid->setZoomHandler([this](int steps) { zoomTiles(steps); });
 	_grid->setDragUrlsProvider([](const QList<QListWidgetItem*>& items) {
 		QList<QUrl> urls;
 		for (const QListWidgetItem* item : items)
@@ -856,7 +857,6 @@ QWidget* BrowserWindow::buildTile(QListWidgetItem* item)
 	case EntryKind::Video: tile->setOnActivatedCallback([this, path = entry.path] { playVideo(path); }); break;
 	}
 	tile->setFileTypeIconLookup(&FileTypeIcons::forType);
-	tile->setOnMouseWheelCallback([this](int steps) { zoomTiles(steps); });
 	tile->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(tile, &QWidget::customContextMenuRequested, this, [this, tile, path = entry.path, isFolder = entry.kind == EntryKind::Folder](QPoint pos) {
 		showEntryContextMenu(path, isFolder, tile->mapToGlobal(pos));
@@ -885,7 +885,7 @@ void BrowserWindow::setTileSizeHints()
 
 void BrowserWindow::zoomTiles(int steps)
 {
-	const int next = ThumbnailWidget::zoomedSize(_tileWidth, steps, MIN_TILE_WIDTH, MAX_TILE_WIDTH);
+	const int next = MediaGrid::zoomedSize(_tileWidth, steps, MIN_TILE_WIDTH, MAX_TILE_WIDTH);
 	if (next == _tileWidth)
 		return;
 

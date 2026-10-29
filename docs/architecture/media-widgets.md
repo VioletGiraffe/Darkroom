@@ -95,9 +95,8 @@ time renders for the ratio of the screen the widget is shown on.
 
 ### Dragging standalone frames
 
-A source-file URL drag is opt-in through `setDragFilePath`: frame viewers and the compare window offer one, grid cards
-do not. `ThumbnailWidget` delegates gesture recognition to `DragGestureHelper`, keeping frame viewers and cards free of
-duplicated pointer-threshold mechanics.
+A source-file URL drag is opt-in through `setDragFilePath`: the compare window's panes offer one. Cards in a `MediaGrid`
+do not: the grid drags its selection. `ThumbnailWidget` delegates gesture recognition to `DragGestureHelper`.
 
 ## Drag helpers
 
@@ -109,13 +108,12 @@ ImportDialog use it to produce label-id payloads rather than implementing separa
 
 ## Preview sizing
 
-Ctrl+wheel over a thumbnail requests a presentation-size change while ordinary wheel input remains available to the
-containing view. Each step scales the size by 10% (`ThumbnailWidget::zoomedSize`). Each owner bounds and persists its
-setting, then debounces card reconstruction:
+Ctrl+wheel anywhere over a `MediaGrid` passes zoom steps to its owner's handler; a plain wheel scrolls. Each step
+scales the size by 10% (`MediaGrid::zoomedSize`). Each owner bounds and persists its setting, then debounces card
+reconstruction:
 
-- The main browser preserves rows and recreates attached cards.
+- The main browser and FrameViewerWindow preserve rows and recreate attached cards.
 - ImportDialog rebuilds staged cards while preserving pending state.
-- FrameViewerWindow rebuilds its thumbnail flow.
 
-These three small owner-specific persistence/debounce paths remain intentionally separate; see the
+These small owner-specific persistence/debounce paths remain intentionally separate; see the
 [backlog](../darkroom-backlog.md).

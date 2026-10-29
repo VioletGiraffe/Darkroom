@@ -22,6 +22,7 @@ DISABLE_COMPILER_WARNINGS
 RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 namespace {
@@ -200,17 +201,33 @@ void MediaGrid::paintEvent(QPaintEvent* event)
 	p.drawText(viewport()->rect().adjusted(20, 20, -20, -20), Qt::AlignCenter | Qt::TextWordWrap, _emptyMessage);
 }
 
+void MediaGrid::setZoomHandler(std::function<void(int steps)> handler)
+{
+	_zoomHandler = std::move(handler);
+}
+
+int MediaGrid::zoomedSize(int size, int steps, int minSize, int maxSize)
+{
+	return qBound(minSize, static_cast<int>(std::lround(size * std::pow(1.1, steps))), maxSize);
+}
+
 void MediaGrid::wheelEvent(QWheelEvent* event)
 {
-	// QListView resets the scrollbar step to the row height on every layout pass.
 	const int dy = event->angleDelta().y();
-	if (dy != 0)
+	if (dy == 0)
 	{
-		verticalScrollBar()->setValue(verticalScrollBar()->value() - dy);
-		event->accept();
+		QListWidget::wheelEvent(event);
 		return;
 	}
-	QListWidget::wheelEvent(event);
+
+	if (_zoomHandler && (event->modifiers() & Qt::ControlModifier))
+		_zoomHandler(dy > 0 ? 1 : -1);
+	else
+	{
+		// Scrolls by the raw delta: QListView resets the scrollbar step to the row height on every layout pass.
+		verticalScrollBar()->setValue(verticalScrollBar()->value() - dy);
+	}
+	event->accept();
 }
 
 void MediaGrid::resizeEvent(QResizeEvent* event)

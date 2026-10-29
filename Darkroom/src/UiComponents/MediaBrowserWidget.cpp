@@ -12,7 +12,6 @@
 #include "UiComponents/PreviewFrameCountCombo.h"
 #include "UiComponents/SegmentedToggle.h"
 #include "UiComponents/SortControl.h"
-#include "UiComponents/ThumbnailWidget.h"
 #include "Utils.h"
 #include "Windows/CompareWindow.h"
 #include "Windows/ImageViewerWindow.h"
@@ -285,6 +284,7 @@ void MediaBrowserWidget::setupUi()
 	_mediaGrid->setDragEnabled(true);
 	_mediaGrid->setDragUrlsProvider([this](const QList<QListWidgetItem*>& items) { return dragUrlsForItems(items); });
 	_mediaGrid->setCardFactory([this](QListWidgetItem* item) { return buildMediaCard(item); });
+	_mediaGrid->setZoomHandler([this](int steps) { zoomCards(steps); });
 	connect(_mediaGrid, &QListWidget::itemSelectionChanged, this, &MediaBrowserWidget::selectionChanged);
 
 	mainLayout->addWidget(_mediaGrid, 1);
@@ -655,7 +655,7 @@ bool MediaBrowserWidget::isGridDragSource(const QObject* source) const
 void MediaBrowserWidget::zoomCards(int steps)
 {
 	const int current = cardImageHeight();
-	const int next = ThumbnailWidget::zoomedSize(current, steps, MIN_CARD_IMAGE_HEIGHT, MAX_CARD_IMAGE_HEIGHT);
+	const int next = MediaGrid::zoomedSize(current, steps, MIN_CARD_IMAGE_HEIGHT, MAX_CARD_IMAGE_HEIGHT);
 	if (next == current)
 		return;
 
@@ -736,7 +736,6 @@ MediaItemWidget* MediaBrowserWidget::buildMediaCard(QListWidgetItem* item)
 	);
 	if (!isPhoto)
 		card->setOnMiddleButtonClick([this, id] { emit inspectVideoFramesRequested(id); });
-	card->setOnMouseWheelCallback([this](int steps) { zoomCards(steps); });
 
 	// Defer rebuilding the grid until this card's dropEvent has unwound.
 	card->setOnLabelDropped([this, id](const QString& labelId) {

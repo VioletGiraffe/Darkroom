@@ -3,11 +3,11 @@
 #include "Theme/Style.h"
 #include "Theme/Theme.h"
 #include "UiComponents/ImageFilesSource.h"
+#include "UiComponents/MediaGrid.h"
 #include "UiComponents/ThumbnailWidget.h"
 #include "Utils.h"
 #include "compiler/compiler_warnings_control.h"
 #include "utils/filemanager.h"
-#include "widgets/layouts/cflowlayout.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QApplication>
@@ -15,12 +15,12 @@ DISABLE_COMPILER_WARNINGS
 #include <QDir>
 #include <QFileInfo>
 #include <QLabel>
+#include <QListWidgetItem>
 #include <QMenu>
-#include <QScrollArea>
-#include <QScrollBar>
 #include <QSettings>
 #include <QShortcut>
 #include <QTimer>
+#include <QUrl>
 #include <QVBoxLayout>
 RESTORE_COMPILER_WARNINGS
 
@@ -48,27 +48,26 @@ FrameViewerWindow::FrameViewerWindow(QWidget* parent)
 	_instructionLabel->hide();
 	layout->addWidget(_instructionLabel);
 
-	_scrollArea = new QScrollArea(this);
-	_scrollArea->setWidgetResizable(true);
-	_scrollArea->setFrameShape(QFrame::NoFrame);
-	_scrollArea->setFocusPolicy(Qt::StrongFocus);
-	_scrollArea->viewport()->setMouseTracking(true);
+	_grid = new MediaGrid(this);
+	_grid->setObjectName("tileGrid");   // the central sheet leaves this grid's cells unpainted: framed thumbnails show their own selection
+	_grid->setFrameShape(QFrame::NoFrame);
+	_grid->setUniformItemSizes(true);
+	_grid->setDragEnabled(true);
+	_grid->setDragUrlsProvider([this](const QList<QListWidgetItem*>& items) {
+		QList<QUrl> urls;
+		for (const QListWidgetItem* item : items)
+			urls.push_back(QUrl::fromLocalFile(_imagePaths.at(_grid->row(item))));
+		return urls;
+	});
+	_grid->setCardFactory([this](QListWidgetItem* item) { return buildThumbnail(item); });
+	_grid->setZoomHandler([this](int steps) { zoomThumbnails(steps); });
+	layout->addWidget(_grid);
 
-	_thumbnailContainer = new QWidget();
-	_thumbnailContainer->setMouseTracking(true);
-	_thumbnailContainer->setFocusPolicy(Qt::NoFocus);
-
-	_thumbnailLayout = new CFlowLayout(_thumbnailContainer);
-	_thumbnailLayout->setSpacing(10);
-	_thumbnailLayout->setContentsMargins(10, 10, 10, 10);
-
-	_scrollArea->setWidget(_thumbnailContainer);
-	layout->addWidget(_scrollArea);
-
-	_refreshDebounceTimer = new QTimer(this);
-	_refreshDebounceTimer->setSingleShot(true);
-	_refreshDebounceTimer->setInterval(100);
-	connect(_refreshDebounceTimer, &QTimer::timeout, this, &FrameViewerWindow::refreshDisplay);
+	// Coalesce wheel steps into one rebuild.
+	_zoomDebounce = new QTimer(this);
+	_zoomDebounce->setSingleShot(true);
+	_zoomDebounce->setInterval(100);
+	connect(_zoomDebounce, &QTimer::timeout, this, &FrameViewerWindow::applyThumbnailSize);
 
 	auto* escShortcut = new QShortcut(Qt::Key_Escape, this);
 	connect(escShortcut, &QShortcut::activated, this, &QWidget::close);
@@ -89,14 +88,7 @@ void FrameViewerWindow::showForFolder(const QString& folderPath, const QString& 
 
 void FrameViewerWindow::refreshDisplay()
 {
-	while (_thumbnailLayout->count() > 0)
-	{
-		QLayoutItem* item = _thumbnailLayout->takeAt(0);
-		if (item->widget())
-			item->widget()->deleteLater();
-		delete item;
-	}
-
+	_grid->clear();
 	_imagePaths.clear();
 
 	if (_folderPath.isEmpty())
@@ -120,49 +112,62 @@ void FrameViewerWindow::refreshDisplay()
 	}
 
 	_instructionLabel->hide();
-	_scrollArea->show();
+	_grid->show();
 
 	_imagePaths.reserve(imageFiles.size());
+	const QSize cell{ _thumbnailSize, _thumbnailSize };
 	for (const QString& fileName : std::as_const(imageFiles))
-		_imagePaths << _folderPath + "/" + fileName;
-
-	for (int index = 0; index < _imagePaths.size(); ++index)
 	{
-		const QString& filePath = _imagePaths.at(index);
-		auto* thumbnail = new ThumbnailWidget(ImageFilesSource{ QStringList{ filePath } }, QFileInfo{ filePath }.completeBaseName(), {}, _thumbnailContainer);
-		thumbnail->setFixedSize(_thumbnailSize, _thumbnailSize);
-		thumbnail->setDragFilePath(filePath);
-		thumbnail->setContextMenuPolicy(Qt::CustomContextMenu);
-		connect(thumbnail, &ThumbnailWidget::customContextMenuRequested, this, [this, thumbnail, filePath](const QPoint& pos) {
-			showThumbnailContextMenu(*thumbnail, filePath, pos);
-		});
-		thumbnail->setOnMouseWheelCallback([this](int steps) { zoomThumbnails(steps); });
-		thumbnail->setOnActivatedCallback([this, index] {
-			ImageViewerWindow::showForImages(_imagePaths, index, this);
-		});
-		_thumbnailLayout->addWidget(thumbnail);
+		_imagePaths << _folderPath + "/" + fileName;
+		(new QListWidgetItem(_grid))->setSizeHint(cell);
 	}
 
-	if (auto* sb = _scrollArea->verticalScrollBar())
-		sb->setValue(0);
+	_grid->scrollToTop();
+	_grid->ensureVisibleCardsExist();
 }
 
 void FrameViewerWindow::showInstruction(const QString& text)
 {
 	_instructionLabel->setText(text);
 	_instructionLabel->show();
-	_scrollArea->hide();
+	_grid->hide();
+}
+
+QWidget* FrameViewerWindow::buildThumbnail(QListWidgetItem* item)
+{
+	const int index = _grid->row(item);
+	const QString& filePath = _imagePaths.at(index);
+	// No drag of its own: the grid drags the whole selection.
+	auto* thumbnail = new ThumbnailWidget(ImageFilesSource{ QStringList{ filePath } }, QFileInfo{ filePath }.completeBaseName(), {}, nullptr);
+	thumbnail->setFixedSize(_thumbnailSize, _thumbnailSize);
+	thumbnail->setContextMenuPolicy(Qt::CustomContextMenu);
+	connect(thumbnail, &ThumbnailWidget::customContextMenuRequested, this, [this, thumbnail, filePath](const QPoint& pos) {
+		showThumbnailContextMenu(*thumbnail, filePath, pos);
+	});
+	thumbnail->setOnActivatedCallback([this, index] {
+		ImageViewerWindow::showForImages(_imagePaths, index, this);
+	});
+	return thumbnail;
 }
 
 void FrameViewerWindow::zoomThumbnails(int steps)
 {
-	const int next = ThumbnailWidget::zoomedSize(_thumbnailSize, steps, MIN_THUMBNAIL_SIZE, MAX_THUMBNAIL_SIZE);
+	const int next = MediaGrid::zoomedSize(_thumbnailSize, steps, MIN_THUMBNAIL_SIZE, MAX_THUMBNAIL_SIZE);
 	if (next == _thumbnailSize)
 		return;
 
 	_thumbnailSize = next;
 	QSettings{}.setValue(SETTINGS_KEY_THUMBNAIL_SIZE, _thumbnailSize);
-	_refreshDebounceTimer->start();
+	_zoomDebounce->start();
+}
+
+void FrameViewerWindow::applyThumbnailSize()
+{
+	const QSize cell{ _thumbnailSize, _thumbnailSize };
+	for (int row = 0, rows = _grid->count(); row < rows; ++row)
+		_grid->item(row)->setSizeHint(cell);
+	_grid->discardAllCards();
+	_grid->ensureVisibleCardsExist();
 }
 
 void FrameViewerWindow::showThumbnailContextMenu(ThumbnailWidget& thumbnail, const QString& path, const QPoint& pos)

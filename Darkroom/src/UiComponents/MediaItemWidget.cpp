@@ -332,11 +332,6 @@ void MediaItemWidget::setOnMiddleButtonClick(std::function<void()> onClick)
 	_thumb->installEventFilter(this);
 }
 
-void MediaItemWidget::setOnMouseWheelCallback(std::function<void(int)> handler)
-{
-	_thumb->setOnMouseWheelCallback(std::move(handler));
-}
-
 void MediaItemWidget::setOnLabelDropped(std::function<void(const QString&)> handler)
 {
 	_onLabelDropped = std::move(handler);

@@ -59,8 +59,6 @@ public:
 
 	void setOnMiddleButtonClick(std::function<void()> onClick);
 
-	void setOnMouseWheelCallback(std::function<void(int steps)> handler);
-
 	// Unset cards reject label drops.
 	void setOnLabelDropped(std::function<void(const QString& labelId)> handler);
 

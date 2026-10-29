@@ -7,9 +7,9 @@ DISABLE_COMPILER_WARNINGS
 #include <QWidget>
 RESTORE_COMPILER_WARNINGS
 
-class CFlowLayout;
+class MediaGrid;
 class QLabel;
-class QScrollArea;
+class QListWidgetItem;
 class QTimer;
 class ThumbnailWidget;
 
@@ -24,16 +24,16 @@ public:
 private:
 	void refreshDisplay();
 	void showInstruction(const QString& text);
+	[[nodiscard]] QWidget* buildThumbnail(QListWidgetItem* item);
 	void showThumbnailContextMenu(ThumbnailWidget& thumbnail, const QString& path, const QPoint& pos);
 	void zoomThumbnails(int steps);
+	void applyThumbnailSize();
 
 private:
 	QString       _folderPath;
-	QStringList   _imagePaths;
+	QStringList   _imagePaths;            // one per grid row, in row order
 	int           _thumbnailSize        = 200;
 	QLabel*       _instructionLabel     = nullptr;
-	QScrollArea*  _scrollArea           = nullptr;
-	QWidget*      _thumbnailContainer   = nullptr;
-	CFlowLayout*  _thumbnailLayout      = nullptr;
-	QTimer*       _refreshDebounceTimer = nullptr;
+	MediaGrid*    _grid                 = nullptr;
+	QTimer*       _zoomDebounce         = nullptr;
 };

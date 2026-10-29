@@ -12,11 +12,9 @@ DISABLE_COMPILER_WARNINGS
 #include <QPainterPath>
 #include <QTimer>
 #include <QUrl>
-#include <QWheelEvent>
 #include <QtMath>
 RESTORE_COMPILER_WARNINGS
 
-#include <cmath>
 #include <optional>
 #include <utility>
 #include <variant>
@@ -153,11 +151,6 @@ int ThumbnailWidget::filmStripBandHeight(int imageAreaHeight)
 	return qBound(7, imageAreaHeight / 11, 18);
 }
 
-int ThumbnailWidget::zoomedSize(int size, int steps, int minSize, int maxSize)
-{
-	return qBound(minSize, static_cast<int>(std::lround(size * std::pow(1.1, steps))), maxSize);
-}
-
 bool ThumbnailWidget::isRenderedFor(QSize box, qreal dpr) const
 {
 	return box == _renderedBox && qFuzzyCompare(dpr, _renderedDpr);
@@ -212,11 +205,6 @@ void ThumbnailWidget::applyResult(ImageSource::Result result)
 	_errorMessage = result.error.isEmpty() ? QString{} : tr("Failed to load:") + '\n' + result.error;
 	_fileTypeIcon = _fileTypeIconLookup ? _fileTypeIconLookup(result.fileType) : QIcon{};
 	_fileTypePixmap = {};
-}
-
-void ThumbnailWidget::setOnMouseWheelCallback(std::function<void(int)> handler)
-{
-	_onZoomRequested = std::move(handler);
 }
 
 void ThumbnailWidget::setOnActivatedCallback(std::function<void()> handler)
@@ -277,18 +265,6 @@ void ThumbnailWidget::mouseMoveEvent(QMouseEvent* event)
 			return;
 	}
 	QWidget::mouseMoveEvent(event);
-}
-
-void ThumbnailWidget::wheelEvent(QWheelEvent* event)
-{
-	const int dy = event->angleDelta().y();
-	if (_onZoomRequested && (event->modifiers() & Qt::ControlModifier) && dy != 0)
-	{
-		_onZoomRequested(dy > 0 ? 1 : -1);
-		event->accept();
-		return;
-	}
-	QWidget::wheelEvent(event);
 }
 
 void ThumbnailWidget::paintEvent(QPaintEvent*)

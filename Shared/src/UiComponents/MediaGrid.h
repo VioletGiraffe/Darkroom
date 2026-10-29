@@ -42,6 +42,11 @@ public:
 
 	void setEmptyMessage(const QString& message);
 
+	// Ctrl+wheel anywhere over the grid calls handler with signed steps instead of scrolling.
+	void setZoomHandler(std::function<void(int steps)> handler);
+	// size scaled by 10% per zoom step, clamped to [minSize, maxSize]
+	[[nodiscard]] static int zoomedSize(int size, int steps, int minSize, int maxSize);
+
 protected:
 	void startDrag(Qt::DropActions supportedActions) override;
 	void paintEvent(QPaintEvent* event) override;
@@ -55,5 +60,6 @@ private:
 	std::function<void(Qt::DropAction action, const QList<QUrl>& urls)> _dragFinishedHandler;
 	Qt::DropActions _dragActions = Qt::CopyAction;
 	std::function<QWidget*(QListWidgetItem*)> _cardFactory;
+	std::function<void(int steps)> _zoomHandler;
 	QString _emptyMessage;
 };

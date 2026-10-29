@@ -5,10 +5,10 @@
 ## FrameViewerWindow
 
 `FrameViewerWindow` is a persistent, reusable top-level thumbnail viewer owned by MainWindow. MainWindow updates or
-clears it when browser workflows rename, remove, or replace its current media item. It uses `CFlowLayout` because
-its thumbnail flow is non-selectable; the main media grid instead requires the native selection and input behavior
-documented in [main-window.md](main-window.md#media-grid--multi-select). Double-clicking a thumbnail opens
-ImageViewerWindow on that frame, through an activation callback the window supplies.
+clears it when browser workflows rename, remove, or replace its current media item. Its frames are rows of a
+`MediaGrid`, which supplies selection, keyboard navigation and dragging the selected frames as files (see
+[main-window.md](main-window.md#media-grid--multi-select)). Double-clicking a thumbnail opens ImageViewerWindow on
+that frame, through an activation callback the window supplies.
 
 ## CompareWindow
 

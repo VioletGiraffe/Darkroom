@@ -44,9 +44,6 @@ public:
 	using FileTypeIconLookup = QIcon (*)(const QByteArray& fileType);
 	void setFileTypeIconLookup(FileTypeIconLookup lookup);
 
-	// Ctrl+wheel emits signed steps and is consumed; plain wheel propagates to the surrounding view.
-	void setOnMouseWheelCallback(std::function<void(int steps)> handler);
-
 	// Called on a double-click. Without a handler a double-click does nothing.
 	void setOnActivatedCallback(std::function<void()> handler);
 
@@ -61,14 +58,10 @@ public:
 	// Exposed so MediaItemWidget can keep corner badges clear of proportional film bands.
 	[[nodiscard]] static int filmStripBandHeight(int imageAreaHeight);
 
-	// size scaled by 10% per mouse-wheel step, clamped to [minSize, maxSize]
-	[[nodiscard]] static int zoomedSize(int size, int steps, int minSize, int maxSize);
-
 protected:
 	void mouseDoubleClickEvent(QMouseEvent* event) override;
 	void mousePressEvent(QMouseEvent* event) override;
 	void mouseMoveEvent(QMouseEvent* event) override;
-	void wheelEvent(QWheelEvent* event) override;
 	void paintEvent(QPaintEvent* /*event*/) override;
 
 private:
@@ -106,6 +99,5 @@ private:
 	DragGestureHelper _dragHelper;
 	std::function<QMimeData*()> _dragMimeDataFactory;
 
-	std::function<void(int)> _onZoomRequested;
 	std::function<void()> _onActivated;
 };
