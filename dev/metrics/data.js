@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793299473583,
+  "lastUpdate": 1793300050037,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -19341,6 +19341,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 818.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 342.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 83.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "42afa3749582854e5eb0cd88605b5d4e58799cbe",
+          "message": "Photo compare loading holds only its batch, not the window: closing cancels the load without waiting for a read in flight (QPromise/QFutureWatcher; decode moved to cpuThreadPool); IoThreadPool::retire and enqueue tags removed as unused",
+          "timestamp": "2026-10-29T20:44:00+02:00",
+          "tree_id": "84a6602f5c9ae1afc23cb1e89ce6d67a7ff07eeb",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/42afa3749582854e5eb0cd88605b5d4e58799cbe"
+        },
+        "date": 1793300047519,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 18364,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1613,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 32043,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6715,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7511,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5426,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 820,
             "unit": "KB"
           },
           {
