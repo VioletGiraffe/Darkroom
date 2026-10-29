@@ -150,12 +150,12 @@ TYPES = [("jpg", "JPG", "#c10500", PAPER), ("png", "PNG", "#c70ea9", PAPER),
 # Legacy formats share one muted colour.
 # ORF, FFF, ARI and LEGACY lose the card's outline on a dark background: accepted, the pads still show.
 LEGACY = "#00201a"
-TYPES += [("cr3", "CR3", "#990000", CARD), ("cr2", "CR2", "#e52b1c", CARD),
+TYPES += [("cr3", "CR3", "#990000", CARD), ("cr2", "CR2", "#f06a5e", CARD),
           ("nef", "NEF", "#d1aa00", CARD), ("nefx", "NEFX", "#d18800", CARD), ("nrw", "NRW", "#d18800", CARD),
-          ("arw", "ARW", "#e94e09", CARD), ("raf", "RAF", "#00a651", CARD), ("dng", "DNG", "#54858f", CARD),
-          ("orf", "ORF", "#120d7d", CARD), ("rw2", "RW2", "#0041c0", CARD), ("rwl", "RWL", "#bf0031", CARD),
+          ("arw", "ARW", "#ff6a00", CARD), ("raf", "RAF", "#00a651", CARD), ("dng", "DNG", "#2f8f80", CARD),
+          ("orf", "ORF", "#120d7d", CARD), ("rw2", "RW2", "#0041c0", CARD), ("rwl", "RWL", "#bf006f", CARD),
           ("pef", "PEF", "#455902", CARD), ("3fr", "3FR", "#7d2693", CARD), ("fff", "FFF", "#310226", CARD),
-          ("iiq", "IIQ", "#8c98e9", CARD), ("ari", "ARI", "#581108", CARD)]
+          ("iiq", "IIQ", "#b38cf0", CARD), ("ari", "ARI", "#581108", CARD)]
 TYPES += [(label.lower(), label, LEGACY, CARD) for label in
           ("CRW", "SR2", "SRF", "MRW", "MOS", "MEF", "DCR", "KDC", "K25", "ERF", "BAY", "MDC", "SRW", "RAW")]
 
