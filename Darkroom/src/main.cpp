@@ -45,12 +45,16 @@ int main(int argc, char* argv[])
 	initSharedSettings();
 	Style::install();
 
-	MainWindow window;
-	if (!window.isLibraryLoaded())
-		return 0;
-	window.show();
-
-	const int result = app.exec();
+	int result = 0;
+	{
+		// Destroyed before the pools stop, so its state is saved before they wait out a read stuck on unreachable storage
+		MainWindow window;
+		if (window.isLibraryLoaded())
+		{
+			window.show();
+			result = app.exec();
+		}
+	}
 	// Image reads transition from the IO pool to the CPU pool, so IO has to be shut down first
 	IoThreadPool::finishAllThreads();
 	cpuThreadPool().finishAllThreads();

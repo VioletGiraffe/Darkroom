@@ -118,6 +118,7 @@ void recordCurrentLibrary(const QString& root)
 }
 
 // A check on a disconnected network share can block for the OS timeout, so shutdown must not wait for it.
+// Its tasks can outlive main(): they must not touch this executable's static data.
 [[nodiscard]] CThreadPool& libraryCheckPool()
 {
 	static CThreadPool pool{ MAX_RECENT_LIBRARIES, "Library availability check", CThreadPool::ShutdownPolicy::AbandonRunningTasks };
