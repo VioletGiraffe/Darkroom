@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793283040131,
+  "lastUpdate": 1793283375872,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -18990,6 +18990,85 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/VioletGiraffe/Darkroom/commit/d171999f4e06f2efd08c18265689b48369562615"
         },
         "date": 1793283037523,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 18251,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1471,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 31842,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6697.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7494,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5416.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 815.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 340,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 82.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "beba4474c987701605cec708a5c3182ab43fbab3",
+          "message": "Windows installer: Darkroom and Quickroom are optional components, at least one required; a component unticked on reinstall has its files and registry entries removed",
+          "timestamp": "2026-10-29T16:05:04+02:00",
+          "tree_id": "cefe1774ba39e487c7be52e48316d89c7ab8ffe1",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/beba4474c987701605cec708a5c3182ab43fbab3"
+        },
+        "date": 1793283373075,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
