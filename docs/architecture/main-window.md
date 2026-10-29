@@ -31,10 +31,11 @@ library; both open with `CreateIfAbsent`, which accepts an absent root and absen
 
 ### Recent libraries
 
-Recent entries are normalized root strings and deliberately perform no filesystem queries while the menu opens. A
-library may live on a disconnected drive or network share, where probing existence can block the UI; stale entries
-therefore remain visible until the normal switch attempt reports failure. Reconnecting the storage makes the same
-entry usable again.
+Recent entries are normalized root strings. Listing them, in the menu or the startup dialog, never queries the
+filesystem on the GUI thread: a library may live on a disconnected drive or network share, where a query can block for
+the OS timeout. Each listed entry is checked on a dedicated pool whose shutdown abandons running checks instead of
+waiting for them, and is marked unavailable when the check finds no library there. Marked entries stay selectable:
+reconnecting the storage makes the same entry usable again.
 
 The menu rebuilds from settings when shown. `recordCurrentLibrary` is the single writer of both the current-root and
 recent-root settings, keeping startup and later switches consistent.

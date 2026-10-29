@@ -125,7 +125,7 @@ camera raws from `ImageDecoding::rawFileSuffixes`. Three artifacts mirror them b
 - **Background disk reads use `Core::IoThreadPool`.** Fast storage receives bounded parallel reads; slow,
   external, network, or unknown storage shares a serial worker to avoid seek thrashing. CPU work follows on the
   process-wide `cpuThreadPool()`. Long-running non-read work owns an appropriate separate worker instead of
-  blocking the I/O route.
+  blocking the I/O route; so do recent-library availability checks, which can hang on unreachable storage.
 - **Every image decode goes through `ImageDecoding`**, never `QImageReader` or `QImage::load` directly. qtutils'
   viewer widget reaches it through its decoder hook and keeps animated files on its own reader.
 - **Decoders carry the color profile, displays convert.** A decoded image comes with its ICC profile: the one a JPEG

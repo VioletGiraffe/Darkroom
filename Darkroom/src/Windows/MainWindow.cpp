@@ -23,6 +23,7 @@
 #include "compiler/compiler_warnings_control.h"
 #include "dialogs/messagedialog.h"
 #include "logger/cloggerinmemory.h"
+#include "threading/cthreadpool.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 #include "widgets/cpersistenceenabler.h"
 
@@ -30,17 +31,21 @@ DISABLE_COMPILER_WARNINGS
 #include <QAbstractButton>
 #include <QApplication>
 #include <QCloseEvent>
+#include <QColor>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QDragEnterEvent>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QFuture>
 #include <QLabel>
 #include <QListWidget>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QPalette>
+#include <QPromise>
 #include <QPushButton>
 #include <QScopeGuard>
 #include <QSet>
@@ -51,6 +56,7 @@ DISABLE_COMPILER_WARNINGS
 RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
+#include <functional>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -111,6 +117,37 @@ void recordCurrentLibrary(const QString& root)
 	settings.setValue(Settings::RecentLibraries, recents);
 }
 
+// A check on a disconnected network share can block for the OS timeout, so shutdown must not wait for it.
+[[nodiscard]] CThreadPool& libraryCheckPool()
+{
+	static CThreadPool pool{ MAX_RECENT_LIBRARIES, "Library availability check", CThreadPool::ShutdownPolicy::AbandonRunningTasks };
+	return pool;
+}
+
+// onUnavailable runs on context's thread, and never after context is destroyed.
+void runIfLibraryUnavailable(const QString& root, QObject* context, std::function<void()> onUnavailable)
+{
+	QPromise<bool> promise;
+	QFuture<bool> future = promise.future();
+	libraryCheckPool().enqueue([root, promise = std::move(promise)]() mutable {
+		promise.start();
+		if (!promise.isCanceled())
+			promise.addResult(Library::holdsLibrary(root));
+		promise.finish();
+	});
+	future.then(context, [onUnavailable = std::move(onUnavailable)](bool holdsLibrary) {
+		if (!holdsLibrary)
+			onUnavailable();
+	});
+	// Lets a check that has not started when context dies skip the filesystem: then() cancels only the continuation's future.
+	QObject::connect(context, &QObject::destroyed, [future]() mutable { future.cancel(); });
+}
+
+[[nodiscard]] QString unavailableLibraryText(const QString& text)
+{
+	return QObject::tr("%1  (unavailable)").arg(text);
+}
+
 struct LibraryChoice
 {
 	QString root;
@@ -145,8 +182,15 @@ struct LibraryChoice
 	if (!recentRoots.isEmpty())
 	{
 		auto* recentList = new QListWidget(&dialog);
+		const QColor unavailableColor = recentList->palette().color(QPalette::Disabled, QPalette::Text);
 		for (const QString& root : recentRoots)
-			recentList->addItem(QDir::toNativeSeparators(root));
+		{
+			auto* item = new QListWidgetItem(QDir::toNativeSeparators(root), recentList);
+			runIfLibraryUnavailable(root, recentList, [item, unavailableColor] {
+				item->setText(unavailableLibraryText(item->text()));
+				item->setForeground(unavailableColor);
+			});
+		}
 		recentList->setCurrentRow(0);
 		layout->addWidget(recentList);
 
@@ -427,6 +471,8 @@ void MainWindow::rebuildRecentLibraryActions()
 			action->setChecked(true);
 			action->setEnabled(false);
 		}
+		else
+			runIfLibraryUnavailable(root, action, [action] { action->setText(unavailableLibraryText(action->text())); });
 		_recentLibraryActions.push_back(action);
 	}
 }
