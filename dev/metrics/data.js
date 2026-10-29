@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793301273420,
+  "lastUpdate": 1793302252549,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -19504,6 +19504,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .data",
             "value": 342.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 83.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "2b9b5a855507714f773d7a9bca09d0f02b28aa09",
+          "message": "Frame viewer and Quickroom open items through the grid's activation (double-click, Cmd+O on macOS) plus Enter on every platform, instead of per-thumbnail double-click handlers",
+          "timestamp": "2026-10-29T21:19:06+02:00",
+          "tree_id": "e3983881984c77c16680b3200ed3a905e1e25b56",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/2b9b5a855507714f773d7a9bca09d0f02b28aa09"
+        },
+        "date": 1793302249926,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 18354,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1606,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 32043,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6714.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7507,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5426.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 819.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 342,
             "unit": "KB"
           },
           {
