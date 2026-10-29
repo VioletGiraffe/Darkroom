@@ -65,7 +65,7 @@ private:
 	void updateStagedTabTitles();
 	void resortStagedItems();
 	void suggestLabels();
-	[[nodiscard]] MediaItemWidget* buildStagedCard(StagedGridItem* item, const QString& path, const QString& tempPreviewDir, qint64 durationMs);
+	[[nodiscard]] MediaItemWidget* buildStagedCard(StagedId id, const QString& path, const QString& tempPreviewDir, qint64 durationMs);
 	// Removes the card and its temporary preview directory.
 	void unstage(StagedId id);
 	void updateCardLabelDots(StagedId id);
@@ -76,9 +76,10 @@ private:
 	void rebuildAllStagedCards();
 	// By pathComparisonKey; None when no staged file is at path.
 	[[nodiscard]] StagedId stagedIdAtPath(const QString& path) const;
-	// The ids of MediaGrid::effectiveSelection(item)
-	[[nodiscard]] std::vector<StagedId> effectiveStagedSelection(StagedGridItem* item) const;
-	void showStagedCardContextMenu(StagedGridItem* item, const QPoint& globalPos);
+	// The ids of MediaGrid::effectiveSelection for id's row; empty when id is no longer staged
+	[[nodiscard]] std::vector<StagedId> effectiveStagedSelection(StagedId id) const;
+	// Does nothing when the item is no longer staged.
+	void showStagedCardContextMenu(StagedId id, const QPoint& globalPos);
 	void previewStagedItem(StagedId id);
 	// Does nothing when the item is no longer staged.
 	void selectAndScrollToStagedItem(StagedId id);

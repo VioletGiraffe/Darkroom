@@ -598,7 +598,7 @@ void ImportDialog::addToStaging(const QStringList& paths)
 	QMetaObject::invokeMethod(this, [this, paths] { stageMediaItems(paths); }, Qt::QueuedConnection);
 }
 
-MediaItemWidget* ImportDialog::buildStagedCard(StagedGridItem* item, const QString& path, const QString& tempPreviewDir, qint64 durationMs)
+MediaItemWidget* ImportDialog::buildStagedCard(StagedId id, const QString& path, const QString& tempPreviewDir, qint64 durationMs)
 {
 	const int imageHeight = stagedCardImageHeight();
 	QSize canvasSize{ imageHeight, imageHeight };
@@ -616,19 +616,19 @@ MediaItemWidget* ImportDialog::buildStagedCard(StagedGridItem* item, const QStri
 		canvasSize,
 		previewPaths, QFileInfo(path).fileName(),
 		/*inBest*/ false,
-		[this, item] {
-			auto it = _staged.find(item->stagedId);
+		[this, id] {
+			auto it = _staged.find(id);
 			if (it != _staged.end())
 				it->pendingBest = !it->pendingBest;
 		},
-		[this, item] { previewStagedItem(item->stagedId); },
-		[this, item](QPoint globalPos) { showStagedCardContextMenu(item, globalPos); },
+		[this, id] { previewStagedItem(id); },
+		[this, id](QPoint globalPos) { showStagedCardContextMenu(id, globalPos); },
 		/* dynamicSizeHint */ false,
 		/* film strip */ !isPhoto
 	);
 
-	card->setOnLabelDropped([this, item](const QString& labelId) {
-		for (const StagedId target : effectiveStagedSelection(item))
+	card->setOnLabelDropped([this, id](const QString& labelId) {
+		for (const StagedId target : effectiveStagedSelection(id))
 		{
 			auto it = _staged.find(target);
 			if (it != _staged.end() && !it->pendingLabelIds.contains(labelId))
@@ -713,7 +713,7 @@ void ImportDialog::stageMediaItems(const QStringList& paths)
 	const auto stageCard = [this, &suggestedLabelNameByPath](QListWidget* grid, const QString& path, const QString& tempPreviewDir, qint64 durationMs = -1) {
 		const StagedId id{ ++_lastStagedId };
 		auto* item = new StagedGridItem(id, QFileInfo(path).fileName(), _sortDirectionToggle->currentIndex() == 1);
-		auto* card = buildStagedCard(item, path, tempPreviewDir, durationMs);
+		auto* card = buildStagedCard(id, path, tempPreviewDir, durationMs);
 		item->setSizeHint(card->sizeHint());
 		grid->addItem(item);
 		grid->setItemWidget(item, card);
@@ -879,7 +879,7 @@ void ImportDialog::rebuildAllStagedCards()
 {
 	for (auto it = _staged.begin(); it != _staged.end(); ++it)
 	{
-		MediaItemWidget* card = buildStagedCard(it->item, it->path, it->tempPreviewDir, it->durationMs);
+		MediaItemWidget* card = buildStagedCard(it.key(), it->path, it->tempPreviewDir, it->durationMs);
 		card->setInBest(it->pendingBest);
 		it->item->setSizeHint(card->sizeHint());
 		it->item->listWidget()->setItemWidget(it->item, card);
@@ -896,35 +896,40 @@ ImportDialog::StagedId ImportDialog::stagedIdAtPath(const QString& path) const
 	return StagedId::None;
 }
 
-std::vector<ImportDialog::StagedId> ImportDialog::effectiveStagedSelection(StagedGridItem* item) const
+std::vector<ImportDialog::StagedId> ImportDialog::effectiveStagedSelection(StagedId id) const
 {
+	const auto entry = _staged.constFind(id);
+	if (entry == _staged.constEnd())
+		return {};
+
 	std::vector<StagedId> targets;
-	for (const QListWidgetItem* target : MediaGrid::effectiveSelection(*item))
+	for (const QListWidgetItem* target : MediaGrid::effectiveSelection(*entry->item))
 		targets.push_back(static_cast<const StagedGridItem*>(target)->stagedId);
 	return targets;
 }
 
-void ImportDialog::showStagedCardContextMenu(StagedGridItem* item, const QPoint& globalPos)
+void ImportDialog::showStagedCardContextMenu(StagedId id, const QPoint& globalPos)
 {
-	if (!_staged.contains(item->stagedId))
+	const auto entry = _staged.constFind(id);
+	if (entry == _staged.constEnd())
 		return;
-	const std::vector<StagedId> selection = effectiveStagedSelection(item);
+	const std::vector<StagedId> selection = effectiveStagedSelection(id);
 
 	QMenu menu(this);
 
-	const bool isPhoto = item->listWidget() == _photoGrid;
+	const bool isPhoto = entry->item->listWidget() == _photoGrid;
 	if (isPhoto && selection.size() >= 2)
 	{
 		menu.addAction(tr("Compare photos"), this, [this, selection] { compareStagedPhotos(selection); });
 		menu.addSeparator();
 	}
 
-	menu.addAction(isPhoto ? tr("Open photo") : tr("Play source video"), this, [this, item] { previewStagedItem(item->stagedId); });
-	menu.addAction(tr("Locate source file"), this, [this, item] { locateStagedSourceFile(item->stagedId); });
-	menu.addAction(tr("Copy source path to clipboard"), this, [this, item] { copyStagedSourcePath(item->stagedId); });
+	menu.addAction(isPhoto ? tr("Open photo") : tr("Play source video"), this, [this, id] { previewStagedItem(id); });
+	menu.addAction(tr("Locate source file"), this, [this, id] { locateStagedSourceFile(id); });
+	menu.addAction(tr("Copy source path to clipboard"), this, [this, id] { copyStagedSourcePath(id); });
 	// Rebuilding the card deletes the widget whose context-menu handler is on the stack.
-	QAction* renameItem = menu.addAction(tr("Rename..."), this, [this, item] {
-		QMetaObject::invokeMethod(this, [this, item] { renameStagedItem(item->stagedId); }, Qt::QueuedConnection);
+	QAction* renameItem = menu.addAction(tr("Rename..."), this, [this, id] {
+		QMetaObject::invokeMethod(this, [this, id] { renameStagedItem(id); }, Qt::QueuedConnection);
 	});
 	renameItem->setShortcut(QKeySequence(Shortcuts::Rename));
 	renameItem->setShortcutContext(Qt::WidgetShortcut);
@@ -1171,7 +1176,7 @@ void ImportDialog::renameStagedItem(StagedId id)
 		return;
 	renamed->path = newPath;
 	renamed->item->fileName = newName;
-	auto* card = buildStagedCard(renamed->item, newPath, renamed->tempPreviewDir, renamed->durationMs);
+	auto* card = buildStagedCard(id, newPath, renamed->tempPreviewDir, renamed->durationMs);
 	renamed->item->listWidget()->setItemWidget(renamed->item, card);
 
 	if (renamed->pendingBest)

@@ -11,7 +11,6 @@ DISABLE_COMPILER_WARNINGS
 #include <QWidget>
 RESTORE_COMPILER_WARNINGS
 
-#include <optional>
 #include <vector>
 
 namespace MediaItemManagement { struct RemovalResult; }
@@ -108,7 +107,8 @@ private:
 	[[nodiscard]] GridViewState captureGridViewState() const;
 	void restoreGridViewState(const GridViewState& state);
 
-	[[nodiscard]] std::vector<MediaItemId> effectiveSelection(std::optional<MediaItemId> target = std::nullopt) const;
+	// MediaGrid::effectiveSelection's rule, by id: the selection when it contains target, else target alone
+	[[nodiscard]] std::vector<MediaItemId> effectiveSelection(MediaItemId target) const;
 	[[nodiscard]] std::vector<MediaItemId> mediaItemsMatchingFilters() const;
 	[[nodiscard]] MediaItemWidget* buildMediaCard(QListWidgetItem* item);
 	[[nodiscard]] QList<QUrl> dragUrlsForItems(const QList<QListWidgetItem*>& items) const;

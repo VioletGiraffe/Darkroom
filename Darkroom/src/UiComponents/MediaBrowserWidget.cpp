@@ -972,11 +972,11 @@ std::vector<MediaItemId> MediaBrowserWidget::visiblePhotosInViewOrder() const
 	return visibleItemsInViewOrder(_mediaGrid, _library.catalog(), Catalog::MediaType::Photo);
 }
 
-std::vector<MediaItemId> MediaBrowserWidget::effectiveSelection(std::optional<MediaItemId> target) const
+std::vector<MediaItemId> MediaBrowserWidget::effectiveSelection(MediaItemId target) const
 {
 	std::vector<MediaItemId> selected = selectedMediaItems();
-	if (target && std::find(selected.cbegin(), selected.cend(), *target) == selected.cend())
-		selected = { *target };
+	if (std::find(selected.cbegin(), selected.cend(), target) == selected.cend())
+		selected = { target };
 	return selected;
 }
 
