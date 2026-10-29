@@ -182,17 +182,17 @@ a surviving reference.
 
 ### Image loading and worker ownership
 
-Photo loading follows the app-wide two-stage rule: tagged reads run on `Core::IoThreadPool`, then a window-local
-compute pool decodes images and builds halving mip chains. The completed ordered batch is published to the GUI thread
-at once. Only one load batch is admitted per window; closing aborts pending decode publication and retires tagged I/O
-before the compute pool joins.
+Photo loading follows the app-wide two-stage rule: reads run on `Core::IoThreadPool`, decoding on `cpuThreadPool()`.
+The completed ordered batch is published to the GUI thread at once. Only one load batch is admitted per window. The
+background stages hold only the batch, never the window, so closing cancels the load without waiting for a read in
+flight.
 
-The mip chain avoids live one-pass minification artifacts during continuous zoom. The same compute pool runs
+The mip chain avoids live one-pass minification artifacts during continuous zoom. A window-local compute pool runs
 automatic alignment, parallelizing across photos and inside each fit. Nested work is safe because the calling worker
 participates in each parallel range rather than blocking for a saturated child queue. Alignment remains deterministic
 because fits perform no cross-thread floating-point reduction.
 
-The compute pool is window-local because loading and alignment share the window's lifetime and no broader owner needs
-the resource. Alignment state is transient. Window geometry, rotation-constraint preference, and the optional
+The alignment pool is window-local because alignment shares the window's lifetime and no broader owner needs the
+resource. Alignment state is transient. Window geometry, rotation-constraint preference, and the optional
 alignment region persist; the region is stored relative to the reference dimensions so it restores across
 resolutions.

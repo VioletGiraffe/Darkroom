@@ -39,6 +39,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPolygonF>
+#include <QPromise>
 #include <QSettings>
 #include <QSignalBlocker>
 #include <QSlider>
@@ -82,14 +83,14 @@ QRectF subjectRectToImage(const QRectF& rect, double scale, double rotation, con
 
 } // namespace
 
-// Shared by the GUI, I/O, and decode stages of one load.
+// Shared by the GUI, I/O, and decode stages of one load. The background stages touch nothing else.
 struct PhotoCompareWindow::PhotoLoadBatch
 {
 	QStringList paths;
 	std::vector<QImage> images;
 	QString completionNotice;
 	std::atomic<int> completedCount{ 0 };
-	std::atomic<bool> abort{ false };
+	QPromise<void> promise; // Finished by the last decode; cancelled when the window closes
 };
 
 // A pane is either a grid cell or, at index -1, the full-view viewport.
@@ -447,6 +448,11 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 	_hintLabel->setAlignment(Qt::AlignCenter);
 	mainLayout->addWidget(_hintLabel, 0);
 
+	connect(&_loadWatcher, &QFutureWatcher<void>::progressValueChanged, this, &PhotoCompareWindow::updateHintText);
+	connect(&_loadWatcher, &QFutureWatcher<void>::finished, this, [this] {
+		const std::shared_ptr<PhotoLoadBatch> batch = _loadBatch; // applyLoadedPhotoBatch resets _loadBatch
+		applyLoadedPhotoBatch(*batch);
+	});
 	addPhotosFromFiles(photoPaths);
 
 	resize(1200, 800);
@@ -456,12 +462,7 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 
 PhotoCompareWindow::~PhotoCompareWindow()
 {
-	if (_loadBatch)
-	{
-		_loadBatch->abort = true;
-		// retire() prevents the I/O task from touching this window or enqueueing more decode work.
-		IoThreadPool::retire(reinterpret_cast<uint64_t>(this));
-	}
+	_loadWatcher.cancel(); // Not waited for: the load's background stages hold only the batch
 	// Persist the region relative to the reference resolution.
 	const QRectF normalizedAoi = !_alignAoi.isEmpty() && !_photos.empty() ? normalizedFromSubjectRect(_alignAoi) : QRectF();
 	QSettings{}.setValue(Settings::PhotoCompareAoi, normalizedAoi);
@@ -537,7 +538,10 @@ void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
 	auto batch = std::make_shared<PhotoLoadBatch>();
 	batch->paths = photoPaths;
 	batch->images.resize(static_cast<size_t>(photoPaths.size()));
+	batch->promise.setProgressRange(0, static_cast<int>(photoPaths.size()));
+	batch->promise.start();
 	_loadBatch = batch;
+	_loadWatcher.setFuture(batch->promise.future());
 	if (_photos.empty())
 	{
 		rebuildPaneGrid();
@@ -546,14 +550,14 @@ void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
 	updateHintText();
 
 	// Serialize reads per storage device, then decode each completed read in the compute pool.
-	IoThreadPool::enqueue(batch->paths.front(), [this, batch, rawRendering = rawRenderingSetting(), colorManaged = colorManagementSetting()] {
+	IoThreadPool::enqueue(batch->paths.front(), [batch, rawRendering = rawRenderingSetting(), colorManaged = colorManagementSetting()] {
 		for (qsizetype i = 0; i < batch->paths.size(); ++i)
 		{
-			if (batch->abort)
+			if (batch->promise.isCanceled())
 				return;
 			ImageDecoding::EncodedImage encoded = ImageDecoding::readEncodedImage(batch->paths[i], rawRendering);
-			_workerPool.enqueue([this, batch, i, encoded = std::move(encoded), colorManaged] {
-				if (!batch->abort)
+			cpuThreadPool().enqueue([batch, i, encoded = std::move(encoded), colorManaged] {
+				if (!batch->promise.isCanceled())
 				{
 					ImageDecoding::DecodedImage decoded = ImageDecoding::decode(encoded);
 					if (decoded.image.isNull())
@@ -564,13 +568,13 @@ void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
 					ImageDecoding::applyOrientation(decoded.image, decoded.orientation);
 					batch->images[static_cast<size_t>(i)] = std::move(decoded.image);
 				}
-				if (++batch->completedCount == static_cast<int>(batch->paths.size()))
-					QMetaObject::invokeMethod(this, [this, batch] { applyLoadedPhotoBatch(*batch); }, Qt::QueuedConnection);
-				else
-					QMetaObject::invokeMethod(this, [this] { if (_loadBatch) updateHintText(); }, Qt::QueuedConnection);
+				const int completedCount = ++batch->completedCount;
+				batch->promise.setProgressValue(completedCount);
+				if (completedCount == static_cast<int>(batch->paths.size()))
+					batch->promise.finish();
 			});
 		}
-	}, reinterpret_cast<uint64_t>(this));
+	});
 }
 
 void PhotoCompareWindow::applyLoadedPhotoBatch(PhotoLoadBatch& batch)

@@ -26,21 +26,15 @@ namespace {
 	}
 }
 
-void IoThreadPool::enqueue(const QString& filePath, TaskType task, const uint64_t tag)
+void IoThreadPool::enqueue(const QString& filePath, TaskType task)
 {
-	poolForPath(filePath).enqueue(std::move(task), tag);
+	poolForPath(filePath).enqueue(std::move(task));
 }
 
 void IoThreadPool::parallelForAsync(const QString& filePath, const size_t count, std::function<void(size_t index)> fn, std::function<void()> onAllCompleted)
 {
 	// The serial pool's single worker drains every index itself, in order
 	poolForPath(filePath).parallelForAsync(count, std::move(fn), std::move(onAllCompleted));
-}
-
-void IoThreadPool::retire(const uint64_t tag)
-{
-	parallelPool().retire(tag);
-	serialPool().retire(tag);
 }
 
 void IoThreadPool::finishAllThreads()

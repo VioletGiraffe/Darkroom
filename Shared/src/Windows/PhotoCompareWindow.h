@@ -5,6 +5,7 @@
 #include "threading/cthreadpool.h"
 
 DISABLE_COMPILER_WARNINGS
+#include <QFutureWatcher>
 #include <QImage>
 #include <QPointF>
 #include <QRectF>
@@ -166,5 +167,6 @@ private:
 	bool _viewTouched = false;
 
 	std::shared_ptr<PhotoLoadBatch> _loadBatch;
+	QFutureWatcher<void> _loadWatcher; // Watches _loadBatch's promise
 	CThreadPool _workerPool;
 };
