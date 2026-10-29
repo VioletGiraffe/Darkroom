@@ -175,6 +175,13 @@ void MediaGrid::filterRows(const std::function<bool(const QListWidgetItem&)>& is
 		selectionModel()->setCurrentIndex({}, QItemSelectionModel::NoUpdate);
 }
 
+QList<QListWidgetItem*> MediaGrid::effectiveSelection(QListWidgetItem& item)
+{
+	if (!item.isSelected())
+		return { &item };
+	return item.listWidget()->selectedItems();
+}
+
 void MediaGrid::setEmptyMessage(const QString& message)
 {
 	if (_emptyMessage == message)

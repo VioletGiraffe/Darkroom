@@ -40,6 +40,9 @@ public:
 	// Hides the rows isShown rejects and shows the rest. A hidden current row stops being current.
 	void filterRows(const std::function<bool(const QListWidgetItem&)>& isShown);
 
+	// What an action on item applies to: the selection when it contains item, else item alone
+	[[nodiscard]] static QList<QListWidgetItem*> effectiveSelection(QListWidgetItem& item);
+
 	void setEmptyMessage(const QString& message);
 
 	// Ctrl+wheel anywhere over the grid calls handler with signed steps instead of scrolling.

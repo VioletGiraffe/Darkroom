@@ -11,7 +11,6 @@ class MediaGrid;
 class QLabel;
 class QListWidgetItem;
 class QTimer;
-class ThumbnailWidget;
 
 class FrameViewerWindow final : public QWidget {
 public:
@@ -25,7 +24,10 @@ private:
 	void refreshDisplay();
 	void showInstruction(const QString& text);
 	[[nodiscard]] QWidget* buildThumbnail(QListWidgetItem* item);
-	void showThumbnailContextMenu(ThumbnailWidget& thumbnail, const QString& path, const QPoint& pos);
+	// Copies the paths of MediaGrid::effectiveSelection(item); reveals item alone.
+	void showThumbnailContextMenu(QListWidgetItem& item, QPoint globalPos);
+	// Reveals the frame folder.
+	void showBackgroundContextMenu(QPoint globalPos);
 	void zoomThumbnails(int steps);
 	void applyThumbnailSize();
 

@@ -896,16 +896,11 @@ ImportDialog::StagedId ImportDialog::stagedIdAtPath(const QString& path) const
 	return StagedId::None;
 }
 
-std::vector<ImportDialog::StagedId> ImportDialog::effectiveStagedSelection(const StagedGridItem* item) const
+std::vector<ImportDialog::StagedId> ImportDialog::effectiveStagedSelection(StagedGridItem* item) const
 {
-	const QList<QListWidgetItem*> selected = item->listWidget()->selectedItems();
-	if (selected.size() <= 1 || !item->isSelected())
-		return { item->stagedId };
-
 	std::vector<StagedId> targets;
-	targets.reserve(selected.size());
-	for (const QListWidgetItem* selectedItem : selected)
-		targets.push_back(static_cast<const StagedGridItem*>(selectedItem)->stagedId);
+	for (const QListWidgetItem* target : MediaGrid::effectiveSelection(*item))
+		targets.push_back(static_cast<const StagedGridItem*>(target)->stagedId);
 	return targets;
 }
 

@@ -61,6 +61,14 @@ FrameViewerWindow::FrameViewerWindow(QWidget* parent)
 	});
 	_grid->setCardFactory([this](QListWidgetItem* item) { return buildThumbnail(item); });
 	_grid->setZoomHandler([this](int steps) { zoomThumbnails(steps); });
+	_grid->setContextMenuPolicy(Qt::CustomContextMenu);
+	connect(_grid, &QWidget::customContextMenuRequested, this, [this](QPoint pos) {
+		const QPoint globalPos = _grid->viewport()->mapToGlobal(pos);
+		if (QListWidgetItem* item = _grid->itemAt(pos))
+			showThumbnailContextMenu(*item, globalPos);
+		else
+			showBackgroundContextMenu(globalPos);
+	});
 	layout->addWidget(_grid);
 
 	// Coalesce wheel steps into one rebuild.
@@ -140,10 +148,6 @@ QWidget* FrameViewerWindow::buildThumbnail(QListWidgetItem* item)
 	// No drag of its own: the grid drags the whole selection.
 	auto* thumbnail = new ThumbnailWidget(ImageFilesSource{ QStringList{ filePath } }, QFileInfo{ filePath }.completeBaseName(), {}, nullptr);
 	thumbnail->setFixedSize(_thumbnailSize, _thumbnailSize);
-	thumbnail->setContextMenuPolicy(Qt::CustomContextMenu);
-	connect(thumbnail, &ThumbnailWidget::customContextMenuRequested, this, [this, thumbnail, filePath](const QPoint& pos) {
-		showThumbnailContextMenu(*thumbnail, filePath, pos);
-	});
 	thumbnail->setOnActivatedCallback([this, index] {
 		ImageViewerWindow::showForImages(_imagePaths, index, this);
 	});
@@ -170,17 +174,34 @@ void FrameViewerWindow::applyThumbnailSize()
 	_grid->ensureVisibleCardsExist();
 }
 
-void FrameViewerWindow::showThumbnailContextMenu(ThumbnailWidget& thumbnail, const QString& path, const QPoint& pos)
+void FrameViewerWindow::showThumbnailContextMenu(QListWidgetItem& item, QPoint globalPos)
 {
+	const QString path = _imagePaths.at(_grid->row(&item));
+	QStringList targetPaths;
+	for (const QListWidgetItem* target : MediaGrid::effectiveSelection(item))
+		targetPaths.push_back(QDir::toNativeSeparators(_imagePaths.at(_grid->row(target))));
+
 	QMenu menu;
 	menu.addAction(revealInFileManagerActionText(), [path, this] {
 		if (!revealInFileManager(path))
 			reportMissingFile(this, path);
 	});
-	menu.addAction(tr("Copy file path"), [path] {
-		QApplication::clipboard()->setText(QDir::toNativeSeparators(path));
+	menu.addAction(targetPaths.size() > 1 ? tr("Copy file paths") : tr("Copy file path"), [targetPaths] {
+		QApplication::clipboard()->setText(targetPaths.join('\n'));
 	});
-	menu.exec(thumbnail.mapToGlobal(pos));
+	menu.exec(globalPos);
 
-	clearStuckHoverIfCursorLeft(&thumbnail);
+	// Null for a row far from the viewport: the menu key opens the menu on the current row wherever it is
+	if (QWidget* card = _grid->itemWidget(&item))
+		clearStuckHoverIfCursorLeft(card);
+}
+
+void FrameViewerWindow::showBackgroundContextMenu(QPoint globalPos)
+{
+	QMenu menu;
+	menu.addAction(revealInFileManagerActionText(), [this] {
+		if (!revealInFileManager(_folderPath))
+			reportMissingFile(this, _folderPath);
+	});
+	menu.exec(globalPos);
 }

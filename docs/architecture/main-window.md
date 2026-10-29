@@ -89,6 +89,9 @@ flow layout would require explicit equivalents for all of those capabilities.
 Hidden rows are never selected: `MediaGrid` drops them from select-all and range selections, so actions on the
 selection reach only visible items.
 
+An action on one row applies to its effective selection (`MediaGrid::effectiveSelection`): the selection when it
+contains the row, else the row alone.
+
 Enabling drag on the item view preserves a multi-selection through press-and-move, allowing the whole selection to
 export together. `MediaGrid::startDrag` exports source-file URLs; Catalog knowledge remains in
 `MediaBrowserWidget`, which supplies the URL provider. MainWindow rejects drags originating from this grid in its

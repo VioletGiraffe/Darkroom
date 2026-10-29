@@ -74,7 +74,8 @@ private:
 	void playVideo(const QString& path);
 	// Empty paths open the comparison's drop-target state.
 	void comparePhotos(const QStringList& paths);
-	void showEntryContextMenu(const QString& path, bool isFolder, QPoint globalPos);
+	// Acts on MediaGrid::effectiveSelection(item); reveal and paste-into act on item alone.
+	void showEntryContextMenu(QListWidgetItem& item, QPoint globalPos);
 	void showBackgroundContextMenu(QPoint globalPos);
 	// Does nothing when the grid does not show the path.
 	void selectAndScrollToPath(const QString& path);

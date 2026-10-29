@@ -309,8 +309,8 @@ void BrowserWindow::setupUi()
 	_grid->setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(_grid, &QWidget::customContextMenuRequested, this, [this](QPoint pos) {
 		const QPoint globalPos = _grid->viewport()->mapToGlobal(pos);
-		if (const auto* entry = static_cast<const GridEntry*>(_grid->itemAt(pos)))
-			showEntryContextMenu(entry->path, entry->kind == EntryKind::Folder, globalPos);
+		if (QListWidgetItem* item = _grid->itemAt(pos))
+			showEntryContextMenu(*item, globalPos);
 		else
 			showBackgroundContextMenu(globalPos);
 	});
@@ -596,22 +596,23 @@ std::function<void(const QString& path)> BrowserWindow::pathSelector()
 	};
 }
 
-void BrowserWindow::showEntryContextMenu(const QString& path, bool isFolder, QPoint globalPos)
+void BrowserWindow::showEntryContextMenu(QListWidgetItem& item, QPoint globalPos)
 {
+	const auto& entry = static_cast<const GridEntry&>(item);
+	const QString path = entry.path;
 	QMenu menu(this);
 	menu.addAction(revealInFileManagerActionText(), this, [this, path] {
 		if (!revealInFileManager(path))
 			reportMissingFile(this, path);
 	});
 
-	// A tile outside the selection is acted on alone.
-	QStringList targets = selectedPaths();
-	if (!targets.contains(path))
-		targets = { path };
+	const QList<QListWidgetItem*> targetItems = MediaGrid::effectiveSelection(item);
+	QStringList targets;
+	for (const QListWidgetItem* target : targetItems)
+		targets.push_back(static_cast<const GridEntry*>(target)->path);
 
-	// Several targets are the selection.
-	const auto isImage = [](const QListWidgetItem* item) { return static_cast<const GridEntry*>(item)->kind == EntryKind::Image; };
-	if (targets.size() >= 2 && std::ranges::all_of(_grid->selectedItems(), isImage))
+	const auto isImage = [](const QListWidgetItem* target) { return static_cast<const GridEntry*>(target)->kind == EntryKind::Image; };
+	if (targets.size() >= 2 && std::ranges::all_of(targetItems, isImage))
 	{
 		menu.addSeparator();
 		menu.addAction(tr("Compare photos"), this, [this, targets] { comparePhotos(targets); });
@@ -620,7 +621,7 @@ void BrowserWindow::showEntryContextMenu(const QString& path, bool isFolder, QPo
 	menu.addSeparator();
 	menu.addAction(tr("Cut"), this, [targets] { FileOperations::putPathsOnClipboard(targets, true); });
 	menu.addAction(tr("Copy"), this, [targets] { FileOperations::putPathsOnClipboard(targets, false); });
-	if (isFolder)
+	if (entry.kind == EntryKind::Folder)
 		menu.addAction(tr("Paste into folder"), this, [this, path] { pasteInto(path); })->setEnabled(clipboardHasFiles());
 
 	// Queued, like folder activation in buildTile: the tile showing this menu may be among those removed.
@@ -857,10 +858,6 @@ QWidget* BrowserWindow::buildTile(QListWidgetItem* item)
 	case EntryKind::Video: tile->setOnActivatedCallback([this, path = entry.path] { playVideo(path); }); break;
 	}
 	tile->setFileTypeIconLookup(&FileTypeIcons::forType);
-	tile->setContextMenuPolicy(Qt::CustomContextMenu);
-	connect(tile, &QWidget::customContextMenuRequested, this, [this, tile, path = entry.path, isFolder = entry.kind == EntryKind::Folder](QPoint pos) {
-		showEntryContextMenu(path, isFolder, tile->mapToGlobal(pos));
-	});
 	setCutMark(tile, isCut(entry.path));
 	return tile;
 }

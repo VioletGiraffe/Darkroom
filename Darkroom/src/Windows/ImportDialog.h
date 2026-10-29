@@ -76,8 +76,8 @@ private:
 	void rebuildAllStagedCards();
 	// By pathComparisonKey; None when no staged file is at path.
 	[[nodiscard]] StagedId stagedIdAtPath(const QString& path) const;
-	// Whole selection when item is selected; otherwise that item alone.
-	[[nodiscard]] std::vector<StagedId> effectiveStagedSelection(const StagedGridItem* item) const;
+	// The ids of MediaGrid::effectiveSelection(item)
+	[[nodiscard]] std::vector<StagedId> effectiveStagedSelection(StagedGridItem* item) const;
 	void showStagedCardContextMenu(StagedGridItem* item, const QPoint& globalPos);
 	void previewStagedItem(StagedId id);
 	// Does nothing when the item is no longer staged.
