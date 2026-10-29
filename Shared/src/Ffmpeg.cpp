@@ -5,13 +5,18 @@
 
 DISABLE_COMPILER_WARNINGS
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QStringList>
+#include <QTimer>
 RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
+#include <chrono>
+#include <functional>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -126,6 +131,71 @@ QStringList buildExtractionArguments(const QString& videoFilePath, const QString
 
 	return arguments;
 }
+
+// One ffmpeg run of extractSingleFrame, owned by the caller's context object.
+// Destroyed while ffmpeg runs, it kills ffmpeg and removes the partial output; onFinished then never runs.
+class SingleFrameProcess final : public QProcess
+{
+public:
+	SingleFrameProcess(QString outputFilePath, std::function<void(const Ffmpeg::SplitResult&)> onFinished, QObject* parent) :
+		QProcess{ parent },
+		_outputFilePath{ std::move(outputFilePath) },
+		_onFinished{ std::move(onFinished) }
+	{
+		connect(this, &QProcess::errorOccurred, this, [this](QProcess::ProcessError error) {
+			if (error == QProcess::FailedToStart)
+				finish({ .status = Ffmpeg::SplitResult::Status::StartFailed });
+		});
+		connect(this, &QProcess::finished, this, [this](int exitCode, QProcess::ExitStatus exitStatus) { finish(result(exitCode, exitStatus)); });
+		QTimer::singleShot(std::chrono::seconds{ 60 }, this, [this] {
+			_timedOut = true;
+			kill();
+		});
+	}
+
+	~SingleFrameProcess() override
+	{
+		if (state() == NotRunning)
+			return;
+
+		disconnect(); // The wait below emits finished(), which must not report
+		kill();
+		waitForFinished();
+		QFile::remove(_outputFilePath);
+	}
+
+private:
+	[[nodiscard]] Ffmpeg::SplitResult result(int exitCode, QProcess::ExitStatus exitStatus)
+	{
+		using Status = Ffmpeg::SplitResult::Status;
+		if (_timedOut)
+		{
+			QFile::remove(_outputFilePath);
+			return { .status = Status::TimedOut };
+		}
+
+		if (exitStatus != NormalExit || exitCode != 0)
+			return { .status = Status::ExtractionFailed, .exitCode = exitCode, .errorOutput = QString::fromUtf8(readAllStandardError() + '\n' + readAllStandardOutput()) };
+
+		// A timestamp at/past the end of the stream makes ffmpeg exit cleanly having written nothing.
+		if (!QFileInfo::exists(_outputFilePath))
+			return { .status = Status::NoFrames };
+
+		return { .frameCount = 1 };
+	}
+
+	void finish(const Ffmpeg::SplitResult& result)
+	{
+		deleteLater();
+		// Moved out: a host's callback may close the window that owns this object.
+		const std::function<void(const Ffmpeg::SplitResult&)> onFinished = std::move(_onFinished);
+		onFinished(result);
+	}
+
+	const QString _outputFilePath;
+	std::function<void(const Ffmpeg::SplitResult&)> _onFinished;
+	bool _timedOut = false;
+};
 
 } // namespace
 
@@ -357,20 +427,21 @@ SplitResult splitVideoIntoFrames(const QString& videoFilePath, const QString& ou
 	return result;
 }
 
-SplitResult extractSingleFrame(const QString& videoFilePath, qint64 timestampMs, const QString& outputFilePath, int jpegQuality)
+void extractSingleFrame(const QString& videoFilePath, qint64 timestampMs, const QString& outputFilePath, int jpegQuality,
+	QObject* context, std::function<void(const SplitResult& result)> onFinished)
 {
-	SplitResult result;
+	assert_and_return_r(context, );
 
 	if (!QFileInfo::exists(videoFilePath))
 	{
-		result.status = SplitResult::Status::SourceMissing;
-		return result;
+		onFinished({ .status = SplitResult::Status::SourceMissing });
+		return;
 	}
 
 	if (!QDir{}.mkpath(QFileInfo{ outputFilePath }.absolutePath()))
 	{
-		result.status = SplitResult::Status::FolderCreateFailed;
-		return result;
+		onFinished({ .status = SplitResult::Status::FolderCreateFailed });
+		return;
 	}
 
 	QStringList arguments;
@@ -388,40 +459,8 @@ SplitResult extractSingleFrame(const QString& videoFilePath, qint64 timestampMs,
 		arguments << "-qscale:v" << QString::number(jpegQuality);
 	arguments << QDir::toNativeSeparators(outputFilePath);
 
-	QProcess process;
-	process.start(ffmpegPath(), arguments);
-
-	if (!process.waitForStarted())
-	{
-		result.status = SplitResult::Status::StartFailed;
-		return result;
-	}
-
-	if (!process.waitForFinished(60000))
-	{
-		process.kill();
-		process.waitForFinished();  // reap the killed process rather than leaving it orphaned
-		result.status = SplitResult::Status::TimedOut;
-		return result;
-	}
-
-	if (process.exitCode() != 0)
-	{
-		result.exitCode    = process.exitCode();
-		result.errorOutput = process.readAllStandardError() + "\n" + process.readAllStandardOutput();
-		result.status = SplitResult::Status::ExtractionFailed;
-		return result;
-	}
-
-	// A timestamp at/past the end of the stream makes ffmpeg exit cleanly having written nothing.
-	if (!QFileInfo::exists(outputFilePath))
-	{
-		result.status = SplitResult::Status::NoFrames;
-		return result;
-	}
-
-	result.frameCount = 1;
-	return result;
+	auto* process = new SingleFrameProcess{ outputFilePath, std::move(onFinished), context };
+	process->start(ffmpegPath(), arguments);
 }
 
 } // namespace Ffmpeg

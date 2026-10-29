@@ -11,10 +11,14 @@ DISABLE_COMPILER_WARNINGS
 #include <QFileInfo>
 #include <QMessageBox>
 #include <QObject>
+#include <QSet>
 #include <QSettings>
 #include <QTime>
 #include <QToolTip>
 RESTORE_COMPILER_WARNINGS
+
+#include <memory>
+#include <utility>
 
 namespace Settings {
 	constexpr const char* LastFrameExtractionMode   = "VideoPlayer/LastFrameExtractionMode";
@@ -25,6 +29,27 @@ namespace {
 
 constexpr const char* ExtractToTargetMode = "library"; // value written when the library was the only target
 constexpr const char* ExtractToFolderMode = "folder";
+
+// Names claimed by running extractions: their files do not exist yet, so firstAvailableFramePath must skip them explicitly.
+[[nodiscard]] QSet<QString>& reservedFramePaths()
+{
+	static QSet<QString> paths; // GUI thread only
+	return paths;
+}
+
+// Keeps path in reservedFramePaths while it lives.
+class FramePathReservation
+{
+public:
+	explicit FramePathReservation(QString path) : _path{ std::move(path) } { reservedFramePaths().insert(_path); }
+	~FramePathReservation() { reservedFramePaths().remove(_path); }
+
+	FramePathReservation(const FramePathReservation&) = delete;
+	FramePathReservation& operator=(const FramePathReservation&) = delete;
+
+private:
+	const QString _path;
+};
 
 [[nodiscard]] QString firstAvailableFramePath(
 	const QString& videoPath, qint64 timestampMs, const QString& destinationFolder, bool tiff)
@@ -37,7 +62,7 @@ constexpr const char* ExtractToFolderMode = "folder";
 	{
 		const QString numberedSuffix = copyIndex == 0 ? QString{} : QString(" (%1)").arg(copyIndex);
 		const QString candidatePath = QDir{ destinationFolder }.filePath(stem + numberedSuffix + extension);
-		if (!QFileInfo::exists(candidatePath))
+		if (!reservedFramePaths().contains(candidatePath) && !QFileInfo::exists(candidatePath))
 			return candidatePath;
 	}
 }
@@ -64,12 +89,13 @@ void SingleFrameExtraction::rememberTargetAsLastDestination()
 	QSettings{}.setValue(Settings::LastFrameExtractionMode, ExtractToTargetMode);
 }
 
-QString SingleFrameExtraction::extractFrame(const QString& videoPath, qint64 timestampMs, const QString& folder, QWidget* dialogParent)
+void SingleFrameExtraction::extractFrame(const QString& videoPath, qint64 timestampMs, const QString& folder, QWidget* dialogParent,
+	std::function<void(const QString& framePath)> onWritten)
 {
 	if (!QDir{}.mkpath(folder))
 	{
 		QMessageBox::critical(dialogParent, QObject::tr("Error"), QObject::tr("Failed to create the folder:\n%1").arg(QDir::toNativeSeparators(folder)));
-		return {};
+		return;
 	}
 
 	const QSettings settings = sharedSettings();
@@ -77,23 +103,25 @@ QString SingleFrameExtraction::extractFrame(const QString& videoPath, qint64 tim
 	const int jpegQuality = settings.value(Settings::JpegQuality, Defaults::JpegQuality).toInt();
 	const QString filePath = firstAvailableFramePath(videoPath, timestampMs, folder, tiff);
 
-	const Ffmpeg::SplitResult result = Ffmpeg::extractSingleFrame(videoPath, timestampMs, filePath, jpegQuality);
-	if (!result.ok())
-	{
-		reportFfmpegFailure(dialogParent, result, videoPath, folder);
-		return {};
-	}
-	return filePath;
+	// Released with the callback: after it runs, or when the extraction is abandoned
+	auto reservation = std::make_shared<const FramePathReservation>(filePath);
+	Ffmpeg::extractSingleFrame(videoPath, timestampMs, filePath, jpegQuality, dialogParent,
+		[reservation, videoPath, folder, filePath, dialogParent, onWritten = std::move(onWritten)](const Ffmpeg::SplitResult& result) {
+			if (!result.ok())
+			{
+				reportFfmpegFailure(dialogParent, result, videoPath, folder);
+				return;
+			}
+			onWritten(filePath);
+		});
 }
 
 void SingleFrameExtraction::extractToFolderInteractive(const QString& videoPath, qint64 timestampMs, const QString& folder, QWidget* dialogParent)
 {
-	const QString filePath = extractFrame(videoPath, timestampMs, folder, dialogParent);
-	if (filePath.isEmpty())
-		return;
-
-	QSettings settings;
-	settings.setValue(Settings::LastFrameExtractionMode, ExtractToFolderMode);
-	settings.setValue(Settings::LastFrameExtractionFolder, folder);
-	QToolTip::showText(QCursor::pos(), QObject::tr("Frame saved:\n%1").arg(QDir::toNativeSeparators(filePath)), dialogParent);
+	extractFrame(videoPath, timestampMs, folder, dialogParent, [folder, dialogParent](const QString& filePath) {
+		QSettings settings;
+		settings.setValue(Settings::LastFrameExtractionMode, ExtractToFolderMode);
+		settings.setValue(Settings::LastFrameExtractionFolder, folder);
+		QToolTip::showText(QCursor::pos(), QObject::tr("Frame saved:\n%1").arg(QDir::toNativeSeparators(filePath)), dialogParent);
+	});
 }

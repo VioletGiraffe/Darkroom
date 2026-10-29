@@ -1219,10 +1219,8 @@ void VideoPlayerWindow::extractFrameToTarget(qint64 timestampMs)
 	if (folder.isEmpty())
 		return;
 
-	const QString framePath = SingleFrameExtraction::extractFrame(_videoPath, timestampMs, folder, this);
-	if (framePath.isEmpty())
-		return;
-
-	SingleFrameExtraction::rememberTargetAsLastDestination();
-	_frameTarget.frameWritten(framePath);
+	SingleFrameExtraction::extractFrame(_videoPath, timestampMs, folder, this, [this](const QString& framePath) {
+		SingleFrameExtraction::rememberTargetAsLastDestination();
+		_frameTarget.frameWritten(framePath);
+	});
 }

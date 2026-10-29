@@ -125,7 +125,8 @@ normal playback resumes at the last displayed cached timestamp and preserves the
 
 `SingleFrameExtraction` owns configured ffmpeg extraction into a folder, failure reporting, and the remembered last
 destination that `E` repeats: a chosen folder, or the host's frame target. A frame target names a folder the frame is
-written into, then handles the written file.
+written into, then handles the written file. ffmpeg runs in the background, owned by the player: closing the player
+abandons the extraction and removes its partial output.
 
 `LibraryPlayer`'s target is the configured Extracted label's photo folder, and the frame is tracked there as an owned
 photo. The library holds no two identical files: when a byte-identical photo is already tracked, the frame is deleted

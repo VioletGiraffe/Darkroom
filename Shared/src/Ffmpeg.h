@@ -10,6 +10,8 @@ RESTORE_COMPILER_WARNINGS
 #include <functional>
 #include <vector>
 
+class QObject;
+
 // UI- and catalog-free ffmpeg operations.
 namespace Ffmpeg {
 
@@ -85,8 +87,12 @@ struct SplitResult
 [[nodiscard]] SplitResult splitVideoIntoFrames(const QString& videoFilePath, const QString& outputFolder, const SplitOptions& options,
 	const std::atomic<bool>& cancelled, const std::function<void(double fractionDone)>& onProgress);
 
-// Blocking single-frame extraction. ".tif" selects TIFF; other extensions select JPEG. The destination must
-// not exist; ffmpeg refuses to overwrite it. Failure may leave a partial output file.
-[[nodiscard]] SplitResult extractSingleFrame(const QString& videoFilePath, qint64 timestampMs, const QString& outputFilePath, int jpegQuality);
+// Single-frame extraction in a background ffmpeg process. ".tif" selects TIFF; other extensions select JPEG.
+// The destination must not exist; ffmpeg refuses to overwrite it. A failed ffmpeg may leave a partial output file.
+// Call on context's thread. onFinished runs there, possibly before this returns.
+// Destroying context first kills ffmpeg and removes its partial output; onFinished then never runs.
+// A timeout kills ffmpeg, removes its partial output and reports TimedOut.
+void extractSingleFrame(const QString& videoFilePath, qint64 timestampMs, const QString& outputFilePath, int jpegQuality,
+	QObject* context, std::function<void(const SplitResult& result)> onFinished);
 
 } // namespace Ffmpeg
