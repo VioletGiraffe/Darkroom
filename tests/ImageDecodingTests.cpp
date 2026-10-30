@@ -21,9 +21,11 @@ DISABLE_COMPILER_WARNINGS
 #include <turbojpeg.h>
 RESTORE_COMPILER_WARNINGS
 
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <memory>
+#include <optional>
 #include <vector>
 
 using namespace ImageDecoding;
@@ -281,6 +283,88 @@ TEST_CASE("ImageDecoding::decode: an EncodedImage's format and orientation repla
 	REQUIRE(failed.format == "nef");
 }
 
+TEST_CASE("decodeJpeg: DCT scaling rounds each side up", "[imagedecoding]")
+{
+	const QByteArray jpeg = encodeJpeg(JpegKind::Rgb);
+	for (const int scaleEighths : { 1, 2, 3, 4, 5, 6, 7, 8 })
+	{
+		CAPTURE(scaleEighths);
+		const std::optional<DecodedImage> decoded = decodeJpeg(jpeg, scaleEighths);
+		REQUIRE(decoded.has_value());
+		REQUIRE(decoded->error.isEmpty());
+		REQUIRE(decoded->image.size() == QSize{ (JpegSize.width() * scaleEighths + 7) / 8, (JpegSize.height() * scaleEighths + 7) / 8 });
+		REQUIRE(hasOpaqueFourthBytes(decoded->image));
+		REQUIRE(showsBothHalves(decoded->image));
+	}
+
+	REQUIRE(readJpegStoredSize(jpeg) == JpegSize);
+	REQUIRE(readJpegStoredSize(encodeJpeg(JpegKind::Cmyk)).isEmpty());
+	REQUIRE(readJpegStoredSize(jpeg.first(3) + QByteArray(64, '\x55')).isEmpty());
+}
+
+TEST_CASE("ImageDecoding::planJpegReduction: the smallest scale covering the box", "[imagedecoding]")
+{
+	const QByteArray jpeg = encodeJpeg(JpegKind::Rgb); // 64x32
+
+	SECTION("the fit scale rounded up to eighths")
+	{
+		const std::optional<JpegReduction> quarter = planJpegReduction(EncodedImage{ .bytes = jpeg }, QSize{ 100, 8 });
+		REQUIRE(quarter.has_value());
+		REQUIRE(quarter->uprightSize == JpegSize);
+		REQUIRE(quarter->scaleEighths == 2);
+
+		const std::optional<JpegReduction> roundedUp = planJpegReduction(EncodedImage{ .bytes = jpeg }, QSize{ 17, 100 });
+		REQUIRE(roundedUp.has_value());
+		REQUIRE(roundedUp->scaleEighths == 3);
+	}
+
+	SECTION("never below 1/8 or above 1")
+	{
+		REQUIRE(planJpegReduction(EncodedImage{ .bytes = jpeg }, QSize{ 1, 1 })->scaleEighths == 1);
+		REQUIRE(planJpegReduction(EncodedImage{ .bytes = jpeg }, QSize{ 1000, 1000 })->scaleEighths == 8);
+	}
+
+	SECTION("the box is upright: EXIF's orientation, or the EncodedImage's in its place")
+	{
+		const QByteArray rotated = withExifOrientation(jpeg, 6);
+		const QSize portraitBox = JpegSize.transposed();
+		const std::optional<JpegReduction> fromExif = planJpegReduction(EncodedImage{ .bytes = rotated }, portraitBox);
+		REQUIRE(fromExif.has_value());
+		REQUIRE(fromExif->uprightSize == JpegSize.transposed());
+		REQUIRE(fromExif->scaleEighths == 8);
+
+		const std::optional<JpegReduction> fromRaw = planJpegReduction(EncodedImage{ .bytes = rotated, .orientation = QImageIOHandler::TransformationNone }, portraitBox);
+		REQUIRE(fromRaw.has_value());
+		REQUIRE(fromRaw->uprightSize == JpegSize);
+		REQUIRE(fromRaw->scaleEighths == 4);
+	}
+
+	SECTION("empty for what decode() does not read through libjpeg-turbo")
+	{
+		REQUIRE_FALSE(planJpegReduction(EncodedImage{ .bytes = encodeJpeg(JpegKind::Cmyk) }, QSize{ 8, 8 }).has_value());
+		REQUIRE_FALSE(planJpegReduction(EncodedImage{ .bytes = jpeg, .rawRendering = RawRendering::HalfSize }, QSize{ 8, 8 }).has_value());
+		REQUIRE_FALSE(planJpegReduction(EncodedImage{ .error = "read failed" }, QSize{ 8, 8 }).has_value());
+		REQUIRE_FALSE(planJpegReduction(EncodedImage{ .bytes = QByteArray{ "not an image" } }, QSize{ 8, 8 }).has_value());
+		REQUIRE_FALSE(planJpegReduction(EncodedImage{ .bytes = jpeg }, QSize{}).has_value());
+	}
+}
+
+TEST_CASE("ImageDecoding::decodeReduced: an EncodedImage's format and orientation apply", "[imagedecoding]")
+{
+	const QByteArray jpeg = withExifOrientation(encodeJpeg(JpegKind::Rgb), 6);
+	const DecodedImage reduced = decodeReduced(EncodedImage{ .bytes = jpeg, .format = "nef", .orientation = QImageIOHandler::TransformationRotate180 }, 4);
+	REQUIRE(reduced.error.isEmpty());
+	REQUIRE(reduced.image.size() == JpegSize / 2);
+	REQUIRE(reduced.format == "nef");
+	REQUIRE(reduced.orientation == QImageIOHandler::TransformationRotate180);
+	REQUIRE(showsBothHalves(reduced.image));
+
+	const DecodedImage plain = decodeReduced(EncodedImage{ .bytes = jpeg }, 2);
+	REQUIRE(plain.format == "jpeg");
+	REQUIRE(plain.orientation == QImageIOHandler::TransformationRotate90);
+	REQUIRE(plain.image.size() == JpegSize / 4);
+}
+
 TEST_CASE("ImageDecoding::readEncodedImage: files are read whole, camera raws through LibRaw", "[imagedecoding]")
 {
 	QTemporaryDir dir;
@@ -338,6 +422,22 @@ TEST_CASE("ImageDecoding::readEncodedImage: files are read whole, camera raws th
 		REQUIRE_FALSE(decoded.error.isEmpty());
 		REQUIRE(decoded.format == "nef");
 	}
+
+	// Only a raw LibRaw parses has a preview to hand over first; everything else reads as without the handler
+	bool previewHandled = false;
+	const RawPreviewHandler abandon = [&](EncodedImage, QSize) {
+		previewHandled = true;
+		return false;
+	};
+	for (const RawRendering rawRendering : { RawRendering::EmbeddedPreview, RawRendering::HalfSize, RawRendering::Full })
+	{
+		CAPTURE(static_cast<int>(rawRendering));
+		REQUIRE(readEncodedImage(photoPath, rawRendering, abandon).bytes == jpeg);
+		const EncodedImage notRaw = readEncodedImage(notRawPath, rawRendering, abandon);
+		REQUIRE(notRaw.format == "nef");
+		REQUIRE(notRaw.bytes == (rawRendering == RawRendering::EmbeddedPreview ? QByteArray{} : jpeg));
+	}
+	REQUIRE_FALSE(previewHandled);
 }
 
 // Hidden: renders every camera raw in the folder named by DARKROOM_RAW_SAMPLES in each way, reporting size and time
@@ -367,6 +467,25 @@ TEST_CASE("ImageDecoding: camera raw samples", "[.][rawsamples]")
 			WARN(report.toStdString());
 			CHECK_FALSE(decoded.image.isNull());
 			CHECK(decoded.format == file.suffix().toLower().toLatin1());
+		}
+
+		// The rendering's predicted size, which the viewer lays its preview out at, is right at least in aspect ratio
+		for (const RawRendering rawRendering : { RawRendering::HalfSize, RawRendering::Full })
+		{
+			QSize predicted;
+			const EncodedImage encoded = readEncodedImage(file.filePath(), rawRendering, [&](EncodedImage, QSize uprightRenderSize) {
+				predicted = uprightRenderSize;
+				return true;
+			});
+			if (predicted.isEmpty())
+				continue; // no embedded JPEG preview
+
+			const DecodedImage decoded = decode(encoded);
+			const bool rotated = decoded.orientation.testFlag(QImageIOHandler::TransformationRotate90);
+			const QSize rendered = rotated ? decoded.image.size().transposed() : decoded.image.size();
+			WARN(QStringLiteral("%1, rendering %2: predicted %3x%4, rendered %5x%6").arg(file.fileName()).arg(static_cast<int>(rawRendering))
+				.arg(predicted.width()).arg(predicted.height()).arg(rendered.width()).arg(rendered.height()).toStdString());
+			CHECK(std::abs((double)predicted.width() / predicted.height() - (double)rendered.width() / rendered.height()) <= 0.02 * rendered.width() / rendered.height());
 		}
 	}
 }

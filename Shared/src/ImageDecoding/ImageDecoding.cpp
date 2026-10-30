@@ -3,6 +3,7 @@
 #include "ImageDecoding/Exif.h"
 #include "ImageDecoding/LibRawDecoder.h"
 #include "ImageDecoding/TurboJpegDecoder.h"
+#include "assert/advanced_assert.h"
 #include "buffered_reader.hpp" // thin_io
 #include "qt_paths.hpp"        // thin_io
 
@@ -15,8 +16,10 @@ DISABLE_COMPILER_WARNINGS
 #include <QSize>
 #include <QTransform>
 #include <QtEndian>
+#include <QtMath>
 RESTORE_COMPILER_WARNINGS
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -131,7 +134,24 @@ static QSize readUprightSizeWithQt(const QString& path)
 	return reader.transformation().testFlag(QImageIOHandler::TransformationRotate90) ? stored.transposed() : stored;
 }
 
+// What the read established replaces what decoding found
+static DecodedImage withEncodedMetadata(DecodedImage decoded, const EncodedImage& encoded)
+{
+	if (!encoded.format.isEmpty())
+		decoded.format = encoded.format;
+	if (encoded.orientation)
+		decoded.orientation = *encoded.orientation;
+	if (encoded.adobeRgb && decoded.iccProfile.isEmpty() && !decoded.image.isNull())
+		decoded.iccProfile = adobeRgbIccProfile();
+	return decoded;
+}
+
 EncodedImage readEncodedImage(const QString& path, RawRendering rawRendering)
+{
+	return readEncodedImage(path, rawRendering, {});
+}
+
+EncodedImage readEncodedImage(const QString& path, RawRendering rawRendering, const RawPreviewHandler& onRawPreview)
 {
 	thin_io::buffered_reader file;
 	if (!file.open(thin_io::native_path(path).data()))
@@ -141,14 +161,32 @@ EncodedImage readEncodedImage(const QString& path, RawRendering rawRendering)
 	if (rawSuffix.isEmpty())
 		return readWholeFile(file);
 
-	EncodedImage encoded;
-	if (std::optional<EncodedImage> preview = rawRendering == RawRendering::EmbeddedPreview ? readRawPreview(file) : std::nullopt)
-		encoded = std::move(*preview);
-	else
+	if (rawRendering == RawRendering::EmbeddedPreview)
 	{
-		encoded = readWholeFile(file);
-		encoded.rawRendering = rawRendering == RawRendering::EmbeddedPreview ? RawRendering::HalfSize : rawRendering;
+		if (std::optional<EncodedImage> preview = readRawPreview(file))
+		{
+			preview->format = rawSuffix.toLatin1();
+			return std::move(*preview);
+		}
 	}
+	else if (onRawPreview)
+	{
+		QSize uprightRenderSize;
+		// A preview that fails to read is skipped: the whole file's read reports the error
+		if (std::optional<EncodedImage> preview = readRawPreview(file, &uprightRenderSize); preview && preview->error.isEmpty())
+		{
+			// LibRaw's half-size rendering rounds each side up
+			if (rawRendering == RawRendering::HalfSize)
+				uprightRenderSize = QSize{ (uprightRenderSize.width() + 1) / 2, (uprightRenderSize.height() + 1) / 2 };
+
+			preview->format = rawSuffix.toLatin1();
+			if (!onRawPreview(std::move(*preview), uprightRenderSize))
+				return {};
+		}
+	}
+
+	EncodedImage encoded = readWholeFile(file);
+	encoded.rawRendering = rawRendering == RawRendering::EmbeddedPreview ? RawRendering::HalfSize : rawRendering;
 	encoded.format = rawSuffix.toLatin1();
 	return encoded;
 }
@@ -158,13 +196,7 @@ DecodedImage decode(const EncodedImage& encoded)
 	DecodedImage decoded = !encoded.error.isEmpty() ? DecodedImage{ .error = encoded.error }
 		: encoded.rawRendering                     ? decodeRaw(encoded.bytes, *encoded.rawRendering)
 		                                           : decode(encoded.bytes);
-	if (!encoded.format.isEmpty())
-		decoded.format = encoded.format;
-	if (encoded.orientation)
-		decoded.orientation = *encoded.orientation;
-	if (encoded.adobeRgb && decoded.iccProfile.isEmpty() && !decoded.image.isNull())
-		decoded.iccProfile = adobeRgbIccProfile();
-	return decoded;
+	return withEncodedMetadata(std::move(decoded), encoded);
 }
 
 DecodedImage decode(const QByteArray& encoded)
@@ -175,6 +207,29 @@ DecodedImage decode(const QByteArray& encoded)
 			return std::move(*decoded);
 	}
 	return decodeWithQt(encoded);
+}
+
+std::optional<JpegReduction> planJpegReduction(const EncodedImage& encoded, QSize uprightBox)
+{
+	if (!encoded.error.isEmpty() || encoded.rawRendering || uprightBox.isEmpty() || !isJpeg(encoded.bytes))
+		return std::nullopt;
+
+	const QSize stored = readJpegStoredSize(encoded.bytes);
+	if (stored.isEmpty())
+		return std::nullopt;
+
+	const QImageIOHandler::Transformations orientation = encoded.orientation ? *encoded.orientation : readJpegExif(encoded.bytes).orientation;
+	const QSize upright = orientation.testFlag(QImageIOHandler::TransformationRotate90) ? stored.transposed() : stored;
+	// Rounded up: a side scaled by n/8 is rounded up too, so the decode covers the fitted image
+	const qreal fitScale = std::min((qreal)uprightBox.width() / upright.width(), (qreal)uprightBox.height() / upright.height());
+	return JpegReduction{ .uprightSize = upright, .scaleEighths = std::clamp(qCeil(fitScale * 8), 1, 8) };
+}
+
+DecodedImage decodeReduced(const EncodedImage& encoded, int scaleEighths)
+{
+	std::optional<DecodedImage> decoded = decodeJpeg(encoded.bytes, scaleEighths);
+	assert_and_return_r(decoded, decode(encoded));
+	return withEncodedMetadata(std::move(*decoded), encoded);
 }
 
 void applyOrientation(QImage& image, QImageIOHandler::Transformations orientation)

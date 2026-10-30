@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Core/AsyncDelivery.h"
+#include "Windows/ImageViewerLoading.h"
 #include "Windows/RemovalAction.h"
 #include "compiler/compiler_warnings_control.h"
 
@@ -11,7 +13,6 @@ RESTORE_COMPILER_WARNINGS
 #include <functional>
 #include <vector>
 
-class CImageViewerWidget;
 class QAction;
 class QMenu;
 class QTimer;
@@ -63,8 +64,15 @@ private:
 	enum class Direction { Previous = -1, Next = 1 };
 
 	void buildMenus();
-	// Leaves the view untouched when the image cannot be loaded.
+	// Switches to the image at once and loads it in the background; the previous image stays on screen until the new one shows.
 	void showImage(int index);
+	// Supersedes any load in progress
+	void loadCurrentImage();
+	void applyLoadStage(ImageViewerLoading::Stage stage, const CImageViewerWidget::PendingImage& pending);
+	// Requires the load ended
+	void reportLoadFailure(const QString& path);
+	// Save as and Copy act on the image itself, which only a finished load provides
+	void updateImageContentActions();
 	void updateTitleAndCaption();
 	// Skips paths that have left the disk; -1 when the list ends first.
 	[[nodiscard]] int adjacentIndex(Direction direction) const;
@@ -87,6 +95,8 @@ private:
 
 	QStringList _imagePaths;
 	int _index = 0;
+	AsyncRequest _load;
+	QString _loadingPath; // empty unless _load runs
 	// Only an animated image holds its file open, so only an animation is released.
 	bool _animationReleased = false;
 	// Touchpads and high-resolution wheels split a notch across several events.
@@ -103,4 +113,6 @@ private:
 	QMenu* _imageMenu = nullptr;
 	QAction* _previousAction = nullptr;
 	QAction* _nextAction = nullptr;
+	QAction* _saveAsAction = nullptr;
+	QAction* _copyAction = nullptr;
 };

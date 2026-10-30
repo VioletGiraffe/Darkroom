@@ -1,7 +1,6 @@
 #include "Windows/ImageViewerWindow.h"
 #include "Core/CpuThreadPool.h"
 #include "ImageDecoding/ColorManagement.h"
-#include "ImageDecoding/ImageDecoding.h"
 #include "Shortcuts.h"
 #include "Utils.h"
 #include "assert/advanced_assert.h"
@@ -12,7 +11,6 @@ DISABLE_COMPILER_WARNINGS
 #include "resize/qimage_resize.h"
 
 #include <QClipboard>
-#include <QColorSpace>
 #include <QDesktopServices>
 #include <QDir>
 #include <QFile>
@@ -32,6 +30,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QMimeType>
 #include <QMouseEvent>
 #include <QSaveFile>
+#include <QScreen>
 #include <QSize>
 #include <QTimer>
 #include <QUrl>
@@ -42,7 +41,6 @@ RESTORE_COMPILER_WARNINGS
 #include <array>
 #include <cstdlib>
 #include <functional>
-#include <optional>
 #include <utility>
 
 constexpr QSize MinViewSize{ 120, 100 };
@@ -73,20 +71,6 @@ constexpr std::array SaveAsTypes{
 	const auto type = std::ranges::find_if(SaveAsTypes, [&](const SaveAsType& listed) { return mimeType == QLatin1String(listed.mimeType); });
 	assert_and_return_r(type != SaveAsTypes.end(), false);
 	return type->lossy;
-}
-
-// Animated files stay with the viewer widget's own reader, which plays them.
-[[nodiscard]] static std::optional<CImageViewerWidget::DecodedFile> decodeStill(const QString& path)
-{
-	ImageDecoding::DecodedImage decoded = ImageDecoding::decode(ImageDecoding::readEncodedImage(path, rawRenderingSetting()));
-	if (decoded.animated)
-		return std::nullopt;
-
-	ImageDecoding::applyOrientation(decoded.image, decoded.orientation);
-	// Save as: Qt's writers embed the profile from the color space, which Qt parses only from some profiles
-	if (!decoded.image.colorSpace().isValid() && !decoded.iccProfile.isEmpty())
-		decoded.image.setColorSpace(QColorSpace::fromIccProfile(decoded.iccProfile));
-	return CImageViewerWidget::DecodedFile{ std::move(decoded.image), QString::fromLatin1(decoded.format), std::move(decoded.iccProfile) };
 }
 
 ImageViewerWindow* ImageViewerWindow::showForImages(QStringList imagePaths, int startIndex, QWidget* parent,
@@ -160,6 +144,9 @@ void ImageViewerWindow::followMovedFiles(const std::function<bool(const QString&
 		viewer->updateTitleAndCaption();
 		if (reopen)
 			viewer->resumeReleasedAnimation();
+		// A load that has yet to open the file would look for it at the old path
+		if (!viewer->_loadingPath.isEmpty() && viewer->_loadingPath != viewer->currentImagePath())
+			viewer->loadCurrentImage();
 	}
 }
 
@@ -189,7 +176,6 @@ ImageViewerWindow::ImageViewerWindow(QStringList imagePaths, int startIndex, QWi
 		if (!ImageProcessing::resize(dest, source, srcRect, cpuParallelFor, kernel))
 			CImageViewerWidget::scaleWithQt(dest, source, srcRect, mode);
 	});
-	_view->setImageDecoder(decodeStill);
 	if (colorManagementSetting())
 		_view->setDisplayColorConverter(ImageDecoding::convertToSrgb);
 
@@ -223,15 +209,15 @@ void ImageViewerWindow::buildMenus()
 	fileMenu->addAction(tr("Open in system app"), this, [this] {
 		QDesktopServices::openUrl(QUrl::fromLocalFile(currentImagePath()));
 	});
-	QAction* saveAsAction = fileMenu->addAction(tr("Save as..."), this, &ImageViewerWindow::saveImageAs);
-	saveAsAction->setShortcut(QKeySequence::SaveAs);
+	_saveAsAction = fileMenu->addAction(tr("Save as..."), this, &ImageViewerWindow::saveImageAs);
+	_saveAsAction->setShortcut(QKeySequence::SaveAs);
 	fileMenu->addSeparator();
 	QAction* closeAction = fileMenu->addAction(tr("Close"), this, &QWidget::close);
 	closeAction->setShortcuts({ QKeySequence(Qt::Key_Escape), QKeySequence::Close });
 
 	QMenu* editMenu = new QMenu(tr("&Edit"), menuBar);
-	QAction* copyAction = editMenu->addAction(tr("Copy image"), this, &ImageViewerWindow::copyImageAndFileToClipboard);
-	copyAction->setShortcut(QKeySequence::Copy);
+	_copyAction = editMenu->addAction(tr("Copy image"), this, &ImageViewerWindow::copyImageAndFileToClipboard);
+	_copyAction->setShortcut(QKeySequence::Copy);
 
 	QMenu* viewMenu = new QMenu(tr("&View"), menuBar);
 	QAction* fitAction = viewMenu->addAction(tr("Fit to window"), this, [this] { _view->fitToWindow(); });
@@ -276,17 +262,12 @@ void ImageViewerWindow::showImage(int index)
 	if (index < 0)
 		return;
 
-	const QString path = _imagePaths.at(index);
-	if (!_view->displayImage(path))
-	{
-		QMessageBox::warning(this, tr("Error"), tr("Failed to load the image:\n%1").arg(QDir::toNativeSeparators(path)));
-		return;
-	}
-
-	_animationReleased = false;
 	_index = index;
+	const QString path = currentImagePath();
+	loadCurrentImage();
+
+	_animationReleased = false; // the load ended any animation
 	updateTitleAndCaption();
-	_windowIconTimer->start();
 	_previousAction->setEnabled(adjacentIndex(Direction::Previous) >= 0);
 	_nextAction->setEnabled(adjacentIndex(Direction::Next) >= 0);
 	for (const auto& updateForImage : _imageActionUpdaters)
@@ -294,6 +275,67 @@ void ImageViewerWindow::showImage(int index)
 
 	if (_onImageChanged)
 		_onImageChanged(path);
+}
+
+void ImageViewerWindow::loadCurrentImage()
+{
+	_loadingPath = currentImagePath();
+	updateImageContentActions();
+
+	CImageViewerWidget::PendingImage pending = _view->expectImage();
+	// The screen, not the view: the first load starts before the window is shown full screen
+	const QScreen* screen = this->screen();
+	const QSize uprightBox = (QSizeF{ screen->size() } * screen->devicePixelRatio()).toSize();
+	_load = ImageViewerLoading::start(_loadingPath, rawRenderingSetting(), uprightBox, this, [this, pending](ImageViewerLoading::Stage stage) {
+		applyLoadStage(std::move(stage), pending);
+	});
+}
+
+void ImageViewerWindow::applyLoadStage(ImageViewerLoading::Stage stage, const CImageViewerWidget::PendingImage& pending)
+{
+	using Kind = ImageViewerLoading::Stage::Kind;
+	if (stage.kind == Kind::Preview)
+	{
+		pending.showPreview(std::move(stage.file), stage.finalSize);
+		_windowIconTimer->start();
+		return;
+	}
+
+	const QString path = std::exchange(_loadingPath, {});
+	_load = {}; // frees the job, which may hold a whole raw file
+
+	if (stage.kind == Kind::Failed)
+	{
+		pending.showFailure();
+		reportLoadFailure(path);
+		return;
+	}
+
+	if (stage.kind == Kind::Animated && !_view->displayImage(path))
+	{
+		_view->displayFrame(QImage{}); // a failed displayImage leaves the previous image on screen
+		reportLoadFailure(path);
+		return;
+	}
+
+	if (stage.kind == Kind::Final)
+		pending.showFinal(std::move(stage.file));
+
+	_windowIconTimer->start();
+	updateImageContentActions();
+}
+
+void ImageViewerWindow::reportLoadFailure(const QString& path)
+{
+	updateImageContentActions();
+	QMessageBox::warning(this, tr("Error"), tr("Failed to load the image:\n%1").arg(QDir::toNativeSeparators(path)));
+}
+
+void ImageViewerWindow::updateImageContentActions()
+{
+	const bool imageLoaded = _loadingPath.isEmpty() && !_view->sourceImage().isNull();
+	_saveAsAction->setEnabled(imageLoaded);
+	_copyAction->setEnabled(imageLoaded);
 }
 
 void ImageViewerWindow::updateTitleAndCaption()
@@ -549,6 +591,5 @@ void ImageViewerWindow::removeCurrentImage(const std::function<bool(const QStrin
 
 	// Erased, not skipped: a removal may leave the file on disk, and the caption counts only the images left.
 	_imagePaths.removeAt(_index);
-	_index = remaining > _index ? remaining - 1 : remaining; // in range even if showImage fails
-	showImage(_index);
+	showImage(remaining > _index ? remaining - 1 : remaining);
 }

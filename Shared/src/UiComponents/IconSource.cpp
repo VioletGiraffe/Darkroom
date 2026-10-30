@@ -60,7 +60,7 @@ std::optional<ImageSource::Result> IconSource::renderNow(QSize box, qreal dpr) c
 	return ImageSource::Result{ .image = scaledIconPixmap(_icon, QSize(iconSide, iconSide), dpr).toImage(), .fileType = _fileType };
 }
 
-ImageSource::Request IconSource::renderAsync(QSize /*box*/, qreal /*dpr*/, QObject* /*context*/, std::function<void(ImageSource::Result)> /*done*/) const
+AsyncRequest IconSource::renderAsync(QSize /*box*/, qreal /*dpr*/, QObject* /*context*/, std::function<void(ImageSource::Result)> /*done*/) const
 {
 	assert_unconditional_r("renderNow always answers");
 	return {};

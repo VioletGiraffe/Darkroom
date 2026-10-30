@@ -11,6 +11,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QStringList>
 RESTORE_COMPILER_WARNINGS
 
+#include <functional>
 #include <optional>
 
 // Image loading: camera raws through LibRaw, chosen by extension; other files by content, JPEG through libjpeg-turbo and
@@ -59,9 +60,28 @@ struct DecodedImage {
 
 // Camera raws are read as rawRendering prescribes, other files whole.
 [[nodiscard]] EncodedImage readEncodedImage(const QString& path, RawRendering rawRendering);
+
+// Receives a camera raw's embedded JPEG preview, with its format, and the upright size of the LibRaw rendering to come.
+// Returning false abandons the read.
+using RawPreviewHandler = std::function<bool (EncodedImage preview, QSize uprightRenderSize)>;
+// As above, except that a raw rendered by LibRaw (HalfSize, Full) hands onRawPreview its embedded JPEG preview, when it has
+// one, before the whole file is read. Empty, without an error, when onRawPreview abandons the read.
+[[nodiscard]] EncodedImage readEncodedImage(const QString& path, RawRendering rawRendering, const RawPreviewHandler& onRawPreview);
+
 [[nodiscard]] DecodedImage decode(const EncodedImage& encoded);
 [[nodiscard]] DecodedImage decode(const QByteArray& encoded);
 void applyOrientation(QImage& image, QImageIOHandler::Transformations orientation);
+
+// A JPEG decode reduced by libjpeg-turbo's DCT scaling
+struct JpegReduction {
+	QSize uprightSize; // the full decode's, turned upright
+	int scaleEighths;  // 1 to 8: the reduced decode's scale, in eighths
+};
+// Empty unless encoded is a JPEG, a camera raw's preview included, that decode() reads through libjpeg-turbo.
+// scaleEighths is the smallest whose decode is at least as large as the full image fitted into uprightBox.
+[[nodiscard]] std::optional<JpegReduction> planJpegReduction(const EncodedImage& encoded, QSize uprightBox);
+// As decode(), at scaleEighths/8 of each side. Requires a JPEG planJpegReduction() accepts.
+[[nodiscard]] DecodedImage decodeReduced(const EncodedImage& encoded, int scaleEighths);
 
 // The image's size once turned upright, read from the file's headers only; empty when they do not state it.
 // A camera raw's is the size LibRaw renders it at.

@@ -35,8 +35,8 @@ where the pixels come from.
   in `ImageSource.h`.
 - `renderNow` answers on the GUI thread when the image is cheap to produce there. Otherwise the widget waits out the
   load dwell and calls `renderAsync`, so cheap sources skip the dwell without the widget telling sources apart.
-- Asynchronous results arrive on the GUI thread through a `Delivery`. The returned `Request` cancels on destruction or
-  replacement, and pending stages skip their work once cancelled.
+- Asynchronous results arrive on the GUI thread through an `AsyncDelivery`. The returned `AsyncRequest` cancels on
+  destruction or replacement, and pending stages skip their work once cancelled.
 - A source states whether its image gets the matte's rounded corners.
 - A result carries the file's type: detected from the data for decoded images, given by the caller otherwise. An
   optional caller-supplied lookup maps it to an icon at the right end of the caption band, drawn at one of the icon's

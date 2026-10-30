@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Core/AsyncDelivery.h"
 #include "UiComponents/ImageSource.h"
 #include "compiler/compiler_warnings_control.h"
 
@@ -17,7 +18,7 @@ public:
 	explicit ImageFilesSource(QStringList paths);
 
 	[[nodiscard]] std::optional<ImageSource::Result> renderNow(QSize box, qreal dpr) const;
-	[[nodiscard]] ImageSource::Request renderAsync(QSize box, qreal dpr, QObject* context, std::function<void(ImageSource::Result)> done) const;
+	[[nodiscard]] AsyncRequest renderAsync(QSize box, qreal dpr, QObject* context, std::function<void(ImageSource::Result)> done) const;
 	[[nodiscard]] bool roundsCorners() const { return true; }
 
 private:

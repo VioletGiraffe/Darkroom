@@ -63,14 +63,16 @@ Link order matters on GNU ld: a library precedes the ones it uses. The `LIBS` co
 
 The directories:
 
-- `Core/` - library, catalog, persistence, identity, and the two thread pools (`IoThreadPool` routes disk reads by
-  storage speed, `CpuThreadPool` is the process-wide compute pool). UI-free.
+- `Core/` - library, catalog, persistence, identity, the two thread pools (`IoThreadPool` routes disk reads by
+  storage speed, `CpuThreadPool` is the process-wide compute pool), and `AsyncDelivery`, which delivers a pooled job's
+  results to the GUI thread and cancels them. UI-free.
 - `ImageDecoding/` - image loading. Camera raws, chosen by extension, go through LibRaw: thumbnails use the largest
   embedded JPEG preview, the viewer and photo compare the shared raw rendering setting (that preview, or LibRaw's
   half-size or full rendering). A raw without a JPEG preview gets the half-size rendering in its place. Other files
   are routed by content: JPEG through libjpeg-turbo, every other format through Qt's image plugins. Reading and
-  decoding are separate calls, for the I/O and CPU pools. `readUprightImageSize` reads only the headers, for layouts sized
-  before decoding. UI-free.
+  decoding are separate calls, for the I/O and CPU pools. For the viewer's previews, a JPEG decodes DCT-reduced, and a
+  raw rendered by LibRaw hands over its embedded JPEG before the whole file is read. `readUprightImageSize` reads only
+  the headers, for layouts sized before decoding. UI-free.
 - `UiComponents/` - widgets reused by more than one window.
 - `Windows/` - top-level windows and dialogs, the workflows that prompt the user or pump events (import execution,
   rename, delete, label management, frame extraction, source relocation), and collaborators that serve one window
@@ -129,7 +131,7 @@ camera raws from `ImageDecoding::rawFileSuffixes`. Three artifacts mirror them b
   process-wide `cpuThreadPool()`. Long-running non-read work owns an appropriate separate worker instead of
   blocking the I/O route; so do recent-library availability checks, which can hang on unreachable storage.
 - **Every image decode goes through `ImageDecoding`**, never `QImageReader` or `QImage::load` directly. qtutils'
-  viewer widget reaches it through its decoder hook and keeps animated files on its own reader.
+  viewer widget displays images decoded outside it and reads only animated files itself.
 - **Decoders carry the color profile, displays convert.** A decoded image comes with its ICC profile: the one a JPEG
   embeds, the one Qt reads for the formats it decodes, or Adobe RGB when only EXIF declares it. With the shared color
   management setting on, each display converts to sRGB at its own resolution: the viewer widget its display buffer,

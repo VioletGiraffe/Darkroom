@@ -153,6 +153,12 @@ QImageIOHandler::Transformations orientationForFlip(int flip) noexcept
 	}
 }
 
+QSize uprightSize(const libraw_image_sizes_t& sizes)
+{
+	const QSize stored{ sizes.width, sizes.height };
+	return orientationForFlip(sizes.flip).testFlag(QImageIOHandler::TransformationRotate90) ? stored.transposed() : stored;
+}
+
 // On LIBRAW_SUCCESS, imgdata.thumbnail holds the largest JPEG preview
 int unpackLargestJpegPreview(LibRaw& raw)
 {
@@ -177,7 +183,7 @@ int unpackLargestJpegPreview(LibRaw& raw)
 
 } // namespace
 
-std::optional<EncodedImage> readRawPreview(thin_io::buffered_reader& file)
+std::optional<EncodedImage> readRawPreview(thin_io::buffered_reader& file, QSize* uprightRenderSize)
 {
 	const std::optional<uint64_t> size = file.size();
 	if (!size)
@@ -189,7 +195,11 @@ std::optional<EncodedImage> readRawPreview(thin_io::buffered_reader& file)
 	const auto raw = std::make_unique<LibRaw>();
 	int result = raw->open_datastream(&stream);
 	if (result == LIBRAW_SUCCESS)
+	{
+		if (uprightRenderSize)
+			*uprightRenderSize = uprightSize(raw->imgdata.sizes);
 		result = unpackLargestJpegPreview(*raw);
+	}
 	if (!stream.ioError().isEmpty())
 		return EncodedImage{ .error = stream.ioError() };
 	if (result == LIBRAW_NO_THUMBNAIL || result == LIBRAW_UNSUPPORTED_THUMBNAIL)
@@ -263,9 +273,7 @@ QSize readRawUprightSize(thin_io::buffered_reader& file)
 	if (raw->open_datastream(&stream) != LIBRAW_SUCCESS)
 		return {};
 
-	const libraw_image_sizes_t& sizes = raw->imgdata.sizes;
-	const QSize stored{ sizes.width, sizes.height };
-	return orientationForFlip(sizes.flip).testFlag(QImageIOHandler::TransformationRotate90) ? stored.transposed() : stored;
+	return uprightSize(raw->imgdata.sizes);
 }
 
 } // namespace ImageDecoding

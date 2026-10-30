@@ -82,7 +82,7 @@ private:
 #endif
 
 namespace {
-	// Shared lifetime spans I/O, decode and the Request.
+	// Shared lifetime spans I/O, decode and the AsyncRequest.
 	// Immutable after posting except the token, the delivery's own state, and the read results, each slot written by its own read.
 	struct LoadJob {
 		LoadJob(QObject* context, std::function<void(ImageSource::Result)> done, QStringList paths, QSize canvasLogical, qreal dpr, bool colorManaged)
@@ -94,7 +94,7 @@ namespace {
 			, _colorManaged{ colorManaged }
 		{}
 
-		ImageSource::Delivery _delivery;
+		AsyncDelivery<ImageSource::Result> _delivery;
 		const QStringList _paths;
 		std::vector<ImageDecoding::EncodedImage> _encodedPerPath;
 		const QSize _canvasLogical;
@@ -248,7 +248,7 @@ namespace {
 		if (job._delivery.isCancelled())
 			return;
 
-		// Moved out of the job: the Request keeps the job alive past delivery
+		// Moved out of the job: the AsyncRequest keeps the job alive past delivery
 		cpuThreadPool().enqueue([jobPtr, encoded = std::move(job._encodedPerPath)] {
 			decodeStage(jobPtr, encoded);
 		});
@@ -268,7 +268,7 @@ std::optional<ImageSource::Result> ImageFilesSource::renderNow(QSize /*box*/, qr
 	return std::nullopt;
 }
 
-ImageSource::Request ImageFilesSource::renderAsync(QSize box, qreal dpr, QObject* context, std::function<void(ImageSource::Result)> done) const
+AsyncRequest ImageFilesSource::renderAsync(QSize box, qreal dpr, QObject* context, std::function<void(ImageSource::Result)> done) const
 {
 	assert_and_return_r(!_paths.empty(), {});
 
@@ -276,7 +276,7 @@ ImageSource::Request ImageFilesSource::renderAsync(QSize box, qreal dpr, QObject
 #ifdef PROFILING_ENABLED
 	job->_batchToken = std::make_unique<LoadBatchToken>();
 #endif
-	ImageSource::Request request{ std::shared_ptr<ImageSource::Delivery>{ job, &job->_delivery } };
+	AsyncRequest request{ std::shared_ptr<AsyncDeliveryState>{ job, &job->_delivery } };
 	// A card's files share one storage device: the first path routes all of them
 	IoThreadPool::parallelForAsync(_paths.front(), _paths.size(), [job](size_t index) { readStage(*job, index); }, [job] { postDecode(job); });
 	return request;

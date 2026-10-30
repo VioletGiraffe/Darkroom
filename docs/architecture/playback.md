@@ -27,6 +27,19 @@ Scaling goes through `ImageProcessing::resize`, nearest neighbor when the widget
 back to `CImageViewerWidget::scaleWithQt` for pixel formats the resizer rejects. Its chunks run on `cpuThreadPool()`,
 which also runs work on the calling thread - the GUI thread is blocked for the duration of a scale either way.
 
+Loading never blocks the GUI thread. `ImageViewerLoading` reads and decodes on the pools; the window hands the results to
+the widget through a `CImageViewerWidget::PendingImage`, so the widget stays free of threads.
+- A preview comes first where the final image takes longer: a JPEG decoded DCT-reduced to the screen's size, or a camera
+  raw's embedded JPEG while LibRaw renders the raw. Other formats show only the final image.
+- The widget lays a preview out at the final image's size, so zoom, Actual pixels and the info strip already refer to the
+  final image, and its arrival changes only sharpness.
+- A pending image accepts nothing once superseded, and no preview after its final image. Navigating replaces the load's
+  `AsyncRequest`, which stops the abandoned job between its stages.
+- The previous image stays on screen until the new one shows; title, position and host actions switch at once. Save as
+  and Copy wait for the final image. A failed load empties the view, or leaves its preview, and stays on that position.
+- The preview's target is the screen size, not the view's: the first load starts before the window is shown.
+- Animated files go to the widget's own reader, which plays them.
+
 Each viewer opens fullscreen and is parentless, for a taskbar button of its own; a modal caller owns the window
 instead, Qt blocking input to unparented windows under a modal dialog. Double-click and `F` switch between
 fullscreen and a window sized to the image down to a minimum, and the menu bar shows only outside fullscreen, or after a lone Alt tap until its menus close. A caller that defers

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Core/AsyncDelivery.h"
 #include "UiComponents/DragGestureHelper.h"
 #include "UiComponents/IconSource.h"
 #include "UiComponents/ImageFilesSource.h"
@@ -93,7 +94,7 @@ private:
 
 	QSize _renderedBox; // empty: nothing requested yet
 	qreal _renderedDpr = 0.0;
-	ImageSource::Request _request;
+	AsyncRequest _request;
 	bool _loadArmed = false;
 
 	DragGestureHelper _dragHelper;
