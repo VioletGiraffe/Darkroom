@@ -258,8 +258,10 @@ private:
 
 } // namespace
 
-std::optional<EncodedImage> readRawPreview(thin_io::buffered_reader& file, QSize* uprightRenderSize)
+std::optional<EncodedImage> readRawPreview(thin_io::buffered_reader& file, RawRendering rawRendering, QSize* uprightRenderSize)
 {
+	assert_r(!uprightRenderSize || rawRendering != RawRendering::EmbeddedPreview);
+
 	const std::optional<uint64_t> size = file.size();
 	if (!size)
 		return EncodedImage{ .error = QString::fromStdString(thin_io::buffered_reader::text_for_last_error()) };
@@ -272,7 +274,13 @@ std::optional<EncodedImage> readRawPreview(thin_io::buffered_reader& file, QSize
 	if (result == LIBRAW_SUCCESS)
 	{
 		if (uprightRenderSize)
-			*uprightRenderSize = uprightSize(raw->imgdata.sizes);
+		{
+			const QSize full = uprightSize(raw->imgdata.sizes);
+			// LibRaw's half-size rendering merges color filter array blocks, rounding each side up; a raw without one renders whole
+			*uprightRenderSize = rawRendering == RawRendering::HalfSize && raw->imgdata.idata.filters != 0
+				? QSize{ (full.width() + 1) / 2, (full.height() + 1) / 2 }
+				: full;
+		}
 		result = unpackLargestJpegPreview(*raw);
 	}
 	if (!stream.ioError().isEmpty())

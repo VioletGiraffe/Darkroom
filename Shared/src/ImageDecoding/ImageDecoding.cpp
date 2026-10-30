@@ -163,7 +163,7 @@ EncodedImage readEncodedImage(const QString& path, RawRendering rawRendering, co
 
 	if (rawRendering == RawRendering::EmbeddedPreview)
 	{
-		if (std::optional<EncodedImage> preview = readRawPreview(file))
+		if (std::optional<EncodedImage> preview = readRawPreview(file, rawRendering, nullptr))
 		{
 			preview->format = rawSuffix.toLatin1();
 			return std::move(*preview);
@@ -173,12 +173,8 @@ EncodedImage readEncodedImage(const QString& path, RawRendering rawRendering, co
 	{
 		QSize uprightRenderSize;
 		// A preview that fails to read is skipped: the whole file's read reports the error
-		if (std::optional<EncodedImage> preview = readRawPreview(file, &uprightRenderSize); preview && preview->error.isEmpty())
+		if (std::optional<EncodedImage> preview = readRawPreview(file, rawRendering, &uprightRenderSize); preview && preview->error.isEmpty())
 		{
-			// LibRaw's half-size rendering rounds each side up
-			if (rawRendering == RawRendering::HalfSize)
-				uprightRenderSize = QSize{ (uprightRenderSize.width() + 1) / 2, (uprightRenderSize.height() + 1) / 2 };
-
 			preview->format = rawSuffix.toLatin1();
 			if (!onRawPreview(std::move(*preview), uprightRenderSize))
 				return {};

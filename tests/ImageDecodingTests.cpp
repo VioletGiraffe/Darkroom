@@ -483,7 +483,7 @@ TEST_CASE("ImageDecoding: camera raw samples", "[.][rawsamples]")
 		CHECK(abandoned.image.isNull());
 		CHECK_FALSE(abandoned.error.isEmpty());
 
-		// The rendering's predicted size, which the viewer lays its preview out at, is right at least in aspect ratio
+		// The rendering's predicted size, which the viewer lays its preview out at, is right within 2% per side
 		for (const RawRendering rawRendering : { RawRendering::HalfSize, RawRendering::Full })
 		{
 			QSize predicted;
@@ -499,7 +499,8 @@ TEST_CASE("ImageDecoding: camera raw samples", "[.][rawsamples]")
 			const QSize rendered = rotated ? decoded.image.size().transposed() : decoded.image.size();
 			WARN(QStringLiteral("%1, rendering %2: predicted %3x%4, rendered %5x%6").arg(file.fileName()).arg(static_cast<int>(rawRendering))
 				.arg(predicted.width()).arg(predicted.height()).arg(rendered.width()).arg(rendered.height()).toStdString());
-			CHECK(std::abs((double)predicted.width() / predicted.height() - (double)rendered.width() / rendered.height()) <= 0.02 * rendered.width() / rendered.height());
+			CHECK(std::abs(predicted.width() - rendered.width()) <= 0.02 * rendered.width());
+			CHECK(std::abs(predicted.height() - rendered.height()) <= 0.02 * rendered.height());
 		}
 	}
 }
