@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793397396437,
+  "lastUpdate": 1793401236884,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -19899,6 +19899,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .data",
             "value": 343.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 84.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "8cf89d01c4839867489f69d65241fc3f4c971492",
+          "message": "LibRaw renders report progress, shown as a bar in the image viewer, and stop between stages once their load is cancelled, in the viewer, the thumbnails and photo compare",
+          "timestamp": "2026-10-31T00:48:03+02:00",
+          "tree_id": "b524bdd177c055a529846b9f6a01cb69e27fa980",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/8cf89d01c4839867489f69d65241fc3f4c971492"
+        },
+        "date": 1793401233747,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 18797,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1596,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 32450,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6752.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7549,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5454,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 826.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 344.5,
             "unit": "KB"
           },
           {
