@@ -68,7 +68,10 @@ using RawPreviewHandler = std::function<bool (EncodedImage preview, QSize uprigh
 // one, before the whole file is read. Empty, without an error, when onRawPreview abandons the read.
 [[nodiscard]] EncodedImage readEncodedImage(const QString& path, RawRendering rawRendering, const RawPreviewHandler& onRawPreview);
 
-[[nodiscard]] DecodedImage decode(const EncodedImage& encoded);
+// Receives the fraction of a LibRaw rendering done, 0 to 1, on the decoding thread. Returning false abandons the rendering.
+using RawRenderProgressHandler = std::function<bool (double fraction)>;
+// A camera raw read whole reports its rendering's progress to onRawProgress; an abandoned rendering fails.
+[[nodiscard]] DecodedImage decode(const EncodedImage& encoded, const RawRenderProgressHandler& onRawProgress = {});
 [[nodiscard]] DecodedImage decode(const QByteArray& encoded);
 void applyOrientation(QImage& image, QImageIOHandler::Transformations orientation);
 

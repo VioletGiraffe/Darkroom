@@ -191,10 +191,10 @@ EncodedImage readEncodedImage(const QString& path, RawRendering rawRendering, co
 	return encoded;
 }
 
-DecodedImage decode(const EncodedImage& encoded)
+DecodedImage decode(const EncodedImage& encoded, const RawRenderProgressHandler& onRawProgress)
 {
 	DecodedImage decoded = !encoded.error.isEmpty() ? DecodedImage{ .error = encoded.error }
-		: encoded.rawRendering                     ? decodeRaw(encoded.bytes, *encoded.rawRendering)
+		: encoded.rawRendering                     ? decodeRaw(encoded.bytes, *encoded.rawRendering, onRawProgress)
 		                                           : decode(encoded.bytes);
 	return withEncodedMetadata(std::move(decoded), encoded);
 }

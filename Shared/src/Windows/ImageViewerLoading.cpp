@@ -80,7 +80,10 @@ void decodeFinal(const std::shared_ptr<LoadJob>& job, const EncodedImage& encode
 		}
 	}
 
-	DecodedImage decoded = decode(encoded);
+	DecodedImage decoded = decode(encoded, [&job](double fraction) {
+		job->delivery.deliver(Stage{ .kind = Stage::Kind::Progress, .progress = fraction }, job);
+		return !job->delivery.isCancelled();
+	});
 	if (decoded.animated)
 		job->delivery.deliver(Stage{ .kind = Stage::Kind::Animated }, job);
 	else if (decoded.image.isNull())

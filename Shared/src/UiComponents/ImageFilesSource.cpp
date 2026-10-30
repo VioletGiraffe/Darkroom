@@ -140,7 +140,7 @@ namespace {
 			DecodedFrame& frame = frames[i];
 			ImageDecoding::DecodedImage decoded = [&] {
 				PROFILE_SAMPLE("Thumbnail image decode");
-				return ImageDecoding::decode(encodedPerPath[i]);
+				return ImageDecoding::decode(encodedPerPath[i], [&job](double) { return !job._delivery.isCancelled(); });
 			}();
 			frame.format = std::move(decoded.format);
 			if (decoded.image.isNull())

@@ -559,8 +559,8 @@ void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
 			cpuThreadPool().enqueue([batch, i, encoded = std::move(encoded), colorManaged] {
 				if (!batch->promise.isCanceled())
 				{
-					ImageDecoding::DecodedImage decoded = ImageDecoding::decode(encoded);
-					if (decoded.image.isNull())
+					ImageDecoding::DecodedImage decoded = ImageDecoding::decode(encoded, [&batch](double) { return !batch->promise.isCanceled(); });
+					if (decoded.image.isNull() && !batch->promise.isCanceled())
 						qWarning() << "PhotoCompareWindow: failed to load" << batch->paths[i] << "-" << decoded.error;
 					// Converted at full size: the photos are drawn through painter transforms, with no display buffer to convert
 					if (colorManaged)

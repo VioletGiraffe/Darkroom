@@ -181,6 +181,81 @@ int unpackLargestJpegPreview(LibRaw& raw)
 	return previews.thumbcount == 0 ? LIBRAW_NO_THUMBNAIL : LIBRAW_UNSUPPORTED_THUMBNAIL;
 }
 
+// The share of a rendering's time that one stage LibRaw reports takes
+struct StageWeight {
+	LibRaw_progress stage;
+	double weight;
+};
+
+// In rendering order; the copy out of LibRaw takes the rest of the rendering.
+// Estimates: the camera raw samples test logs each rendering's progress against time.
+constexpr std::array HalfSizeStageWeights{
+	StageWeight{ LIBRAW_PROGRESS_LOAD_RAW, 0.6 },
+	StageWeight{ LIBRAW_PROGRESS_SCALE_COLORS, 0.1 },
+	StageWeight{ LIBRAW_PROGRESS_PRE_INTERPOLATE, 0.05 },
+	StageWeight{ LIBRAW_PROGRESS_CONVERT_RGB, 0.15 },
+};
+constexpr std::array FullStageWeights{
+	StageWeight{ LIBRAW_PROGRESS_LOAD_RAW, 0.35 },
+	StageWeight{ LIBRAW_PROGRESS_SCALE_COLORS, 0.05 },
+	StageWeight{ LIBRAW_PROGRESS_PRE_INTERPOLATE, 0.05 },
+	StageWeight{ LIBRAW_PROGRESS_INTERPOLATE, 0.35 },
+	StageWeight{ LIBRAW_PROGRESS_CONVERT_RGB, 0.1 },
+};
+
+// LibRaw's progress reports, mapped through the stage weights to the whole rendering's progress; onProgress may be empty
+class RenderProgress
+{
+public:
+	RenderProgress(LibRaw& raw, RawRendering rawRendering, const RawRenderProgressHandler& onProgress) noexcept
+		: _stageWeights{ rawRendering == RawRendering::HalfSize ? std::span<const StageWeight>{ HalfSizeStageWeights } : std::span<const StageWeight>{ FullStageWeights } }
+		, _onProgress{ onProgress }
+	{
+		raw.set_progress_handler(&RenderProgress::onLibRawProgress, this);
+	}
+
+	// False when the rendering is abandoned
+	[[nodiscard]] bool reportCopyStarted()
+	{
+		double copyStart = 0.0;
+		for (const StageWeight& stageWeight : _stageWeights)
+			copyStart += stageWeight.weight;
+		return report(copyStart);
+	}
+
+private:
+	// LibRaw's progress_callback: non-zero cancels.
+	// Runs on the thread that called into LibRaw: an OpenMP loop reports only from its master thread, which is that thread.
+	static int onLibRawProgress(void* data, LibRaw_progress stage, int iteration, int expected)
+	{
+		auto& progress = *static_cast<RenderProgress*>(data);
+		double stageStart = 0.0;
+		for (const StageWeight& stageWeight : progress._stageWeights)
+		{
+			if (stageWeight.stage == stage)
+			{
+				// Iterations run from 0 to expected - 1, the last one at the stage's end
+				const double stageDone = std::clamp(static_cast<double>(iteration) / std::max(expected - 1, 1), 0.0, 1.0);
+				return progress.report(stageStart + stageWeight.weight * stageDone) ? 0 : 1;
+			}
+			stageStart += stageWeight.weight;
+		}
+		// An unweighted stage still lets the handler abandon the rendering
+		return progress.report(progress._reported) ? 0 : 1;
+	}
+
+	bool report(double fraction)
+	{
+		_reported = std::max(_reported, fraction);
+		return !_onProgress || _onProgress(_reported);
+	}
+
+private:
+	const std::span<const StageWeight> _stageWeights;
+	const RawRenderProgressHandler& _onProgress;
+	double _reported = 0.0; // never decreases
+};
+
 } // namespace
 
 std::optional<EncodedImage> readRawPreview(thin_io::buffered_reader& file, QSize* uprightRenderSize)
@@ -215,11 +290,12 @@ std::optional<EncodedImage> readRawPreview(thin_io::buffered_reader& file, QSize
 	};
 }
 
-DecodedImage decodeRaw(const QByteArray& file, RawRendering rawRendering)
+DecodedImage decodeRaw(const QByteArray& file, RawRendering rawRendering, const RawRenderProgressHandler& onProgress)
 {
 	assert_r(rawRendering != RawRendering::EmbeddedPreview);
 
 	const auto raw = std::make_unique<LibRaw>();
+	RenderProgress progress{ *raw, rawRendering, onProgress };
 	libraw_output_params_t& params = raw->imgdata.params;
 	params.use_camera_wb = 1;
 	params.half_size = rawRendering == RawRendering::HalfSize;
@@ -235,6 +311,8 @@ DecodedImage decodeRaw(const QByteArray& file, RawRendering rawRendering)
 		result = raw->unpack();
 	if (result == LIBRAW_SUCCESS)
 		result = raw->dcraw_process();
+	if (result == LIBRAW_SUCCESS && !progress.reportCopyStarted())
+		result = LIBRAW_CANCELLED_BY_CALLBACK;
 	if (result != LIBRAW_SUCCESS)
 		return { .error = QString::fromLatin1(LibRaw::strerror(result)) };
 

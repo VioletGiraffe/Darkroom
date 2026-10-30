@@ -21,6 +21,7 @@ DISABLE_COMPILER_WARNINGS
 #include <turbojpeg.h>
 RESTORE_COMPILER_WARNINGS
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -458,16 +459,29 @@ TEST_CASE("ImageDecoding: camera raw samples", "[.][rawsamples]")
 			timer.start();
 			const EncodedImage encoded = readEncodedImage(file.filePath(), rawRendering);
 			const qint64 readMs = timer.restart();
-			const DecodedImage decoded = decode(encoded);
+			// For tuning LibRaw's stage weights: each reported fraction with the time it came at
+			std::vector<double> fractions;
+			QString progressLog;
+			const DecodedImage decoded = decode(encoded, [&](double fraction) {
+				fractions.push_back(fraction);
+				progressLog += QStringLiteral(" %1 ms %2,").arg(timer.elapsed()).arg(fraction, 0, 'f', 2);
+				return true;
+			});
 			const qint64 decodeMs = timer.elapsed();
 
-			const QString report = QStringLiteral("%1, rendering %2: %3x%4, read %5 ms, decode %6 ms %7")
+			const QString report = QStringLiteral("%1, rendering %2: %3x%4, read %5 ms, decode %6 ms %7\nprogress:%8")
 				.arg(file.fileName()).arg(static_cast<int>(rawRendering)).arg(decoded.image.width()).arg(decoded.image.height())
-				.arg(readMs).arg(decodeMs).arg(decoded.error);
+				.arg(readMs).arg(decodeMs).arg(decoded.error).arg(progressLog);
 			WARN(report.toStdString());
 			CHECK_FALSE(decoded.image.isNull());
 			CHECK(decoded.format == file.suffix().toLower().toLatin1());
+			CHECK(std::ranges::is_sorted(fractions));
+			CHECK(std::ranges::all_of(fractions, [](double fraction) { return fraction >= 0.0 && fraction <= 1.0; }));
 		}
+
+		const DecodedImage abandoned = decode(readEncodedImage(file.filePath(), RawRendering::Full), [](double fraction) { return fraction < 0.5; });
+		CHECK(abandoned.image.isNull());
+		CHECK_FALSE(abandoned.error.isEmpty());
 
 		// The rendering's predicted size, which the viewer lays its preview out at, is right at least in aspect ratio
 		for (const RawRendering rawRendering : { RawRendering::HalfSize, RawRendering::Full })

@@ -33,8 +33,10 @@ the widget through a `CImageViewerWidget::PendingImage`, so the widget stays fre
   raw's embedded JPEG while LibRaw renders the raw. Other formats show only the final image.
 - The widget lays a preview out at the final image's size, so zoom, Actual pixels and the info strip already refer to the
   final image, and its arrival changes only sharpness.
+- While LibRaw renders a raw, the viewer shows its progress. The fraction comes from per-stage weights in
+  `LibRawDecoder.cpp`; the hidden raw samples test logs progress against time for tuning them.
 - A pending image accepts nothing once superseded, and no preview after its final image. Navigating replaces the load's
-  `AsyncRequest`, which stops the abandoned job between its stages.
+  `AsyncRequest`, which stops the abandoned job between its stages and abandons a LibRaw rendering at its next stage.
 - The previous image stays on screen until the new one shows; title, position and host actions switch at once. Save as
   and Copy wait for the final image. A failed load empties the view, or leaves its preview, and stays on that position.
 - The preview's target is the screen size, not the view's: the first load starts before the window is shown.

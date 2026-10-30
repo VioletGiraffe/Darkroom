@@ -300,6 +300,11 @@ void ImageViewerWindow::applyLoadStage(ImageViewerLoading::Stage stage, const CI
 		_windowIconTimer->start();
 		return;
 	}
+	if (stage.kind == Kind::Progress)
+	{
+		pending.showProgress(stage.progress);
+		return;
+	}
 
 	const QString path = std::exchange(_loadingPath, {});
 	_load = {}; // frees the job, which may hold a whole raw file
