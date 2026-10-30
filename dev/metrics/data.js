@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793310072387,
+  "lastUpdate": 1793397396437,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -19825,6 +19825,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 84,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "952927ebd1bb72d5f17189de0aa3add93157804a",
+          "message": "The image viewer loads in the background, showing a DCT-reduced JPEG or a raw's embedded preview while the final image decodes; Delivery and Request move to Core as the generic AsyncDelivery and AsyncRequest\n\nSave as and Copy wait for the final image. A failed load now stays on the failed image, so Next moves past it instead of retrying it.",
+          "timestamp": "2026-10-30T23:40:00+02:00",
+          "tree_id": "c5e4a11a38cc1c14940d9f16b74ab9e5d9aa7918",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/952927ebd1bb72d5f17189de0aa3add93157804a"
+        },
+        "date": 1793397391107,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 18724,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1596,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 32390,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6745.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7541.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5450,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 824.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 343.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 84.5,
             "unit": "KB"
           },
           {
