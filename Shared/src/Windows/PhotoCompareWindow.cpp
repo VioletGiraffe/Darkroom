@@ -12,6 +12,7 @@
 
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
+#include "utils/displayformatting.h"
 #include "utils/filemanager.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 #include "utils/scoped_cursor.h"
@@ -45,6 +46,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QSignalBlocker>
 #include <QSlider>
 #include <QStackedLayout>
+#include <QStringView>
 #include <QtMath>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -70,6 +72,8 @@ constexpr qsizetype MaxImages = 50;
 
 constexpr int PhotoSliderStepWidth = 32;
 constexpr int PhotoSliderMaxWidth = 800;
+
+constexpr QStringView HintSeparator = u" · ";
 
 QPointF rotated(const QPointF& p, double angle)
 {
@@ -455,6 +459,7 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 
 	_hintLabel = new QLabel(this);
 	_hintLabel->setAlignment(Qt::AlignCenter);
+	_hintLabel->setWordWrap(true);
 	mainLayout->addWidget(_hintLabel, 0);
 
 	connect(&_loadWatcher, &QFutureWatcher<void>::progressValueChanged, this, &PhotoCompareWindow::updateHintText);
@@ -1156,10 +1161,11 @@ void PhotoCompareWindow::updateAllPanes()
 
 void PhotoCompareWindow::updateHintText()
 {
+	QString hint;
 	if (_loadBatch)
-		_hintLabel->setText(tr("Loading photos... %1 of %2").arg(_loadBatch->completedCount.load()).arg(_loadBatch->paths.size()));
+		hint = tr("Loading photos... %1 of %2").arg(_loadBatch->completedCount.load()).arg(_loadBatch->paths.size());
 	else if (_photos.empty())
-		_hintLabel->setText(tr("Drop images or folders onto the window to load them · Esc: close"));
+		hint = tr("Drop images or folders onto the window to load them · Esc: close");
 	else if (_calibrating)
 	{
 		QStringList progress;
@@ -1170,13 +1176,14 @@ void PhotoCompareWindow::updateHintText()
 				entry += tr(" (ref)");
 			progress.push_back(entry);
 		}
-		_hintLabel->setText(tr("Alignment: click the same two features in every photo · right-click: undo a point · Esc: cancel · %1")
-			.arg(progress.join("   ")));
+		hint = tr("Alignment: click the same two features in every photo · right-click: undo a point · Esc: cancel · %1")
+			.arg(progress.join(HintSeparator));
 	}
 	else if (_fullViewIndex >= 0)
-		_hintLabel->setText(tr("Full view %1/%2 · slider / Left,Right: switch photo · hold 1..%2: flicker · A: auto-align · Shift+drag: align region · D: difference · I: patch info · wheel: zoom · drag: pan · Alt+wheel / Alt+drag: adjust this photo · Ctrl+0 / Home: fit · Ctrl+1: actual px · R: reset · F / Esc: back to grid")
-			.arg(_fullViewIndex + 1).arg(_photos.size()));
+		hint = tr("Full view %1/%2 · slider / Left,Right: switch photo · hold 1..%2: flicker · A: auto-align · Shift+drag: align region · D: difference · I: patch info · wheel: zoom · drag: pan · Alt+wheel / Alt+drag: adjust this photo · Ctrl+0 / Home: fit · Ctrl+1: actual px · R: reset · F / Esc: back to grid")
+			.arg(_fullViewIndex + 1).arg(_photos.size());
 	else
-		_hintLabel->setText(tr("Wheel: zoom · drag: pan · Alt+wheel / Alt+drag: adjust one photo · A: auto-align · Shift+A: align by 2 clicks · Shift+drag: align region · hold 1..%1: flicker · D: difference · I: patch info · slider / F: full view · Ctrl+0 / Home / double-click: fit · Ctrl+1: actual px · R: reset · Esc: close")
-			.arg(_photos.size()));
+		hint = tr("Wheel: zoom · drag: pan · Alt+wheel / Alt+drag: adjust one photo · A: auto-align · Shift+A: align by 2 clicks · Shift+drag: align region · hold 1..%1: flicker · D: difference · I: patch info · slider / F: full view · Ctrl+0 / Home / double-click: fit · Ctrl+1: actual px · R: reset · Esc: close")
+			.arg(_photos.size());
+	_hintLabel->setText(wrappableOnlyAtSeparators(hint, HintSeparator));
 }
