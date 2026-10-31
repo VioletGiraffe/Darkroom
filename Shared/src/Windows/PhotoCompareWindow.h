@@ -100,6 +100,7 @@ private:
 	void addPhotosFromFiles(const QStringList& photoPaths);
 	void applyLoadedPhotoBatch(PhotoLoadBatch& batch);
 	void rebuildPaneGrid();
+	void updateSliderToPhotoCount();
 	void removePhotoFromComparison(int index);
 
 	[[nodiscard]] QRectF referenceSubjectRect() const;

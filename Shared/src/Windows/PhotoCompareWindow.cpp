@@ -68,6 +68,9 @@ namespace {
 // Each photo retains a full-resolution image and mipmap chain.
 constexpr qsizetype MaxImages = 50;
 
+constexpr int PhotoSliderStepWidth = 32;
+constexpr int PhotoSliderMaxWidth = 800;
+
 QPointF rotated(const QPointF& p, double angle)
 {
 	const double c = std::cos(angle), s = std::sin(angle);
@@ -431,7 +434,8 @@ PhotoCompareWindow::PhotoCompareWindow(const QStringList& photoPaths, QWidget* p
 	_slider->setFocusPolicy(Qt::NoFocus);
 	connect(_slider, &QSlider::sliderPressed, this, [this] { setFullViewIndex(_slider->value()); });
 	connect(_slider, &QSlider::valueChanged, this, [this](int value) { setFullViewIndex(value); });
-	toolbar->addWidget(_slider, 1);
+	toolbar->addWidget(_slider);
+	toolbar->addStretch(1);
 
 	_ignoreRotationCheck = new QCheckBox(tr("Ignore rotation"), this);
 	_ignoreRotationCheck->setToolTip(tr("Auto-align fits scale and offset only, treating any apparent rotation as spurious\n"
@@ -550,7 +554,7 @@ void PhotoCompareWindow::addPhotosFromFiles(const QStringList& photoPaths)
 	if (_photos.empty())
 	{
 		rebuildPaneGrid();
-		_slider->setEnabled(false);
+		updateSliderToPhotoCount();
 	}
 	updateHintText();
 
@@ -603,8 +607,7 @@ void PhotoCompareWindow::applyLoadedPhotoBatch(PhotoLoadBatch& batch)
 	}
 
 	rebuildPaneGrid();
-	_slider->setRange(0, std::max(0, static_cast<int>(_photos.size()) - 1));
-	_slider->setEnabled(!_photos.empty() && !_calibrating);
+	updateSliderToPhotoCount();
 	if (!_viewTouched)
 		fitView();
 	// Restore the normalized region only once a reference exists.
@@ -657,6 +660,17 @@ void PhotoCompareWindow::rebuildPaneGrid()
 		grid->setRowStretch(r, 1);
 }
 
+void PhotoCompareWindow::updateSliderToPhotoCount()
+{
+	const int photoCount = static_cast<int>(_photos.size());
+	{
+		const QSignalBlocker blocker(_slider); // A shrinking range clamps the value, which would open full view
+		_slider->setRange(0, std::max(0, photoCount - 1));
+	}
+	_slider->setFixedWidth(std::min(PhotoSliderStepWidth * std::max(photoCount, 2), PhotoSliderMaxWidth));
+	_slider->setEnabled(!_photos.empty() && !_calibrating);
+}
+
 void PhotoCompareWindow::removePhotoFromComparison(int index)
 {
 	const bool removedReference = index == _refIndex;
@@ -675,12 +689,7 @@ void PhotoCompareWindow::removePhotoFromComparison(int index)
 		--_refIndex;
 
 	rebuildPaneGrid();
-	{
-		const QSignalBlocker blocker(_slider);
-		_slider->setRange(0, std::max(0, static_cast<int>(_photos.size()) - 1));
-		_slider->setValue(std::min(_slider->value(), _slider->maximum()));
-	}
-	_slider->setEnabled(!_photos.empty() && !_calibrating);
+	updateSliderToPhotoCount();
 	if (removedReference && !_photos.empty())
 		resetToInitialState();
 	else
@@ -758,7 +767,18 @@ void PhotoCompareWindow::keyPressEvent(QKeyEvent* event)
 		else
 			autoAlignPhotos();
 	}
-	else if (key == Qt::Key_F || key == Qt::Key_Home || (ctrl && key == Qt::Key_0))
+	else if (key == Qt::Key_F && !event->isAutoRepeat() && !_photos.empty() && !_calibrating)
+	{
+		if (_fullViewIndex >= 0)
+			exitFullView();
+		else
+		{
+			const auto gridEnd = _paneWidgets.cbegin() + static_cast<int>(_photos.size());
+			const auto hoveredPane = std::find_if(_paneWidgets.cbegin(), gridEnd, [](const PhotoComparePane* pane) { return pane->underMouse(); });
+			setFullViewIndex(hoveredPane != gridEnd ? static_cast<int>(hoveredPane - _paneWidgets.cbegin()) : _slider->value());
+		}
+	}
+	else if (key == Qt::Key_Home || (ctrl && key == Qt::Key_0))
 		fitView();
 	else if (ctrl && key == Qt::Key_1)
 		zoomToActualPixels();
@@ -1154,9 +1174,9 @@ void PhotoCompareWindow::updateHintText()
 			.arg(progress.join("   ")));
 	}
 	else if (_fullViewIndex >= 0)
-		_hintLabel->setText(tr("Full view %1/%2 · slider / Left,Right: switch photo · hold 1..%2: flicker · A: auto-align · Shift+drag: align region · D: difference · I: patch info · wheel: zoom · drag: pan · Alt+wheel / Alt+drag: adjust this photo · F / Ctrl+0 / Home: fit · Ctrl+1: actual px · R: reset · Esc: back to grid")
+		_hintLabel->setText(tr("Full view %1/%2 · slider / Left,Right: switch photo · hold 1..%2: flicker · A: auto-align · Shift+drag: align region · D: difference · I: patch info · wheel: zoom · drag: pan · Alt+wheel / Alt+drag: adjust this photo · Ctrl+0 / Home: fit · Ctrl+1: actual px · R: reset · F / Esc: back to grid")
 			.arg(_fullViewIndex + 1).arg(_photos.size()));
 	else
-		_hintLabel->setText(tr("Wheel: zoom · drag: pan · Alt+wheel / Alt+drag: adjust one photo · A: auto-align · Shift+A: align by 2 clicks · Shift+drag: align region · hold 1..%1: flicker · D: difference · I: patch info · slider: full view · F / Ctrl+0 / Home / double-click: fit · Ctrl+1: actual px · R: reset · Esc: close")
+		_hintLabel->setText(tr("Wheel: zoom · drag: pan · Alt+wheel / Alt+drag: adjust one photo · A: auto-align · Shift+A: align by 2 clicks · Shift+drag: align region · hold 1..%1: flicker · D: difference · I: patch info · slider / F: full view · Ctrl+0 / Home / double-click: fit · Ctrl+1: actual px · R: reset · Esc: close")
 			.arg(_photos.size()));
 }
