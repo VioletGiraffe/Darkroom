@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793455143957,
+  "lastUpdate": 1793466725930,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -20131,6 +20131,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 827,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 344.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 85,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "2a9a3c76f96a88c568a563f35e79cb7d2f6f2429",
+          "message": "Decode timings: Pentax PEF and pixel-shift PEF, and Fujifilm lossy X-Trans RAF samples on all three machines. Backlog: multi-frame Pentax PEFs render only their first frame",
+          "timestamp": "2026-10-31T18:57:17+02:00",
+          "tree_id": "1c920cf6dbe9f21eb6d8476f2566184823fee120",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/2a9a3c76f96a88c568a563f35e79cb7d2f6f2429"
+        },
+        "date": 1793466723458,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 18825,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1596,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 32563,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6761,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7557.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5461,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 827.5,
             "unit": "KB"
           },
           {
