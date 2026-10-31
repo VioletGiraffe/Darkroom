@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793403595314,
+  "lastUpdate": 1793455143957,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -20062,6 +20062,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 84.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "2cfcbd327361c78ff444ac0bfc0e86d0b679cab6",
+          "message": "Image viewer previews: a JPEG predicted to decode in 100 ms or more gets a 1/8 preview in parallel with its full decode; a raw's embedded JPEG is fitted to the screen up to 1/2, else decoded whole; progressive and arithmetic-coded JPEGs are never reduced\n\nThe prediction is a running average of this machine's full JPEG decode time per megapixel, starting near a Raspberry Pi 4's.",
+          "timestamp": "2026-10-31T15:51:17+02:00",
+          "tree_id": "de04d5395b9933dcd44a8e31abd387c73e333345",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/2cfcbd327361c78ff444ac0bfc0e86d0b679cab6"
+        },
+        "date": 1793455139042,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 18830,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1596,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 32521,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6759.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7555,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5460,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 827,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 344.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 85,
             "unit": "KB"
           },
           {
