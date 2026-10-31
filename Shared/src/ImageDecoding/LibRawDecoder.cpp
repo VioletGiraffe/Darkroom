@@ -278,10 +278,12 @@ double cameraRenderingExposureEv(const LibRaw& raw)
 	return ev;
 }
 
+using SrgbCodeTable = std::array<uint8_t, 65536>; // indexed by LibRaw's 16-bit linear values
+
 // Maps LibRaw's linear output to sRGB codes through the tone curve of cameras' own JPEGs, fitted to the camera raw samples' embedded JPEGs.
 // Each channel goes through the curve, as in cameras: that also matches their saturation.
 // exposureGain scales the input; raw white stays white.
-std::array<uint8_t, 65536> toneCurveToSrgb(double exposureGain)
+SrgbCodeTable toneCurveToSrgb(double exposureGain)
 {
 	// A sigmoid: lifts midtones by about 1.2 EV and compresses the highlights
 	// toeOffset keeps the deepest shadows linear
@@ -293,7 +295,7 @@ std::array<uint8_t, 65536> toneCurveToSrgb(double exposureGain)
 	};
 	const double black = sigmoid(toeOffset), white = sigmoid(exposureGain + toeOffset);
 
-	std::array<uint8_t, 65536> codes{};
+	SrgbCodeTable codes{};
 	for (size_t i = 0; i < codes.size(); ++i)
 	{
 		const double linear = (sigmoid(static_cast<double>(i) / 65535 * exposureGain + toeOffset) - black) / (white - black);
@@ -378,7 +380,11 @@ DecodedImage decodeRaw(const QByteArray& file, RawRendering rawRendering, const 
 	if (image.isNull())
 		return { .error = outOfMemory };
 
-	const std::array<uint8_t, 65536> toSrgb = toneCurveToSrgb(std::exp2(cameraRenderingExposureEv(*raw)));
+	// Most raws have no exposure shift: their table is built once
+	static const SrgbCodeTable unshiftedToSrgb = toneCurveToSrgb(1.0);
+	std::optional<SrgbCodeTable> shiftedToSrgb;
+	const double exposureEv = cameraRenderingExposureEv(*raw); // exactly 0 when no part applies
+	const SrgbCodeTable& toSrgb = exposureEv == 0.0 ? unshiftedToSrgb : shiftedToSrgb.emplace(toneCurveToSrgb(std::exp2(exposureEv)));
 	for (int y = 0; y < height; ++y)
 	{
 		uchar* code = image.scanLine(y);
