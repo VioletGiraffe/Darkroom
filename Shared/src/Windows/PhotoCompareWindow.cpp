@@ -38,6 +38,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPoint>
 #include <QPolygonF>
 #include <QPromise>
 #include <QSettings>
@@ -115,6 +116,7 @@ protected:
 
 private:
 	[[nodiscard]] int photoIndex() const { return _index >= 0 ? _index : _owner._fullViewIndex; }
+	[[nodiscard]] int renderedPhotoIndex() const { return _owner._flickerIndex >= 0 ? _owner._flickerIndex : photoIndex(); }
 
 	void drawCaption(QPainter& painter, const PhotoCompareWindow::Photo& photo, int renderIndex) const;
 
@@ -125,7 +127,7 @@ private:
 	QPointF _lastDragPos;
 	bool _leftButtonDown = false;
 	bool _dragConfirmed = false;
-	bool _ctrlDrag = false;
+	int _draggedPhotoIndex = -1; // -1: the drag pans the view
 
 	// Subject-space anchoring keeps the selection attached to content while the view moves.
 	bool _aoiDrag = false;
@@ -137,7 +139,7 @@ void PhotoComparePane::paintEvent(QPaintEvent*)
 	QPainter painter(this);
 	painter.fillRect(rect(), Theme::current().thumbnailMatte);
 
-	const int renderIndex = _owner._flickerIndex >= 0 ? _owner._flickerIndex : photoIndex();
+	const int renderIndex = renderedPhotoIndex();
 	PhotoCompareWindow::Photo& photo = _owner._photos[renderIndex];
 
 	const auto drawPhoto = [&](PhotoCompareWindow::Photo& drawn) {
@@ -256,12 +258,15 @@ void PhotoComparePane::drawCaption(QPainter& painter, const PhotoCompareWindow::
 
 void PhotoComparePane::wheelEvent(QWheelEvent* event)
 {
-	const double steps = event->angleDelta().y() / 120.0;
+	const bool adjustPhoto = event->modifiers().testFlag(Qt::AltModifier);
+	// Qt on Windows reports Alt+wheel as horizontal scrolling.
+	const QPoint angleDelta = event->angleDelta();
+	const double steps = (adjustPhoto && angleDelta.y() == 0 ? angleDelta.x() : angleDelta.y()) / 120.0;
 	if (steps == 0.0)
 		return;
 	const double factor = std::pow(1.25, steps);
-	if (event->modifiers().testFlag(Qt::ControlModifier))
-		_owner.adjustPhotoScale(photoIndex(), factor, event->position());
+	if (adjustPhoto)
+		_owner.adjustPhotoScale(renderedPhotoIndex(), factor, event->position());
 	else
 		_owner.zoomView(factor, event->position());
 	event->accept();
@@ -281,7 +286,7 @@ void PhotoComparePane::mousePressEvent(QMouseEvent* event)
 	{
 		_leftButtonDown = true;
 		_dragConfirmed = false;
-		_ctrlDrag = event->modifiers().testFlag(Qt::ControlModifier);
+		_draggedPhotoIndex = event->modifiers().testFlag(Qt::AltModifier) ? renderedPhotoIndex() : -1;
 		_pressPos = _lastDragPos = event->position();
 	}
 	else if (event->button() == Qt::RightButton && _owner._calibrating)
@@ -306,8 +311,8 @@ void PhotoComparePane::mouseMoveEvent(QMouseEvent* event)
 	}
 	if (_dragConfirmed)
 	{
-		if (_ctrlDrag)
-			_owner.movePhotoOffset(photoIndex(), pos - _lastDragPos);
+		if (_draggedPhotoIndex >= 0)
+			_owner.movePhotoOffset(_draggedPhotoIndex, pos - _lastDragPos);
 		else
 			_owner.panView(pos - _lastDragPos);
 	}
@@ -1135,9 +1140,9 @@ void PhotoCompareWindow::updateHintText()
 			.arg(progress.join("   ")));
 	}
 	else if (_fullViewIndex >= 0)
-		_hintLabel->setText(tr("Full view %1/%2 · slider / Left,Right: switch photo · hold 1..%2: flicker · A: auto-align · Shift+drag: align region · D: difference · I: patch info · wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust this photo · F / Ctrl+0 / Home: fit · Ctrl+1: actual px · R: reset · Esc: back to grid")
+		_hintLabel->setText(tr("Full view %1/%2 · slider / Left,Right: switch photo · hold 1..%2: flicker · A: auto-align · Shift+drag: align region · D: difference · I: patch info · wheel: zoom · drag: pan · Alt+wheel / Alt+drag: adjust this photo · F / Ctrl+0 / Home: fit · Ctrl+1: actual px · R: reset · Esc: back to grid")
 			.arg(_fullViewIndex + 1).arg(_photos.size()));
 	else
-		_hintLabel->setText(tr("Wheel: zoom · drag: pan · Ctrl+wheel / Ctrl+drag: adjust one photo · A: auto-align · Shift+A: align by 2 clicks · Shift+drag: align region · hold 1..%1: flicker · D: difference · I: patch info · slider: full view · F / Ctrl+0 / Home / double-click: fit · Ctrl+1: actual px · R: reset · Esc: close")
+		_hintLabel->setText(tr("Wheel: zoom · drag: pan · Alt+wheel / Alt+drag: adjust one photo · A: auto-align · Shift+A: align by 2 clicks · Shift+drag: align region · hold 1..%1: flicker · D: difference · I: patch info · slider: full view · F / Ctrl+0 / Home / double-click: fit · Ctrl+1: actual px · R: reset · Esc: close")
 			.arg(_photos.size()));
 }
