@@ -17,3 +17,5 @@
   - JPEG XL DNG (DNG 1.7): LibRaw decodes it only through Adobe's DNG SDK.
   - Lossy DNG: needs LibRaw built with libjpeg; our build has none.
   - Nikon High Efficiency NEF (Z 8, Z 9, Z f, Z6III): JPEG XS-based; LibRaw has no decoder for it.
+- Pentax pixel-shift and HDR PEFs hold 4 and 3 raw frames; LibRaw renders only the first, so the half-size and full
+  renderings show one unmerged frame.

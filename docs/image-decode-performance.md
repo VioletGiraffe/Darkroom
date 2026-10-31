@@ -12,7 +12,7 @@ sources: libjpeg-turbo 3.2.0 and LibRaw 0.22.2, from vcpkg's source trees.
 | CPU | process pinned to the 6 P-cores, 12 logical CPUs | 4 Cortex-A72 at 1.8 GHz, `ondemand` governor; 1.8 GB RAM | 2 cores, 4 logical CPUs at 2.1 GHz, no turbo; AVX without AVX2, so libjpeg-turbo runs its SSE2 code; 16 GB RAM |
 | Build | MSVC `/O2`, vcpkg release libraries | libjpeg-turbo: Clang 22, CMake Release; LibRaw: GCC 14 `-O3` | the 12600KF's binaries |
 | LibRaw OpenMP threads | 12 | 4 | 4 |
-| Throttling | Windows power throttling disabled | none occurred: `vcgencmd get_throttled` 0x0, peak 71 °C | Windows power throttling disabled; 2.1 GHz at every check |
+| Throttling | Windows power throttling disabled | none occurred: `vcgencmd get_throttled` 0x0, peak 74 °C | Windows power throttling disabled; 2.1 GHz at every check |
 
 ## Method
 
@@ -32,7 +32,8 @@ The samples come from a collection of test-stack images, one per kind.
 
 - JPEG: 16 of 12,196 files. The collection is baseline 8-bit except 47 progressive files, with no CMYK, 12-bit,
   arithmetic-coded or lossless JPEGs. Labels give the subsampling, restart markers, megapixels and source.
-- Raw: 26 files, one per format and decoder, plus an iPhone ProRAW DNG. Number 23, a JPEG XL DNG, is missing: LibRaw cannot render it.
+- Raw: 29 files: one per format and decoder, plus an iPhone ProRAW DNG and a Pentax pixel-shift PEF. Numbers 23 and 28,
+  a JPEG XL DNG and a Nikon High Efficiency NEF, are missing: LibRaw cannot render them.
 
 ## JPEG: DCT-reduced decodes
 
@@ -206,6 +207,9 @@ Half size:
 | 25 ARW lossless S YCbCr | 3516x2344 | 225 | 1048 | 4.7 | 886 | 3.9 |
 | 26 CR2 sRAW YCbCr | 3000x2000 | 316 | 1362 | 4.3 | 1101 | 3.5 |
 | 27 DNG ProRAW linear | 8064x6048 | 2330 | 9520 | 4.1 | 8618 | 3.7 |
+| 29 PEF | 3112x2080 | 414 | 1604 | 3.9 | 1454 | 3.5 |
+| 30 PEF pixel shift 4 frames | 3112x2080 | 416 | 1620 | 3.9 | 1458 | 3.5 |
+| 31 RAF X-Trans lossy compressed | 3876x2589 | 398 | 2054 | 5.2 | 3024 | 7.6 |
 
 Full size:
 
@@ -237,13 +241,17 @@ Full size:
 | 25 ARW lossless S YCbCr | 3516x2344 | 224 | 1041 | 4.7 | 890 | 4.0 |
 | 26 CR2 sRAW YCbCr | 3000x2000 | 312 | 1374 | 4.4 | 1082 | 3.5 |
 | 27 DNG ProRAW linear | 8064x6048 | 2362 | 9533 | 4.0 | 8453 | 3.6 |
+| 29 PEF | 6224x4160 | 900 | 4046 | 4.5 | 4344 | 4.8 |
+| 30 PEF pixel shift 4 frames | 6224x4160 | 904 | 4058 | 4.5 | 4348 | 4.8 |
+| 31 RAF X-Trans lossy compressed | 7752x5178 | 3201 | 24678 | 7.7 | 27065 | 8.5 |
 
-- Over the files both rendered, the Pi is 4.2x slower than the 12600KF at half size and 5.2x at full size. Over all
-  files the 2310M is 4.1x and 5.7x slower, about the Pi's speed.
+- Over the files both rendered, the Pi is 4.2x slower than the 12600KF at half size and 5.4x at full size. Over all
+  files the 2310M is 4.1x and 5.9x slower, about the Pi's speed.
 - Unpacking is mostly 3-5x slower on the Pi, 8-10x for uncompressed data (06, 21); `dcraw_process` is 4-6x slower,
-  except X-Trans full renders at 8.2x.
-- On the 2310M unpacking is mostly 3-4x slower, Fujifilm's compressed formats (11, 13) 7-9x; `dcraw_process` is 4-8x
-  slower.
+  except X-Trans full renders at 8.0-8.2x.
+- On the 2310M unpacking is mostly 3-4x slower, Fujifilm's compressed formats (11, 13, 31) 7-9x; `dcraw_process` is
+  4-7x slower, X-Trans full renders 8-9x.
+- The pixel-shift PEF (30) holds 4 raw frames: LibRaw renders only the first, in the time of a single-frame PEF (29).
 - Under the Pi's 1.4 GB cap renders up to 51 MP fit. At 1.6 GB the 102 MP 3FR fits, while the 102 MP GFX100 RAF, the
   IIQ, the RW2 and the NEFX still fail: the memory needed depends on the decoder, not on the pixel count alone.
 - Uncapped, with zram and then a disk swapfile as swap: the GFX100 RAF renders full size in 15 s with almost no swapping,
