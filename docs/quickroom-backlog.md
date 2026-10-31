@@ -13,3 +13,9 @@
 - Deduplicate the logging/message-handler block shared verbatim by both apps' `main.cpp`.
 - SVG opens through the raster image path; zooming should re-render from the vector.
 - AVIF, HEIC and JPEG XL are unsupported; all need the `kimageformats` plugins.
+- Camera raws LibRaw cannot render:
+  - JPEG XL DNG (DNG 1.7): LibRaw decodes it only through Adobe's DNG SDK.
+  - Lossy DNG: needs LibRaw built with libjpeg; our build has none.
+  - Nikon High Efficiency NEF (Z 8, Z 9, Z f, Z6III): JPEG XS-based; LibRaw has no decoder for it.
+- In the half-size and full renderings, the viewer replaces a raw's embedded preview with the error when LibRaw fails
+  to render the raw. That preview can be full size, as in Nikon High Efficiency NEFs and a Galaxy S22's JPEG XL DNG.
