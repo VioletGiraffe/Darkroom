@@ -260,6 +260,24 @@ private:
 	double _reported = 0.0; // never decreases
 };
 
+// The exposure the camera adds to the raw in its own rendering, in EV; LibRaw parses each part, applying them is the caller's to do
+double cameraRenderingExposureEv(const LibRaw& raw)
+{
+	double ev = 0.0;
+	if (const float baselineEv = raw.imgdata.color.dng_levels.baseline_exposure; baselineEv != LibRawNoBaselineExposure)
+		ev += baselineEv;
+
+	// Fujifilm's DR200 and DR400 expose the raw 1 and 2 EV under; DynamicRangeSetting 0 is automatic, 1 manual
+	const libraw_fuji_info_t& fuji = raw.imgdata.makernotes.fuji;
+	const int dynamicRangePercent = fuji.DynamicRangeSetting == 0 ? fuji.AutoDynamicRange : fuji.DynamicRangeSetting == 1 ? fuji.DevelopmentDynamicRange : 0;
+	if (dynamicRangePercent > 100 && dynamicRangePercent <= 400)
+		ev += std::log2(dynamicRangePercent / 100.0);
+
+	// Canon's Highlight Tone Priority exposes the raw under by its level in EV, as LibRaw's ExposureCalibrationShift counts it
+	ev += raw.imgdata.makernotes.canon.HighlightTonePriority;
+	return ev;
+}
+
 // Maps LibRaw's linear output to sRGB codes through the tone curve of cameras' own JPEGs, fitted to the camera raw samples' embedded JPEGs.
 // Each channel goes through the curve, as in cameras: that also matches their saturation.
 // exposureGain scales the input; raw white stays white.
@@ -267,7 +285,7 @@ std::array<uint8_t, 65536> toneCurveToSrgb(double exposureGain)
 {
 	// A sigmoid: lifts midtones by about 1.2 EV and compresses the highlights
 	// toeOffset keeps the deepest shadows linear
-	constexpr double exponent = 1.75, halfInput = 0.222, toeOffset = 0.005;
+	constexpr double exponent = 1.75, halfInput = 0.231, toeOffset = 0.005;
 	const double halfPowered = std::pow(halfInput, exponent);
 	const auto sigmoid = [&](double v) {
 		const double powered = std::pow(v, exponent);
@@ -360,9 +378,7 @@ DecodedImage decodeRaw(const QByteArray& file, RawRendering rawRendering, const 
 	if (image.isNull())
 		return { .error = outOfMemory };
 
-	// A DNG's BaselineExposure belongs to its intended rendering; LibRaw parses it, applying it is the caller's to do
-	const float baselineEv = raw->imgdata.color.dng_levels.baseline_exposure;
-	const std::array<uint8_t, 65536> toSrgb = toneCurveToSrgb(baselineEv == LibRawNoBaselineExposure ? 1.0 : std::exp2(baselineEv));
+	const std::array<uint8_t, 65536> toSrgb = toneCurveToSrgb(std::exp2(cameraRenderingExposureEv(*raw)));
 	for (int y = 0; y < height; ++y)
 	{
 		uchar* code = image.scanLine(y);
