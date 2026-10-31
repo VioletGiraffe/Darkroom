@@ -77,6 +77,11 @@ wired up yet). Match this for new UI strings:
 - Leave un-wrapped: `QSettings` keys, stylesheet/QSS, object names, ffmpeg args/paths, `QTime` format codes,
   JSON keys, pure separators (`", "`, `" - "`, `"<br>"`), and iconic single glyphs (★, ⏳, ↑, ↓, ×).
 
+## Qt images
+
+Read [qtutils' image-quirks page](../qtutils/docs/qt-image-quirks.md) before querying a `QImage`'s layout: some
+queries that look like metadata scan the pixels.
+
 ## Qt styling / QSS
 
 Read [qtutils' styling-quirks page](../qtutils/docs/qt-styling-quirks.md) before any `QComboBox` or general
