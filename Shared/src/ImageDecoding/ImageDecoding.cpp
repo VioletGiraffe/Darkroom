@@ -205,20 +205,28 @@ DecodedImage decode(const QByteArray& encoded)
 	return decodeWithQt(encoded);
 }
 
-std::optional<JpegReduction> planJpegReduction(const EncodedImage& encoded, QSize uprightBox)
+QSize readReducibleJpegUprightSize(const EncodedImage& encoded)
 {
-	if (!encoded.error.isEmpty() || encoded.rawRendering || uprightBox.isEmpty() || !isJpeg(encoded.bytes))
-		return std::nullopt;
+	if (!encoded.error.isEmpty() || encoded.rawRendering || !isJpeg(encoded.bytes))
+		return {};
 
-	const QSize stored = readJpegStoredSize(encoded.bytes);
-	if (stored.isEmpty())
-		return std::nullopt;
+	const std::optional<JpegHeader> header = readJpegHeader(encoded.bytes);
+	if (!header || header->progressive || header->arithmetic || header->storedSize.isEmpty())
+		return {};
 
 	const QImageIOHandler::Transformations orientation = encoded.orientation ? *encoded.orientation : readJpegExif(encoded.bytes).orientation;
-	const QSize upright = orientation.testFlag(QImageIOHandler::TransformationRotate90) ? stored.transposed() : stored;
+	return orientation.testFlag(QImageIOHandler::TransformationRotate90) ? header->storedSize.transposed() : header->storedSize;
+}
+
+int fittedScaleEighths(QSize uprightSize, QSize uprightBox)
+{
+	assert_and_return_r(!uprightSize.isEmpty(), 8);
+	if (uprightBox.isEmpty())
+		return 8;
+
 	// Rounded up: a side scaled by n/8 is rounded up too, so the decode covers the fitted image
-	const qreal fitScale = std::min((qreal)uprightBox.width() / upright.width(), (qreal)uprightBox.height() / upright.height());
-	return JpegReduction{ .uprightSize = upright, .scaleEighths = std::clamp(qCeil(fitScale * 8), 1, 8) };
+	const qreal fitScale = std::min((qreal)uprightBox.width() / uprightSize.width(), (qreal)uprightBox.height() / uprightSize.height());
+	return std::clamp(qCeil(fitScale * 8), 1, 8);
 }
 
 DecodedImage decodeReduced(const EncodedImage& encoded, int scaleEighths)

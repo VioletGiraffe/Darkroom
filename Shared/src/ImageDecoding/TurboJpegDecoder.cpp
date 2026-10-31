@@ -102,14 +102,18 @@ std::optional<DecodedImage> decodeJpeg(const QByteArray& encoded, int scaleEight
 	return DecodedImage{ .image = std::move(image), .orientation = exif.orientation, .iccProfile = std::move(iccProfile), .format = FormatName };
 }
 
-QSize readJpegStoredSize(const QByteArray& encoded)
+std::optional<JpegHeader> readJpegHeader(const QByteArray& encoded)
 {
 	const std::unique_ptr<void, decltype(&tj3Destroy)> handle{ tj3Init(TJINIT_DECOMPRESS), &tj3Destroy };
 	if (!handle || tj3DecompressHeader(handle.get(), reinterpret_cast<const unsigned char*>(encoded.constData()), static_cast<size_t>(encoded.size())) != 0
 		|| isLeftToQt(handle.get()))
-		return {};
+		return std::nullopt;
 
-	return QSize{ tj3Get(handle.get(), TJPARAM_JPEGWIDTH), tj3Get(handle.get(), TJPARAM_JPEGHEIGHT) };
+	return JpegHeader{
+		.storedSize = QSize{ tj3Get(handle.get(), TJPARAM_JPEGWIDTH), tj3Get(handle.get(), TJPARAM_JPEGHEIGHT) },
+		.progressive = tj3Get(handle.get(), TJPARAM_PROGRESSIVE) == 1,
+		.arithmetic = tj3Get(handle.get(), TJPARAM_ARITHMETIC) == 1,
+	};
 }
 
 } // namespace ImageDecoding

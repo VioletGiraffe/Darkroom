@@ -29,8 +29,15 @@ which also runs work on the calling thread - the GUI thread is blocked for the d
 
 Loading never blocks the GUI thread. `ImageViewerLoading` reads and decodes on the pools; the window hands the results to
 the widget through a `CImageViewerWidget::PendingImage`, so the widget stays free of threads.
-- A preview comes first where the final image takes longer: a JPEG decoded DCT-reduced to the screen's size, or a camera
-  raw's embedded JPEG while LibRaw renders the raw. Other formats show only the final image.
+- A preview comes first where the final image takes longer, decoded in parallel with it:
+  - a JPEG whose full decode is predicted at 100 ms or more - a 1/8 DCT-reduced decode, the fastest: the full decode
+    soon replaces it, but on a slow machine a viewer flicking through files may move on first. The prediction is the
+    megapixels times this machine's running average for full JPEG decodes.
+  - a camera raw LibRaw renders - its embedded JPEG, fitted to the screen where that takes 1/2 or less, else decoded
+    whole: it stays up while LibRaw renders, and above 1/2 a reduced decode is no cheaper.
+  - Progressive and arithmetic-coded JPEGs are never reduced: entropy decoding dominates at every scale.
+- Other formats show only the final image. Decode times at each JPEG scale and for LibRaw renders:
+  [image-decode-performance.md](../image-decode-performance.md).
 - The widget lays a preview out at the final image's size, so zoom, Actual pixels and the info strip already refer to the
   final image, and its arrival changes only sharpness.
 - While LibRaw renders a raw, the viewer shows its progress. The fraction comes from per-stage weights in

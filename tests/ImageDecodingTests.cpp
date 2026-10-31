@@ -33,7 +33,7 @@ using namespace ImageDecoding;
 
 namespace {
 
-enum class JpegKind { Rgb, Gray, Cmyk, Ycck, Rgb12Bit };
+enum class JpegKind { Rgb, Gray, Cmyk, Ycck, Rgb12Bit, Progressive, Arithmetic };
 
 // Each fills a half of every test JPEG; the halves meet on a block boundary, so both stay flat after compression
 constexpr QRgb LeftColor = qRgb(200, 30, 40);
@@ -64,6 +64,10 @@ constexpr QSize JpegSize{ 64, 32 };
 	REQUIRE(tj3Set(handle.get(), TJPARAM_SUBSAMP, gray ? TJSAMP_GRAY : TJSAMP_444) == 0);
 	if (cmyk)
 		REQUIRE(tj3Set(handle.get(), TJPARAM_COLORSPACE, kind == JpegKind::Cmyk ? TJCS_CMYK : TJCS_YCCK) == 0);
+	if (kind == JpegKind::Progressive)
+		REQUIRE(tj3Set(handle.get(), TJPARAM_PROGRESSIVE, 1) == 0);
+	if (kind == JpegKind::Arithmetic)
+		REQUIRE(tj3Set(handle.get(), TJPARAM_ARITHMETIC, 1) == 0);
 
 	const int pixelFormat = gray ? TJPF_GRAY : cmyk ? TJPF_CMYK : TJPF_RGB;
 	// scale: 16 maps 8-bit levels onto 12-bit samples
@@ -298,55 +302,54 @@ TEST_CASE("decodeJpeg: DCT scaling rounds each side up", "[imagedecoding]")
 		REQUIRE(showsBothHalves(decoded->image));
 	}
 
-	REQUIRE(readJpegStoredSize(jpeg) == JpegSize);
-	REQUIRE(readJpegStoredSize(encodeJpeg(JpegKind::Cmyk)).isEmpty());
-	REQUIRE(readJpegStoredSize(jpeg.first(3) + QByteArray(64, '\x55')).isEmpty());
+	const std::optional<JpegHeader> header = readJpegHeader(jpeg);
+	REQUIRE(header.has_value());
+	REQUIRE(header->storedSize == JpegSize);
+	REQUIRE_FALSE(header->progressive);
+	REQUIRE_FALSE(header->arithmetic);
+	REQUIRE(readJpegHeader(encodeJpeg(JpegKind::Progressive))->progressive);
+	REQUIRE(readJpegHeader(encodeJpeg(JpegKind::Arithmetic))->arithmetic);
+	REQUIRE_FALSE(readJpegHeader(encodeJpeg(JpegKind::Cmyk)).has_value());
+	REQUIRE_FALSE(readJpegHeader(jpeg.first(3) + QByteArray(64, '\x55')).has_value());
 }
 
-TEST_CASE("ImageDecoding::planJpegReduction: the smallest scale covering the box", "[imagedecoding]")
+TEST_CASE("ImageDecoding::readReducibleJpegUprightSize", "[imagedecoding]")
 {
-	const QByteArray jpeg = encodeJpeg(JpegKind::Rgb); // 64x32
+	const QByteArray jpeg = encodeJpeg(JpegKind::Rgb);
+	REQUIRE(readReducibleJpegUprightSize(EncodedImage{ .bytes = jpeg }) == JpegSize);
 
+	SECTION("upright: EXIF's orientation, or the EncodedImage's in its place")
+	{
+		const QByteArray rotated = withExifOrientation(jpeg, 6);
+		REQUIRE(readReducibleJpegUprightSize(EncodedImage{ .bytes = rotated }) == JpegSize.transposed());
+		REQUIRE(readReducibleJpegUprightSize(EncodedImage{ .bytes = rotated, .orientation = QImageIOHandler::TransformationNone }) == JpegSize);
+	}
+
+	SECTION("empty for what decode() does not read through libjpeg-turbo, and for progressive and arithmetic-coded JPEGs")
+	{
+		REQUIRE(readReducibleJpegUprightSize(EncodedImage{ .bytes = encodeJpeg(JpegKind::Cmyk) }).isEmpty());
+		REQUIRE(readReducibleJpegUprightSize(EncodedImage{ .bytes = jpeg, .rawRendering = RawRendering::HalfSize }).isEmpty());
+		REQUIRE(readReducibleJpegUprightSize(EncodedImage{ .error = "read failed" }).isEmpty());
+		REQUIRE(readReducibleJpegUprightSize(EncodedImage{ .bytes = QByteArray{ "not an image" } }).isEmpty());
+		REQUIRE(readReducibleJpegUprightSize(EncodedImage{ .bytes = encodeJpeg(JpegKind::Progressive) }).isEmpty());
+		REQUIRE(readReducibleJpegUprightSize(EncodedImage{ .bytes = encodeJpeg(JpegKind::Arithmetic) }).isEmpty());
+	}
+}
+
+TEST_CASE("ImageDecoding::fittedScaleEighths: the smallest scale covering the box", "[imagedecoding]")
+{
 	SECTION("the fit scale rounded up to eighths")
 	{
-		const std::optional<JpegReduction> quarter = planJpegReduction(EncodedImage{ .bytes = jpeg }, QSize{ 100, 8 });
-		REQUIRE(quarter.has_value());
-		REQUIRE(quarter->uprightSize == JpegSize);
-		REQUIRE(quarter->scaleEighths == 2);
-
-		const std::optional<JpegReduction> roundedUp = planJpegReduction(EncodedImage{ .bytes = jpeg }, QSize{ 17, 100 });
-		REQUIRE(roundedUp.has_value());
-		REQUIRE(roundedUp->scaleEighths == 3);
+		REQUIRE(fittedScaleEighths(JpegSize, QSize{ 100, 8 }) == 2);
+		REQUIRE(fittedScaleEighths(JpegSize, QSize{ 17, 100 }) == 3);
+		REQUIRE(fittedScaleEighths(JpegSize, JpegSize.transposed()) == 4);
 	}
 
 	SECTION("never below 1/8 or above 1")
 	{
-		REQUIRE(planJpegReduction(EncodedImage{ .bytes = jpeg }, QSize{ 1, 1 })->scaleEighths == 1);
-		REQUIRE(planJpegReduction(EncodedImage{ .bytes = jpeg }, QSize{ 1000, 1000 })->scaleEighths == 8);
-	}
-
-	SECTION("the box is upright: EXIF's orientation, or the EncodedImage's in its place")
-	{
-		const QByteArray rotated = withExifOrientation(jpeg, 6);
-		const QSize portraitBox = JpegSize.transposed();
-		const std::optional<JpegReduction> fromExif = planJpegReduction(EncodedImage{ .bytes = rotated }, portraitBox);
-		REQUIRE(fromExif.has_value());
-		REQUIRE(fromExif->uprightSize == JpegSize.transposed());
-		REQUIRE(fromExif->scaleEighths == 8);
-
-		const std::optional<JpegReduction> fromRaw = planJpegReduction(EncodedImage{ .bytes = rotated, .orientation = QImageIOHandler::TransformationNone }, portraitBox);
-		REQUIRE(fromRaw.has_value());
-		REQUIRE(fromRaw->uprightSize == JpegSize);
-		REQUIRE(fromRaw->scaleEighths == 4);
-	}
-
-	SECTION("empty for what decode() does not read through libjpeg-turbo")
-	{
-		REQUIRE_FALSE(planJpegReduction(EncodedImage{ .bytes = encodeJpeg(JpegKind::Cmyk) }, QSize{ 8, 8 }).has_value());
-		REQUIRE_FALSE(planJpegReduction(EncodedImage{ .bytes = jpeg, .rawRendering = RawRendering::HalfSize }, QSize{ 8, 8 }).has_value());
-		REQUIRE_FALSE(planJpegReduction(EncodedImage{ .error = "read failed" }, QSize{ 8, 8 }).has_value());
-		REQUIRE_FALSE(planJpegReduction(EncodedImage{ .bytes = QByteArray{ "not an image" } }, QSize{ 8, 8 }).has_value());
-		REQUIRE_FALSE(planJpegReduction(EncodedImage{ .bytes = jpeg }, QSize{}).has_value());
+		REQUIRE(fittedScaleEighths(JpegSize, QSize{ 1, 1 }) == 1);
+		REQUIRE(fittedScaleEighths(JpegSize, QSize{ 1000, 1000 }) == 8);
+		REQUIRE(fittedScaleEighths(JpegSize, QSize{}) == 8);
 	}
 }
 

@@ -75,15 +75,14 @@ using RawRenderProgressHandler = std::function<bool (double fraction)>;
 [[nodiscard]] DecodedImage decode(const QByteArray& encoded);
 void applyOrientation(QImage& image, QImageIOHandler::Transformations orientation);
 
-// A JPEG decode reduced by libjpeg-turbo's DCT scaling
-struct JpegReduction {
-	QSize uprightSize; // the full decode's, turned upright
-	int scaleEighths;  // 1 to 8: the reduced decode's scale, in eighths
-};
-// Empty unless encoded is a JPEG, a camera raw's preview included, that decode() reads through libjpeg-turbo.
-// scaleEighths is the smallest whose decode is at least as large as the full image fitted into uprightBox.
-[[nodiscard]] std::optional<JpegReduction> planJpegReduction(const EncodedImage& encoded, QSize uprightBox);
-// As decode(), at scaleEighths/8 of each side. Requires a JPEG planJpegReduction() accepts.
+// The full decode's size, turned upright, from the headers only.
+// Empty unless a DCT-reduced decode of encoded saves time: a JPEG, a camera raw's preview included, that decode() reads
+// through libjpeg-turbo, neither progressive nor arithmetic-coded: entropy decoding dominates those at every scale.
+[[nodiscard]] QSize readReducibleJpegUprightSize(const EncodedImage& encoded);
+// 1 to 8: the smallest DCT scale, in eighths, whose decode is at least as large as uprightSize fitted into uprightBox.
+// 8 for an empty uprightBox.
+[[nodiscard]] int fittedScaleEighths(QSize uprightSize, QSize uprightBox);
+// As decode(), at scaleEighths/8 of each side. Requires a JPEG readReducibleJpegUprightSize() accepts.
 [[nodiscard]] DecodedImage decodeReduced(const EncodedImage& encoded, int scaleEighths);
 
 // The image's size once turned upright, read from the file's headers only; empty when they do not state it.

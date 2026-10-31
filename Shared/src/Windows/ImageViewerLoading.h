@@ -33,9 +33,11 @@ struct Stage {
 	QString error;
 };
 
-// Previews come first where the final image takes longer: a JPEG's DCT-reduced decode that still covers uprightBox, and a
-// camera raw's embedded preview while LibRaw renders the raw. Progress comes, in any order with a preview, while LibRaw renders.
-// Then exactly one of Final, Animated or Failed.
+// A preview decodes in parallel with the final image where that takes longer:
+//   a JPEG whose full decode this machine is predicted to take 100 ms or more - at 1/8;
+//   a camera raw's embedded JPEG while LibRaw renders the raw - fitted to uprightBox where that is 1/2 or less, else whole.
+// Progress comes, in any order with a preview, while LibRaw renders.
+// Exactly one of Final, Animated or Failed ends the load; a preview may still arrive after it.
 [[nodiscard]] AsyncRequest start(const QString& path, ImageDecoding::RawRendering rawRendering, QSize uprightBox, QObject* context,
 	std::function<void(Stage)> done);
 
