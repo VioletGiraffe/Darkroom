@@ -112,7 +112,7 @@ protected:
 	void mouseReleaseEvent(QMouseEvent* event) override;
 	void mouseDoubleClickEvent(QMouseEvent* event) override;
 	void contextMenuEvent(QContextMenuEvent* event) override;
-	void resizeEvent(QResizeEvent* event) override { QWidget::resizeEvent(event); _owner.onPaneResized(); }
+	void resizeEvent(QResizeEvent* event) override { QWidget::resizeEvent(event); _owner.adaptViewToViewportSize(); }
 
 private:
 	[[nodiscard]] int photoIndex() const { return _index >= 0 ? _index : _owner._fullViewIndex; }
@@ -839,6 +839,11 @@ const QImage& PhotoCompareWindow::imageForScale(Photo& photo, double effectiveSc
 	return mip;
 }
 
+const QWidget* PhotoCompareWindow::activeViewport() const
+{
+	return _fullViewIndex >= 0 ? _fullPane : _paneWidgets.front();
+}
+
 void PhotoCompareWindow::zoomView(double factor, const QPointF& widgetAnchor)
 {
 	const double newZoom = std::clamp(_viewZoom * factor, 0.01, 100.0);
@@ -860,9 +865,10 @@ void PhotoCompareWindow::fitView()
 {
 	if (_photos.empty())
 		return;
-	const QSizeF paneSize = (_fullViewIndex >= 0 ? _fullPane : _paneWidgets[0])->size();
+	const QSizeF paneSize = activeViewport()->size();
 	if (paneSize.isEmpty())
 		return;
+	_viewportSize = paneSize;
 	const QRectF subjectRect = referenceSubjectRect();
 	_viewZoom = std::min(paneSize.width() / subjectRect.width(), paneSize.height() / subjectRect.height());
 	_viewPan = QPointF((paneSize.width() - _viewZoom * subjectRect.width()) / 2.0,
@@ -875,7 +881,7 @@ void PhotoCompareWindow::zoomToActualPixels()
 {
 	if (_photos.empty())
 		return;
-	const QWidget* pane = _fullViewIndex >= 0 ? _fullPane : _paneWidgets.front();
+	const QWidget* pane = activeViewport();
 	const QSizeF paneSize = pane->size();
 	if (paneSize.isEmpty())
 		return;
@@ -1071,7 +1077,7 @@ void PhotoCompareWindow::setFullViewIndex(int index)
 	_fullViewIndex = index;
 	_slider->setValue(index);
 	if (entering)
-		switchViewportPage(1, _paneWidgets[0]->size(), _viewStack->widget(0)->size());
+		switchViewportPage(1);
 	else
 	{
 		updateHintText();
@@ -1084,17 +1090,13 @@ void PhotoCompareWindow::exitFullView()
 	if (_fullViewIndex < 0)
 		return;
 	_fullViewIndex = -1;
-	switchViewportPage(0, _fullPane->size(), _paneWidgets[0]->size());
+	switchViewportPage(0);
 }
 
-void PhotoCompareWindow::switchViewportPage(int page, const QSizeF& oldViewportSize, const QSizeF& newViewportSize)
+void PhotoCompareWindow::switchViewportPage(int page)
 {
 	_viewStack->setCurrentIndex(page);
-	// Preserve the center for a user-positioned view; otherwise keep fitting automatically.
-	if (_viewTouched)
-		_viewPan += QPointF(newViewportSize.width() - oldViewportSize.width(), newViewportSize.height() - oldViewportSize.height()) / 2.0;
-	else
-		fitView();
+	adaptViewToViewportSize();
 	updateHintText();
 	updateAllPanes();
 }
@@ -1106,10 +1108,22 @@ void PhotoCompareWindow::setDifferenceMode(bool difference)
 	updateAllPanes();
 }
 
-void PhotoCompareWindow::onPaneResized()
+void PhotoCompareWindow::adaptViewToViewportSize()
 {
+	if (_photos.empty())
+		return;
+	const QSizeF viewportSize = activeViewport()->size();
+	if (viewportSize == _viewportSize)
+		return;
 	if (!_viewTouched)
+	{
 		fitView();
+		return;
+	}
+	// A stale size read at a page switch is corrected by the resize that follows: the shifts add up.
+	_viewPan += QPointF(viewportSize.width() - _viewportSize.width(), viewportSize.height() - _viewportSize.height()) / 2.0;
+	_viewportSize = viewportSize;
+	updateAllPanes();
 }
 
 void PhotoCompareWindow::updateAllPanes()

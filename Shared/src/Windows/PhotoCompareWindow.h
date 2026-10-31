@@ -9,6 +9,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QImage>
 #include <QPointF>
 #include <QRectF>
+#include <QSizeF>
 #include <QStringList>
 #include <QWidget>
 RESTORE_COMPILER_WARNINGS
@@ -108,6 +109,9 @@ private:
 	void setDefaultAlignment(Photo& photo);
 	void resetToInitialState();
 
+	// The full-view pane, or grid pane 0 standing for all the equally sized grid panes.
+	[[nodiscard]] const QWidget* activeViewport() const;
+
 	void zoomView(double factor, const QPointF& widgetAnchor);
 	void panView(const QPointF& widgetDelta);
 	void fitView();
@@ -129,13 +133,12 @@ private:
 
 	void setFullViewIndex(int index);
 	void exitFullView();
-	// Switches _viewStack to 'page', compensating the shared view for the viewport size change: a touched
-	// view keeps its center subject point, an untouched one re-fits.
-	void switchViewportPage(int page, const QSizeF& oldViewportSize, const QSizeF& newViewportSize);
+	void switchViewportPage(int page);
 
 	void setDifferenceMode(bool difference);
 
-	void onPaneResized();
+	// On a viewport size change, a touched view keeps its center subject point and an untouched one re-fits.
+	void adaptViewToViewportSize();
 	void updateAllPanes();
 	void updateHintText();
 
@@ -154,6 +157,7 @@ private:
 
 	double _viewZoom = 1.0;
 	QPointF _viewPan;
+	QSizeF _viewportSize; // The activeViewport() size _viewPan was computed for
 	QRectF _alignAoi;
 	int _flickerIndex = -1;
 	int _fullViewIndex = -1;
