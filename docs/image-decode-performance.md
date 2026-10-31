@@ -174,7 +174,7 @@ Decode, with each scale as a fraction of the arithmetic-coded full decode:
 
 ## Camera raw: LibRaw renders
 
-Total time from `unpack` through `copy_mem_image`, in ms. Linear and monochrome raws (08, 18, 19, 20, 25, 26, 27) have no color
+Total time from `unpack` through the copy out of LibRaw, in ms. Linear and monochrome raws (08, 18, 19, 20, 25, 26, 27) have no color
 filter array: their half-size rendering is full size.
 
 Half size:

@@ -68,10 +68,11 @@ The directories:
   results to the GUI thread and cancels them. UI-free.
 - `ImageDecoding/` - image loading. Camera raws, chosen by extension, go through LibRaw: thumbnails use the largest
   embedded JPEG preview, the viewer and photo compare the shared raw rendering setting (that preview, or LibRaw's
-  half-size or full rendering). A raw without a JPEG preview gets the half-size rendering in its place. Other files
-  are routed by content: JPEG through libjpeg-turbo, every other format through Qt's image plugins. Reading and
-  decoding are separate calls, for the I/O and CPU pools. For the viewer's previews, a JPEG decodes DCT-reduced, and a
-  raw rendered by LibRaw hands over its embedded JPEG before the whole file is read. A LibRaw rendering reports its
+  half-size or full rendering). A raw without a JPEG preview gets the half-size rendering in its place. LibRaw's linear
+  output goes through our tone curve, fitted to cameras' own JPEGs, after a DNG's BaselineExposure. Other files are
+  routed by content: JPEG through libjpeg-turbo, every other format through Qt's image plugins. Reading and decoding
+  are separate calls, for the I/O and CPU pools. For the viewer's previews, a JPEG decodes DCT-reduced, and a raw
+  rendered by LibRaw hands over its embedded JPEG before the whole file is read. A LibRaw rendering reports its
   progress and can be abandoned between its stages. `readUprightImageSize` reads only the headers, for layouts sized
   before decoding. UI-free.
 - `UiComponents/` - widgets reused by more than one window.

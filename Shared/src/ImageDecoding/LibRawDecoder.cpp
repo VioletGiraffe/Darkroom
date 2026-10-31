@@ -9,6 +9,7 @@ RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -22,6 +23,9 @@ RESTORE_COMPILER_WARNINGS
 namespace ImageDecoding {
 
 namespace {
+
+// dng_levels.baseline_exposure for a raw without the DNG tag; compared exactly, as LibRaw assigns this value
+constexpr float LibRawNoBaselineExposure = -999.f;
 
 // LibRaw's input, with the stdio semantics LibRaw expects; seeks clamp the position to the file
 class BufferedReaderStream final : public LibRaw_abstract_datastream
@@ -256,6 +260,31 @@ private:
 	double _reported = 0.0; // never decreases
 };
 
+// Maps LibRaw's linear output to sRGB codes through the tone curve of cameras' own JPEGs, fitted to the camera raw samples' embedded JPEGs.
+// Each channel goes through the curve, as in cameras: that also matches their saturation.
+// exposureGain scales the input; raw white stays white.
+std::array<uint8_t, 65536> toneCurveToSrgb(double exposureGain)
+{
+	// A sigmoid: lifts midtones by about 1.2 EV and compresses the highlights
+	// toeOffset keeps the deepest shadows linear
+	constexpr double exponent = 1.75, halfInput = 0.222, toeOffset = 0.005;
+	const double halfPowered = std::pow(halfInput, exponent);
+	const auto sigmoid = [&](double v) {
+		const double powered = std::pow(v, exponent);
+		return powered / (powered + halfPowered);
+	};
+	const double black = sigmoid(toeOffset), white = sigmoid(exposureGain + toeOffset);
+
+	std::array<uint8_t, 65536> codes{};
+	for (size_t i = 0; i < codes.size(); ++i)
+	{
+		const double linear = (sigmoid(static_cast<double>(i) / 65535 * exposureGain + toeOffset) - black) / (white - black);
+		const double encoded = linear <= 0.0031308 ? 12.92 * linear : 1.055 * std::pow(linear, 1 / 2.4) - 0.055;
+		codes[i] = static_cast<uint8_t>(std::lround(encoded * 255));
+	}
+	return codes;
+}
+
 } // namespace
 
 std::optional<EncodedImage> readRawPreview(thin_io::buffered_reader& file, RawRendering rawRendering, QSize* uprightRenderSize)
@@ -307,9 +336,6 @@ DecodedImage decodeRaw(const QByteArray& file, RawRendering rawRendering, const 
 	libraw_output_params_t& params = raw->imgdata.params;
 	params.use_camera_wb = 1;
 	params.half_size = rawRendering == RawRendering::HalfSize;
-	// The sRGB tone curve, matching the sRGB primaries LibRaw outputs by default; LibRaw's default curve is BT.709's
-	params.gamm[0] = 1 / 2.4;
-	params.gamm[1] = 12.92;
 	params.user_flip = 0; // the orientation is reported, as for previews
 
 	int result = raw->open_buffer(file.constData(), static_cast<size_t>(file.size()));
@@ -324,19 +350,28 @@ DecodedImage decodeRaw(const QByteArray& file, RawRendering rawRendering, const 
 	if (result != LIBRAW_SUCCESS)
 		return { .error = QString::fromLatin1(LibRaw::strerror(result)) };
 
-	int width = 0, height = 0, colors = 0, bitsPerSample = 0;
-	raw->get_mem_image_format(&width, &height, &colors, &bitsPerSample);
-	if (bitsPerSample != 8 || (colors != 1 && colors != 3))
-		return { .error = QObject::tr("Unsupported raw image layout: %1 colors, %2 bits per sample").arg(colors).arg(bitsPerSample) };
+	// After processing, imgdata.image holds width x height linear pixels in sRGB primaries, as stored: user_flip is 0
+	const int width = raw->imgdata.sizes.width, height = raw->imgdata.sizes.height, colors = raw->imgdata.idata.colors;
+	if (colors != 1 && colors != 3)
+		return { .error = QObject::tr("Unsupported raw image layout: %1 colors").arg(colors) };
 
 	const QString outOfMemory = QObject::tr("Not enough memory to decode a %1x%2 image").arg(width).arg(height);
 	QImage image{ width, height, colors == 1 ? QImage::Format_Grayscale8 : QImage::Format_RGB888 };
 	if (image.isNull())
 		return { .error = outOfMemory };
 
-	result = raw->copy_mem_image(image.bits(), static_cast<int>(image.bytesPerLine()), 0);
-	if (result != LIBRAW_SUCCESS)
-		return { .error = QString::fromLatin1(LibRaw::strerror(result)) };
+	// A DNG's BaselineExposure belongs to its intended rendering; LibRaw parses it, applying it is the caller's to do
+	const float baselineEv = raw->imgdata.color.dng_levels.baseline_exposure;
+	const std::array<uint8_t, 65536> toSrgb = toneCurveToSrgb(baselineEv == LibRawNoBaselineExposure ? 1.0 : std::exp2(baselineEv));
+	for (int y = 0; y < height; ++y)
+	{
+		uchar* code = image.scanLine(y);
+		for (const auto& pixel : std::span{ raw->imgdata.image + static_cast<size_t>(y) * width, static_cast<size_t>(width) })
+		{
+			for (int c = 0; c < colors; ++c)
+				*code++ = toSrgb[pixel[c]];
+		}
+	}
 
 	raw->recycle(); // frees LibRaw's buffers before the conversion allocates
 	// Format_RGB32, as decodeJpeg() delivers
