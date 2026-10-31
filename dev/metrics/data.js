@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793466725930,
+  "lastUpdate": 1793472519109,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -20205,6 +20205,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .text",
             "value": 5461,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 827.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 344.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 85,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "3c6a7dfe17a0f71874b8a3298d47bc1141c5690d",
+          "message": "LibRaw renders go through a tone curve fitted to cameras' own JPEGs, applied per channel after a DNG's BaselineExposure, in place of LibRaw's auto-brightened sRGB curve\n\nFitted to the embedded JPEGs of 22 corpus raws: median midtone exposure, contrast and saturation come within 0.15 EV, 2% and 1% of the cameras'.",
+          "timestamp": "2026-10-31T20:36:43+02:00",
+          "tree_id": "e388c3016c9bbe2788fb6f16320a821c4bd13085",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/3c6a7dfe17a0f71874b8a3298d47bc1141c5690d"
+        },
+        "date": 1793472516689,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 18850,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1596,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 32563,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6762,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7558.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5462,
             "unit": "KB"
           },
           {
