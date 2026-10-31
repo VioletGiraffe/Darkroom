@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793472519109,
+  "lastUpdate": 1793473477731,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -20284,6 +20284,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .text",
             "value": 5462,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 827.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 344.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 85,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "10eae149873cf4804f9a820956fceec133fd20bc",
+          "message": "LibRawDecoder: building the tone curve table once (for EV=0.0 only), not per render",
+          "timestamp": "2026-10-31T20:55:56+02:00",
+          "tree_id": "32fa8f6a3c7ada15a9cf9c62fcd32065457fe41f",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/10eae149873cf4804f9a820956fceec133fd20bc"
+        },
+        "date": 1793473474799,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 18865,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1596,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 32616,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6762.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7563,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5462.5,
             "unit": "KB"
           },
           {
