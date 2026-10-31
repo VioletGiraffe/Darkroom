@@ -45,7 +45,8 @@ the widget through a `CImageViewerWidget::PendingImage`, so the widget stays fre
 - A pending image accepts nothing once superseded, and no preview after its final image. Navigating replaces the load's
   `AsyncRequest`, which stops the abandoned job between its stages and abandons a LibRaw rendering at its next stage.
 - The previous image stays on screen until the new one shows; title, position and host actions switch at once. Save as
-  and Copy wait for the final image. A failed load empties the view, or leaves its preview, and stays on that position.
+  and Copy wait for the final image. A failed load empties the view, or leaves its preview, and stays on that position;
+  a notice in place of the progress bar gives the reason, with no message box.
 - The preview's target is the screen size, not the view's: the first load starts before the window is shown.
 - Animated files go to the widget's own reader, which plays them.
 

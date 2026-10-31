@@ -311,15 +311,16 @@ void ImageViewerWindow::applyLoadStage(ImageViewerLoading::Stage stage, const CI
 
 	if (stage.kind == Kind::Failed)
 	{
-		pending.showFailure();
-		reportLoadFailure(path);
+		pending.showFailure(pending.isShowingPreview() ? tr("Showing the preview: the full image failed to load (%1)").arg(stage.error)
+		                                               : tr("Could not load the image: %1").arg(stage.error));
+		updateImageContentActions();
 		return;
 	}
 
 	if (stage.kind == Kind::Animated && !_view->displayImage(path))
 	{
-		_view->displayFrame(QImage{}); // a failed displayImage leaves the previous image on screen
-		reportLoadFailure(path);
+		pending.showFailure(tr("Could not load the image"));
+		updateImageContentActions();
 		return;
 	}
 
@@ -328,12 +329,6 @@ void ImageViewerWindow::applyLoadStage(ImageViewerLoading::Stage stage, const CI
 
 	_windowIconTimer->start();
 	updateImageContentActions();
-}
-
-void ImageViewerWindow::reportLoadFailure(const QString& path)
-{
-	updateImageContentActions();
-	QMessageBox::warning(this, tr("Error"), tr("Failed to load the image:\n%1").arg(QDir::toNativeSeparators(path)));
 }
 
 void ImageViewerWindow::updateImageContentActions()

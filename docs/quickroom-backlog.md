@@ -17,5 +17,3 @@
   - JPEG XL DNG (DNG 1.7): LibRaw decodes it only through Adobe's DNG SDK.
   - Lossy DNG: needs LibRaw built with libjpeg; our build has none.
   - Nikon High Efficiency NEF (Z 8, Z 9, Z f, Z6III): JPEG XS-based; LibRaw has no decoder for it.
-- In the half-size and full renderings, the viewer replaces a raw's embedded preview with the error when LibRaw fails
-  to render the raw. That preview can be full size, as in Nikon High Efficiency NEFs and a Galaxy S22's JPEG XL DNG.

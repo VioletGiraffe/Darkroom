@@ -68,9 +68,8 @@ private:
 	void showImage(int index);
 	// Supersedes any load in progress
 	void loadCurrentImage();
+	// A failure shows a notice in the view, not a message box: the user may be flicking through files.
 	void applyLoadStage(ImageViewerLoading::Stage stage, const CImageViewerWidget::PendingImage& pending);
-	// Requires the load ended
-	void reportLoadFailure(const QString& path);
 	// Save as and Copy act on the image itself, which only a finished load provides
 	void updateImageContentActions();
 	void updateTitleAndCaption();
