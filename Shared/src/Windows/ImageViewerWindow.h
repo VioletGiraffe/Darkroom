@@ -1,8 +1,8 @@
 #pragma once
 
 #include "Core/AsyncDelivery.h"
-#include "Windows/ImageViewerLoading.h"
 #include "Windows/RemovalAction.h"
+#include "Windows/StagedImageLoad.h"
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -69,7 +69,7 @@ private:
 	// Supersedes any load in progress
 	void loadCurrentImage();
 	// A failure shows a notice in the view, not a message box: the user may be flicking through files.
-	void applyLoadStage(ImageViewerLoading::Stage stage, const CImageViewerWidget::PendingImage& pending);
+	void applyLoadStage(StagedImageLoad::Stage stage, const CImageViewerWidget::PendingImage& pending);
 	// Save as and Copy act on the image itself, which only a finished load provides
 	void updateImageContentActions();
 	void updateTitleAndCaption();

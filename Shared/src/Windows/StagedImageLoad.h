@@ -15,7 +15,7 @@ RESTORE_COMPILER_WARNINGS
 class QObject;
 
 // Loads one image for ImageViewerWindow: reads on IoThreadPool, decodes on cpuThreadPool(), delivers on the context's thread.
-namespace ImageViewerLoading {
+namespace StagedImageLoad {
 
 struct Stage {
 	enum class Kind {
@@ -41,4 +41,4 @@ struct Stage {
 [[nodiscard]] AsyncRequest start(const QString& path, ImageDecoding::RawRendering rawRendering, QSize uprightBox, QObject* context,
 	std::function<void(Stage)> done);
 
-} // namespace ImageViewerLoading
+} // namespace StagedImageLoad

@@ -1,4 +1,4 @@
-#include "Windows/ImageViewerLoading.h"
+#include "Windows/StagedImageLoad.h"
 #include "Core/CpuThreadPool.h"
 #include "Core/IoThreadPool.h"
 #include "timing/ctimeelapsed.h"
@@ -16,7 +16,7 @@ RESTORE_COMPILER_WARNINGS
 
 using namespace ImageDecoding;
 
-namespace ImageViewerLoading {
+namespace StagedImageLoad {
 
 namespace {
 
@@ -155,4 +155,4 @@ AsyncRequest start(const QString& path, RawRendering rawRendering, QSize upright
 	return request;
 }
 
-} // namespace ImageViewerLoading
+} // namespace StagedImageLoad

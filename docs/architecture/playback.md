@@ -27,7 +27,7 @@ Scaling goes through `ImageProcessing::resize`, nearest neighbor when the widget
 back to `CImageViewerWidget::scaleWithQt` for pixel formats the resizer rejects. Its chunks run on `cpuThreadPool()`,
 which also runs work on the calling thread - the GUI thread is blocked for the duration of a scale either way.
 
-Loading never blocks the GUI thread. `ImageViewerLoading` reads and decodes on the pools; the window hands the results to
+Loading never blocks the GUI thread. `StagedImageLoad` reads and decodes on the pools; the window hands the results to
 the widget through a `CImageViewerWidget::PendingImage`, so the widget stays free of threads.
 - A preview comes first where the final image takes longer, decoded in parallel with it:
   - a JPEG whose full decode is predicted at 100 ms or more - a 1/8 DCT-reduced decode, the fastest: the full decode

@@ -286,14 +286,14 @@ void ImageViewerWindow::loadCurrentImage()
 	// The screen, not the view: the first load starts before the window is shown full screen
 	const QScreen* screen = this->screen();
 	const QSize uprightBox = (QSizeF{ screen->size() } * screen->devicePixelRatio()).toSize();
-	_load = ImageViewerLoading::start(_loadingPath, rawRenderingSetting(), uprightBox, this, [this, pending](ImageViewerLoading::Stage stage) {
+	_load = StagedImageLoad::start(_loadingPath, rawRenderingSetting(), uprightBox, this, [this, pending](StagedImageLoad::Stage stage) {
 		applyLoadStage(std::move(stage), pending);
 	});
 }
 
-void ImageViewerWindow::applyLoadStage(ImageViewerLoading::Stage stage, const CImageViewerWidget::PendingImage& pending)
+void ImageViewerWindow::applyLoadStage(StagedImageLoad::Stage stage, const CImageViewerWidget::PendingImage& pending)
 {
-	using Kind = ImageViewerLoading::Stage::Kind;
+	using Kind = StagedImageLoad::Stage::Kind;
 	if (stage.kind == Kind::Preview)
 	{
 		pending.showPreview(std::move(stage.file), stage.finalSize);
