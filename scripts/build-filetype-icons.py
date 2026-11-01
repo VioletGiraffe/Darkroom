@@ -87,6 +87,7 @@ SIZES = [16, 20, 24, 32, 40, 48, 60, 64, 256]
 
 VECTOR_FROM = 24      # at or above this the wordmark comes from the font, below it from the hand-drawn face
 PIXEL_MARK_AT = 16    # only the smallest size uses the bitmap landscape
+SUN_FROM = 24         # smaller landscapes have no sun: at those sizes it reads as a stray sprocket hole
 BMP_UPTO = 48         # largest size stored uncompressed; see write_ico
 
 # Geometry as fractions of the icon, taken from the hand-tuned 16px design.
@@ -107,8 +108,8 @@ SS = 4                # supersample; chrome lands on exact pixel boundaries so i
 
 # Sprocket run for the film body: a hole count, and a duty cycle spending that share of each pitch on a hole.
 # The run divides the space above the band, so it fills that space at any count and any size. The two tiers
-# need separate rules: the pixel run is packed at a 1px gap, which scaled up leaves three 16px holes 1px apart
-# at 256, while an even pitch overflows the 9px run at 24.
+# need separate rules: the pixel run is packed at a 1px gap, which scaled up leaves holes 1px apart at 256,
+# while an even pitch overflows the 9px run at 24.
 # Three is the ceiling on the count: 32 is the even-pitch tier's smallest size and its run above the band is
 # 12px, so a pitch of 4 is the finest that clears a 2px hole off both ends. Four lands one in the top corner.
 # Holes stay square: a rounded corner greys at 32-48, where every other edge in the design is a whole pixel.
@@ -117,7 +118,7 @@ SPROCKET = dict(holes=3, duty=0.6, rim=1 / 32)
 # hole off both ends, which 32 is the first size to give. At 24 the run is 9px and the offsets land on .5,
 # where rounding drops a hole in the top corner and merges the other two into one slot.
 SPROCKET_FROM = 32
-HOLES_ABOVE = 3       # per side, below SPROCKET_FROM
+PIXEL_PERF = 2        # hole side below SPROCKET_FROM
 
 # The SD card: three pads, and a 45-degree clip at the top-right. Hand-tuned at the sizes in CARD_PIXEL: clip depth,
 # pad x offsets from the card's left edge, pad width, pad top row and height.
@@ -250,8 +251,10 @@ GLYPH_CHOICES = {"WEBP": {16: "W4 E2 B3 P3", 20: "W5 E2 B4 P4"},
                  "MEF": {16: "M5 E3 F4"},
                  "NEFX": {16: "N4 E2 F2 X3", 20: "N4 E3 F4 X3"}}
 
-# The 16px landscape, on a grid of tenths of the body width.
-MARK_PX = [".......##.", ".......##.", "....#.....", "..#####...", ".########."]
+# The 16px landscapes, widest first and sunless (see SUN_FROM). The widest that clears the mark frame by 1px on
+# each side is drawn, centred.
+MARK_PX = [["........", "........", "...#....", ".#####..", "########"],
+           ["......", "......", "..#...", ".###..", "######"]]
 
 # Landscape normalised to a unit-width box, y down. Sun sits clear of the ridge: at icon sizes any
 # contact reads as one cloud-like mass.
@@ -317,12 +320,12 @@ def sprockets(size, g, spec):
     """
     rim = max(1, round(spec["rim"] * size))
     if size < SPROCKET_FROM:
-        # A constant pitch would give 3, 4 and 2 holes at 16, 20 and 24: the hole doubles at 24 but the run
-        # above the band does not. Three per side at every size instead, packed at the minimum gap.
-        perf = max(1, round(size / 16))
-        free = g["band_y"] - HOLES_ABOVE * perf
-        top = 1 + max(0, free - HOLES_ABOVE) // 2   # slack beyond the minimum gaps goes to the top inset first
-        rows = [top + i * (perf + 1) for i in range(HOLES_ABOVE)]
+        # As many holes as fit at the minimum gap and a 1px top inset: 2 per side at 16 and 20, 3 at 24.
+        perf = PIXEL_PERF
+        holes = g["band_y"] // (perf + 1)
+        free = g["band_y"] - holes * perf
+        top = 1 + max(0, free - holes) // 2   # slack beyond the minimum gaps goes to the top inset first
+        rows = [top + i * (perf + 1) for i in range(holes)]
     else:
         pitch = g["band_y"] / spec["holes"]
         perf = max(1, round(pitch * spec["duty"]))
@@ -508,20 +511,21 @@ def render(label, colour, size, body=PAPER):
     if body["card"]:
         draw_card(d, size, g, mark)
     elif size == PIXEL_MARK_AT:
-        cell = f["bw"] * k / 10
-        x0 = f["bx"] * k + (f["bw"] * k - 10 * cell) / 2
-        for r, row in enumerate(MARK_PX):
+        grid = next((m for m in MARK_PX if len(m[0]) <= f["bw"] - 2), None)
+        assert grid, f"{label}@{size}: no 16px landscape fits a {f['bw']}px mark frame"
+        x0 = f["bx"] + (f["bw"] - len(grid[0])) // 2
+        for r, row in enumerate(grid):
             for i, ch in enumerate(row):
                 if ch == "#":
-                    d.rectangle([x0 + i * cell, r * cell, x0 + (i + 1) * cell - 1, (r + 1) * cell - 1],
-                                fill=mark)
+                    d.rectangle([(x0 + i) * k, r * k, (x0 + i + 1) * k - 1, (r + 1) * k - 1], fill=mark)
     else:
         mx, my, mw = mark_box(size, f)
         mx, my, mw = mx * k, my * k, mw * k
         d.polygon([(mx + a * mw, my + b * mw) for a, b in MARK_RIDGE], fill=mark)
-        cx, cy, r = MARK_SUN
-        d.ellipse([mx + (cx - r) * mw, my + (cy - r) * mw,
-                   mx + (cx + r) * mw, my + (cy + r) * mw], fill=mark)
+        if size >= SUN_FROM:
+            cx, cy, r = MARK_SUN
+            d.ellipse([mx + (cx - r) * mw, my + (cy - r) * mw,
+                       mx + (cx + r) * mw, my + (cy + r) * mw], fill=mark)
 
     d.rectangle([0, g["band_y"] * k, size * k - 1, (g["band_y"] + g["band_h"]) * k - 1], fill=band)
 
