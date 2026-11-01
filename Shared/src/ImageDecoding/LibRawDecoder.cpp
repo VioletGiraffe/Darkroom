@@ -11,12 +11,14 @@ RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <functional>
 #include <memory>
+#include <numeric>
 #include <optional>
 #include <span>
 #include <string>
@@ -453,6 +455,41 @@ double quantile(const std::vector<double>& values, double fraction)
 	return values[below] + (values[above] - values[below]) * (position - static_cast<double>(below));
 }
 
+// As std::nth_element for each of ranks, which must be ascending. scratch and bucketEnds are working storage, reused across calls.
+// A counting sort orders the values into buckets of ascending ranges, 256 per octave from 2^-26 to 2: by the top bits of the double,
+// which rise with a positive value. Then only the buckets holding a rank are sorted.
+void nthElements(std::vector<double>& values, const std::vector<size_t>& ranks, std::vector<double>& scratch, std::vector<uint32_t>& bucketEnds)
+{
+	constexpr int keyShift = 44;
+	static constexpr int64_t lowestKey = std::bit_cast<int64_t>(0x1p-26) >> keyShift, highestKey = std::bit_cast<int64_t>(2.0) >> keyShift;
+	// Signed: values below 2^-26, zero and negatives included, fall in the lowest bucket; values from 2 up in the highest
+	const auto bucketOf = [](double value) {
+		return static_cast<size_t>(std::clamp(std::bit_cast<int64_t>(value) >> keyShift, lowestKey, highestKey) - lowestKey);
+	};
+
+	bucketEnds.assign(static_cast<size_t>(highestKey - lowestKey) + 2, 0);
+	for (const double value : values)
+		++bucketEnds[bucketOf(value) + 1];
+	std::partial_sum(bucketEnds.begin(), bucketEnds.end(), bucketEnds.begin());
+	// Each bucket's start advances to its end
+	scratch.resize(values.size());
+	for (const double value : values)
+		scratch[bucketEnds[bucketOf(value)]++] = value;
+
+	size_t sortedEnd = 0;
+	for (const size_t rank : ranks)
+	{
+		if (rank < sortedEnd)
+			continue;
+
+		const auto bucketEnd = std::ranges::upper_bound(bucketEnds, static_cast<uint32_t>(rank));
+		const size_t bucketStart = bucketEnd == bucketEnds.begin() ? 0 : *(bucketEnd - 1);
+		sortedEnd = *bucketEnd;
+		std::sort(scratch.begin() + static_cast<std::ptrdiff_t>(bucketStart), scratch.begin() + static_cast<std::ptrdiff_t>(sortedEnd));
+	}
+	values.swap(scratch);
+}
+
 // The exposure shift, in EV within +-2, that matches the rendering's midtones, through ToneCurve at exposureGain, to the preview's.
 // Matches log2 luminance quantiles in least squares, over the range of quantiles where the preview is midtone, 0.05 to 0.4 linear:
 // that range ignores how differently the camera renders deep shadows and highlights.
@@ -487,7 +524,7 @@ double quantileMatchingShiftEv(const CellColors& rendering, const CellColors& pr
 	for (const double fraction : fractions)
 		targets.push_back(std::log2(std::max(quantile(previewLuminances, fraction), darkestLuminance)));
 
-	// The ranks quantile() reads from renderingLuminances, ascending: nth_element places just these
+	// The ranks quantile() reads from renderingLuminances, ascending: nthElements places just these
 	std::vector<size_t> ranks;
 	for (const double fraction : fractions)
 	{
@@ -496,9 +533,9 @@ double quantileMatchingShiftEv(const CellColors& rendering, const CellColors& pr
 		ranks.push_back(std::min(below + 1, rendering.size() - 1));
 	}
 	std::ranges::sort(ranks);
-	ranks.erase(std::ranges::unique(ranks).begin(), ranks.end());
 
-	std::vector<double> renderingLuminances(rendering.size());
+	std::vector<double> renderingLuminances(rendering.size()), nthElementsScratch;
+	std::vector<uint32_t> nthElementsBuckets;
 	// The tone curve tabulated, interpolated linearly: a fraction of the cost of evaluating it per cell
 	constexpr int curvePoints = 4096;
 	std::array<double, curvePoints + 1> curve{};
@@ -514,13 +551,7 @@ double quantileMatchingShiftEv(const CellColors& rendering, const CellColors& pr
 		std::ranges::transform(rendering, renderingLuminances.begin(), [&](const std::array<float, 3>& rgb) {
 			return luminance({ curveAt(rgb[0]), curveAt(rgb[1]), curveAt(rgb[2]) });
 		});
-		auto unplaced = renderingLuminances.begin();
-		for (const size_t rank : ranks)
-		{
-			const auto ranked = renderingLuminances.begin() + static_cast<std::ptrdiff_t>(rank);
-			std::nth_element(unplaced, ranked, renderingLuminances.end());
-			unplaced = ranked + 1;
-		}
+		nthElements(renderingLuminances, ranks, nthElementsScratch, nthElementsBuckets);
 		double sum = 0.0;
 		for (size_t i = 0; i < fractions.size(); ++i)
 		{
