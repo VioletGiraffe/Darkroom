@@ -24,8 +24,8 @@ whose inputs did not change regenerates byte-identical.
 Adding a format:
   Add a TYPES entry. Every letter of the label must exist in GLYPHS; the run fails naming a missing one.
   Look at the label at 16 and 20: where a full-height stem touches the band edge, add a GLYPH_CHOICES spec.
-  Judge the colour on rendered icons beside the others, not by colour distance: CIE76 rated JPG/MKV the
-    closest pair here, and by eye they are not close at all.
+  Judge the colour on rendered icons beside the others, at 16. OKLab distance between the dominant colours
+    (pale: the band, deep: the body) finds candidates: under about 0.08 a pair reads as one colour.
   Mirror the suffix in Utils.cpp's lists (camera raws: ImageDecoding::rawFileSuffixes), in installer.iss and in
     Quickroom's FileTypeIcons.h; list the icon in quickroom.qrc.
 
@@ -59,7 +59,7 @@ WORDMARK_FONT = Path("C:/Windows/Fonts/bahnschrift.ttf")
 WORDMARK_AXES = {"wght": 700, "wdth": 75}   # the "Bold Condensed" instance; both axes are at their extreme
 
 CREAM, INK = (240, 234, 224, 255), (36, 29, 21, 255)
-TINT, SHADE = 0.72, 0.35   # pale's mix of the hue toward white and toward black
+TINT, SHADE = 0.72, 0.2    # pale's mix of the hue toward white and toward black
 
 
 def hx(colour):
@@ -135,16 +135,17 @@ FILM = dict(x=BODY_X_FILM, w=None, sprocket=SPROCKET, card=False, scheme=pale)
 CARD = dict(x=BODY_X_FILM, w=None, sprocket=None, card=True, scheme=deep)
 
 # m4v -> MP4, mpeg -> MPG and m2ts/mts/ts -> MTS, so the 13 supported video suffixes need nine icons.
-# Indigo, purple and blue are the closest three, so only one of them (MP4) is on a common video format.
-TYPES = [("jpg", "JPG", "#c10500", PAPER), ("png", "PNG", "#c70ea9", PAPER),
-         ("webp", "WEBP", "#e8a800", PAPER), ("tiff", "TIF", "#401970", PAPER),
-         ("gif", "GIF", "#2ba100", PAPER), ("bmp", "BMP", "#4a6fb5", PAPER),
-         ("svg", "SVG", "#00b377", PAPER),
-         ("mp4", "MP4", "#004dc4", FILM), ("mov", "MOV", "#0096b6", FILM),
-         ("avi", "AVI", "#1f8a70", FILM), ("mkv", "MKV", "#de4600", FILM),
-         ("webm", "WEBM", "#a3133a", FILM), ("wmv", "WMV", "#3a2fc0", FILM),
-         ("mpg", "MPG", "#8131b4", FILM), ("mts", "MTS", "#b5302c", FILM),
-         ("flv", "FLV", "#6b8e00", FILM)]
+# Hue alone cannot separate this many types: types whose hues are close differ in band lightness.
+# Orange and yellow only work as light bands: dark, they read as brown and mustard.
+TYPES = [("jpg", "JPG", "#ce1506", PAPER), ("png", "PNG", "#db286b", PAPER),
+         ("webp", "WEBP", "#df7c04", PAPER), ("tiff", "TIF", "#34145b", PAPER),
+         ("gif", "GIF", "#238300", PAPER), ("bmp", "BMP", "#3c5a93", PAPER),
+         ("svg", "SVG", "#009160", PAPER),
+         ("mp4", "MP4", "#0144a9", FILM), ("mov", "MOV", "#0d99c1", FILM),
+         ("avi", "AVI", "#0c6a4c", FILM), ("mkv", "MKV", "#ff5b21", FILM),
+         ("webm", "WEBM", "#9c067c", FILM), ("wmv", "WMV", "#7775fe", FILM),
+         ("mpg", "MPG", "#7018af", FILM), ("mts", "MTS", "#8f0312", FILM),
+         ("flv", "FLV", "#798f0c", FILM)]
 
 # Camera raws: colours after the maker's brand colour where it has a recognisable one, shades of it for its other formats.
 # Legacy formats share one muted colour.
