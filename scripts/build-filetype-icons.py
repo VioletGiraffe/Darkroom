@@ -25,7 +25,8 @@ Adding a format:
   Add a TYPES entry. Every letter of the label must exist in GLYPHS; the run fails naming a missing one.
   Look at the label at 16 and 20: where a full-height stem touches the band edge, add a GLYPH_CHOICES spec.
   Judge the colour on rendered icons beside the others, at 16. OKLab distance between the dominant colours
-    (pale: the band, deep: the body) finds candidates: under about 0.08 a pair reads as one colour.
+    (pale: the band, deep: the body) finds candidates: under about 0.08 a pair reads as one colour. Deep bodies
+    need more: their colour shows only above the band.
   Mirror the suffix in Utils.cpp's lists (camera raws: ImageDecoding::rawFileSuffixes), in installer.iss and in
     Quickroom's FileTypeIcons.h; list the icon in quickroom.qrc.
 
@@ -154,7 +155,7 @@ TYPES = [("jpg", "JPG", "#ce1506", PAPER), ("png", "PNG", "#db286b", PAPER),
 LEGACY = "#00201a"
 TYPES += [("cr3", "CR3", "#990000", CARD), ("cr2", "CR2", "#f06a5e", CARD),
           ("nef", "NEF", "#d1aa00", CARD), ("nefx", "NEFX", "#d18800", CARD), ("nrw", "NRW", "#d18800", CARD),
-          ("arw", "ARW", "#ff6a00", CARD), ("raf", "RAF", "#00a651", CARD), ("dng", "DNG", "#2f8f80", CARD),
+          ("arw", "ARW", "#ff6a00", CARD), ("raf", "RAF", "#00a651", CARD), ("dng", "DNG", "#4292aa", CARD),
           ("orf", "ORF", "#120d7d", CARD), ("rw2", "RW2", "#0041c0", CARD), ("rwl", "RWL", "#bf006f", CARD),
           ("pef", "PEF", "#455902", CARD), ("3fr", "3FR", "#7d2693", CARD), ("fff", "FFF", "#310226", CARD),
           ("iiq", "IIQ", "#b38cf0", CARD), ("ari", "ARI", "#581108", CARD)]
