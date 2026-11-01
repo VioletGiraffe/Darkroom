@@ -163,6 +163,14 @@ bool areComparable(const QList<QListWidgetItem*>& items)
 	return items.size() >= 2 && std::ranges::all_of(items, isImage);
 }
 
+QStringList entryPaths(const QList<QListWidgetItem*>& items)
+{
+	QStringList paths;
+	for (const QListWidgetItem* item : items)
+		paths.push_back(static_cast<const GridEntry*>(item)->path);
+	return paths;
+}
+
 // Paths of the shown entries of kind, in grid order.
 QStringList shownPathsOfKind(const QListWidget& grid, EntryKind kind)
 {
@@ -647,9 +655,7 @@ void BrowserWindow::showEntryContextMenu(QListWidgetItem& item, QPoint globalPos
 	});
 
 	const QList<QListWidgetItem*> targetItems = MediaGrid::effectiveSelection(item);
-	QStringList targets;
-	for (const QListWidgetItem* target : targetItems)
-		targets.push_back(static_cast<const GridEntry*>(target)->path);
+	const QStringList targets = entryPaths(targetItems);
 
 	if (areComparable(targetItems))
 	{
@@ -821,10 +827,7 @@ void BrowserWindow::selectAndScrollToPath(const QString& path)
 
 QStringList BrowserWindow::selectedPaths() const
 {
-	QStringList paths;
-	for (const QListWidgetItem* item : _grid->selectedItems())
-		paths.push_back(static_cast<const GridEntry*>(item)->path);
-	return paths;
+	return entryPaths(_grid->selectedItems());
 }
 
 void BrowserWindow::deletePaths(const QStringList& paths, PathDeletion::Mode mode)
