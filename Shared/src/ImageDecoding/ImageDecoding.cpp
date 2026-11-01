@@ -255,7 +255,11 @@ void applyOrientation(QImage& image, QImageIOHandler::Transformations orientatio
 		flips |= Qt::Horizontal;
 	if (orientation.testFlag(QImageIOHandler::TransformationFlip))
 		flips |= Qt::Vertical;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
 	image.flip(flips);
+#else
+	image.mirror(flips.testFlag(Qt::Horizontal), flips.testFlag(Qt::Vertical));
+#endif
 	if (orientation.testFlag(QImageIOHandler::TransformationRotate90))
 		image = image.transformed(QTransform{}.rotate(90));
 }
