@@ -23,7 +23,9 @@
 #include "compiler/compiler_warnings_control.h"
 #include "logger/cloggerinmemory.h"
 #include "utils/filemanager.h"
+#include "utils/naturalsorting/cnaturalsorterqcollator.h"
 #include "widgets/chistorycombobox.h"
+#include "widgets/clabelelided.h"
 #include "widgets/cpersistenceenabler.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -341,6 +343,17 @@ void BrowserWindow::setupUi()
 	setAcceptDrops(true);
 
 	connect(_grid, &QListWidget::itemActivated, this, &BrowserWindow::activateEntry);
+
+	// Not showMessage: hovering a menu item replaces the temporary message with the item's status tip, usually empty.
+	// CLabelElided: a QLabel's full text width would set the window's minimum width.
+	// ElideRight: both texts lead with their totals.
+	_entryCountsLabel = new CLabelElided();
+	_entryCountsLabel->setElideMode(Qt::ElideRight);
+	statusBar()->addWidget(_entryCountsLabel);
+	_selectionSummaryLabel = new CLabelElided();
+	_selectionSummaryLabel->setElideMode(Qt::ElideRight);
+	statusBar()->addPermanentWidget(_selectionSummaryLabel);
+	connect(_grid, &QListWidget::itemSelectionChanged, this, &BrowserWindow::updateSelectionSummary);
 
 	// Grid-only: the path field keeps its own keys.
 	// Enter activates on macOS too: item views there activate with Cmd+O and leave Enter to editing.
@@ -857,8 +870,44 @@ void BrowserWindow::updateCountsAndEmptyMessage()
 	QString counts = tr("%1 folders, %2 images, %3 videos").arg(folders).arg(images).arg(videos);
 	if (hidden > 0)
 		counts += tr(", %1 hidden by filter").arg(hidden);
-	statusBar()->showMessage(counts);
+	_entryCountsLabel->setText(counts);
+	statusBar()->clearMessage(); // ends a navigation error message, which hides the counts
 	_grid->setEmptyMessage(hidden > 0 ? tr("No names match the filter.") : tr("No folders or supported media files here."));
+}
+
+void BrowserWindow::updateSelectionSummary()
+{
+	const QList<QListWidgetItem*> selection = _grid->selectedItems();
+	if (selection.empty())
+	{
+		_selectionSummaryLabel->clear();
+		return;
+	}
+
+	int folders = 0, files = 0;
+	std::unordered_map<QString, int> filesPerExtension;
+	for (const QListWidgetItem* item : selection)
+	{
+		const auto& entry = static_cast<const GridEntry&>(*item);
+		if (entry.kind == EntryKind::Folder)
+		{
+			++folders;
+			continue;
+		}
+		++files;
+		++filesPerExtension[QFileInfo(entry.name).suffix().toUpper()];
+	}
+
+	std::vector<std::pair<QString, int>> extensionCounts(filesPerExtension.begin(), filesPerExtension.end());
+	std::ranges::sort(extensionCounts, NaturalSort::lessCaseSensitive, &std::pair<QString, int>::first);
+	QStringList extensionTexts;
+	for (const auto& [extension, count] : extensionCounts)
+		extensionTexts.push_back(QStringLiteral("%1: %2").arg(extension).arg(count));
+
+	QString summary = tr("Selected: %1 folders, %2 files").arg(folders).arg(files);
+	if (!extensionTexts.empty())
+		summary += QStringLiteral(" (%1)").arg(extensionTexts.join(QStringLiteral(", ")));
+	_selectionSummaryLabel->setText(summary);
 }
 
 QWidget* BrowserWindow::buildTile(QListWidgetItem* item)

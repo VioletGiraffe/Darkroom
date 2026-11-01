@@ -16,6 +16,7 @@ RESTORE_COMPILER_WARNINGS
 #include <vector>
 
 class CHistoryComboBox;
+class CLabelElided;
 class MediaGrid;
 class NameFilterField;
 class QAction;
@@ -89,6 +90,7 @@ private:
 	// removeEntries for one path, safe to call after this window is gone: viewers and players can outlive it.
 	[[nodiscard]] std::function<void(const QString& path)> entryRemover();
 	void updateCountsAndEmptyMessage();
+	void updateSelectionSummary();
 
 	// Copies or moves the files on the clipboard into folder; a cut is moved and taken off the clipboard.
 	void pasteInto(const QString& folder);
@@ -114,6 +116,8 @@ private:
 	CHistoryComboBox* _pathField = nullptr;
 	NameFilterField* _nameFilter = nullptr;
 	SortControl* _sortControl = nullptr;
+	CLabelElided* _entryCountsLabel = nullptr;
+	CLabelElided* _selectionSummaryLabel = nullptr;
 	QAction*   _backAction = nullptr;
 	QAction*   _forwardAction = nullptr;
 	QAction*   _upAction = nullptr;
