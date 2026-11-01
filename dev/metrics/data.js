@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793473477731,
+  "lastUpdate": 1793541546941,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -20368,6 +20368,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 827.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 344.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 85,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "ab121ce4e658a96a5330b7dca4bce1d7938d6a9e",
+          "message": "LibRaw renders: five-term tone curve with deeper blacks, and exposure matched to the embedded JPEG preview's midtones; tone curve fitting tool: the hidden [tonecurvedata] test and scripts/fit_tone_curve.py\n\nThe curve's shape is fitted with a free exposure shift per raw; the black offset is a choice of look, picked by eye from renders of the raw corpus.\nThe preview is decoded at half size: a 1/8 DCT-reduced decode averages sRGB codes and biased the match dark by up to 0.36 EV.",
+          "timestamp": "2026-11-01T14:07:26+02:00",
+          "tree_id": "898d45e563a552580255350e2aad858edbd7ec1e",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/ab121ce4e658a96a5330b7dca4bce1d7938d6a9e"
+        },
+        "date": 1793541536406,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 19184,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1596,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 32626,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6777.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7578,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5476.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 828.5,
             "unit": "KB"
           },
           {
