@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793547544602,
+  "lastUpdate": 1793552910459,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -20521,6 +20521,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .text",
             "value": 5477,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 829,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 345,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 85.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "3ecd1e2341371a98169908efdadc41563997be4e",
+          "message": "Exposure matching: the quantile search finds its ranks through a bucketed counting sort, 2.6x faster on an i5-12600KF and 1.8x on a Pi 4, with identical results\n\nChecked by replaying the cells of the 28 raws the corpus matches: identical shifts.",
+          "timestamp": "2026-11-01T18:57:01+02:00",
+          "tree_id": "f726abac55acf467548b1f7084c730b20a599a39",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/3ecd1e2341371a98169908efdadc41563997be4e"
+        },
+        "date": 1793552907863,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 19231,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1596,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 32626,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6781,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7582,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5478.5,
             "unit": "KB"
           },
           {
