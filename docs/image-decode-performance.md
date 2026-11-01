@@ -2,8 +2,8 @@
 
 [← Back to frame viewing and playback](architecture/playback.md)
 
-Decode times on the image viewer's JPEG and camera raw paths, measured 2026-10-31; raw 29 on 2026-11-01. All machines
-ran the same library sources: libjpeg-turbo 3.2.0 and LibRaw 0.22.2, from vcpkg's source trees.
+Decode times on the image viewer's JPEG and camera raw paths, measured 2026-10-31; raws 29 and 32-34 on 2026-11-01.
+All machines ran the same library sources: libjpeg-turbo 3.2.0 and LibRaw 0.22.2, from vcpkg's source trees.
 
 ## Setups
 
@@ -21,7 +21,8 @@ ran the same library sources: libjpeg-turbo 3.2.0 and LibRaw 0.22.2, from vcpkg'
   output buffer, `tj3Decompress8`. A cell is the median of 5-50 repetitions, single-threaded.
 - Raw: one render per pass with `decodeRaw`'s parameters. On the Pi each file renders in its own process, capped at
   1.4 GB of address space; 21 and later at 1.6 GB, measured with 200 MB more RAM free.
-- Pass-to-pass spread: at most 6% on the 12600KF. On the Pi, JPEG cells reach 20%: 6 of 128 cells differ by more than 8%,
+- Pass-to-pass spread: at most 7% on the 12600KF. Between runs there, the unpack of the lossy GFX RAF (33) varied from
+  280 to 410 ms. On the Pi, JPEG cells reach 20%: 6 of 128 cells differ by more than 8%,
   while repetitions within a pass agree to 0.3%. Pi raw renders stay within 4%, except X-Trans full renders at 13-18%.
   On the 2310M, at most 7% in the JPEG tables and 10% for raw renders.
 - On the 2310M the start of a run disturbed its first file's first pass, by up to 28%: those files were re-run.
@@ -32,8 +33,9 @@ The samples come from a collection of test-stack images, one per kind.
 
 - JPEG: 16 of 12,196 files. The collection is baseline 8-bit except 47 progressive files, with no CMYK, 12-bit,
   arithmetic-coded or lossless JPEGs. Labels give the subsampling, restart markers, megapixels and source.
-- Raw: 29 files: one per format and decoder, plus an iPhone ProRAW DNG and a Pentax pixel-shift PEF. Numbers 23 and 28,
-  a JPEG XL DNG and a Nikon High Efficiency NEF, are missing: LibRaw cannot render them.
+- Raw: 30 files: one per format and decoder variant, plus an iPhone ProRAW DNG, a Pentax pixel-shift PEF, a burst-crop
+  RAF and a rotated RAF. Labels give the format and the attributes that matter for decoding. Numbers 10 and 12 are
+  retired; 23 and 28, a JPEG XL DNG and a Nikon High Efficiency NEF, are missing: LibRaw cannot render them.
 
 ## JPEG: DCT-reduced decodes
 
@@ -181,76 +183,78 @@ Half size:
 
 | File | Output | 12600KF ms | Pi 4 ms | Pi / 12600KF | i3-2310M ms | 2310M / 12600KF |
 |---|---|---|---|---|---|---|
-| 01 ARW lossy | 3984x2660 | 290 | 1278 | 4.4 | 1137 | 3.9 |
-| 02 CR2 ljpeg | 2898x1935 | 477 | 1741 | 3.6 | 1857 | 3.9 |
-| 03 CR3 lossless | 4095x2731 | 268 | 1063 | 4.0 | 1256 | 4.7 |
-| 04 NEF lossless | 4144x2760 | 786 | 2994 | 3.8 | 2694 | 3.4 |
+| 01 ARW lossy small preview | 3984x2660 | 290 | 1278 | 4.4 | 1137 | 3.9 |
+| 02 CR2 lossless JPEG 14-bit | 2898x1935 | 477 | 1741 | 3.6 | 1857 | 3.9 |
+| 03 CR3 lossless 14-bit | 4095x2731 | 268 | 1063 | 4.0 | 1256 | 4.7 |
+| 04 NEF lossless 14-bit | 4144x2760 | 786 | 2994 | 3.8 | 2694 | 3.4 |
 | 05 NEF lossy 12-bit | 3689x2462 | 622 | 2242 | 3.6 | 2150 | 3.5 |
-| 06 NEF uncompressed | 4144x2760 | 154 | 812 | 5.3 | 744 | 4.8 |
+| 06 NEF uncompressed 14-bit | 4144x2760 | 154 | 812 | 5.3 | 744 | 4.8 |
 | 07 NEF packed 14-bit | 3032x2020 | 96 | 480 | 5.0 | 455 | 4.7 |
-| 08 NEFX Z8 merged linear | 16512x11008 | 2382 | out of memory | | 10600 | 4.5 |
-| 09 ORF | 2620x1956 | 486 | 1501 | 3.1 | 1476 | 3.0 |
-| 10 RAF X-Trans uncompressed | 3123x2085 | 140 | 547 | 3.9 | 620 | 4.4 |
-| 11 RAF X-Trans compressed | 3132x2088 | 262 | 1490 | 5.7 | 1958 | 7.5 |
-| 12 RAF GFX50S uncompressed | 4140x3104 | 264 | 1143 | 4.3 | 1128 | 4.3 |
-| 13 RAF GFX100 compressed | 5831x4373 | 936 | 4410 | 4.7 | 6192 | 6.6 |
-| 14 IIQ Phase One | 7102x5326 | 1636 | 7165 | 4.4 | 6554 | 4.0 |
-| 15 RW2 S1R high-res | 8384x5610 | 970 | 4988 | 5.1 | 4614 | 4.8 |
-| 16 DNG lossless bayer | 2610x1956 | 406 | 1470 | 3.6 | 1426 | 3.5 |
-| 17 DNG uncompressed bayer | 2880x1920 | 116 | 490 | 4.2 | 543 | 4.7 |
+| 08 NEFX Z8 merged linear 182MP | 16512x11008 | 2382 | out of memory | | 10600 | 4.5 |
+| 09 ORF lossless 12-bit | 2620x1956 | 486 | 1501 | 3.1 | 1476 | 3.0 |
+| 11 RAF X-Trans lossless compressed 14-bit | 3132x2088 | 262 | 1490 | 5.7 | 1958 | 7.5 |
+| 13 RAF GFX100 lossless compressed 16-bit | 5831x4373 | 936 | 4410 | 4.7 | 6192 | 6.6 |
+| 14 IIQ Phase One 150MP no preview | 7102x5326 | 1636 | 7165 | 4.4 | 6554 | 4.0 |
+| 15 RW2 S1R high-res packed 14-bit | 8384x5610 | 970 | 4988 | 5.1 | 4614 | 4.8 |
+| 16 DNG lossless bayer small preview | 2610x1956 | 406 | 1470 | 3.6 | 1426 | 3.5 |
+| 17 DNG uncompressed bayer no preview | 2880x1920 | 116 | 490 | 4.2 | 543 | 4.7 |
 | 18 DNG lossless linear | 8224x5490 | 2414 | 9424 | 3.9 | 8815 | 3.7 |
-| 19 DNG deflate float linear | 3840x5760 | 852 | 3263 | 3.8 | 2605 | 3.1 |
-| 20 DNG mono | 5984x4000 | 440 | 2342 | 5.3 | 1767 | 4.0 |
+| 19 DNG deflate float linear portrait | 3840x5760 | 852 | 3263 | 3.8 | 2605 | 3.1 |
+| 20 DNG mono uncompressed 12-bit small preview | 5984x4000 | 440 | 2342 | 5.3 | 1767 | 4.0 |
 | 21 3FR Hasselblad 16-bit uncompressed | 5832x4375 | 329 | 1840 | 5.6 | 1668 | 5.1 |
-| 22 CR3 C-RAW lossy | 3012x2010 | 150 | 583 | 3.9 | 748 | 5.0 |
-| 24 ARW lossless | 3514x2344 | 654 | 2326 | 3.6 | 2078 | 3.2 |
+| 22 CR3 C-RAW lossy 14-bit | 3012x2010 | 150 | 583 | 3.9 | 748 | 5.0 |
+| 24 ARW lossless 14-bit | 3514x2344 | 654 | 2326 | 3.6 | 2078 | 3.2 |
 | 25 ARW lossless S YCbCr | 3516x2344 | 225 | 1048 | 4.7 | 886 | 3.9 |
 | 26 CR2 sRAW YCbCr | 3000x2000 | 316 | 1362 | 4.3 | 1101 | 3.5 |
-| 27 DNG ProRAW linear | 8064x6048 | 2330 | 9520 | 4.1 | 8618 | 3.7 |
-| 29 PEF | 3012x2012 | 398 | 1548 | 3.9 | 1400 | 3.5 |
-| 30 PEF pixel shift 4 frames | 3112x2080 | 416 | 1620 | 3.9 | 1458 | 3.5 |
-| 31 RAF X-Trans lossy compressed | 3876x2589 | 398 | 2054 | 5.2 | 3024 | 7.6 |
+| 27 DNG ProRAW lossless linear 10-bit | 8064x6048 | 2330 | 9520 | 4.1 | 8618 | 3.7 |
+| 29 PEF compressed 14-bit | 3012x2012 | 398 | 1548 | 3.9 | 1400 | 3.5 |
+| 30 PEF compressed 14-bit pixel shift 4 frames | 3112x2080 | 416 | 1620 | 3.9 | 1458 | 3.5 |
+| 31 RAF X-Trans lossy compressed 14-bit | 3876x2589 | 398 | 2054 | 5.2 | 3024 | 7.6 |
+| 32 RAF X-Trans uncompressed 14-bit crop | 2502x1674 | 98 | 399 | 4.1 | 440 | 4.5 |
+| 33 RAF GFX50S II lossy compressed 14-bit | 4140x3104 | 444 | 2327 | 5.2 | 3388 | 7.6 |
+| 34 RAF GFX50S uncompressed 14-bit rotated | 4140x3104 | 258 | 1176 | 4.6 | 1154 | 4.5 |
 
 Full size:
 
 | File | Output | 12600KF ms | Pi 4 ms | Pi / 12600KF | i3-2310M ms | 2310M / 12600KF |
 |---|---|---|---|---|---|---|
-| 01 ARW lossy | 7968x5320 | 1006 | 5378 | 5.3 | 6164 | 6.1 |
-| 02 CR2 ljpeg | 5796x3870 | 928 | 3840 | 4.1 | 4450 | 4.8 |
-| 03 CR3 lossless | 8191x5463 | 1037 | 5244 | 5.1 | 6563 | 6.3 |
-| 04 NEF lossless | 8288x5520 | 1567 | 7246 | 4.6 | 8186 | 5.2 |
+| 01 ARW lossy small preview | 7968x5320 | 1006 | 5378 | 5.3 | 6164 | 6.1 |
+| 02 CR2 lossless JPEG 14-bit | 5796x3870 | 928 | 3840 | 4.1 | 4450 | 4.8 |
+| 03 CR3 lossless 14-bit | 8191x5463 | 1037 | 5244 | 5.1 | 6563 | 6.3 |
+| 04 NEF lossless 14-bit | 8288x5520 | 1567 | 7246 | 4.6 | 8186 | 5.2 |
 | 05 NEF lossy 12-bit | 7378x4924 | 1257 | 5760 | 4.6 | 6612 | 5.3 |
-| 06 NEF uncompressed | 8288x5520 | 908 | 5096 | 5.6 | 6243 | 6.9 |
+| 06 NEF uncompressed 14-bit | 8288x5520 | 908 | 5096 | 5.6 | 6243 | 6.9 |
 | 07 NEF packed 14-bit | 6064x4040 | 570 | 2732 | 4.8 | 3280 | 5.8 |
-| 08 NEFX Z8 merged linear | 16512x11008 | 2382 | out of memory | | 11038 | 4.6 |
-| 09 ORF | 5240x3912 | 899 | 3507 | 3.9 | 3870 | 4.3 |
-| 10 RAF X-Trans uncompressed | 6246x4170 | 2212 | 17716 | 8.0 | 17326 | 7.8 |
-| 11 RAF X-Trans compressed | 6264x4176 | 2364 | 18968 | 8.0 | 18736 | 7.9 |
-| 12 RAF GFX50S uncompressed | 8280x6208 | 1047 | 6018 | 5.7 | 6807 | 6.5 |
-| 13 RAF GFX100 compressed | 11662x8746 | 2782 | crashed at the memory cap | | 18954 | 6.8 |
-| 14 IIQ Phase One | 14204x10652 | 4186 | out of memory | | 25132 | 6.0 |
-| 15 RW2 S1R high-res | 16768x11220 | 4330 | out of memory | | 28558 | 6.6 |
-| 16 DNG lossless bayer | 5220x3912 | 822 | 3488 | 4.2 | 3852 | 4.7 |
-| 17 DNG uncompressed bayer | 5760x3840 | 565 | 2608 | 4.6 | 3253 | 5.8 |
+| 08 NEFX Z8 merged linear 182MP | 16512x11008 | 2382 | out of memory | | 11038 | 4.6 |
+| 09 ORF lossless 12-bit | 5240x3912 | 899 | 3507 | 3.9 | 3870 | 4.3 |
+| 11 RAF X-Trans lossless compressed 14-bit | 6264x4176 | 2364 | 18968 | 8.0 | 18736 | 7.9 |
+| 13 RAF GFX100 lossless compressed 16-bit | 11662x8746 | 2782 | crashed at the memory cap | | 18954 | 6.8 |
+| 14 IIQ Phase One 150MP no preview | 14204x10652 | 4186 | out of memory | | 25132 | 6.0 |
+| 15 RW2 S1R high-res packed 14-bit | 16768x11220 | 4330 | out of memory | | 28558 | 6.6 |
+| 16 DNG lossless bayer small preview | 5220x3912 | 822 | 3488 | 4.2 | 3852 | 4.7 |
+| 17 DNG uncompressed bayer no preview | 5760x3840 | 565 | 2608 | 4.6 | 3253 | 5.8 |
 | 18 DNG lossless linear | 8224x5490 | 2410 | 9514 | 3.9 | 8548 | 3.5 |
-| 19 DNG deflate float linear | 3840x5760 | 828 | 3323 | 4.0 | 2613 | 3.2 |
-| 20 DNG mono | 5984x4000 | 446 | 2228 | 5.0 | 1780 | 4.0 |
+| 19 DNG deflate float linear portrait | 3840x5760 | 828 | 3323 | 4.0 | 2613 | 3.2 |
+| 20 DNG mono uncompressed 12-bit small preview | 5984x4000 | 446 | 2228 | 5.0 | 1780 | 4.0 |
 | 21 3FR Hasselblad 16-bit uncompressed | 11664x8750 | 2317 | 11894 | 5.1 | 14218 | 6.1 |
-| 22 CR3 C-RAW lossy | 6024x4020 | 620 | 2826 | 4.6 | 3598 | 5.8 |
-| 24 ARW lossless | 7028x4688 | 1228 | 5663 | 4.6 | 6092 | 5.0 |
+| 22 CR3 C-RAW lossy 14-bit | 6024x4020 | 620 | 2826 | 4.6 | 3598 | 5.8 |
+| 24 ARW lossless 14-bit | 7028x4688 | 1228 | 5663 | 4.6 | 6092 | 5.0 |
 | 25 ARW lossless S YCbCr | 3516x2344 | 224 | 1041 | 4.7 | 890 | 4.0 |
 | 26 CR2 sRAW YCbCr | 3000x2000 | 312 | 1374 | 4.4 | 1082 | 3.5 |
-| 27 DNG ProRAW linear | 8064x6048 | 2362 | 9533 | 4.0 | 8453 | 3.6 |
-| 29 PEF | 6024x4024 | 907 | 3858 | 4.3 | 4100 | 4.5 |
-| 30 PEF pixel shift 4 frames | 6224x4160 | 904 | 4058 | 4.5 | 4348 | 4.8 |
-| 31 RAF X-Trans lossy compressed | 7752x5178 | 3201 | 24678 | 7.7 | 27065 | 8.5 |
+| 27 DNG ProRAW lossless linear 10-bit | 8064x6048 | 2362 | 9533 | 4.0 | 8453 | 3.6 |
+| 29 PEF compressed 14-bit | 6024x4024 | 907 | 3858 | 4.3 | 4100 | 4.5 |
+| 30 PEF compressed 14-bit pixel shift 4 frames | 6224x4160 | 904 | 4058 | 4.5 | 4348 | 4.8 |
+| 31 RAF X-Trans lossy compressed 14-bit | 7752x5178 | 3201 | 24678 | 7.7 | 27065 | 8.5 |
+| 32 RAF X-Trans uncompressed 14-bit crop | 5004x3348 | 1556 | 12030 | 7.7 | 10796 | 6.9 |
+| 33 RAF GFX50S II lossy compressed 14-bit | 8280x6208 | 1316 | 7328 | 5.6 | 9227 | 7.0 |
+| 34 RAF GFX50S uncompressed 14-bit rotated | 8280x6208 | 1096 | 6212 | 5.7 | 6971 | 6.4 |
 
 - Over the files both rendered, the Pi is 4.2x slower than the 12600KF at half size and 5.4x at full size. Over all
-  files the 2310M is 4.1x and 5.9x slower, about the Pi's speed.
-- Unpacking is mostly 3-5x slower on the Pi, 8-10x for uncompressed data (06, 21); `dcraw_process` is 4-6x slower,
-  except X-Trans full renders at 8.0-8.2x.
-- On the 2310M unpacking is mostly 3-4x slower, Fujifilm's compressed formats (11, 13, 31) 7-9x; `dcraw_process` is
-  4-7x slower, X-Trans full renders 8-9x.
+  files the 2310M is 4.2x and 5.8x slower, about the Pi's speed.
+- Unpacking is mostly 3-5x slower on the Pi, 8-10x for the uncompressed NEF and 3FR (06, 21); `dcraw_process` is 4-6x
+  slower, except X-Trans full renders at 7.9-8.2x.
+- On the 2310M unpacking is mostly 3-4x slower, Fujifilm's compressed formats (11, 13, 31, 33) 7-9x; `dcraw_process` is
+  4-7x slower, X-Trans full renders 7-9x.
 - The pixel-shift PEF (30) holds 4 raw frames: LibRaw renders only the first, in the time of a single-frame PEF from
   the same camera.
 - Under the Pi's 1.4 GB cap renders up to 51 MP fit. At 1.6 GB the 102 MP 3FR fits, while the 102 MP GFX100 RAF, the

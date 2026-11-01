@@ -26,7 +26,7 @@ Running it:
 
 Exclude a raw, by the start of its file name, when its preview is not a plain global rendering of its scene: a mostly clipped
 scene, or a phone's preview with local tone mapping. Monochrome raws and raws without a preview are skipped. In the raw corpus
-docs/image-decode-performance.md uses, that is: --exclude 12 27
+docs/image-decode-performance.md uses, that is: --exclude 27
 
 The output:
   - The fitted constants, as the line ToneCurve declares them, with the current blackOffset.
