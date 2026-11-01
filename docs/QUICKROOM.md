@@ -56,9 +56,9 @@ through the removal actions `FileOperations` installs, and the browser removes t
 of relisting.
 
 Photo comparison is Darkroom's `PhotoCompareWindow` (see [playback.md](architecture/playback.md#photocomparewindow)),
-opened from the context menu of a selection of two or more images, or empty from Tools > Compare photos to take dropped
-files. It is parentless, for a taskbar button of its own. Its pane menu moves the photo to Trash unasked and removes its
-entry from the grid.
+opened from the context menu of a selection of two or more images, or from Tools > Compare photos (Shift+C), which
+takes such a selection too and otherwise opens empty to take dropped files. It is parentless, for a taskbar button of its
+own. Its pane menu moves the photo to Trash unasked and removes its entry from the grid.
 
 Copy and move:
 

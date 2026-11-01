@@ -84,6 +84,15 @@ constexpr int MIN_TILE_WIDTH  = 80;
 constexpr int MAX_TILE_WIDTH  = 800;
 const ThumbnailWidget::Options TILE_OPTIONS{};
 
+// Not QKeySequence::Cut: on Windows and Linux it includes Shift+Del, the permanent deletion.
+const QKeySequence CUT_KEYS{ Qt::CTRL | Qt::Key_X };
+const QKeySequence COMPARE_KEYS{ Qt::SHIFT | Qt::Key_C };
+
+QKeySequence deletionKeys(PathDeletion::Mode mode)
+{
+	return mode == PathDeletion::Mode::Trash ? QKeySequence{ Qt::Key_Delete } : QKeySequence{ Qt::SHIFT | Qt::Key_Delete };
+}
+
 int savedTileWidth()
 {
 	return qBound(MIN_TILE_WIDTH, QSettings{}.value(TILE_SIZE_KEY, DEFAULT_TILE_WIDTH).toInt(), MAX_TILE_WIDTH);
@@ -143,6 +152,13 @@ private:
 int sortedInsertionRow(const QListWidget& grid, const GridEntry& entry)
 {
 	return *std::ranges::partition_point(std::views::iota(0, grid.count()), [&](int row) { return *grid.item(row) < entry; });
+}
+
+// The comparison takes two or more images and nothing else.
+bool areComparable(const QList<QListWidgetItem*>& items)
+{
+	const auto isImage = [](const QListWidgetItem* item) { return static_cast<const GridEntry*>(item)->kind == EntryKind::Image; };
+	return items.size() >= 2 && std::ranges::all_of(items, isImage);
 }
 
 // Paths of the shown entries of kind, in grid order.
@@ -331,11 +347,10 @@ void BrowserWindow::setupUi()
 	const auto activateCurrent = [this] { activateEntry(_grid->currentItem()); };
 	new QShortcut(QKeySequence(Qt::Key_Return), _grid, activateCurrent, Qt::WidgetShortcut);
 	new QShortcut(QKeySequence(Qt::Key_Enter), _grid, activateCurrent, Qt::WidgetShortcut);
-	new QShortcut(QKeySequence(Qt::Key_Delete), _grid, [this] { deletePaths(selectedPaths(), PathDeletion::Mode::Trash); }, Qt::WidgetShortcut);
-	new QShortcut(QKeySequence(Qt::SHIFT | Qt::Key_Delete), _grid, [this] { deletePaths(selectedPaths(), PathDeletion::Mode::Permanent); }, Qt::WidgetShortcut);
+	for (const PathDeletion::Mode mode : { PathDeletion::Mode::Trash, PathDeletion::Mode::Permanent })
+		new QShortcut(deletionKeys(mode), _grid, [this, mode] { deletePaths(selectedPaths(), mode); }, Qt::WidgetShortcut);
 	new QShortcut(QKeySequence::Copy, _grid, [this] { FileOperations::putPathsOnClipboard(selectedPaths(), false); }, Qt::WidgetShortcut);
-	// Not QKeySequence::Cut: on Windows and Linux it includes Shift+Del, the permanent deletion above.
-	new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_X), _grid, [this] { FileOperations::putPathsOnClipboard(selectedPaths(), true); }, Qt::WidgetShortcut);
+	new QShortcut(CUT_KEYS, _grid, [this] { FileOperations::putPathsOnClipboard(selectedPaths(), true); }, Qt::WidgetShortcut);
 	new QShortcut(QKeySequence::Paste, _grid, [this] { pasteInto(_currentPath); }, Qt::WidgetShortcut);
 
 	connect(QGuiApplication::clipboard(), &QClipboard::dataChanged, this, &BrowserWindow::updateCutMarks);
@@ -369,7 +384,9 @@ void BrowserWindow::setupMainMenu()
 	fileMenu->addAction(tr("Exit"), QKeySequence("Ctrl+Q"), this, &QApplication::closeAllWindows);
 
 	QMenu* toolsMenu = menuBar()->addMenu(tr("&Tools"));
-	toolsMenu->addAction(tr("Compare photos..."), QKeySequence("Shift+C"), this, [this] { comparePhotos({}); });
+	toolsMenu->addAction(tr("Compare photos..."), COMPARE_KEYS, this, [this] {
+		comparePhotos(areComparable(_grid->selectedItems()) ? selectedPaths() : QStringList{});
+	});
 
 	QMenu* helpMenu = menuBar()->addMenu(tr("&Help"));
 	helpMenu->addAction(tr("Report a bug..."), this, [this] {
@@ -616,22 +633,21 @@ void BrowserWindow::showEntryContextMenu(QListWidgetItem& item, QPoint globalPos
 	for (const QListWidgetItem* target : targetItems)
 		targets.push_back(static_cast<const GridEntry*>(target)->path);
 
-	const auto isImage = [](const QListWidgetItem* target) { return static_cast<const GridEntry*>(target)->kind == EntryKind::Image; };
-	if (targets.size() >= 2 && std::ranges::all_of(targetItems, isImage))
+	if (areComparable(targetItems))
 	{
 		menu.addSeparator();
-		menu.addAction(tr("Compare photos"), this, [this, targets] { comparePhotos(targets); });
+		menu.addAction(tr("Compare photos"), COMPARE_KEYS, this, [this, targets] { comparePhotos(targets); });
 	}
 
 	menu.addSeparator();
-	menu.addAction(tr("Cut"), this, [targets] { FileOperations::putPathsOnClipboard(targets, true); });
-	menu.addAction(tr("Copy"), this, [targets] { FileOperations::putPathsOnClipboard(targets, false); });
+	menu.addAction(tr("Cut"), CUT_KEYS, this, [targets] { FileOperations::putPathsOnClipboard(targets, true); });
+	menu.addAction(tr("Copy"), QKeySequence::Copy, this, [targets] { FileOperations::putPathsOnClipboard(targets, false); });
 	if (entry.kind == EntryKind::Folder)
 		menu.addAction(tr("Paste into folder"), this, [this, path] { pasteInto(path); })->setEnabled(clipboardHasFiles());
 
 	// Queued, like folder activation in activateEntry: the tile showing this menu may be among those removed.
 	const auto addDeleteAction = [this, &menu, targets](PathDeletion::Mode mode) {
-		menu.addAction(FileOperations::deleteActionText(mode), this, [this, targets, mode] {
+		menu.addAction(FileOperations::deleteActionText(mode), deletionKeys(mode), this, [this, targets, mode] {
 			QMetaObject::invokeMethod(this, [this, targets, mode] { deletePaths(targets, mode); }, Qt::QueuedConnection);
 		});
 	};
@@ -650,7 +666,7 @@ void BrowserWindow::showEntryContextMenu(QListWidgetItem& item, QPoint globalPos
 void BrowserWindow::showBackgroundContextMenu(QPoint globalPos)
 {
 	QMenu menu(this);
-	menu.addAction(tr("Paste"), this, [this] { pasteInto(_currentPath); })->setEnabled(clipboardHasFiles());
+	menu.addAction(tr("Paste"), QKeySequence::Paste, this, [this] { pasteInto(_currentPath); })->setEnabled(clipboardHasFiles());
 	menu.exec(globalPos);
 }
 
