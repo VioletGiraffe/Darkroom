@@ -2,8 +2,8 @@
 
 [← Back to frame viewing and playback](architecture/playback.md)
 
-Decode times on the image viewer's JPEG and camera raw paths, measured 2026-10-31. All machines ran the same library
-sources: libjpeg-turbo 3.2.0 and LibRaw 0.22.2, from vcpkg's source trees.
+Decode times on the image viewer's JPEG and camera raw paths, measured 2026-10-31; raw 29 on 2026-11-01. All machines
+ran the same library sources: libjpeg-turbo 3.2.0 and LibRaw 0.22.2, from vcpkg's source trees.
 
 ## Setups
 
@@ -207,7 +207,7 @@ Half size:
 | 25 ARW lossless S YCbCr | 3516x2344 | 225 | 1048 | 4.7 | 886 | 3.9 |
 | 26 CR2 sRAW YCbCr | 3000x2000 | 316 | 1362 | 4.3 | 1101 | 3.5 |
 | 27 DNG ProRAW linear | 8064x6048 | 2330 | 9520 | 4.1 | 8618 | 3.7 |
-| 29 PEF | 3112x2080 | 414 | 1604 | 3.9 | 1454 | 3.5 |
+| 29 PEF | 3012x2012 | 398 | 1548 | 3.9 | 1400 | 3.5 |
 | 30 PEF pixel shift 4 frames | 3112x2080 | 416 | 1620 | 3.9 | 1458 | 3.5 |
 | 31 RAF X-Trans lossy compressed | 3876x2589 | 398 | 2054 | 5.2 | 3024 | 7.6 |
 
@@ -241,7 +241,7 @@ Full size:
 | 25 ARW lossless S YCbCr | 3516x2344 | 224 | 1041 | 4.7 | 890 | 4.0 |
 | 26 CR2 sRAW YCbCr | 3000x2000 | 312 | 1374 | 4.4 | 1082 | 3.5 |
 | 27 DNG ProRAW linear | 8064x6048 | 2362 | 9533 | 4.0 | 8453 | 3.6 |
-| 29 PEF | 6224x4160 | 900 | 4046 | 4.5 | 4344 | 4.8 |
+| 29 PEF | 6024x4024 | 907 | 3858 | 4.3 | 4100 | 4.5 |
 | 30 PEF pixel shift 4 frames | 6224x4160 | 904 | 4058 | 4.5 | 4348 | 4.8 |
 | 31 RAF X-Trans lossy compressed | 7752x5178 | 3201 | 24678 | 7.7 | 27065 | 8.5 |
 
@@ -251,7 +251,8 @@ Full size:
   except X-Trans full renders at 8.0-8.2x.
 - On the 2310M unpacking is mostly 3-4x slower, Fujifilm's compressed formats (11, 13, 31) 7-9x; `dcraw_process` is
   4-7x slower, X-Trans full renders 8-9x.
-- The pixel-shift PEF (30) holds 4 raw frames: LibRaw renders only the first, in the time of a single-frame PEF (29).
+- The pixel-shift PEF (30) holds 4 raw frames: LibRaw renders only the first, in the time of a single-frame PEF from
+  the same camera.
 - Under the Pi's 1.4 GB cap renders up to 51 MP fit. At 1.6 GB the 102 MP 3FR fits, while the 102 MP GFX100 RAF, the
   IIQ, the RW2 and the NEFX still fail: the memory needed depends on the decoder, not on the pixel count alone.
 - Uncapped, with zram and then a disk swapfile as swap: the GFX100 RAF renders full size in 15 s with almost no swapping,
