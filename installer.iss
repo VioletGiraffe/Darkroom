@@ -230,3 +230,31 @@ begin
   if not Result then
     SuppressibleMsgBox('Select at least one application to install.', mbError, MB_OK, IDOK);
 end;
+
+function Shell_GetCachedImageIndexW(IconPath: String; IconIndex: Integer; Flags: Cardinal): Integer;
+  external 'Shell_GetCachedImageIndexW@shell32.dll stdcall';
+procedure SHUpdateImageW(IconPath: String; IconIndex: Integer; Flags: Cardinal; ImageIndex: Integer);
+  external 'SHUpdateImageW@shell32.dll stdcall';
+
+// Makes the shell reload each .ico overwritten in place: it caches icons by path.
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  Dir, IconPath: String;
+  ImageIndex: Integer;
+  Rec: TFindRec;
+begin
+  if CurStep <> ssPostInstall then
+    exit;
+  Dir := ExpandConstant('{app}\{#IconDir}\');
+  if FindFirst(Dir + '*.ico', Rec) then
+  try
+    repeat
+      IconPath := Dir + Rec.Name;
+      ImageIndex := Shell_GetCachedImageIndexW(IconPath, 0, 0);
+      if ImageIndex >= 0 then
+        SHUpdateImageW(IconPath, 0, 0, ImageIndex);
+    until not FindNext(Rec);
+  finally
+    FindClose(Rec);
+  end;
+end;
