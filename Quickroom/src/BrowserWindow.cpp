@@ -872,7 +872,7 @@ void BrowserWindow::updateCountsAndEmptyMessage()
 		}
 	}
 
-	QString counts = tr("%1 folders, %2 images, %3 videos").arg(folders).arg(images).arg(videos);
+	QString counts = tr("%1 folder(s), %2 image(s), %3 video(s)").arg(folders).arg(images).arg(videos);
 	if (hidden > 0)
 		counts += tr(", %1 hidden by filter").arg(hidden);
 	_entryCountsLabel->setText(counts);
@@ -909,7 +909,7 @@ void BrowserWindow::updateSelectionSummary()
 	for (const auto& [extension, count] : extensionCounts)
 		extensionTexts.push_back(QStringLiteral("%1: %2").arg(extension).arg(count));
 
-	QString summary = tr("Selected: %1 folders, %2 files").arg(folders).arg(files);
+	QString summary = tr("Selected: %1 folder(s), %2 file(s)").arg(folders).arg(files);
 	if (!extensionTexts.empty())
 		summary += QStringLiteral(" (%1)").arg(extensionTexts.join(QStringLiteral(", ")));
 	_selectionSummaryLabel->setText(summary);
