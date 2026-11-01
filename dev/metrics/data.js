@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793570047274,
+  "lastUpdate": 1793576396461,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -20758,6 +20758,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .text",
             "value": 5478.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 829.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 345,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 85.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "c0b52b1f7a79d61c4306fed682e25330463a2500",
+          "message": "Quickroom: one helper turns grid items into paths, for both the selection and the context menu's targets",
+          "timestamp": "2026-11-02T01:28:23+02:00",
+          "tree_id": "0df6ad3f94a94bdddb32f07f4502123f6f4a1aee",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/c0b52b1f7a79d61c4306fed682e25330463a2500"
+        },
+        "date": 1793576393784,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 19234,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1660,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 32631,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6782,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7591,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5479,
             "unit": "KB"
           },
           {
