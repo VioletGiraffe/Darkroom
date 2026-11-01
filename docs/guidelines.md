@@ -71,8 +71,11 @@ All user-facing strings in the apps' sources are wrapped for translation-readine
 wired up yet). Match this for new UI strings:
 
 - Member-function strings use `tr(...)`; free-function / namespace-scope strings use `QObject::tr(...)`.
-- Concatenated messages use `%1` placeholders — `tr("Failed to create label:\n%1").arg(path)` — not
-  fragment-wrapping.
+- A sentence is one `tr()` string, with `%1` placeholders for the variable parts:
+  `tr("Failed to create label:\n%1").arg(path)`. Never split a sentence into translated pieces: word order differs
+  between languages.
+- Separately translated items may be joined with a pure separator when each one is a complete phrase on its own, such
+  as the entries of a list or a set of counts.
 - Don't add `Q_OBJECT` solely for `tr()` — strings-only.
 - Leave un-wrapped: `QSettings` keys, stylesheet/QSS, object names, ffmpeg args/paths, `QTime` format codes,
   JSON keys, pure separators (`", "`, `" - "`, `"<br>"`), and iconic single glyphs (★, ⏳, ↑, ↓, ×).
