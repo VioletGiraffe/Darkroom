@@ -70,6 +70,16 @@ Test sources are listed explicitly in `tests/tests.pro`; a new test file must be
 silent breakage: persisted-format compatibility, identity invariants, catalog mutations, case-sensitive filesystem
 behavior, and catalog-integrity verdicts.
 
+Hidden tests run only when named, e.g. `run_tests.bat "[rawsamples]"`:
+- `[rawsamples]` decodes every camera raw at the top level of the folder named by `DARKROOM_RAW_SAMPLES`, in each raw
+  rendering. A raw fails when it does not decode, when its progress reports go backwards, when abandoning its rendering
+  halfway still yields an image, or when its predicted rendering size is more than 2% off. It logs each rendering's
+  size, read and decode times, and progress against time, the data for tuning LibRaw's stage weights. Keep raws LibRaw
+  cannot render out of that top level.
+- `[tonecurvedata]` writes, for the same raws, the data `scripts/fit_tone_curve.py` fits LibRaw renderings' tone curve
+  to: each raw's half-size rendering before the curve, its embedded JPEG preview, and the exposures the decoder applies.
+  It writes into the folder named by `DARKROOM_TONE_CURVE_DATA`. The script's header describes the whole procedure.
+
 ## Image read benchmark
 
 `scripts/image_read_benchmark.py` times reading image files cold: one screenful under the I/O strategies a loader can

@@ -26,7 +26,7 @@ contains implementation detail. Keep both in sync.
 | `Shared/` | the static library both apps link: `Shared.pro`, `src/`, `res/` (the shared `UI/` icon SVGs, `shared.qrc`) |
 | `tests/` | Catch2 tests over the Core model |
 | `docs/` | this documentation; `mockups/` holds static HTML UI mockups, design input only and not kept in sync with the code |
-| `scripts/` | `build` and `run_tests` (see [build.md](build.md#scripts)), `create_dmg.sh` (macOS packaging), `build-filetype-icons.py` (Quickroom file-type icons) and `preview-filetype-icons.py` (contact sheets of them), `image_read_benchmark` (see [build.md](build.md#image-read-benchmark)) |
+| `scripts/` | `build` and `run_tests` (see [build.md](build.md#scripts)), `create_dmg.sh` (macOS packaging), `build-filetype-icons.py` (Quickroom file-type icons) and `preview-filetype-icons.py` (contact sheets of them), `image_read_benchmark` (see [build.md](build.md#image-read-benchmark)), `fit_tone_curve.py` (fits LibRaw renderings' tone curve to cameras' JPEGs) |
 | `installer.iss` | Windows installer script (Inno Setup) |
 | `.github/workflows/` | CI |
 | `Darkroom.pro`, `Tests.pro`, `global.pri` | the two qmake roots and their shared compiler settings |
@@ -69,8 +69,10 @@ The directories:
 - `ImageDecoding/` - image loading. Camera raws, chosen by extension, go through LibRaw: thumbnails use the largest
   embedded JPEG preview, the viewer and photo compare the shared raw rendering setting (that preview, or LibRaw's
   half-size or full rendering). A raw without a JPEG preview gets the half-size rendering in its place. LibRaw's linear
-  output goes through our tone curve, fitted to cameras' own JPEGs, after the exposure the camera's rendering adds: a
-  DNG's BaselineExposure, Fujifilm's DR modes, Canon's Highlight Tone Priority. Other files are routed by content: JPEG
+  output goes through our tone curve after the exposure the camera's rendering adds: a DNG's BaselineExposure,
+  Fujifilm's DR modes, Canon's Highlight Tone Priority. The curve is fitted to cameras' own JPEGs, with deeper blacks
+  by choice. With an embedded JPEG preview, that exposure is then shifted to match the preview's midtones, which catches
+  what the metadata does not record, such as Canon's Auto Lighting Optimizer. Other files are routed by content: JPEG
   through libjpeg-turbo, every other format through Qt's image plugins. Reading and decoding are separate calls, for
   the I/O and CPU pools. For the viewer's previews, a JPEG decodes DCT-reduced, and a raw
   rendered by LibRaw hands over its embedded JPEG before the whole file is read. A LibRaw rendering reports its

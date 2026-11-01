@@ -1,5 +1,6 @@
 #include "ImageDecoding/ColorManagement.h"
 #include "ImageDecoding/ImageDecoding.h"
+#include "ImageDecoding/LibRawDecoder.h"
 #include "ImageDecoding/TurboJpegDecoder.h"
 #include "JpegTestData.h"
 
@@ -13,6 +14,9 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QImage>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QPoint>
 #include <QSize>
 #include <QTemporaryDir>
@@ -127,6 +131,36 @@ constexpr QSize JpegSize{ 64, 32 };
 		}
 	}
 	return true;
+}
+
+// A Format_RGBX64 or Format_Grayscale16 image as a 16-bit binary PPM or PGM, each pixel the average of a factor x factor block.
+// A partial block at the right or bottom edge is dropped.
+[[nodiscard]] QByteArray boxAveragedNetpbm(const QImage& image, int factor)
+{
+	const bool gray = image.format() == QImage::Format_Grayscale16;
+	const int channels = gray ? 1 : 3, valuesPerPixel = gray ? 1 : 4;
+	const int width = image.width() / factor, height = image.height() / factor;
+	QByteArray netpbm = QStringLiteral("%1\n%2 %3\n65535\n").arg(gray ? "P5" : "P6").arg(width).arg(height).toLatin1();
+	std::vector<double> sums(static_cast<size_t>(width) * channels);
+	for (int y = 0; y < height * factor; ++y)
+	{
+		const auto* values = reinterpret_cast<const uint16_t*>(image.constScanLine(y));
+		for (int x = 0; x < width * factor; ++x)
+		{
+			for (int c = 0; c < channels; ++c)
+				sums[static_cast<size_t>(x / factor) * channels + c] += values[x * valuesPerPixel + c];
+		}
+		if ((y + 1) % factor != 0)
+			continue;
+
+		for (double& sum : sums)
+		{
+			const auto value = static_cast<uint16_t>(std::lround(sum / (factor * factor)));
+			netpbm.append(static_cast<char>(value >> 8)).append(static_cast<char>(value & 0xFF)); // Netpbm is big-endian
+			sum = 0.0;
+		}
+	}
+	return netpbm;
 }
 
 } // namespace
@@ -506,6 +540,59 @@ TEST_CASE("ImageDecoding: camera raw samples", "[.][rawsamples]")
 			CHECK(std::abs(predicted.height() - rendered.height()) <= 0.02 * rendered.height());
 		}
 	}
+}
+
+// Hidden: writes the data scripts/fit_tone_curve.py fits decodeRaw()'s tone curve to, into the folder named by DARKROOM_TONE_CURVE_DATA.
+// For every camera raw at the top level of the folder named by DARKROOM_RAW_SAMPLES:
+//   <raw file name>.ppm, or .pgm for a monochrome raw - its half-size rendering before the tone curve, box-averaged to about 480 pixels wide
+//   <raw file name>.jpg - its embedded JPEG preview, when it has one
+//   an entry in samples.json - the raw's file name, the two exposures decodeRaw() applies before the curve, whether the preview exists and is Adobe RGB
+TEST_CASE("ImageDecoding: tone curve fitting data", "[.][tonecurvedata]")
+{
+	const QString samplesFolder = qEnvironmentVariable("DARKROOM_RAW_SAMPLES");
+	const QString dataFolderPath = qEnvironmentVariable("DARKROOM_TONE_CURVE_DATA");
+	REQUIRE_FALSE(samplesFolder.isEmpty());
+	REQUIRE_FALSE(dataFolderPath.isEmpty());
+	REQUIRE(QDir{}.mkpath(dataFolderPath));
+	const QDir dataFolder{ dataFolderPath };
+
+	const auto writeFile = [&](const QString& name, const QByteArray& bytes) {
+		QFile file{ dataFolder.filePath(name) };
+		REQUIRE(file.open(QIODevice::WriteOnly));
+		REQUIRE(file.write(bytes) == bytes.size());
+	};
+
+	QJsonArray samples;
+	for (const QFileInfo& file : QDir{ samplesFolder }.entryInfoList(QDir::Files, QDir::Name))
+	{
+		if (!rawFileSuffixes().contains(file.suffix().toLower()))
+			continue;
+
+		INFO(file.fileName().toStdString());
+		QFile raw{ file.filePath() };
+		REQUIRE(raw.open(QIODevice::ReadOnly));
+		const LinearRawRendering linear = decodeRawLinear(raw.readAll(), RawRendering::HalfSize);
+		CHECK(linear.error.isEmpty());
+		if (linear.image.isNull())
+			continue;
+
+		const bool gray = linear.image.format() == QImage::Format_Grayscale16;
+		writeFile(file.fileName() + (gray ? ".pgm" : ".ppm"), boxAveragedNetpbm(linear.image, std::max(1, linear.image.width() / 480)));
+
+		const EncodedImage preview = readEncodedImage(file.filePath(), RawRendering::EmbeddedPreview);
+		const bool hasPreview = !preview.rawRendering && !preview.bytes.isEmpty();
+		if (hasPreview)
+			writeFile(file.fileName() + ".jpg", preview.bytes);
+
+		samples.append(QJsonObject{
+			{ "raw", file.fileName() },
+			{ "cameraExposureEv", linear.cameraExposureEv },
+			{ "previewShiftEv", linear.previewShiftEv },
+			{ "preview", hasPreview },
+			{ "previewAdobeRgb", preview.adobeRgb },
+		});
+	}
+	writeFile("samples.json", QJsonDocument{ samples }.toJson());
 }
 
 TEST_CASE("ImageDecoding::applyOrientation: every transformation as EXIF defines it", "[imagedecoding]")
