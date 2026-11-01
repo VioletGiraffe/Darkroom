@@ -123,6 +123,7 @@ private:
 	QAction*   _upAction = nullptr;
 	QTimer*    _zoomDebounce = nullptr;
 	QTimer*    _refreshDebounce = nullptr;
+	QTimer*    _selectionSummaryDebounce = nullptr;
 	QFileSystemWatcher* _folderWatcher = nullptr;
 	QFileIconProvider _iconProvider;
 

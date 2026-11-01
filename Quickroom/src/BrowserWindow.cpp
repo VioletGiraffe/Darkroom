@@ -353,7 +353,12 @@ void BrowserWindow::setupUi()
 	_selectionSummaryLabel = new CLabelElided();
 	_selectionSummaryLabel->setElideMode(Qt::ElideRight);
 	statusBar()->addPermanentWidget(_selectionSummaryLabel);
-	connect(_grid, &QListWidget::itemSelectionChanged, this, &BrowserWindow::updateSelectionSummary);
+	// Coalesces the per-row selection changes of a bulk row removal into one summary.
+	_selectionSummaryDebounce = new QTimer(this);
+	_selectionSummaryDebounce->setSingleShot(true);
+	_selectionSummaryDebounce->setInterval(0);
+	connect(_selectionSummaryDebounce, &QTimer::timeout, this, &BrowserWindow::updateSelectionSummary);
+	connect(_grid, &QListWidget::itemSelectionChanged, _selectionSummaryDebounce, qOverload<>(&QTimer::start));
 
 	// Grid-only: the path field keeps its own keys.
 	// Enter activates on macOS too: item views there activate with Cmd+O and leave Enter to editing.
