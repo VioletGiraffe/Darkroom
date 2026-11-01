@@ -22,6 +22,7 @@ RESTORE_COMPILER_WARNINGS
 #include <optional>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace ImageDecoding {
@@ -396,11 +397,10 @@ CellColors renderingCellColors(const LibRaw& raw)
 	return cells;
 }
 
-// A decodeRawPreview() result, converted to sRGB; empty for a null image
+// A decodeRawPreview() result, converted to sRGB
 CellColors previewCellColors(DecodedImage preview)
 {
-	if (preview.image.isNull())
-		return {};
+	assert_and_return_r(!preview.image.isNull(), {});
 
 	QImage& image = preview.image;
 	convertToSrgb(image, preview.iccProfile);
@@ -603,10 +603,15 @@ double quantileMatchingShiftEv(const CellColors& rendering, const CellColors& pr
 // The shift matching raw's rendering to its embedded JPEG preview, from decodedPreview when given; 0 without a usable preview
 double previewMatchingShiftEv(LibRaw& raw, double exposureGain, const DecodedRawPreviewSource& decodedPreview)
 {
-	constexpr size_t minCells = 100;
-	const CellColors preview = previewCellColors(decodedPreview ? decodedPreview()
+	DecodedImage decoded = decodedPreview ? decodedPreview()
 		: unpackLargestJpegPreview(raw) == LIBRAW_SUCCESS ? decodeRawPreview(unpackedJpegPreview(raw), {})
-		                                                  : DecodedImage{});
+		                                                  : DecodedImage{};
+	// A preview narrower than the grid is a thumbnail, whose exposure need not follow the camera's rendering
+	if (decoded.image.width() < MatchingGridWidth)
+		return 0.0;
+
+	constexpr size_t minCells = 100;
+	const CellColors preview = previewCellColors(std::move(decoded));
 	if (preview.size() < minCells)
 		return 0.0;
 

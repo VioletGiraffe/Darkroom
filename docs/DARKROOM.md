@@ -72,7 +72,8 @@ The directories:
   output goes through our tone curve after the exposure the camera's rendering adds: a DNG's BaselineExposure,
   Fujifilm's DR modes, Canon's Highlight Tone Priority. The curve is fitted to cameras' own JPEGs, with deeper blacks
   by choice. With an embedded JPEG preview, that exposure is then shifted to match the preview's midtones, which catches
-  what the metadata does not record, such as Canon's Auto Lighting Optimizer. Other files are routed by content: JPEG
+  what the metadata does not record, such as Canon's Auto Lighting Optimizer. A thumbnail-sized preview is not matched:
+  its exposure need not follow the camera's rendering. Other files are routed by content: JPEG
   through libjpeg-turbo, every other format through Qt's image plugins. Reading and decoding are separate calls, for
   the I/O and CPU pools. For the viewer's previews, a JPEG decodes DCT-reduced, and a raw
   rendered by LibRaw hands over its embedded JPEG before the whole file is read. A LibRaw rendering reports its
