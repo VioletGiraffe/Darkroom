@@ -33,8 +33,10 @@ the widget through a `CImageViewerWidget::PendingImage`, so the widget stays fre
   - a JPEG whose full decode is predicted at 100 ms or more - a 1/8 DCT-reduced decode, the fastest: the full decode
     soon replaces it, but on a slow machine a viewer flicking through files may move on first. The prediction is the
     megapixels times this machine's running average for full JPEG decodes.
-  - a camera raw LibRaw renders - its embedded JPEG, fitted to the screen where that takes 1/2 or less, else decoded
-    whole: it stays up while LibRaw renders, and above 1/2 a reduced decode is no cheaper.
+  - a camera raw LibRaw renders - its embedded JPEG at 1/2 where that covers the screen, else decoded whole: it stays
+    up while LibRaw renders, which matches the raw's exposure to this same decode. Smaller DCT-reduced decodes would
+    bias that matching, and above 1/2 a reduced decode is no cheaper. Whichever of the two tasks needs it first
+    decodes it, once.
   - Progressive and arithmetic-coded JPEGs are never reduced: entropy decoding dominates at every scale.
 - Other formats show only the final image. Decode times at each JPEG scale and for LibRaw renders:
   [image-decode-performance.md](../image-decode-performance.md).

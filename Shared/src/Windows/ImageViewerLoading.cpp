@@ -11,6 +11,7 @@ RESTORE_COMPILER_WARNINGS
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <utility>
 
 using namespace ImageDecoding;
@@ -23,9 +24,6 @@ namespace {
 constexpr double MinJpegDecodeMsForPreview = 100.0;
 // A JPEG's preview shows only until its full decode, running in parallel, replaces it: the fastest scale
 constexpr int JpegPreviewScaleEighths = 1;
-// A raw's embedded JPEG shows while LibRaw renders: fitted to the screen.
-// Above 1/2 every IDCT is scalar: a reduced decode costs about as much as a full one, or more.
-constexpr int MaxRawPreviewScaleEighths = 4;
 
 // This machine's full JPEG decodes, a running average; it starts near a Raspberry Pi 4's, so a fast machine sees a few needless previews
 std::atomic<double> jpegDecodeMsPerMegapixel{ 15.0 };
@@ -52,10 +50,22 @@ struct LoadJob {
 		, uprightBox{ uprightBox }
 	{}
 
+	// rawPreview decoded once, by whichever task needs it first: the one showing it, or LibRaw's rendering, which matches its exposure to it
+	[[nodiscard]] const DecodedImage& decodedRawPreview()
+	{
+		std::call_once(_rawPreviewDecoded, [this] { _decodedRawPreview = decodeRawPreview(rawPreview, uprightBox); });
+		return _decodedRawPreview;
+	}
+
 	AsyncDelivery<Stage> delivery;
 	const QString path;
 	const RawRendering rawRendering;
 	const QSize uprightBox;
+	EncodedImage rawPreview; // a camera raw's embedded JPEG, empty when the read hands over none; set by readStage before any task reads it
+
+private:
+	std::once_flag _rawPreviewDecoded;
+	DecodedImage _decodedRawPreview;
 };
 
 // Requires a decoded image. Turned upright, as the viewer shows it.
@@ -77,14 +87,10 @@ void deliverPreview(const std::shared_ptr<LoadJob>& job, DecodedImage decoded, Q
 	job->delivery.deliver(Stage{ .kind = Stage::Kind::Preview, .file = toDecodedFile(std::move(decoded)), .finalSize = finalSize }, job);
 }
 
-void decodeRawPreview(const std::shared_ptr<LoadJob>& job, const EncodedImage& preview, QSize uprightRenderSize)
+void deliverRawPreview(const std::shared_ptr<LoadJob>& job, QSize uprightRenderSize)
 {
-	if (job->delivery.isCancelled())
-		return;
-
-	const QSize jpegSize = readReducibleJpegUprightSize(preview);
-	const int scaleEighths = jpegSize.isEmpty() ? 8 : fittedScaleEighths(jpegSize, job->uprightBox);
-	deliverPreview(job, scaleEighths <= MaxRawPreviewScaleEighths ? decodeReduced(preview, scaleEighths) : decode(preview), uprightRenderSize);
+	if (!job->delivery.isCancelled())
+		deliverPreview(job, job->decodedRawPreview(), uprightRenderSize);
 }
 
 void decodeFinal(const std::shared_ptr<LoadJob>& job, const EncodedImage& encoded)
@@ -103,10 +109,15 @@ void decodeFinal(const std::shared_ptr<LoadJob>& job, const EncodedImage& encode
 	}
 
 	const CTimeElapsed decodeTimer{ true };
-	DecodedImage decoded = decode(encoded, [&job](double fraction) {
+	const auto onRawProgress = [&job](double fraction) {
 		job->delivery.deliver(Stage{ .kind = Stage::Kind::Progress, .progress = fraction }, job);
 		return !job->delivery.isCancelled();
-	});
+	};
+	// Without a preview from the read, decode() looks for one in the whole file
+	const DecodedRawPreviewSource decodedRawPreview = job->rawPreview.bytes.isEmpty()
+		? DecodedRawPreviewSource{}
+		: DecodedRawPreviewSource{ [&job] { return job->decodedRawPreview(); } };
+	DecodedImage decoded = decode(encoded, onRawProgress, decodedRawPreview);
 	if (!jpegSize.isEmpty() && !decoded.image.isNull())
 		recordJpegDecode(decodeTimer.usElapsed(), jpegSize);
 	if (decoded.animated)
@@ -122,16 +133,15 @@ void readStage(const std::shared_ptr<LoadJob>& job)
 	if (job->delivery.isCancelled())
 		return;
 
-	// Captured through a pointer: a pool task's captures have a fixed capacity
 	EncodedImage encoded = readEncodedImage(job->path, job->rawRendering, [&job](EncodedImage preview, QSize uprightRenderSize) {
-		cpuThreadPool().enqueue([job, preview = std::make_unique<EncodedImage>(std::move(preview)), uprightRenderSize] {
-			decodeRawPreview(job, *preview, uprightRenderSize);
-		});
+		job->rawPreview = std::move(preview);
+		cpuThreadPool().enqueue([job, uprightRenderSize] { deliverRawPreview(job, uprightRenderSize); });
 		return !job->delivery.isCancelled();
 	});
 	if (job->delivery.isCancelled())
 		return;
 
+	// Captured through a pointer: a pool task's captures have a fixed capacity
 	cpuThreadPool().enqueue([job, encoded = std::make_unique<EncodedImage>(std::move(encoded))] { decodeFinal(job, *encoded); });
 }
 

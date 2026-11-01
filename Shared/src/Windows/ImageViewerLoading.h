@@ -35,7 +35,7 @@ struct Stage {
 
 // A preview decodes in parallel with the final image where that takes longer:
 //   a JPEG whose full decode this machine is predicted to take 100 ms or more - at 1/8;
-//   a camera raw's embedded JPEG while LibRaw renders the raw - fitted to uprightBox where that is 1/2 or less, else whole.
+//   a camera raw's embedded JPEG while LibRaw renders the raw - see decodeRawPreview(); the rendering reuses that decode.
 // Progress comes, in any order with a preview, while LibRaw renders.
 // Exactly one of Final, Animated or Failed ends the load; a preview may still arrive after it.
 [[nodiscard]] AsyncRequest start(const QString& path, ImageDecoding::RawRendering rawRendering, QSize uprightBox, QObject* context,

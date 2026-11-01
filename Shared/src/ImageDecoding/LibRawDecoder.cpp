@@ -1,6 +1,5 @@
 #include "ImageDecoding/LibRawDecoder.h"
 #include "ImageDecoding/ColorManagement.h"
-#include "ImageDecoding/TurboJpegDecoder.h"
 #include "assert/advanced_assert.h"
 #include "buffered_reader.hpp" // thin_io
 
@@ -186,6 +185,16 @@ int unpackLargestJpegPreview(LibRaw& raw)
 			return LIBRAW_SUCCESS;
 	}
 	return previews.thumbcount == 0 ? LIBRAW_NO_THUMBNAIL : LIBRAW_UNSUPPORTED_THUMBNAIL;
+}
+
+// Requires unpackLargestJpegPreview() to have succeeded; orientation and format are left to the caller
+EncodedImage unpackedJpegPreview(const LibRaw& raw)
+{
+	const libraw_thumbnail_t& preview = raw.imgdata.thumbnail;
+	return EncodedImage{
+		.bytes = QByteArray{ preview.thumb, static_cast<qsizetype>(preview.tlength) },
+		.adobeRgb = raw.imgdata.color.ExifColorSpace == LIBRAW_COLORSPACE_AdobeRGB,
+	};
 }
 
 // The share of a rendering's time that one stage LibRaw reports takes
@@ -385,24 +394,14 @@ CellColors renderingCellColors(const LibRaw& raw)
 	return cells;
 }
 
-// The largest embedded JPEG preview in sRGB; empty when the raw has none or it does not decode
-CellColors previewCellColors(LibRaw& raw)
+// A decodeRawPreview() result, converted to sRGB; empty for a null image
+CellColors previewCellColors(DecodedImage preview)
 {
-	if (unpackLargestJpegPreview(raw) != LIBRAW_SUCCESS)
+	if (preview.image.isNull())
 		return {};
 
-	const libraw_thumbnail_t& thumbnail = raw.imgdata.thumbnail;
-	const QByteArray jpeg = QByteArray::fromRawData(thumbnail.thumb, static_cast<qsizetype>(thumbnail.tlength));
-	// Half size, no smaller: a DCT-reduced decode averages sRGB codes, which darkens fine texture.
-	// At half size that shifts the match by under 0.1 EV on the camera raw samples, at 1/8 by up to 0.36.
-	std::optional<DecodedImage> decoded = decodeJpeg(jpeg, 4);
-	if (!decoded || decoded->image.isNull())
-		return {};
-
-	QImage& image = decoded->image;
-	// As decode() does for a raw's preview: an embedded profile, else Adobe RGB when the EXIF declares it
-	const bool exifAdobeRgb = raw.imgdata.color.ExifColorSpace == LIBRAW_COLORSPACE_AdobeRGB;
-	convertToSrgb(image, decoded->iccProfile.isEmpty() && exifAdobeRgb ? adobeRgbIccProfile() : decoded->iccProfile);
+	QImage& image = preview.image;
+	convertToSrgb(image, preview.iccProfile);
 	image.convertTo(QImage::Format_RGB32);
 
 	static const std::array<float, 256> linearForCode = [] {
@@ -570,11 +569,13 @@ double quantileMatchingShiftEv(const CellColors& rendering, const CellColors& pr
 	return (low + high) / 2;
 }
 
-// The shift matching raw's rendering to its embedded JPEG preview; 0 without a usable preview
-double previewMatchingShiftEv(LibRaw& raw, double exposureGain)
+// The shift matching raw's rendering to its embedded JPEG preview, from decodedPreview when given; 0 without a usable preview
+double previewMatchingShiftEv(LibRaw& raw, double exposureGain, const DecodedRawPreviewSource& decodedPreview)
 {
 	constexpr size_t minCells = 100;
-	const CellColors preview = previewCellColors(raw);
+	const CellColors preview = previewCellColors(decodedPreview ? decodedPreview()
+		: unpackLargestJpegPreview(raw) == LIBRAW_SUCCESS ? decodeRawPreview(unpackedJpegPreview(raw), {})
+		                                                  : DecodedImage{});
 	if (preview.size() < minCells)
 		return 0.0;
 
@@ -656,24 +657,22 @@ std::optional<EncodedImage> readRawPreview(thin_io::buffered_reader& file, RawRe
 	if (result != LIBRAW_SUCCESS)
 		return EncodedImage{ .error = QString::fromLatin1(LibRaw::strerror(result)) };
 
-	const libraw_thumbnail_t& preview = raw->imgdata.thumbnail;
-	return EncodedImage{
-		.bytes = QByteArray{ preview.thumb, static_cast<qsizetype>(preview.tlength) },
-		.orientation = orientationForFlip(raw->imgdata.sizes.flip),
-		.adobeRgb = raw->imgdata.color.ExifColorSpace == LIBRAW_COLORSPACE_AdobeRGB,
-	};
+	EncodedImage preview = unpackedJpegPreview(*raw);
+	preview.orientation = orientationForFlip(raw->imgdata.sizes.flip);
+	return preview;
 }
 
-DecodedImage decodeRaw(const QByteArray& file, RawRendering rawRendering, const RawRenderProgressHandler& onProgress)
+DecodedImage decodeRaw(const QByteArray& file, RawRendering rawRendering, const RawRenderProgressHandler& onProgress,
+	const DecodedRawPreviewSource& decodedPreview)
 {
 	const ProcessedRaw processed = processRaw(file, rawRendering, onProgress);
 	if (!processed.raw)
 		return { .error = processed.error };
 
 	LibRaw& raw = *processed.raw;
-	// Before the image is allocated: the matching decodes the preview, and frees it on return
+	// Before the image is allocated: the matching holds an sRGB copy of the preview until it returns
 	const double cameraExposureEv = cameraRenderingExposureEv(raw);
-	const double exposureEv = cameraExposureEv + previewMatchingShiftEv(raw, std::exp2(cameraExposureEv));
+	const double exposureEv = cameraExposureEv + previewMatchingShiftEv(raw, std::exp2(cameraExposureEv), decodedPreview);
 	const SrgbCodeTable toSrgb = toneCurveToSrgb(std::exp2(exposureEv));
 
 	const int width = raw.imgdata.sizes.width, height = raw.imgdata.sizes.height, colors = raw.imgdata.idata.colors;
@@ -725,7 +724,7 @@ LinearRawRendering decodeRawLinear(const QByteArray& file, RawRendering rawRende
 		}
 	}
 	const double cameraExposureEv = cameraRenderingExposureEv(raw);
-	return { .image = std::move(image), .cameraExposureEv = cameraExposureEv, .previewShiftEv = previewMatchingShiftEv(raw, std::exp2(cameraExposureEv)) };
+	return { .image = std::move(image), .cameraExposureEv = cameraExposureEv, .previewShiftEv = previewMatchingShiftEv(raw, std::exp2(cameraExposureEv), {}) };
 }
 
 QSize readRawUprightSize(thin_io::buffered_reader& file)

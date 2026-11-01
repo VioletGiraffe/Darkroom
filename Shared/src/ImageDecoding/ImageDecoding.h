@@ -70,8 +70,12 @@ using RawPreviewHandler = std::function<bool (EncodedImage preview, QSize uprigh
 
 // Receives the fraction of a LibRaw rendering done, 0 to 1, on the decoding thread. Returning false abandons the rendering.
 using RawRenderProgressHandler = std::function<bool (double fraction)>;
+// Returns decodeRawPreview() of the raw's embedded JPEG preview; a null image when the raw has none
+using DecodedRawPreviewSource = std::function<DecodedImage ()>;
 // A camera raw read whole reports its rendering's progress to onRawProgress; an abandoned rendering fails.
-[[nodiscard]] DecodedImage decode(const EncodedImage& encoded, const RawRenderProgressHandler& onRawProgress = {});
+// Its rendering's exposure is matched to its embedded JPEG preview: from decodedRawPreview when given, else decoded from the raw.
+[[nodiscard]] DecodedImage decode(const EncodedImage& encoded, const RawRenderProgressHandler& onRawProgress = {},
+	const DecodedRawPreviewSource& decodedRawPreview = {});
 [[nodiscard]] DecodedImage decode(const QByteArray& encoded);
 void applyOrientation(QImage& image, QImageIOHandler::Transformations orientation);
 
@@ -84,6 +88,9 @@ void applyOrientation(QImage& image, QImageIOHandler::Transformations orientatio
 [[nodiscard]] int fittedScaleEighths(QSize uprightSize, QSize uprightBox);
 // As decode(), at scaleEighths/8 of each side. Requires a JPEG readReducibleJpegUprightSize() accepts.
 [[nodiscard]] DecodedImage decodeReduced(const EncodedImage& encoded, int scaleEighths);
+// A camera raw's embedded JPEG preview at 1/2 where readReducibleJpegUprightSize() accepts it and 1/2 covers uprightBox, or
+// uprightBox is empty; else whole. No smaller: decode() matches the raw's exposure to this decode.
+[[nodiscard]] DecodedImage decodeRawPreview(const EncodedImage& preview, QSize uprightBox);
 
 // The image's size once turned upright, read from the file's headers only; empty when they do not state it.
 // A camera raw's is the size LibRaw renders it at.

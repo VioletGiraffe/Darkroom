@@ -187,10 +187,10 @@ EncodedImage readEncodedImage(const QString& path, RawRendering rawRendering, co
 	return encoded;
 }
 
-DecodedImage decode(const EncodedImage& encoded, const RawRenderProgressHandler& onRawProgress)
+DecodedImage decode(const EncodedImage& encoded, const RawRenderProgressHandler& onRawProgress, const DecodedRawPreviewSource& decodedRawPreview)
 {
 	DecodedImage decoded = !encoded.error.isEmpty() ? DecodedImage{ .error = encoded.error }
-		: encoded.rawRendering                     ? decodeRaw(encoded.bytes, *encoded.rawRendering, onRawProgress)
+		: encoded.rawRendering                     ? decodeRaw(encoded.bytes, *encoded.rawRendering, onRawProgress, decodedRawPreview)
 		                                           : decode(encoded.bytes);
 	return withEncodedMetadata(std::move(decoded), encoded);
 }
@@ -234,6 +234,17 @@ DecodedImage decodeReduced(const EncodedImage& encoded, int scaleEighths)
 	std::optional<DecodedImage> decoded = decodeJpeg(encoded.bytes, scaleEighths);
 	assert_and_return_r(decoded, decode(encoded));
 	return withEncodedMetadata(std::move(*decoded), encoded);
+}
+
+DecodedImage decodeRawPreview(const EncodedImage& preview, QSize uprightBox)
+{
+	// A DCT-reduced decode averages sRGB codes, which darkens fine texture and biases the exposure matching:
+	// on the camera raw samples by up to 0.09 EV at 1/2, 0.19 EV at 1/4.
+	// Above 1/2 every IDCT is scalar: a reduced decode costs about as much as a full one, or more.
+	constexpr int halfSizeEighths = 4;
+	const QSize jpegSize = readReducibleJpegUprightSize(preview);
+	const bool halfSizeCovers = !jpegSize.isEmpty() && (uprightBox.isEmpty() || fittedScaleEighths(jpegSize, uprightBox) <= halfSizeEighths);
+	return halfSizeCovers ? decodeReduced(preview, halfSizeEighths) : decode(preview);
 }
 
 void applyOrientation(QImage& image, QImageIOHandler::Transformations orientation)
