@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793576396461,
+  "lastUpdate": 1793578300719,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -20807,6 +20807,85 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/VioletGiraffe/Darkroom/commit/c0b52b1f7a79d61c4306fed682e25330463a2500"
         },
         "date": 1793576393784,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 19234,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 1660,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 32631,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6782,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7591,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5479,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 829.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 345,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 85.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "3f4e95784fc5473570d9fc6895e49fbb899a711b",
+          "message": "Installer: tells the shell to reload the file-type icons after install, so an upgrade that changes their artwork shows it without a logoff",
+          "timestamp": "2026-11-02T01:56:49+02:00",
+          "tree_id": "aad62179946c59ac302fddbb65a15b87e956b47e",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/3f4e95784fc5473570d9fc6895e49fbb899a711b"
+        },
+        "date": 1793578298240,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
