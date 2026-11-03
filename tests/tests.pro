@@ -50,6 +50,7 @@ SOURCES += \
 	MJpegParserTests.cpp \
 	ExifTests.cpp \
 	ImageDecodingTests.cpp \
+	ImageEncodingTests.cpp \
 	ColorManagementTests.cpp \
 	../Darkroom/src/Core/Catalog.cpp \
 	../Darkroom/src/Core/CatalogIntegrity.cpp \

@@ -1,6 +1,7 @@
 #include "Windows/ImageViewerWindow.h"
 #include "Core/CpuThreadPool.h"
 #include "ImageDecoding/ColorManagement.h"
+#include "ImageEncoding/ImageEncoding.h"
 #include "Shortcuts.h"
 #include "Utils.h"
 #include "assert/advanced_assert.h"
@@ -18,7 +19,6 @@ DISABLE_COMPILER_WARNINGS
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QImage>
-#include <QImageWriter>
 #include <QKeyEvent>
 #include <QKeySequence>
 #include <QLayout>
@@ -38,40 +38,11 @@ DISABLE_COMPILER_WARNINGS
 RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
-#include <array>
 #include <cstdlib>
 #include <functional>
 #include <utility>
 
 constexpr QSize MinViewSize{ 120, 100 };
-constexpr int LossyEncodeQuality = 90;
-
-struct SaveAsType
-{
-	const char* mimeType;
-	// Only lossy types take LossyEncodeQuality: the PNG writer maps quality to its compression level.
-	bool lossy;
-};
-
-// Offered where a writer plugin for it is present.
-constexpr std::array SaveAsTypes{
-	SaveAsType{ "image/avif", true },
-	SaveAsType{ "image/bmp", false },
-	SaveAsType{ "image/heic", true },
-	SaveAsType{ "image/heif", true },
-	SaveAsType{ "image/jpeg", true },
-	SaveAsType{ "image/jxl", true },
-	SaveAsType{ "image/png", false },
-	SaveAsType{ "image/tiff", false },
-	SaveAsType{ "image/webp", true },
-};
-
-[[nodiscard]] static bool isLossySaveAsType(const QString& mimeType)
-{
-	const auto type = std::ranges::find_if(SaveAsTypes, [&](const SaveAsType& listed) { return mimeType == QLatin1String(listed.mimeType); });
-	assert_and_return_r(type != SaveAsTypes.end(), false);
-	return type->lossy;
-}
 
 ImageViewerWindow* ImageViewerWindow::showForImages(QStringList imagePaths, int startIndex, QWidget* parent,
 	std::function<void(const QString& path)> onImageChanged)
@@ -497,36 +468,18 @@ void ImageViewerWindow::saveImageAs()
 	const QFileInfo source{ currentImagePath() };
 	const QMimeDatabase mimeDatabase;
 
-	const QList<QByteArray> supportedTypes = QImageWriter::supportedMimeTypes();
-	QStringList writableTypes;
-	for (const SaveAsType& type : SaveAsTypes)
-	{
-		if (supportedTypes.contains(type.mimeType))
-			writableTypes.push_back(QString::fromLatin1(type.mimeType));
-	}
-
-	// Empty when unlisted. Compares resolved types: a platform's MIME database may know a listed name as an alias.
-	const auto listedTypeOf = [&](const QMimeType& type) {
-		const auto listed = std::ranges::find_if(writableTypes, [&](const QString& name) { return mimeDatabase.mimeTypeForName(name) == type; });
-		return listed != writableTypes.end() ? *listed : QString{};
-	};
-
-	// HEIF is a filter only without HEIC, which writes the same files under the conventional extension.
-	QStringList filterTypes = writableTypes;
-	if (filterTypes.contains(QLatin1String("image/heic")))
-		filterTypes.removeOne(QStringLiteral("image/heif"));
-
-	const QString sourceType = listedTypeOf(mimeDatabase.mimeTypeForFile(source));
+	const QStringList offeredTypes = ImageEncoding::offeredMimeTypes();
+	const QString sourceType = ImageEncoding::writableMimeTypeOf(mimeDatabase.mimeTypeForFile(source));
 	QFileDialog dialog(this, tr("Save image as"), source.absolutePath());
 	dialog.setAcceptMode(QFileDialog::AcceptSave);
-	dialog.setMimeTypeFilters(filterTypes);
-	dialog.selectMimeTypeFilter(filterTypes.contains(sourceType) ? sourceType : QStringLiteral("image/png"));
+	dialog.setMimeTypeFilters(offeredTypes);
+	dialog.selectMimeTypeFilter(offeredTypes.contains(sourceType) ? sourceType : QStringLiteral("image/png"));
 	dialog.selectFile(source.completeBaseName());
 	if (dialog.exec() != QDialog::Accepted)
 		return;
 
 	QString targetPath = dialog.selectedFiles().front();
-	QString targetType = listedTypeOf(mimeDatabase.mimeTypeForFile(targetPath, QMimeDatabase::MatchExtension));
+	QString targetType = ImageEncoding::writableMimeTypeOf(mimeDatabase.mimeTypeForFile(targetPath, QMimeDatabase::MatchExtension));
 	if (targetType.isEmpty())
 	{
 		// The dialog checked for overwriting only the name as typed.
@@ -543,31 +496,27 @@ void ImageViewerWindow::saveImageAs()
 
 QString ImageViewerWindow::writeCurrentImage(const QString& targetPath, const QString& mimeType, bool copyFile) const
 {
+	QFile source{ currentImagePath() };
+	if (!copyFile)
+	{
+		// Read for its EXIF; an unreadable source only leaves the EXIF out
+		QByteArray sourceBytes;
+		if (ImageEncoding::takesExif(mimeType) && source.open(QIODevice::ReadOnly))
+			sourceBytes = source.readAll();
+		return ImageEncoding::writeImage(_view->sourceImage(), targetPath, mimeType, ImageEncoding::DefaultQuality, sourceBytes);
+	}
+
+	if (!source.open(QIODevice::ReadOnly))
+		return source.errorString();
+	const QByteArray bytes = source.readAll();
+	if (bytes.size() != source.size())
+		return source.errorString();
+
 	QSaveFile target{ targetPath };
 	if (!target.open(QIODevice::WriteOnly))
 		return target.errorString();
-
-	if (copyFile)
-	{
-		QFile source{ currentImagePath() };
-		if (!source.open(QIODevice::ReadOnly))
-			return source.errorString();
-
-		const QByteArray bytes = source.readAll();
-		if (bytes.size() != source.size())
-			return source.errorString();
-		if (target.write(bytes) != bytes.size())
-			return target.errorString();
-	}
-	else
-	{
-		QImageWriter writer{ &target, QImageWriter::imageFormatsForMimeType(mimeType.toLatin1()).value(0) };
-		if (isLossySaveAsType(mimeType))
-			writer.setQuality(LossyEncodeQuality);
-		if (!writer.write(_view->sourceImage()))
-			return writer.errorString();
-	}
-
+	if (target.write(bytes) != bytes.size())
+		return target.errorString();
 	return target.commit() ? QString{} : target.errorString();
 }
 

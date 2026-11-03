@@ -79,6 +79,8 @@ The directories:
   rendered by LibRaw hands over its embedded JPEG before the whole file is read. A LibRaw rendering reports its
   progress and can be abandoned between its stages. `readUprightImageSize` reads only the headers, for layouts sized
   before decoding. UI-free.
+- `ImageEncoding/` - saving an image through Qt's writer plugins: the formats offered, atomic writes, and a JPEG's
+  EXIF from `ImageMetadata`. UI-free.
 - `ImageMetadata/` - EXIF: decoding's orientation and Adobe RGB flag; every tag of a JPEG, and of a camera raw through
   LibRaw; the EXIF for a JPEG written from the image, fitted to its upright pixels. A JPEG source's EXIF is edited in
   place, so its MakerNote stays valid; a raw's is rewritten without one. UI-free.

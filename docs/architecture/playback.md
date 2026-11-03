@@ -61,7 +61,7 @@ add its own actions to the Image menu, which the viewer keeps current for the im
 Best. Alone among the windows here it persists no geometry.
 Copy puts both the image and its file on the clipboard, for apps that paste pixels and for those that take files.
 Save as copies the file when the target format matches the source, keeping metadata and every frame; any other
-format encodes the frame shown.
+format encodes the frame shown through `ImageEncoding`, a JPEG with the source's EXIF.
 The info strip shows the image's position in the list and its file name in the center.
 The current image becomes the window icon after a delay, so several open viewers stay distinguishable in the
 taskbar without an icon being scaled for every image browsed past.
