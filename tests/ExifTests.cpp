@@ -535,7 +535,8 @@ TEST_CASE("jpegWithExifApp1: the segment follows SOI, and APP0 when present", "[
 	REQUIRE(jpegWithExifApp1(jpeg(app0), payload) == jpeg(app0 + segment(0xE1, payload)));
 	REQUIRE(jpegWithExifApp1(jpeg(app0), {}) == jpeg(app0));
 
-	const std::optional<QByteArrayView> found = findExifApp1(jpegWithExifApp1(jpeg(app0), payload));
+	const QByteArray written = jpegWithExifApp1(jpeg(app0), payload);
+	const std::optional<QByteArrayView> found = findExifApp1(written);
 	REQUIRE(found);
 	REQUIRE(found->toByteArray() == payload);
 }

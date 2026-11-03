@@ -1,0 +1,361 @@
+#include "BatchConvert/BatchConvertDialog.h"
+#include "UiComponents/SegmentedToggle.h"
+
+DISABLE_COMPILER_WARNINGS
+#include <QAbstractButton>
+#include <QCheckBox>
+#include <QCloseEvent>
+#include <QComboBox>
+#include <QDir>
+#include <QFileDialog>
+#include <QFormLayout>
+#include <QGridLayout>
+#include <QGroupBox>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QLineEdit>
+#include <QMessageBox>
+#include <QMimeDatabase>
+#include <QMimeType>
+#include <QPlainTextEdit>
+#include <QProgressBar>
+#include <QPushButton>
+#include <QRadioButton>
+#include <QSettings>
+#include <QSpinBox>
+#include <QVBoxLayout>
+RESTORE_COMPILER_WARNINGS
+
+#include <algorithm>
+#include <array>
+#include <utility>
+
+using namespace BatchConvert;
+
+namespace {
+
+const QString ResizeKey = QStringLiteral("batchConvert/resize");
+const QString FitKey = QStringLiteral("batchConvert/fit");
+const QString WidthKey = QStringLiteral("batchConvert/width");
+const QString HeightKey = QStringLiteral("batchConvert/height");
+const QString DirectionKey = QStringLiteral("batchConvert/direction");
+const QString AdaptToOrientationKey = QStringLiteral("batchConvert/adaptToOrientation");
+const QString FormatKey = QStringLiteral("batchConvert/format");
+const QString QualityKey = QStringLiteral("batchConvert/quality");
+const QString SubsamplingKey = QStringLiteral("batchConvert/jpegSubsampling");
+const QString LocationKey = QStringLiteral("batchConvert/location");
+const QString SubfolderKey = QStringLiteral("batchConvert/subfolder");
+const QString FolderKey = QStringLiteral("batchConvert/folder");
+
+// In the order of the controls' segments and items, which the settings store as indices
+constexpr std::array FitModes{ FitMode::Inside, FitMode::Outside };
+constexpr std::array ScaleDirections{ ScaleDirection::Any, ScaleDirection::OnlyEnlarge, ScaleDirection::OnlyShrink };
+constexpr std::array Subsamplings{ ImageEncoding::JpegSubsampling::Chroma420, ImageEncoding::JpegSubsampling::Chroma422, ImageEncoding::JpegSubsampling::Chroma444 };
+constexpr std::array Locations{ OutputLocation::Subfolder, OutputLocation::Folder, OutputLocation::SourceFolder };
+
+constexpr int MaxSide = 65535; // JPEG's limit
+
+// A stored index, clamped to count entries
+int storedIndex(const QSettings& settings, const QString& key, size_t count)
+{
+	return std::clamp(settings.value(key, 0).toInt(), 0, static_cast<int>(count) - 1);
+}
+
+template <typename Value, size_t Count>
+int indexOf(const std::array<Value, Count>& values, Value value)
+{
+	return static_cast<int>(std::ranges::find(values, value) - values.begin());
+}
+
+} // namespace
+
+void BatchConvertDialog::showForImages(QStringList imagePaths)
+{
+	auto* dialog = new BatchConvertDialog(std::move(imagePaths));
+	dialog->setAttribute(Qt::WA_DeleteOnClose);
+	dialog->show();
+}
+
+BatchConvertDialog::BatchConvertDialog(QStringList imagePaths)
+	: _imagePaths{ std::move(imagePaths) }
+{
+	setWindowTitle(tr("Resize / convert %n image(s)", nullptr, static_cast<int>(_imagePaths.size())));
+
+	_resizeGroup = new QGroupBox(tr("Resize"));
+	_resizeGroup->setCheckable(true);
+	_widthBox = new QSpinBox;
+	_heightBox = new QSpinBox;
+	for (QSpinBox* side : { _widthBox, _heightBox })
+	{
+		side->setRange(1, MaxSide);
+		side->setSuffix(tr(" px"));
+	}
+	auto* sizeRow = new QHBoxLayout;
+	sizeRow->addWidget(_widthBox);
+	sizeRow->addWidget(new QLabel(QStringLiteral("×")));
+	sizeRow->addWidget(_heightBox);
+	sizeRow->addStretch();
+	_fitToggle = new SegmentedToggle({ tr("Inside"), tr("Outside") });
+	_directionToggle = new SegmentedToggle({ tr("Any"), tr("Only enlarge"), tr("Only shrink") });
+	_adaptToOrientationBox = new QCheckBox(tr("Adapt to orientation"));
+	_adaptToOrientationBox->setToolTip(tr("Swaps width and height for an image whose orientation differs from the box's"));
+	auto* resizeForm = new QFormLayout(_resizeGroup);
+	resizeForm->addRow(tr("Box:"), sizeRow);
+	resizeForm->addRow(tr("Fit:"), _fitToggle);
+	resizeForm->addRow(tr("Scale:"), _directionToggle);
+	resizeForm->addRow(QString{}, _adaptToOrientationBox);
+
+	auto* formatGroup = new QGroupBox(tr("Format"));
+	_formatBox = new QComboBox;
+	_formatBox->addItem(tr("Same as the original"), QString{});
+	_formatBox->setToolTip(tr("Camera raws, and originals in formats that cannot be written, are saved as JPEG"));
+	const QMimeDatabase mimeDatabase;
+	for (const QString& mimeType : ImageEncoding::offeredMimeTypes())
+	{
+		const QMimeType type = mimeDatabase.mimeTypeForName(mimeType);
+		_formatBox->addItem(QStringLiteral("%1 (.%2)").arg(type.comment(), type.preferredSuffix()), mimeType);
+	}
+	_qualityBox = new QSpinBox;
+	_qualityBox->setRange(1, 100);
+	_subsamplingBox = new QComboBox;
+	_subsamplingBox->addItems({ QStringLiteral("4:2:0"), QStringLiteral("4:2:2"), QStringLiteral("4:4:4") });
+	auto* formatForm = new QFormLayout(formatGroup);
+	formatForm->addRow(tr("Format:"), _formatBox);
+	formatForm->addRow(tr("Quality:"), _qualityBox);
+	formatForm->addRow(tr("JPEG chroma subsampling:"), _subsamplingBox);
+
+	auto* outputGroup = new QGroupBox(tr("Save to"));
+	_subfolderButton = new QRadioButton(tr("A subfolder beside each original:"));
+	_subfolderEdit = new QLineEdit;
+	_folderButton = new QRadioButton(tr("One folder:"));
+	_folderEdit = new QLineEdit;
+	_browseButton = new QPushButton(tr("Browse..."));
+	_sourceFolderButton = new QRadioButton(tr("The originals' own folders"));
+	auto* outputGrid = new QGridLayout(outputGroup);
+	outputGrid->addWidget(_subfolderButton, 0, 0);
+	outputGrid->addWidget(_subfolderEdit, 0, 1, 1, 2);
+	outputGrid->addWidget(_folderButton, 1, 0);
+	outputGrid->addWidget(_folderEdit, 1, 1);
+	outputGrid->addWidget(_browseButton, 1, 2);
+	outputGrid->addWidget(_sourceFolderButton, 2, 0, 1, 3);
+	outputGrid->setColumnStretch(1, 1);
+
+	_optionsArea = new QWidget;
+	auto* optionsLayout = new QVBoxLayout(_optionsArea);
+	optionsLayout->setContentsMargins(0, 0, 0, 0);
+	optionsLayout->addWidget(_resizeGroup);
+	optionsLayout->addWidget(formatGroup);
+	optionsLayout->addWidget(outputGroup);
+
+	_progressBar = new QProgressBar;
+	_statusLabel = new QLabel;
+	_failureList = new QPlainTextEdit;
+	_failureList->setReadOnly(true);
+	for (QWidget* progressWidget : std::initializer_list<QWidget*>{ _progressBar, _statusLabel, _failureList })
+		progressWidget->hide();
+
+	_startButton = new QPushButton(tr("Start"));
+	_startButton->setDefault(true);
+	_closeButton = new QPushButton(tr("Close"));
+	auto* buttonRow = new QHBoxLayout;
+	buttonRow->addStretch();
+	buttonRow->addWidget(_startButton);
+	buttonRow->addWidget(_closeButton);
+
+	auto* layout = new QVBoxLayout(this);
+	layout->addWidget(_optionsArea);
+	layout->addWidget(_progressBar);
+	layout->addWidget(_statusLabel);
+	layout->addWidget(_failureList, 1);
+	layout->addLayout(buttonRow);
+
+	loadOptions();
+	updateControls();
+
+	connect(_formatBox, &QComboBox::currentIndexChanged, this, &BatchConvertDialog::updateControls);
+	for (QRadioButton* location : { _subfolderButton, _folderButton, _sourceFolderButton })
+		connect(location, &QRadioButton::toggled, this, &BatchConvertDialog::updateControls);
+	for (QLineEdit* edit : { _subfolderEdit, _folderEdit })
+		connect(edit, &QLineEdit::textChanged, this, &BatchConvertDialog::updateControls);
+	connect(_browseButton, &QPushButton::clicked, this, [this] {
+		if (const QString folder = QFileDialog::getExistingDirectory(this, tr("Save to folder"), _folderEdit->text()); !folder.isEmpty())
+			_folderEdit->setText(QDir::toNativeSeparators(folder));
+	});
+	connect(_startButton, &QPushButton::clicked, this, &BatchConvertDialog::startConversion);
+	connect(_closeButton, &QPushButton::clicked, this, &BatchConvertDialog::reject);
+}
+
+void BatchConvertDialog::done(int result)
+{
+	saveOptions();
+	QDialog::done(result);
+}
+
+void BatchConvertDialog::reject()
+{
+	if (!_job || !_job->isRunning())
+	{
+		QDialog::reject();
+		return;
+	}
+
+	// Set first: the job may finish within cancel()
+	_closeOnFinish = true;
+	_closeButton->setEnabled(false);
+	_statusLabel->setText(tr("Cancelling..."));
+	_job->cancel();
+}
+
+void BatchConvertDialog::closeEvent(QCloseEvent* event)
+{
+	if (_job && _job->isRunning())
+	{
+		reject();
+		event->ignore();
+		return;
+	}
+	QDialog::closeEvent(event);
+}
+
+void BatchConvertDialog::loadOptions()
+{
+	const Options defaults;
+	const QSettings settings;
+	_resizeGroup->setChecked(settings.value(ResizeKey, defaults.resize.enabled).toBool());
+	_fitToggle->setCurrentIndex(storedIndex(settings, FitKey, FitModes.size()));
+	_widthBox->setValue(settings.value(WidthKey, defaults.resize.box.width()).toInt());
+	_heightBox->setValue(settings.value(HeightKey, defaults.resize.box.height()).toInt());
+	_directionToggle->setCurrentIndex(storedIndex(settings, DirectionKey, ScaleDirections.size()));
+	_adaptToOrientationBox->setChecked(settings.value(AdaptToOrientationKey, defaults.resize.adaptToOrientation).toBool());
+	_formatBox->setCurrentIndex(std::max(_formatBox->findData(settings.value(FormatKey).toString()), 0));
+	_qualityBox->setValue(settings.value(QualityKey, defaults.quality).toInt());
+	_subsamplingBox->setCurrentIndex(storedIndex(settings, SubsamplingKey, Subsamplings.size()));
+
+	const std::array<QRadioButton*, Locations.size()> locationButtons{ _subfolderButton, _folderButton, _sourceFolderButton };
+	locationButtons[static_cast<size_t>(storedIndex(settings, LocationKey, Locations.size()))]->setChecked(true);
+	_subfolderEdit->setText(settings.value(SubfolderKey, defaults.subfolderName).toString());
+	_folderEdit->setText(QDir::toNativeSeparators(settings.value(FolderKey).toString()));
+}
+
+void BatchConvertDialog::saveOptions() const
+{
+	const Options current = options();
+	QSettings settings;
+	settings.setValue(ResizeKey, current.resize.enabled);
+	settings.setValue(FitKey, indexOf(FitModes, current.resize.fit));
+	settings.setValue(WidthKey, current.resize.box.width());
+	settings.setValue(HeightKey, current.resize.box.height());
+	settings.setValue(DirectionKey, indexOf(ScaleDirections, current.resize.direction));
+	settings.setValue(AdaptToOrientationKey, current.resize.adaptToOrientation);
+	settings.setValue(FormatKey, current.mimeType);
+	settings.setValue(QualityKey, current.quality);
+	settings.setValue(SubsamplingKey, indexOf(Subsamplings, current.jpegSubsampling));
+	settings.setValue(LocationKey, indexOf(Locations, current.location));
+	settings.setValue(SubfolderKey, current.subfolderName);
+	settings.setValue(FolderKey, current.folder);
+}
+
+Options BatchConvertDialog::options() const
+{
+	Options current;
+	current.resize.enabled = _resizeGroup->isChecked();
+	current.resize.fit = FitModes[static_cast<size_t>(_fitToggle->currentIndex())];
+	current.resize.box = QSize{ _widthBox->value(), _heightBox->value() };
+	current.resize.direction = ScaleDirections[static_cast<size_t>(_directionToggle->currentIndex())];
+	current.resize.adaptToOrientation = _adaptToOrientationBox->isChecked();
+	current.mimeType = _formatBox->currentData().toString();
+	current.quality = _qualityBox->value();
+	current.jpegSubsampling = Subsamplings[static_cast<size_t>(_subsamplingBox->currentIndex())];
+	current.location = _subfolderButton->isChecked() ? OutputLocation::Subfolder : _folderButton->isChecked() ? OutputLocation::Folder : OutputLocation::SourceFolder;
+	current.subfolderName = _subfolderEdit->text().trimmed();
+	current.folder = QDir::fromNativeSeparators(_folderEdit->text().trimmed());
+	return current;
+}
+
+void BatchConvertDialog::updateControls()
+{
+	const QString format = _formatBox->currentData().toString();
+	// "Same as the original" may write lossy formats and JPEG
+	_qualityBox->setEnabled(format.isEmpty() || ImageEncoding::isLossy(format));
+	_subsamplingBox->setEnabled(format.isEmpty() || format == QLatin1String("image/jpeg"));
+	_subfolderEdit->setEnabled(_subfolderButton->isChecked());
+	_folderEdit->setEnabled(_folderButton->isChecked());
+	_browseButton->setEnabled(_folderButton->isChecked());
+
+	const QString subfolder = _subfolderEdit->text().trimmed();
+	const bool subfolderValid = !subfolder.isEmpty() && subfolder != QLatin1String(".") && subfolder != QLatin1String("..")
+		&& !subfolder.contains('/') && !subfolder.contains('\\');
+	const bool outputValid = _subfolderButton->isChecked() ? subfolderValid : !_folderButton->isChecked() || QDir::isAbsolutePath(_folderEdit->text().trimmed());
+	_startButton->setEnabled(outputValid && !_job);
+}
+
+void BatchConvertDialog::startConversion()
+{
+	const Options conversion = options();
+	Plan plan = planTargets(_imagePaths, conversion, ClashResolution::Replace);
+	if (plan.existingCount > 0)
+	{
+		QString question = tr("A file of the same name already exists for %n image(s).", nullptr, plan.existingCount);
+		if (plan.replacedSourceCount > 0)
+			question += "\n\n" + tr("For %n of them it is the original itself: replacing moves the original to Trash.", nullptr, plan.replacedSourceCount);
+		QMessageBox box{ QMessageBox::Question, windowTitle(), question, QMessageBox::Cancel, this };
+		const QAbstractButton* replace = box.addButton(tr("Replace"), QMessageBox::AcceptRole);
+		QPushButton* keepBoth = box.addButton(tr("Keep both"), QMessageBox::AcceptRole);
+		const QAbstractButton* skip = box.addButton(tr("Skip"), QMessageBox::AcceptRole);
+		box.setDefaultButton(keepBoth);
+		box.exec();
+
+		if (box.clickedButton() == keepBoth)
+			plan = planTargets(_imagePaths, conversion, ClashResolution::KeepBoth);
+		else if (box.clickedButton() == skip)
+			plan = planTargets(_imagePaths, conversion, ClashResolution::Skip);
+		else if (box.clickedButton() != replace)
+			return;
+	}
+
+	_optionsArea->setEnabled(false);
+	_startButton->setEnabled(false);
+	_closeButton->setText(tr("Cancel"));
+	_targetCount = static_cast<int>(plan.targets.size());
+	_progressBar->setRange(0, _targetCount);
+	_progressBar->setValue(0);
+	_progressBar->show();
+	_statusLabel->setText(tr("Starting..."));
+	_statusLabel->show();
+
+	_job = new Job(std::move(plan.targets), conversion, [this](const TargetResult& result) { showTargetEnded(result); }, [this] { showFinished(); }, this);
+	_job->start();
+}
+
+void BatchConvertDialog::showTargetEnded(const TargetResult& result)
+{
+	++_endedCount;
+	switch (result.ending)
+	{
+	case Ending::Written: ++_writtenCount; break;
+	case Ending::Skipped: ++_skippedCount; break;
+	case Ending::Cancelled: break;
+	case Ending::Failed:
+		++_failedCount;
+		_failureList->appendPlainText(QStringLiteral("%1: %2").arg(QDir::toNativeSeparators(result.target.sourcePath), result.error));
+		_failureList->show();
+		break;
+	}
+
+	_progressBar->setValue(_endedCount);
+	if (!_closeOnFinish)
+		_statusLabel->setText(tr("%1 of %2 images done").arg(_endedCount).arg(_targetCount));
+}
+
+void BatchConvertDialog::showFinished()
+{
+	const QString outcome = _endedCount < _targetCount || _closeOnFinish ? tr("Cancelled.") : tr("Done.");
+	_statusLabel->setText(outcome + ' ' + tr("Written: %1, skipped: %2, failed: %3").arg(_writtenCount).arg(_skippedCount).arg(_failedCount));
+	_closeButton->setText(tr("Close"));
+	_closeButton->setEnabled(true);
+	_job->deleteLater();
+	_job = nullptr;
+
+	if (_closeOnFinish)
+		QDialog::reject();
+}

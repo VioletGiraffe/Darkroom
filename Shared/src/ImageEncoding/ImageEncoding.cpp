@@ -4,7 +4,6 @@
 
 DISABLE_COMPILER_WARNINGS
 #include <QBuffer>
-#include <QByteArray>
 #include <QColorSpace>
 #include <QImage>
 #include <QImageWriter>
@@ -14,10 +13,13 @@ DISABLE_COMPILER_WARNINGS
 #include <QObject>
 #include <QPainter>
 #include <QSaveFile>
+#include <QtGlobal>
+#include <turbojpeg.h>
 RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 #include <array>
+#include <memory>
 
 namespace ImageEncoding {
 
@@ -43,15 +45,95 @@ constexpr std::array Formats{
 	Format{ "image/webp", true },
 };
 
+QString notEnoughMemoryError(const QImage& image)
+{
+	return QObject::tr("Not enough memory to save a %1x%2 image").arg(image.width()).arg(image.height());
+}
+
+// image in a layout tj3Compress8() takes: RGB32, RGB888 or Grayscale8. Alpha is composed onto white. Null when out of memory.
+QImage jpegCompressibleImage(const QImage& image)
+{
+	if (image.hasAlphaChannel())
+	{
+		QImage flattened{ image.size(), QImage::Format_RGB32 };
+		if (flattened.isNull())
+			return {};
+		flattened.fill(Qt::white);
+		QPainter{ &flattened }.drawImage(0, 0, image);
+		return flattened;
+	}
+
+	switch (image.format())
+	{
+	case QImage::Format_RGB32:
+	case QImage::Format_RGB888:
+	case QImage::Format_Grayscale8:
+		return image;
+	case QImage::Format_Grayscale16:
+		return image.convertToFormat(QImage::Format_Grayscale8);
+	default:
+		return image.convertToFormat(QImage::Format_RGB32);
+	}
+}
+
+EncodedFile encodeJpeg(const QImage& image, const QByteArray& iccProfile, int quality, JpegSubsampling subsampling)
+{
+	const QImage source = jpegCompressibleImage(image);
+	if (source.isNull())
+		return { .error = notEnoughMemoryError(image) };
+
+	const std::unique_ptr<void, decltype(&tj3Destroy)> handle{ tj3Init(TJINIT_COMPRESS), &tj3Destroy };
+	const auto error = [&] { return EncodedFile{ .error = QString::fromLocal8Bit(tj3GetErrorStr(handle.get())) }; };
+	if (!handle)
+		return error();
+
+	const bool gray = source.format() == QImage::Format_Grayscale8;
+	const int pixelFormat = gray ? TJPF_GRAY
+		: source.format() == QImage::Format_RGB888 ? TJPF_RGB
+		: Q_BYTE_ORDER == Q_LITTLE_ENDIAN ? TJPF_BGRX : TJPF_XRGB; // Format_RGB32 is 0xffRRGGBB
+	const int chromaSubsampling = subsampling == JpegSubsampling::Chroma444 ? TJSAMP_444 : subsampling == JpegSubsampling::Chroma422 ? TJSAMP_422 : TJSAMP_420;
+	tj3Set(handle.get(), TJPARAM_QUALITY, std::clamp(quality, 1, 100));
+	tj3Set(handle.get(), TJPARAM_SUBSAMP, gray ? TJSAMP_GRAY : chromaSubsampling);
+	tj3Set(handle.get(), TJPARAM_OPTIMIZE, 1);
+	// tj3SetICCProfile() copies the profile
+	if (!iccProfile.isEmpty()
+		&& tj3SetICCProfile(handle.get(), reinterpret_cast<unsigned char*>(const_cast<char*>(iccProfile.constData())), static_cast<size_t>(iccProfile.size())) != 0)
+		return error();
+
+	unsigned char* jpeg = nullptr;
+	size_t jpegSize = 0;
+	const int result = tj3Compress8(handle.get(), source.constBits(), source.width(), static_cast<int>(source.bytesPerLine()), source.height(), pixelFormat, &jpeg, &jpegSize);
+	const std::unique_ptr<unsigned char, decltype(&tj3Free)> jpegOwner{ jpeg, &tj3Free };
+	if (result != 0)
+		return error();
+	return { .bytes = QByteArray{ reinterpret_cast<const char*>(jpeg), static_cast<qsizetype>(jpegSize) } };
+}
+
+EncodedFile encodeWithQt(const QImage& image, const QByteArray& iccProfile, const EncodingOptions& options)
+{
+	QImage tagged = image;
+	if (!tagged.colorSpace().isValid() && !iccProfile.isEmpty())
+		tagged.setColorSpace(QColorSpace::fromIccProfile(iccProfile));
+
+	QBuffer encoded;
+	encoded.open(QIODevice::WriteOnly);
+	QImageWriter writer{ &encoded, QImageWriter::imageFormatsForMimeType(options.mimeType.toLatin1()).value(0) };
+	if (isLossy(options.mimeType))
+		writer.setQuality(options.quality);
+	if (!writer.write(tagged))
+		return { .error = writer.errorString() };
+	return { .bytes = encoded.data() };
+}
+
 } // namespace
 
 QStringList writableMimeTypes()
 {
-	const QList<QByteArray> supportedTypes = QImageWriter::supportedMimeTypes();
+	const QList<QByteArray> qtWritableTypes = QImageWriter::supportedMimeTypes();
 	QStringList writableTypes;
 	for (const Format& format : Formats)
 	{
-		if (supportedTypes.contains(format.mimeType))
+		if (QLatin1String(format.mimeType) == QLatin1String(JpegMimeType) || qtWritableTypes.contains(format.mimeType))
 			writableTypes.push_back(QString::fromLatin1(format.mimeType));
 	}
 	return writableTypes;
@@ -85,38 +167,33 @@ bool takesExif(const QString& mimeType)
 	return mimeType == QLatin1String(JpegMimeType);
 }
 
-QString writeImage(const QImage& image, const QString& targetPath, const QString& mimeType, int quality, QByteArrayView sourceFile)
+EncodedFile encodeImage(const QImage& image, const QByteArray& iccProfile, const EncodingOptions& options, QByteArrayView sourceFile)
 {
-	const bool jpeg = mimeType == QLatin1String(JpegMimeType);
-	QImage written = image;
-	if (jpeg && image.hasAlphaChannel())
-	{
-		written = QImage{ image.size(), QImage::Format_RGB32 };
-		if (written.isNull())
-			return QObject::tr("Not enough memory to save a %1x%2 image").arg(image.width()).arg(image.height());
-		written.setColorSpace(image.colorSpace());
-		written.fill(Qt::white);
-		QPainter{ &written }.drawImage(0, 0, image);
-	}
+	if (!takesExif(options.mimeType))
+		return encodeWithQt(image, iccProfile, options);
 
-	QBuffer encoded;
-	encoded.open(QIODevice::WriteOnly);
-	QImageWriter writer{ &encoded, QImageWriter::imageFormatsForMimeType(mimeType.toLatin1()).value(0) };
-	if (isLossy(mimeType))
-		writer.setQuality(quality);
-	if (!writer.write(written))
-		return writer.errorString();
+	EncodedFile jpeg = encodeJpeg(image, iccProfile, options.quality, options.jpegSubsampling);
+	if (!jpeg.bytes.isEmpty() && !sourceFile.empty())
+		jpeg.bytes = ImageMetadata::jpegWithExifApp1(jpeg.bytes, ImageMetadata::exifApp1ForOutput(sourceFile, image.size()));
+	return jpeg;
+}
 
-	QByteArray bytes = encoded.data();
-	if (jpeg && !sourceFile.empty())
-		bytes = ImageMetadata::jpegWithExifApp1(bytes, ImageMetadata::exifApp1ForOutput(sourceFile, written.size()));
+QString writeFileAtomically(const QString& path, QByteArrayView bytes, const std::function<void()>& beforeReplacing)
+{
+	QSaveFile file{ path };
+	if (!file.open(QIODevice::WriteOnly))
+		return file.errorString();
+	if (file.write(bytes.data(), bytes.size()) != bytes.size())
+		return file.errorString();
+	if (beforeReplacing)
+		beforeReplacing();
+	return file.commit() ? QString{} : file.errorString();
+}
 
-	QSaveFile target{ targetPath };
-	if (!target.open(QIODevice::WriteOnly))
-		return target.errorString();
-	if (target.write(bytes) != bytes.size())
-		return target.errorString();
-	return target.commit() ? QString{} : target.errorString();
+QString writeImage(const QImage& image, const QByteArray& iccProfile, const QString& targetPath, const EncodingOptions& options, QByteArrayView sourceFile)
+{
+	const EncodedFile encoded = encodeImage(image, iccProfile, options, sourceFile);
+	return encoded.bytes.isEmpty() ? encoded.error : writeFileAtomically(targetPath, encoded.bytes, {});
 }
 
 } // namespace ImageEncoding

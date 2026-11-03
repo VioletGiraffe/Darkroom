@@ -29,7 +29,6 @@ DISABLE_COMPILER_WARNINGS
 #include <QMimeDatabase>
 #include <QMimeType>
 #include <QMouseEvent>
-#include <QSaveFile>
 #include <QScreen>
 #include <QSize>
 #include <QTimer>
@@ -503,7 +502,7 @@ QString ImageViewerWindow::writeCurrentImage(const QString& targetPath, const QS
 		QByteArray sourceBytes;
 		if (ImageEncoding::takesExif(mimeType) && source.open(QIODevice::ReadOnly))
 			sourceBytes = source.readAll();
-		return ImageEncoding::writeImage(_view->sourceImage(), targetPath, mimeType, ImageEncoding::DefaultQuality, sourceBytes);
+		return ImageEncoding::writeImage(_view->sourceImage(), _view->sourceIccProfile(), targetPath, { .mimeType = mimeType }, sourceBytes);
 	}
 
 	if (!source.open(QIODevice::ReadOnly))
@@ -511,13 +510,7 @@ QString ImageViewerWindow::writeCurrentImage(const QString& targetPath, const QS
 	const QByteArray bytes = source.readAll();
 	if (bytes.size() != source.size())
 		return source.errorString();
-
-	QSaveFile target{ targetPath };
-	if (!target.open(QIODevice::WriteOnly))
-		return target.errorString();
-	if (target.write(bytes) != bytes.size())
-		return target.errorString();
-	return target.commit() ? QString{} : target.errorString();
+	return ImageEncoding::writeFileAtomically(targetPath, bytes);
 }
 
 void ImageViewerWindow::removeCurrentImage(const std::function<bool(const QString& path)>& remove)

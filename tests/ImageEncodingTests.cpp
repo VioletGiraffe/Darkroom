@@ -1,3 +1,4 @@
+#include "ImageDecoding/ColorManagement.h"
 #include "ImageDecoding/ImageDecoding.h"
 #include "ImageEncoding/ImageEncoding.h"
 #include "ImageMetadata/Exif.h"
@@ -12,6 +13,9 @@
 #include <QStringList>
 #include <QTemporaryDir>
 
+#include <turbojpeg.h>
+
+#include <memory>
 #include <optional>
 
 using namespace ImageEncoding;
@@ -29,6 +33,15 @@ namespace {
 	QImage image{ 40, 30, QImage::Format_RGB32 };
 	image.fill(Qt::gray);
 	return image;
+}
+
+// TJSAMP_*; -1 when jpeg is not one libjpeg-turbo reads
+[[nodiscard]] int jpegSubsampling(const QByteArray& jpeg)
+{
+	const std::unique_ptr<void, decltype(&tj3Destroy)> handle{ tj3Init(TJINIT_DECOMPRESS), &tj3Destroy };
+	if (tj3DecompressHeader(handle.get(), reinterpret_cast<const unsigned char*>(jpeg.constData()), static_cast<size_t>(jpeg.size())) != 0)
+		return -1;
+	return tj3Get(handle.get(), TJPARAM_SUBSAMP);
 }
 
 } // namespace
@@ -52,7 +65,7 @@ TEST_CASE("ImageEncoding: a JPEG carries the source's EXIF, fitted to the image;
 	const QImage image = grayImage();
 
 	const QString jpegPath = dir.filePath("out.jpg");
-	REQUIRE(writeImage(image, jpegPath, "image/jpeg", DefaultQuality, source).isEmpty());
+	REQUIRE(writeImage(image, {}, jpegPath, { .mimeType = "image/jpeg" }, source).isEmpty());
 	const QByteArray jpeg = readFile(jpegPath);
 	const std::optional<QByteArrayView> exif = ImageMetadata::findExifApp1(jpeg);
 	REQUIRE(exif);
@@ -60,8 +73,25 @@ TEST_CASE("ImageEncoding: a JPEG carries the source's EXIF, fitted to the image;
 	REQUIRE(ImageDecoding::decode(jpeg).image.size() == image.size());
 
 	const QString pngPath = dir.filePath("out.png");
-	REQUIRE(writeImage(image, pngPath, "image/png", DefaultQuality, source).isEmpty());
+	REQUIRE(writeImage(image, {}, pngPath, { .mimeType = "image/png" }, source).isEmpty());
 	REQUIRE_FALSE(readFile(pngPath).contains("Exif"));
+}
+
+TEST_CASE("ImageEncoding: a JPEG embeds the ICC profile and has the chroma subsampling asked for", "[imageencoding]")
+{
+	const QByteArray& profile = ImageDecoding::adobeRgbIccProfile();
+	const auto encoded = [&](const QImage& image, JpegSubsampling subsampling) {
+		const EncodedFile jpeg = encodeImage(image, profile, { .mimeType = "image/jpeg", .jpegSubsampling = subsampling }, {});
+		REQUIRE(jpeg.error.isEmpty());
+		return jpeg.bytes;
+	};
+
+	const QByteArray jpeg = encoded(grayImage(), JpegSubsampling::Chroma444);
+	REQUIRE(ImageDecoding::decode(jpeg).iccProfile == profile);
+	REQUIRE(jpegSubsampling(jpeg) == TJSAMP_444);
+	REQUIRE(jpegSubsampling(encoded(grayImage(), JpegSubsampling::Chroma422)) == TJSAMP_422);
+	REQUIRE(jpegSubsampling(encoded(grayImage(), JpegSubsampling::Chroma420)) == TJSAMP_420);
+	REQUIRE(jpegSubsampling(encoded(grayImage().convertToFormat(QImage::Format_Grayscale8), JpegSubsampling::Chroma420)) == TJSAMP_GRAY);
 }
 
 TEST_CASE("ImageEncoding: a JPEG of a transparent image is white", "[imageencoding]")
@@ -72,7 +102,7 @@ TEST_CASE("ImageEncoding: a JPEG of a transparent image is white", "[imageencodi
 	transparent.fill(Qt::transparent);
 
 	const QString path = dir.filePath("out.jpg");
-	REQUIRE(writeImage(transparent, path, "image/jpeg", 100, {}).isEmpty());
+	REQUIRE(writeImage(transparent, {}, path, { .mimeType = "image/jpeg", .quality = 100 }, {}).isEmpty());
 	const QImage written = ImageDecoding::decode(readFile(path)).image;
 	REQUIRE(written.size() == transparent.size());
 	REQUIRE(qGray(written.pixel(8, 8)) >= 250);
@@ -89,7 +119,18 @@ TEST_CASE("ImageEncoding: a failed write leaves the target as it was", "[imageen
 		existing.write("old");
 	}
 
-	REQUIRE_FALSE(writeImage(QImage{}, path, "image/png", DefaultQuality, {}).isEmpty());
+	REQUIRE_FALSE(writeImage(QImage{}, {}, path, { .mimeType = "image/png" }, {}).isEmpty());
 	REQUIRE(readFile(path) == "old");
-	REQUIRE_FALSE(writeImage(grayImage(), dir.filePath("missing/out.png"), "image/png", DefaultQuality, {}).isEmpty());
+	REQUIRE_FALSE(writeImage(grayImage(), {}, dir.filePath("missing/out.png"), { .mimeType = "image/png" }, {}).isEmpty());
+}
+
+TEST_CASE("ImageEncoding: writeFileAtomically runs beforeReplacing before the file takes its path", "[imageencoding]")
+{
+	QTemporaryDir dir;
+	REQUIRE(dir.isValid());
+	const QString path = dir.filePath("out.bin");
+	QByteArray seenBeforeReplacing = "unset";
+	REQUIRE(writeFileAtomically(path, "new", [&] { seenBeforeReplacing = readFile(path); }).isEmpty());
+	REQUIRE(seenBeforeReplacing.isEmpty()); // no file there yet
+	REQUIRE(readFile(path) == "new");
 }
