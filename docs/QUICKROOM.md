@@ -75,7 +75,9 @@ Copy and move:
 - The `file-operations` engine runs each transfer in its own progress dialog, which asks about collisions. Before a
   move, open players and viewers release the files moved. The folder watch shows the result.
 
-Resize / convert, from the menu of a tile selection with images, or from Tools for the selected images, else every image shown:
+Resize / convert, from the menu of a tile selection with images, or from Tools (Shift+R) for the selected images, if any:
+- The dialog lists the images. Images and folders dropped on it join the list until the conversion starts; Del removes
+  images from it.
 - Resizing is optional: the image fits a box inside or outside, locked to enlarging or shrinking if asked. The box's sides
   swap for an image of the other orientation, unless that is turned off.
 - The format is the original's where writable, else JPEG, or one chosen for all. Lossy formats take a quality; JPEG takes

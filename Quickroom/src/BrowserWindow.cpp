@@ -90,6 +90,7 @@ const ThumbnailWidget::Options TILE_OPTIONS{};
 // Not QKeySequence::Cut: on Windows and Linux it includes Shift+Del, the permanent deletion.
 const QKeySequence CUT_KEYS{ Qt::CTRL | Qt::Key_X };
 const QKeySequence COMPARE_KEYS{ Qt::SHIFT | Qt::Key_C };
+const QKeySequence BATCH_CONVERT_KEYS{ Qt::SHIFT | Qt::Key_R };
 
 QKeySequence deletionKeys(PathDeletion::Mode mode)
 {
@@ -428,12 +429,8 @@ void BrowserWindow::setupMainMenu()
 	toolsMenu->addAction(tr("Compare photos..."), COMPARE_KEYS, this, [this] {
 		comparePhotos(areComparable(_grid->selectedItems()) ? selectedPaths() : QStringList{});
 	});
-	// The selected images, else every image shown
-	toolsMenu->addAction(tr("Resize / convert images..."), this, [this] {
-		const QStringList selectedImages = imagePathsInGridOrder(*_grid, _grid->selectedItems());
-		const QStringList images = selectedImages.empty() ? shownPathsOfKind(*_grid, EntryKind::Image) : selectedImages;
-		if (!images.empty())
-			BatchConvertDialog::showForImages(images);
+	toolsMenu->addAction(tr("Resize / convert images..."), BATCH_CONVERT_KEYS, this, [this] {
+		BatchConvertDialog::showForImages(imagePathsInGridOrder(*_grid, _grid->selectedItems()));
 	});
 
 	QMenu* helpMenu = menuBar()->addMenu(tr("&Help"));
@@ -686,7 +683,7 @@ void BrowserWindow::showEntryContextMenu(QListWidgetItem& item, QPoint globalPos
 	if (comparable)
 		menu.addAction(tr("Compare photos"), COMPARE_KEYS, this, [this, targets] { comparePhotos(targets); });
 	if (!targetImages.empty())
-		menu.addAction(tr("Resize / convert..."), this, [targetImages] { BatchConvertDialog::showForImages(targetImages); });
+		menu.addAction(tr("Resize / convert..."), BATCH_CONVERT_KEYS, this, [targetImages] { BatchConvertDialog::showForImages(targetImages); });
 
 	menu.addSeparator();
 	menu.addAction(tr("Cut"), CUT_KEYS, this, [targets] { FileOperations::putPathsOnClipboard(targets, true); });

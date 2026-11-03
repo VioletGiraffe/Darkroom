@@ -34,6 +34,8 @@ void clearStuckHoverIfCursorLeft(QWidget* w);
 
 [[nodiscard]] bool hasSupportedPaths(const QMimeData* mime);
 [[nodiscard]] QStringList supportedPaths(const QMimeData* mime);
+// The local paths in mime, each folder replaced by its images: recursively, natural-sorted per folder. Files are not filtered.
+[[nodiscard]] QStringList droppedFilesWithFolderImages(const QMimeData* mime);
 
 // Byte-for-byte comparison with a size short-circuit.
 [[nodiscard]] bool filesAreIdentical(const QString& pathA, const QString& pathB);

@@ -91,7 +91,7 @@ EncodedFile encodeJpeg(const QImage& image, const QByteArray& iccProfile, int qu
 	const int pixelFormat = gray ? TJPF_GRAY
 		: source.format() == QImage::Format_RGB888 ? TJPF_RGB
 		: Q_BYTE_ORDER == Q_LITTLE_ENDIAN ? TJPF_BGRX : TJPF_XRGB; // Format_RGB32 is 0xffRRGGBB
-	const int chromaSubsampling = subsampling == JpegSubsampling::Chroma444 ? TJSAMP_444 : subsampling == JpegSubsampling::Chroma422 ? TJSAMP_422 : TJSAMP_420;
+	const int chromaSubsampling = subsampling == JpegSubsampling::Chroma444 ? TJSAMP_444 : TJSAMP_420;
 	tj3Set(handle.get(), TJPARAM_QUALITY, std::clamp(quality, 1, 100));
 	tj3Set(handle.get(), TJPARAM_SUBSAMP, gray ? TJSAMP_GRAY : chromaSubsampling);
 	tj3Set(handle.get(), TJPARAM_OPTIMIZE, 1);

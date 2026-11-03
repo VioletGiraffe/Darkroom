@@ -13,6 +13,7 @@ class QComboBox;
 class QGroupBox;
 class QLabel;
 class QLineEdit;
+class QListWidget;
 class QPlainTextEdit;
 class QProgressBar;
 class QPushButton;
@@ -20,22 +21,32 @@ class QRadioButton;
 class QSpinBox;
 class SegmentedToggle;
 
-// The resize and format conversion of a set of images: its options, then its progress. The options persist.
+// The resize and format conversion of a set of images: the images and the options, then the progress. The options persist.
+// Dropped images join the set until the conversion starts.
 // While the conversion runs, closing the dialog cancels it; the dialog closes once the targets in flight end.
 class BatchConvertDialog final : public QDialog
 {
 public:
 	// Opens a self-deleting dialog for imagePaths. Parentless: closing the browser must not end a running conversion.
-	static void showForImages(QStringList imagePaths);
+	static void showForImages(const QStringList& imagePaths);
 
 	void done(int result) override;
 	void reject() override;
 
 protected:
 	void closeEvent(QCloseEvent* event) override;
+	void dragEnterEvent(QDragEnterEvent* event) override;
+	void dragMoveEvent(QDragMoveEvent* event) override;
+	void dropEvent(QDropEvent* event) override;
 
 private:
-	explicit BatchConvertDialog(QStringList imagePaths);
+	explicit BatchConvertDialog(const QStringList& imagePaths);
+
+	// Skips the images already listed
+	void addImages(const QStringList& paths);
+	void removeSelectedImages();
+	[[nodiscard]] QStringList imagePaths() const;
+	void updateForImageCount();
 
 	void loadOptions();
 	void saveOptions() const;
@@ -47,9 +58,8 @@ private:
 	void showFinished();
 
 private:
-	const QStringList _imagePaths;
-
-	QWidget* _optionsArea = nullptr;
+	QWidget* _setupArea = nullptr; // the images and the options
+	QListWidget* _imageList = nullptr;
 	QGroupBox* _resizeGroup = nullptr;
 	SegmentedToggle* _fitToggle = nullptr;
 	QSpinBox* _widthBox = nullptr;

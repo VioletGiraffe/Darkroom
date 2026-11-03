@@ -14,7 +14,6 @@
 #include "compiler/compiler_warnings_control.h"
 #include "utils/displayformatting.h"
 #include "utils/filemanager.h"
-#include "utils/naturalsorting/cnaturalsorterqcollator.h"
 #include "utils/scoped_cursor.h"
 #include "widgets/cpersistenceenabler.h"
 
@@ -717,22 +716,7 @@ void PhotoCompareWindow::dragEnterEvent(QDragEnterEvent* event)
 
 void PhotoCompareWindow::dropEvent(QDropEvent* event)
 {
-	QStringList paths;
-	for (const QUrl& url : event->mimeData()->urls())
-	{
-		if (!url.isLocalFile())
-			continue;
-		const QString localPath = url.toLocalFile();
-		if (!QFileInfo(localPath).isDir())
-		{
-			paths.push_back(localPath);
-			continue;
-		}
-		QStringList folderImages = collectFilesInDirectory(localPath, /*recursive=*/true, isSupportedImageFile);
-		std::ranges::sort(folderImages, &NaturalSort::lessCaseSensitive);
-		paths += folderImages;
-	}
-
+	QStringList paths = droppedFilesWithFolderImages(event->mimeData());
 	const qsizetype capacity = std::max<qsizetype>(0, MaxImages - static_cast<qsizetype>(_photos.size()));
 	const bool truncated = paths.size() > capacity;
 	if (truncated)

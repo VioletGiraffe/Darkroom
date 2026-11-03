@@ -1,12 +1,17 @@
 #include "BatchConvert/BatchConvertDialog.h"
 #include "UiComponents/SegmentedToggle.h"
+#include "Utils.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QAbstractButton>
+#include <QAction>
 #include <QCheckBox>
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QDir>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QGridLayout>
@@ -14,15 +19,19 @@ DISABLE_COMPILER_WARNINGS
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QMessageBox>
+#include <QMimeData>
 #include <QMimeDatabase>
 #include <QMimeType>
 #include <QPlainTextEdit>
 #include <QProgressBar>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QSet>
 #include <QSettings>
 #include <QSpinBox>
+#include <QUrl>
 #include <QVBoxLayout>
 RESTORE_COMPILER_WARNINGS
 
@@ -50,7 +59,7 @@ const QString FolderKey = QStringLiteral("batchConvert/folder");
 // In the order of the controls' segments and items, which the settings store as indices
 constexpr std::array FitModes{ FitMode::Inside, FitMode::Outside };
 constexpr std::array ScaleDirections{ ScaleDirection::Any, ScaleDirection::OnlyEnlarge, ScaleDirection::OnlyShrink };
-constexpr std::array Subsamplings{ ImageEncoding::JpegSubsampling::Chroma420, ImageEncoding::JpegSubsampling::Chroma422, ImageEncoding::JpegSubsampling::Chroma444 };
+constexpr std::array Subsamplings{ ImageEncoding::JpegSubsampling::Chroma420, ImageEncoding::JpegSubsampling::Chroma444 };
 constexpr std::array Locations{ OutputLocation::Subfolder, OutputLocation::Folder, OutputLocation::SourceFolder };
 
 constexpr int MaxSide = 65535; // JPEG's limit
@@ -69,17 +78,28 @@ int indexOf(const std::array<Value, Count>& values, Value value)
 
 } // namespace
 
-void BatchConvertDialog::showForImages(QStringList imagePaths)
+void BatchConvertDialog::showForImages(const QStringList& imagePaths)
 {
-	auto* dialog = new BatchConvertDialog(std::move(imagePaths));
+	auto* dialog = new BatchConvertDialog(imagePaths);
 	dialog->setAttribute(Qt::WA_DeleteOnClose);
 	dialog->show();
 }
 
-BatchConvertDialog::BatchConvertDialog(QStringList imagePaths)
-	: _imagePaths{ std::move(imagePaths) }
+BatchConvertDialog::BatchConvertDialog(const QStringList& imagePaths)
 {
-	setWindowTitle(tr("Resize / convert %n image(s)", nullptr, static_cast<int>(_imagePaths.size())));
+	setAcceptDrops(true);
+
+	auto* imagesGroup = new QGroupBox(tr("Images"));
+	_imageList = new QListWidget;
+	_imageList->setSelectionMode(QAbstractItemView::ExtendedSelection);
+	_imageList->setContextMenuPolicy(Qt::ActionsContextMenu);
+	auto* removeAction = new QAction(tr("Remove from the batch"), _imageList);
+	removeAction->setShortcut(QKeySequence::Delete);
+	removeAction->setShortcutContext(Qt::WidgetShortcut);
+	_imageList->addAction(removeAction);
+	auto* imagesLayout = new QVBoxLayout(imagesGroup);
+	imagesLayout->addWidget(_imageList);
+	imagesLayout->addWidget(new QLabel(tr("Drop images or folders here to add them")));
 
 	_resizeGroup = new QGroupBox(tr("Resize"));
 	_resizeGroup->setCheckable(true);
@@ -96,7 +116,7 @@ BatchConvertDialog::BatchConvertDialog(QStringList imagePaths)
 	sizeRow->addWidget(_heightBox);
 	sizeRow->addStretch();
 	_fitToggle = new SegmentedToggle({ tr("Inside"), tr("Outside") });
-	_directionToggle = new SegmentedToggle({ tr("Any"), tr("Only enlarge"), tr("Only shrink") });
+	_directionToggle = new SegmentedToggle({ tr("Both directions"), tr("Only enlarge"), tr("Only shrink") });
 	_adaptToOrientationBox = new QCheckBox(tr("Adapt to orientation"));
 	_adaptToOrientationBox->setToolTip(tr("Swaps width and height for an image whose orientation differs from the box's"));
 	auto* resizeForm = new QFormLayout(_resizeGroup);
@@ -118,7 +138,7 @@ BatchConvertDialog::BatchConvertDialog(QStringList imagePaths)
 	_qualityBox = new QSpinBox;
 	_qualityBox->setRange(1, 100);
 	_subsamplingBox = new QComboBox;
-	_subsamplingBox->addItems({ QStringLiteral("4:2:0"), QStringLiteral("4:2:2"), QStringLiteral("4:4:4") });
+	_subsamplingBox->addItems({ QStringLiteral("4:2:0"), QStringLiteral("4:4:4") });
 	auto* formatForm = new QFormLayout(formatGroup);
 	formatForm->addRow(tr("Format:"), _formatBox);
 	formatForm->addRow(tr("Quality:"), _qualityBox);
@@ -140,12 +160,17 @@ BatchConvertDialog::BatchConvertDialog(QStringList imagePaths)
 	outputGrid->addWidget(_sourceFolderButton, 2, 0, 1, 3);
 	outputGrid->setColumnStretch(1, 1);
 
-	_optionsArea = new QWidget;
-	auto* optionsLayout = new QVBoxLayout(_optionsArea);
-	optionsLayout->setContentsMargins(0, 0, 0, 0);
+	auto* optionsLayout = new QVBoxLayout;
 	optionsLayout->addWidget(_resizeGroup);
 	optionsLayout->addWidget(formatGroup);
 	optionsLayout->addWidget(outputGroup);
+	optionsLayout->addStretch();
+
+	_setupArea = new QWidget;
+	auto* setupLayout = new QHBoxLayout(_setupArea);
+	setupLayout->setContentsMargins(0, 0, 0, 0);
+	setupLayout->addWidget(imagesGroup, 1);
+	setupLayout->addLayout(optionsLayout);
 
 	_progressBar = new QProgressBar;
 	_statusLabel = new QLabel;
@@ -163,15 +188,16 @@ BatchConvertDialog::BatchConvertDialog(QStringList imagePaths)
 	buttonRow->addWidget(_closeButton);
 
 	auto* layout = new QVBoxLayout(this);
-	layout->addWidget(_optionsArea);
+	layout->addWidget(_setupArea, 1);
 	layout->addWidget(_progressBar);
 	layout->addWidget(_statusLabel);
 	layout->addWidget(_failureList, 1);
 	layout->addLayout(buttonRow);
 
 	loadOptions();
-	updateControls();
+	addImages(imagePaths);
 
+	connect(removeAction, &QAction::triggered, this, &BatchConvertDialog::removeSelectedImages);
 	connect(_formatBox, &QComboBox::currentIndexChanged, this, &BatchConvertDialog::updateControls);
 	for (QRadioButton* location : { _subfolderButton, _folderButton, _sourceFolderButton })
 		connect(location, &QRadioButton::toggled, this, &BatchConvertDialog::updateControls);
@@ -215,6 +241,69 @@ void BatchConvertDialog::closeEvent(QCloseEvent* event)
 		return;
 	}
 	QDialog::closeEvent(event);
+}
+
+void BatchConvertDialog::dragEnterEvent(QDragEnterEvent* event)
+{
+	dragMoveEvent(event);
+}
+
+void BatchConvertDialog::dragMoveEvent(QDragMoveEvent* event)
+{
+	const QList<QUrl> urls = event->mimeData()->urls();
+	if (!_setupArea->isEnabled() || !event->possibleActions().testFlag(Qt::CopyAction) || !std::ranges::any_of(urls, &QUrl::isLocalFile))
+		return event->ignore();
+
+	// Copy, never move: a source such as Explorer deletes the originals after a drop that reports a move
+	event->setDropAction(Qt::CopyAction);
+	event->accept();
+}
+
+void BatchConvertDialog::dropEvent(QDropEvent* event)
+{
+	QStringList paths = droppedFilesWithFolderImages(event->mimeData());
+	paths.removeIf([](const QString& path) { return !isSupportedImageFile(path); });
+	addImages(paths);
+	event->setDropAction(Qt::CopyAction);
+	event->accept();
+}
+
+void BatchConvertDialog::addImages(const QStringList& paths)
+{
+	QSet<QString> listedKeys;
+	for (const QString& listed : imagePaths())
+		listedKeys.insert(pathComparisonKey(listed));
+	for (const QString& path : paths)
+	{
+		const QString key = pathComparisonKey(path);
+		if (listedKeys.contains(key))
+			continue;
+		listedKeys.insert(key);
+		auto* item = new QListWidgetItem(QDir::toNativeSeparators(path), _imageList);
+		item->setData(Qt::UserRole, path);
+	}
+	updateForImageCount();
+}
+
+void BatchConvertDialog::removeSelectedImages()
+{
+	qDeleteAll(_imageList->selectedItems());
+	updateForImageCount();
+}
+
+QStringList BatchConvertDialog::imagePaths() const
+{
+	QStringList paths;
+	paths.reserve(_imageList->count());
+	for (int row = 0; row < _imageList->count(); ++row)
+		paths.push_back(_imageList->item(row)->data(Qt::UserRole).toString());
+	return paths;
+}
+
+void BatchConvertDialog::updateForImageCount()
+{
+	setWindowTitle(tr("Resize / convert %n image(s)", nullptr, _imageList->count()));
+	updateControls();
 }
 
 void BatchConvertDialog::loadOptions()
@@ -286,13 +375,14 @@ void BatchConvertDialog::updateControls()
 	const bool subfolderValid = !subfolder.isEmpty() && subfolder != QLatin1String(".") && subfolder != QLatin1String("..")
 		&& !subfolder.contains('/') && !subfolder.contains('\\');
 	const bool outputValid = _subfolderButton->isChecked() ? subfolderValid : !_folderButton->isChecked() || QDir::isAbsolutePath(_folderEdit->text().trimmed());
-	_startButton->setEnabled(outputValid && !_job);
+	_startButton->setEnabled(outputValid && _imageList->count() > 0 && !_job);
 }
 
 void BatchConvertDialog::startConversion()
 {
 	const Options conversion = options();
-	Plan plan = planTargets(_imagePaths, conversion, ClashResolution::Replace);
+	const QStringList sources = imagePaths();
+	Plan plan = planTargets(sources, conversion, ClashResolution::Replace);
 	if (plan.existingCount > 0)
 	{
 		QString question = tr("A file of the same name already exists for %n image(s).", nullptr, plan.existingCount);
@@ -306,14 +396,14 @@ void BatchConvertDialog::startConversion()
 		box.exec();
 
 		if (box.clickedButton() == keepBoth)
-			plan = planTargets(_imagePaths, conversion, ClashResolution::KeepBoth);
+			plan = planTargets(sources, conversion, ClashResolution::KeepBoth);
 		else if (box.clickedButton() == skip)
-			plan = planTargets(_imagePaths, conversion, ClashResolution::Skip);
+			plan = planTargets(sources, conversion, ClashResolution::Skip);
 		else if (box.clickedButton() != replace)
 			return;
 	}
 
-	_optionsArea->setEnabled(false);
+	_setupArea->setEnabled(false);
 	_startButton->setEnabled(false);
 	_closeButton->setText(tr("Cancel"));
 	_targetCount = static_cast<int>(plan.targets.size());

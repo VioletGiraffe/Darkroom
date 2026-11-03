@@ -6,6 +6,7 @@
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
 #include "dialogs/messagedialog.h"
+#include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QCoreApplication>
@@ -136,6 +137,26 @@ QStringList supportedPaths(const QMimeData* mime)
 	{
 		if (const QString path = url.toLocalFile(); isDirectoryOrSupportedFile(path))
 			paths.push_back(path);
+	}
+	return paths;
+}
+
+QStringList droppedFilesWithFolderImages(const QMimeData* mime)
+{
+	QStringList paths;
+	for (const QUrl& url : mime->urls())
+	{
+		if (!url.isLocalFile())
+			continue;
+		const QString localPath = url.toLocalFile();
+		if (!QFileInfo(localPath).isDir())
+		{
+			paths.push_back(localPath);
+			continue;
+		}
+		QStringList folderImages = collectFilesInDirectory(localPath, /*recursive=*/true, isSupportedImageFile);
+		std::ranges::sort(folderImages, &NaturalSort::lessCaseSensitive);
+		paths += folderImages;
 	}
 	return paths;
 }

@@ -19,7 +19,7 @@ namespace ImageEncoding {
 
 constexpr int DefaultQuality = 90;
 
-enum class JpegSubsampling { Chroma420, Chroma422, Chroma444 };
+enum class JpegSubsampling { Chroma420, Chroma444 };
 
 struct EncodingOptions
 {

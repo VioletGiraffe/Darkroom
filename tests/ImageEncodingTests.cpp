@@ -89,7 +89,6 @@ TEST_CASE("ImageEncoding: a JPEG embeds the ICC profile and has the chroma subsa
 	const QByteArray jpeg = encoded(grayImage(), JpegSubsampling::Chroma444);
 	REQUIRE(ImageDecoding::decode(jpeg).iccProfile == profile);
 	REQUIRE(jpegSubsampling(jpeg) == TJSAMP_444);
-	REQUIRE(jpegSubsampling(encoded(grayImage(), JpegSubsampling::Chroma422)) == TJSAMP_422);
 	REQUIRE(jpegSubsampling(encoded(grayImage(), JpegSubsampling::Chroma420)) == TJSAMP_420);
 	REQUIRE(jpegSubsampling(encoded(grayImage().convertToFormat(QImage::Format_Grayscale8), JpegSubsampling::Chroma420)) == TJSAMP_GRAY);
 }
