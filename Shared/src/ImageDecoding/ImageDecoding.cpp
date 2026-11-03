@@ -1,8 +1,8 @@
 #include "ImageDecoding/ImageDecoding.h"
 #include "ImageDecoding/ColorManagement.h"
-#include "ImageDecoding/Exif.h"
 #include "ImageDecoding/LibRawDecoder.h"
 #include "ImageDecoding/TurboJpegDecoder.h"
+#include "ImageMetadata/Exif.h"
 #include "assert/advanced_assert.h"
 #include "buffered_reader.hpp" // thin_io
 #include "qt_paths.hpp"        // thin_io
@@ -109,7 +109,7 @@ static QSize readJpegUprightSize(thin_io::buffered_reader& file)
 			const std::optional<std::span<const std::byte>> payload = file.peek(length - 2u);
 			if (!payload)
 				return {};
-			if (const std::optional<ExifMetadata> exif = readExifApp1(QByteArrayView{ payload->data(), static_cast<qsizetype>(payload->size()) }))
+			if (const std::optional<ImageMetadata::ExifMetadata> exif = ImageMetadata::readExifApp1(QByteArrayView{ payload->data(), static_cast<qsizetype>(payload->size()) }))
 				orientation = exif->orientation;
 		}
 		// SOF0 to SOF15, except DHT, JPG and DAC: precision, height, width
@@ -214,7 +214,7 @@ QSize readReducibleJpegUprightSize(const EncodedImage& encoded)
 	if (!header || header->progressive || header->arithmetic || header->storedSize.isEmpty())
 		return {};
 
-	const QImageIOHandler::Transformations orientation = encoded.orientation ? *encoded.orientation : readJpegExif(encoded.bytes).orientation;
+	const QImageIOHandler::Transformations orientation = encoded.orientation ? *encoded.orientation : ImageMetadata::readJpegExif(encoded.bytes).orientation;
 	return orientation.testFlag(QImageIOHandler::TransformationRotate90) ? header->storedSize.transposed() : header->storedSize;
 }
 

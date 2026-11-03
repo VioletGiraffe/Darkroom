@@ -79,6 +79,8 @@ Hidden tests run only when named, e.g. `run_tests.bat "[rawsamples]"`:
 - `[tonecurvedata]` writes, for the same raws, the data `scripts/fit_tone_curve.py` fits LibRaw renderings' tone curve
   to: each raw's half-size rendering before the curve, its embedded JPEG preview, and the exposures the decoder applies.
   It writes into the folder named by `DARKROOM_TONE_CURVE_DATA`. The script's header describes the whole procedure.
+- `[rawexif]` reads the EXIF of the same raws through LibRaw, logging each directory's entry count. A raw fails without
+  a Make or a DateTimeOriginal, or when the EXIF written for a JPEG of it does not read back as its tags fitted to that JPEG.
 
 ## Image read benchmark
 

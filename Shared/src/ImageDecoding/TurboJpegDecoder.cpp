@@ -1,6 +1,6 @@
 #include "ImageDecoding/TurboJpegDecoder.h"
 #include "ImageDecoding/ColorManagement.h"
-#include "ImageDecoding/Exif.h"
+#include "ImageMetadata/Exif.h"
 #include "assert/advanced_assert.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -96,7 +96,7 @@ std::optional<DecodedImage> decodeJpeg(const QByteArray& encoded, int scaleEight
 		&& tj3GetErrorCode(handle.get()) != TJERR_WARNING)
 		return DecodedImage{ .format = FormatName, .error = errorString(handle.get()) };
 
-	const ExifMetadata exif = readJpegExif(encoded);
+	const ImageMetadata::ExifMetadata exif = ImageMetadata::readJpegExif(encoded);
 	if (iccProfile.isEmpty() && exif.adobeRgb)
 		iccProfile = adobeRgbIccProfile();
 	return DecodedImage{ .image = std::move(image), .orientation = exif.orientation, .iccProfile = std::move(iccProfile), .format = FormatName };
