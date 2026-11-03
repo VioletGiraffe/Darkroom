@@ -7,6 +7,7 @@
 DISABLE_COMPILER_WARNINGS
 #include <QHash>
 #include <QObject>
+#include <QSet>
 #include <QString>
 RESTORE_COMPILER_WARNINGS
 
@@ -51,7 +52,7 @@ public:
 		std::function<void(const TargetResult&)> onTargetEnded, std::function<void()> onFinished, QObject* parent);
 	~Job() override;
 
-	// Creates the target folders, then starts the targets
+	// Creates the target folders, then starts the targets. The targets of a folder that cannot be created fail at once.
 	void start();
 	// Starts no more targets; the ones in flight end at their next stage without writing. onFinished follows.
 	void cancel();
@@ -71,6 +72,7 @@ private:
 	std::shared_ptr<StageState> _stageState;
 	std::unique_ptr<CThreadPool> _ownWritePool; // created on the first target that needs it
 	QHash<QString, bool> _ownWritePoolByFolders; // writePool() by source and target folder
+	QSet<QString> _uncreatableFolderKeys; // by pathComparisonKey
 	std::function<void(size_t targetIndex)> _onTargetStarted;
 	std::function<void(const TargetResult&)> _onTargetEnded;
 	std::function<void()> _onFinished;

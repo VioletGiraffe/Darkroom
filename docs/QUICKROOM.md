@@ -84,7 +84,8 @@ Resize / convert, from the menu of a tile selection with images, or from Tools (
   a chroma subsampling.
 - Each image is written to a subfolder beside its original, to one folder for all, or into its original's folder.
 - A name already taken by another image of the batch gets a counter. Before starting, one question covers the files
-  already on disk: replace, keep both (with a counter), or skip. An original replaced by its own conversion goes to Trash.
+  already on disk: replace, keep both (with a counter), or skip. An original replaced by its own conversion goes to Trash,
+  and back if the conversion cannot be saved.
 - Camera raws get the full rendering. An output keeps the original's modification time and its EXIF, see `ImageMetadata`.
 - Each image goes through three stages: reading on the I/O pool for its source; decoding, resizing and encoding on the
   CPU pool; writing on the I/O pool for its target. A target on a slow volume other than its slow source's is written by a

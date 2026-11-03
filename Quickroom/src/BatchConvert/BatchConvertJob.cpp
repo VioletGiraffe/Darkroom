@@ -24,7 +24,9 @@ DISABLE_COMPILER_WARNINGS
 RESTORE_COMPILER_WARNINGS
 
 #include <atomic>
+#include <exception>
 #include <filesystem>
+#include <new>
 #include <optional>
 #include <utility>
 
@@ -60,6 +62,8 @@ void deliverEnding(const StageState& state, TargetWork& work, Ending ending, QSt
 	// A failure after a cancel is the cancel's doing
 	if (ending == Ending::Failed && state.cancelled)
 		ending = Ending::Cancelled;
+	if (ending == Ending::Failed && error.isEmpty())
+		error = QObject::tr("Unknown error");
 	TargetResult result{ std::move(work.target), work.targetIndex, ending, std::move(error) };
 	if (ending == Ending::Written)
 	{
@@ -67,6 +71,29 @@ void deliverEnding(const StageState& state, TargetWork& work, Ending ending, QSt
 		result.outputBytes = work.output.size();
 	}
 	state.delivery->deliver(std::move(result), state.delivery);
+}
+
+using Stage = void (*)(const std::shared_ptr<StageState>&, const std::shared_ptr<TargetWork>&);
+
+// An exception ends the target as failed: the pool would contain it, and the target would never end
+void runStage(Stage stage, const std::shared_ptr<StageState>& state, const std::shared_ptr<TargetWork>& work)
+{
+	try
+	{
+		stage(state, work);
+	}
+	catch (const std::bad_alloc&)
+	{
+		deliverEnding(*state, *work, Ending::Failed, QObject::tr("Not enough memory"));
+	}
+	catch (const std::exception& e)
+	{
+		deliverEnding(*state, *work, Ending::Failed, QString::fromLocal8Bit(e.what()));
+	}
+	catch (...)
+	{
+		deliverEnding(*state, *work, Ending::Failed);
+	}
 }
 
 // image at size; null when out of memory. Single-threaded: the job runs one target per CPU worker.
@@ -91,10 +118,16 @@ void writeTarget(const std::shared_ptr<StageState>& state, const std::shared_ptr
 
 	const Target& target = work->target;
 	// Where Trash is unavailable, the write replaces the source
-	const auto trashSource = [&] { static_cast<void>(QFile::moveToTrash(target.sourcePath)); };
-	const QString error = ImageEncoding::writeFileAtomically(target.targetPath, work->output, target.replacesSource ? std::function<void()>{ trashSource } : std::function<void()>{});
+	QString sourceInTrash;
+	const auto trashSource = [&] { static_cast<void>(QFile::moveToTrash(target.sourcePath, &sourceInTrash)); };
+	QString error = ImageEncoding::writeFileAtomically(target.targetPath, work->output, target.replacesSource ? std::function<void()>{ trashSource } : std::function<void()>{});
 	if (!error.isEmpty())
-		return deliverEnding(*state, *work, Ending::Failed, error);
+	{
+		// The source is back in place unless the move out of Trash fails too
+		if (!sourceInTrash.isEmpty() && !QFile::rename(sourceInTrash, target.sourcePath))
+			error = QObject::tr("%1 (the original is in Trash)").arg(error);
+		return deliverEnding(*state, *work, Ending::Failed, QObject::tr("Cannot save %1: %2").arg(QDir::toNativeSeparators(target.targetPath), error));
+	}
 
 	if (work->sourceTimes)
 	{
@@ -130,7 +163,7 @@ void convertTarget(const std::shared_ptr<StageState>& state, const std::shared_p
 		return deliverEnding(*state, *work, Ending::Failed, output.error);
 
 	work->output = std::move(output.bytes);
-	auto write = [state, work] { writeTarget(state, work); };
+	auto write = [state, work] { runStage(writeTarget, state, work); };
 	if (work->writePool)
 		work->writePool->enqueue(std::move(write));
 	else
@@ -148,7 +181,7 @@ void readTarget(const std::shared_ptr<StageState>& state, const std::shared_ptr<
 	// Before the write, which may move the source to Trash
 	work->sourceTimes = thin_io::get_times(thin_io::native_path(work->target.sourcePath).data());
 
-	cpuThreadPool().enqueue([state, work] { convertTarget(state, work); });
+	cpuThreadPool().enqueue([state, work] { runStage(convertTarget, state, work); });
 }
 
 bool isSlowStorage(const QString& path)
@@ -182,13 +215,16 @@ void Job::start()
 {
 	assert_and_return_r(!_running && _nextTarget == 0, );
 
-	QSet<QString> createdFolderKeys;
+	QSet<QString> checkedFolderKeys;
 	for (const Target& target : _targets)
 	{
 		const QString folder = QFileInfo{ target.targetPath }.absolutePath();
-		// A folder that cannot be created fails its targets' writes
-		if (!target.skipped && !createdFolderKeys.contains(pathComparisonKey(folder)) && QDir{}.mkpath(folder))
-			createdFolderKeys.insert(pathComparisonKey(folder));
+		const QString folderKey = pathComparisonKey(folder);
+		if (target.skipped || checkedFolderKeys.contains(folderKey))
+			continue;
+		checkedFolderKeys.insert(folderKey);
+		if (!QDir{}.mkpath(folder))
+			_uncreatableFolderKeys.insert(folderKey);
 	}
 
 	_running = true;
@@ -219,13 +255,19 @@ void Job::startTargets()
 			_onTargetEnded(TargetResult{ std::move(target), targetIndex, Ending::Skipped });
 			continue;
 		}
+		if (const QString folder = QFileInfo{ target.targetPath }.absolutePath(); _uncreatableFolderKeys.contains(pathComparisonKey(folder)))
+		{
+			const QString error = QObject::tr("Cannot create the folder %1").arg(QDir::toNativeSeparators(folder));
+			_onTargetEnded(TargetResult{ std::move(target), targetIndex, Ending::Failed, error });
+			continue;
+		}
 
 		auto work = std::make_shared<TargetWork>();
 		work->targetIndex = targetIndex;
 		work->writePool = writePool(target);
 		work->target = std::move(target);
 		++_inFlight;
-		IoThreadPool::enqueue(work->target.sourcePath, [state = _stageState, work] { readTarget(state, work); });
+		IoThreadPool::enqueue(work->target.sourcePath, [state = _stageState, work] { runStage(readTarget, state, work); });
 	}
 
 	if (_inFlight == 0 && _running)
