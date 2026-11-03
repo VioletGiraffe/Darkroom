@@ -153,20 +153,21 @@ constexpr char kSliders[] = R"(
 
 constexpr char kCheckBoxes[] = R"(
 	QCheckBox { spacing: 8px; }
-	QCheckBox::indicator {
+	QCheckBox::indicator, QGroupBox::indicator {
 		width: 14px; height: 14px;
 		border: 1px solid %borderStrong%;
 		border-radius: %checkboxRadius%px;
 		background: transparent;
 	}
-	QCheckBox::indicator:hover { border-color: %accent%; }
-	QCheckBox::indicator:checked {
+	QCheckBox::indicator:hover, QGroupBox::indicator:hover { border-color: %accent%; }
+	QCheckBox::indicator:checked, QGroupBox::indicator:checked {
 		background: %selectionBg%;
 		border-color: %selectionBg%;
 		image: url(%checkboxCheckIcon%);
 	}
 )";
 
+// title's top: Qt rounds a checkable title's indicator one pixel above the widget when the title is as tall as the indicator
 constexpr char kGroupBoxes[] = R"(
 	QGroupBox {
 		border: 1px solid %borderSubtle%;
@@ -178,6 +179,7 @@ constexpr char kGroupBoxes[] = R"(
 		subcontrol-origin: margin;
 		subcontrol-position: top left;
 		left: 8px;
+		top: 1px;
 		padding: 0 3px;
 		background-color: palette(window);
 		color: %instructionText%;
