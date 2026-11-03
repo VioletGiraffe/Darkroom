@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793742691863,
+  "lastUpdate": 1793747148946,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -21054,6 +21054,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Lines of code (Quickroom)",
             "value": 2730,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 34507,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6997.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7901.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5676,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 840.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 345,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 93,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "67f30e6a4a773ae95595f6ca7aee641a8a1fac64",
+          "message": "Quickroom batch convert: the app no longer lags while a long list of images converts",
+          "timestamp": "2026-11-04T00:48:58+02:00",
+          "tree_id": "fd6da2c23900433e3f7933c7f142e2b7ee6de500",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/67f30e6a4a773ae95595f6ca7aee641a8a1fac64"
+        },
+        "date": 1793747145279,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 19853,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 2732,
             "unit": "LOC"
           },
           {
