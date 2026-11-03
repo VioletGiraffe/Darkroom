@@ -37,11 +37,13 @@ INCLUDEPATH += \
 HEADERS += \
 	TestHelpers.h \
 	JpegTestData.h \
-	../Darkroom/src/Core/Library.h
+	../Darkroom/src/Core/Library.h \
+	../Quickroom/src/BatchConvert/BatchConvertPlan.h
 
-# The Darkroom sources under test are compiled in: they belong to the app, not to a library.
+# The app sources under test are compiled in: they belong to an app, not to a library.
 SOURCES += \
 	main.cpp \
+	BatchConvertPlanTests.cpp \
 	PersistenceTests.cpp \
 	CatalogTests.cpp \
 	CatalogIntegrityTests.cpp \
@@ -55,7 +57,8 @@ SOURCES += \
 	../Darkroom/src/Core/Catalog.cpp \
 	../Darkroom/src/Core/CatalogIntegrity.cpp \
 	../Darkroom/src/Core/Library.cpp \
-	../Darkroom/src/Core/MetadataStore.cpp
+	../Darkroom/src/Core/MetadataStore.cpp \
+	../Quickroom/src/BatchConvert/BatchConvertPlan.cpp
 
 # GNU ld resolves left to right: shared before the libraries it uses, qtutils before cpputils
 LIBS += -L$${DESTDIR} -lshared -lqtutils -lcpputils -lthin_io

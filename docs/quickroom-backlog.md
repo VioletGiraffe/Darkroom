@@ -19,3 +19,7 @@
   - Nikon High Efficiency NEF (Z 8, Z 9, Z f, Z6III): JPEG XS-based; LibRaw has no decoder for it.
 - Pentax pixel-shift and HDR PEFs hold 4 and 3 raw frames; LibRaw renders only the first, so the half-size and full
   renderings show one unmerged frame.
+- Resize / convert:
+  - No memory limit: full raw renderings take about 16 bytes per pixel, so many large raws at once can exhaust the RAM.
+  - Each resize is single-threaded; a batch of fewer images than CPU workers could resize each one in parallel.
+  - LibRaw's OpenMP threads add to the CPU pool's when several raws render at once.

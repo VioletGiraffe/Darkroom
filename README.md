@@ -31,6 +31,7 @@ with Darkroom, so there is nothing extra to download.
 - **Fullscreen (or windowed) viewing with zoom and pan support**: point Quickroom at an image and it opens fullscreen; arrow keys move to next or previous image in the same folder; `F` or double-click switches from full-screen image view to folder browsing.
 - **Built-in video player** with the same features as Darkroom's player.
 - **Compare photos side by side**, with the same automatic alignment as Darkroom.
+- **Resize and convert images in batch**, keeping their EXIF.
 
 ## Documentation
 

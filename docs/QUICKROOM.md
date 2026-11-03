@@ -26,6 +26,8 @@ the coding conventions.
 - `SettingsDialog` - Quickroom's own: ffmpeg path, theming, camera raw rendering, color management, the video player's frame extraction format.
 - `FileOperations` - file operations with Quickroom's confirmation policy, shared by the browser and the
   standalone viewer: deletion, the file clipboard, and copy/move through the `file-operations` engine.
+- `BatchConvert/` - resizing and converting images in batch: `BatchConvertPlan` (options, output sizes, target names),
+  `BatchConvertJob` (the pipeline), `BatchConvertDialog`.
 
 Every tile is a `ThumbnailWidget`: images through a single-file `ImageFilesSource` (the FrameViewerWindow pattern),
 folders and videos through `IconSource` with the native file icon. Lazy dwell-loading, async decode, and Ctrl+wheel
@@ -72,6 +74,20 @@ Copy and move:
   performs a move itself.
 - The `file-operations` engine runs each transfer in its own progress dialog, which asks about collisions. Before a
   move, open players and viewers release the files moved. The folder watch shows the result.
+
+Resize / convert, from the menu of a tile selection with images, or from Tools for the selected images, else every image shown:
+- Resizing is optional: the image fits a box inside or outside, locked to enlarging or shrinking if asked. The box's sides
+  swap for an image of the other orientation, unless that is turned off.
+- The format is the original's where writable, else JPEG, or one chosen for all. Lossy formats take a quality; JPEG takes
+  a chroma subsampling.
+- Each image is written to a subfolder beside its original, to one folder for all, or into its original's folder.
+- A name already taken by another image of the batch gets a counter. Before starting, one question covers the files
+  already on disk: replace, keep both (with a counter), or skip. An original replaced by its own conversion goes to Trash.
+- Camera raws get the full rendering. An output keeps the original's modification time and its EXIF, see `ImageMetadata`.
+- Each image goes through three stages: reading on the I/O pool for its source; decoding, resizing and encoding on the
+  CPU pool; writing on the I/O pool for its target. A target on a slow volume other than its slow source's is written by a
+  one-thread pool of the job's own: the I/O pool's single serial worker would otherwise serialize the two volumes.
+- The parallelism is one image per CPU worker, with twice as many images in flight.
 
 On Windows a tile's menu ends with "Explorer context menu": Explorer's own (classic) menu for the same files, opened beside
 the item like a submenu, on hover or click, while Quickroom's menu stays open behind it. The shell side is cpputils'

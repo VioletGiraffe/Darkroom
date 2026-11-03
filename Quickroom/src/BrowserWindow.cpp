@@ -1,4 +1,5 @@
 #include "BrowserWindow.h"
+#include "BatchConvert/BatchConvertDialog.h"
 #include "ExplorerContextMenuItem.h"
 #include "FileOperations.h"
 #include "FileTypeIcons.h"
@@ -180,6 +181,20 @@ QStringList shownPathsOfKind(const QListWidget& grid, EntryKind kind)
 		const auto& entry = static_cast<const GridEntry&>(*grid.item(row));
 		if (entry.kind == kind && !entry.isHidden())
 			paths.push_back(entry.path);
+	}
+	return paths;
+}
+
+// Paths of the shown images among items, in grid order: a batch conversion numbers clashing names in that order
+QStringList imagePathsInGridOrder(const QListWidget& grid, const QList<QListWidgetItem*>& items)
+{
+	const QSet<const QListWidgetItem*> itemSet{ items.cbegin(), items.cend() };
+	QStringList paths;
+	for (int row = 0, rows = grid.count(); row < rows; ++row)
+	{
+		const auto* entry = static_cast<const GridEntry*>(grid.item(row));
+		if (entry->kind == EntryKind::Image && !entry->isHidden() && itemSet.contains(entry))
+			paths.push_back(entry->path);
 	}
 	return paths;
 }
@@ -412,6 +427,13 @@ void BrowserWindow::setupMainMenu()
 	QMenu* toolsMenu = menuBar()->addMenu(tr("&Tools"));
 	toolsMenu->addAction(tr("Compare photos..."), COMPARE_KEYS, this, [this] {
 		comparePhotos(areComparable(_grid->selectedItems()) ? selectedPaths() : QStringList{});
+	});
+	// The selected images, else every image shown
+	toolsMenu->addAction(tr("Resize / convert images..."), this, [this] {
+		const QStringList selectedImages = imagePathsInGridOrder(*_grid, _grid->selectedItems());
+		const QStringList images = selectedImages.empty() ? shownPathsOfKind(*_grid, EntryKind::Image) : selectedImages;
+		if (!images.empty())
+			BatchConvertDialog::showForImages(images);
 	});
 
 	QMenu* helpMenu = menuBar()->addMenu(tr("&Help"));
@@ -657,11 +679,14 @@ void BrowserWindow::showEntryContextMenu(QListWidgetItem& item, QPoint globalPos
 	const QList<QListWidgetItem*> targetItems = MediaGrid::effectiveSelection(item);
 	const QStringList targets = entryPaths(targetItems);
 
-	if (areComparable(targetItems))
-	{
+	const bool comparable = areComparable(targetItems);
+	const QStringList targetImages = imagePathsInGridOrder(*_grid, targetItems);
+	if (comparable || !targetImages.empty())
 		menu.addSeparator();
+	if (comparable)
 		menu.addAction(tr("Compare photos"), COMPARE_KEYS, this, [this, targets] { comparePhotos(targets); });
-	}
+	if (!targetImages.empty())
+		menu.addAction(tr("Resize / convert..."), this, [targetImages] { BatchConvertDialog::showForImages(targetImages); });
 
 	menu.addSeparator();
 	menu.addAction(tr("Cut"), CUT_KEYS, this, [targets] { FileOperations::putPathsOnClipboard(targets, true); });
