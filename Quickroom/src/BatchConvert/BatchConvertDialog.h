@@ -21,7 +21,7 @@ class QRadioButton;
 class QSpinBox;
 class SegmentedToggle;
 
-// The resize and format conversion of a set of images: the images and the options, then the progress. The options persist.
+// The resize and format conversion of a set of images: the images and the options, then the progress. The options and the window geometry persist.
 // Dropped images join the set until the conversion starts.
 // While the conversion runs, closing the dialog cancels it; the dialog closes once the targets in flight end.
 class BatchConvertDialog final : public QDialog

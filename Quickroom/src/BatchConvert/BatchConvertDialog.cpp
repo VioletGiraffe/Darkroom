@@ -1,6 +1,7 @@
 #include "BatchConvert/BatchConvertDialog.h"
 #include "UiComponents/SegmentedToggle.h"
 #include "Utils.h"
+#include "widgets/cpersistenceenabler.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QAbstractButton>
@@ -209,6 +210,8 @@ BatchConvertDialog::BatchConvertDialog(const QStringList& imagePaths)
 	});
 	connect(_startButton, &QPushButton::clicked, this, &BatchConvertDialog::startConversion);
 	connect(_closeButton, &QPushButton::clicked, this, &BatchConvertDialog::reject);
+
+	enablePersistence(this, "batchConvert/window", CPersistenceEnabler::Delayed{ true }, CPersistenceEnabler::SetDefaultSize{ false });
 }
 
 void BatchConvertDialog::done(int result)
