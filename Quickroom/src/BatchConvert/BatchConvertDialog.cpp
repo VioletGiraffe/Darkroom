@@ -119,6 +119,9 @@ BatchConvertDialog::BatchConvertDialog(const QStringList& imagePaths)
 	_imageList = new QListWidget;
 	_imageList->setSelectionMode(QAbstractItemView::ExtendedSelection);
 	_imageList->setContextMenuPolicy(Qt::ActionsContextMenu);
+	// Restyling a row lays out the whole list again: with uniform sizes that layout measures one row, not all of them
+	_imageList->setUniformItemSizes(true);
+	_imageList->setTextElideMode(Qt::ElideMiddle); // a path wider than the rows keeps its drive and file name
 	_removeAction = new QAction(tr("Remove from the batch"), _imageList);
 	_removeAction->setShortcut(QKeySequence::Delete);
 	_removeAction->setShortcutContext(Qt::WidgetShortcut);
