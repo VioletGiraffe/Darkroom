@@ -53,6 +53,13 @@ an overridden `done(int)` before delegating to `QDialog::done`, not from the des
 rejection, Escape, and window close while the dialog still exists. Reserve destruction for state no caller waits on,
 such as a persisted splitter position.
 
+## File drops — accept as a copy
+
+A window that only reads dropped files accepts the drag and the drop with `acceptDropAsCopy()` (`Utils.h`), in
+`dragMoveEvent` as well as `dragEnterEvent`, never with `acceptProposedAction()`. Shift makes Move the proposed action,
+and a source such as Explorer deletes the originals after a drop that reports a move. A window that moves the files
+itself reports `Qt::TargetMoveAction`, as Quickroom's browser does.
+
 ## Sorting — natural sort for strings that may contain numbers
 
 Most user-visible strings (file and media names) contain numbers, so sort them with natural comparison, not

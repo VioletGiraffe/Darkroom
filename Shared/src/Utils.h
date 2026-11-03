@@ -12,6 +12,7 @@ RESTORE_COMPILER_WARNINGS
 #include <vector>
 
 class QDateTime;
+class QDropEvent;
 class QMimeData;
 class QWidget;
 
@@ -36,6 +37,9 @@ void clearStuckHoverIfCursorLeft(QWidget* w);
 [[nodiscard]] QStringList supportedPaths(const QMimeData* mime);
 // The local paths in mime, each folder replaced by its images: recursively, natural-sorted per folder. Files are not filtered.
 [[nodiscard]] QStringList droppedFilesWithFolderImages(const QMimeData* mime);
+// Accepts event as a copy, or ignores it when the source offers no copy.
+// Never a move: a source such as Explorer deletes the originals after a drop that reports a move.
+void acceptDropAsCopy(QDropEvent* event);
 
 // Byte-for-byte comparison with a size short-circuit.
 [[nodiscard]] bool filesAreIdentical(const QString& pathA, const QString& pathB);

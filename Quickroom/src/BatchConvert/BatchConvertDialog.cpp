@@ -251,21 +251,18 @@ void BatchConvertDialog::dragEnterEvent(QDragEnterEvent* event)
 void BatchConvertDialog::dragMoveEvent(QDragMoveEvent* event)
 {
 	const QList<QUrl> urls = event->mimeData()->urls();
-	if (!_setupArea->isEnabled() || !event->possibleActions().testFlag(Qt::CopyAction) || !std::ranges::any_of(urls, &QUrl::isLocalFile))
-		return event->ignore();
-
-	// Copy, never move: a source such as Explorer deletes the originals after a drop that reports a move
-	event->setDropAction(Qt::CopyAction);
-	event->accept();
+	if (_setupArea->isEnabled() && std::ranges::any_of(urls, &QUrl::isLocalFile))
+		acceptDropAsCopy(event);
+	else
+		event->ignore();
 }
 
 void BatchConvertDialog::dropEvent(QDropEvent* event)
 {
+	acceptDropAsCopy(event);
 	QStringList paths = droppedFilesWithFolderImages(event->mimeData());
 	paths.removeIf([](const QString& path) { return !isSupportedImageFile(path); });
 	addImages(paths);
-	event->setDropAction(Qt::CopyAction);
-	event->accept();
 }
 
 void BatchConvertDialog::addImages(const QStringList& paths)

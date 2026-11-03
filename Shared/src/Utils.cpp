@@ -14,6 +14,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QDateTime>
 #include <QDir>
 #include <QDirIterator>
+#include <QDropEvent>
 #include <QFile>
 #include <QFileInfo>
 #include <QMessageBox>
@@ -159,6 +160,17 @@ QStringList droppedFilesWithFolderImages(const QMimeData* mime)
 		paths += folderImages;
 	}
 	return paths;
+}
+
+void acceptDropAsCopy(QDropEvent* event)
+{
+	if (!event->possibleActions().testFlag(Qt::CopyAction))
+	{
+		event->ignore();
+		return;
+	}
+	event->setDropAction(Qt::CopyAction);
+	event->accept();
 }
 
 bool filesAreIdentical(const QString& pathA, const QString& pathB)

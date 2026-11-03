@@ -24,6 +24,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QContextMenuEvent>
 #include <QDebug>
 #include <QDragEnterEvent>
+#include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QElapsedTimer>
 #include <QFileInfo>
@@ -707,11 +708,16 @@ void PhotoCompareWindow::removePhotoFromComparison(int index)
 
 void PhotoCompareWindow::dragEnterEvent(QDragEnterEvent* event)
 {
-	if (_loadBatch)
-		return;
+	dragMoveEvent(event);
+}
+
+void PhotoCompareWindow::dragMoveEvent(QDragMoveEvent* event)
+{
 	const QList<QUrl> urls = event->mimeData()->urls();
-	if (std::any_of(urls.cbegin(), urls.cend(), [](const QUrl& url) { return url.isLocalFile(); }))
-		event->acceptProposedAction();
+	if (!_loadBatch && std::any_of(urls.cbegin(), urls.cend(), [](const QUrl& url) { return url.isLocalFile(); }))
+		acceptDropAsCopy(event);
+	else
+		event->ignore();
 }
 
 void PhotoCompareWindow::dropEvent(QDropEvent* event)
@@ -730,7 +736,7 @@ void PhotoCompareWindow::dropEvent(QDropEvent* event)
 		else
 			_hintLabel->setText(notice);
 	}
-	event->acceptProposedAction();
+	acceptDropAsCopy(event);
 }
 
 void PhotoCompareWindow::keyPressEvent(QKeyEvent* event)

@@ -47,6 +47,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QComboBox>
 #include <QDir>
 #include <QDragEnterEvent>
+#include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QElapsedTimer>
 #include <QFileDialog>
@@ -386,12 +387,20 @@ ImportDialog::~ImportDialog()
 
 void ImportDialog::dragEnterEvent(QDragEnterEvent* event)
 {
+	dragMoveEvent(event);
+}
+
+void ImportDialog::dragMoveEvent(QDragMoveEvent* event)
+{
 	if (hasSupportedPaths(event->mimeData()))
-		event->acceptProposedAction();
+		acceptDropAsCopy(event);
+	else
+		event->ignore();
 }
 
 void ImportDialog::dropEvent(QDropEvent* event)
 {
+	acceptDropAsCopy(event);
 	QStringList paths = supportedPaths(event->mimeData());
 	if (!paths.isEmpty())
 	{

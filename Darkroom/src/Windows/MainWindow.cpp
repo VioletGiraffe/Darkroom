@@ -36,6 +36,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QDragEnterEvent>
+#include <QDragMoveEvent>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFuture>
@@ -551,16 +552,21 @@ void MainWindow::openSettings()
 
 void MainWindow::dragEnterEvent(QDragEnterEvent* event)
 {
-	// Reject the grid's exported URLs so they cannot be re-imported into this window.
-	if (_mediaBrowser->isGridDragSource(event->source()))
-		return;
+	dragMoveEvent(event);
+}
 
-	if (hasSupportedPaths(event->mimeData()))
-		event->acceptProposedAction();
+void MainWindow::dragMoveEvent(QDragMoveEvent* event)
+{
+	// Reject the grid's exported URLs so they cannot be re-imported into this window.
+	if (!_mediaBrowser->isGridDragSource(event->source()) && hasSupportedPaths(event->mimeData()))
+		acceptDropAsCopy(event);
+	else
+		event->ignore();
 }
 
 void MainWindow::dropEvent(QDropEvent* event)
 {
+	acceptDropAsCopy(event);
 	QStringList paths = supportedPaths(event->mimeData());
 
 	// Release the source application's drag before opening the import workflow.
