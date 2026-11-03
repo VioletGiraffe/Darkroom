@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793725109702,
+  "lastUpdate": 1793742691863,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -21010,6 +21010,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 85.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "eb48c451dead2abddce433812a5ad558ef006c13",
+          "message": "Quickroom batch convert: running out of memory no longer hangs the job, a failed save puts a trashed original back, and errors name the folder or file at fault",
+          "timestamp": "2026-11-03T23:31:58+02:00",
+          "tree_id": "85bcd1c8c54f9cc192577583338482552bce7cd9",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/eb48c451dead2abddce433812a5ad558ef006c13"
+        },
+        "date": 1793742688750,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 19853,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 2730,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 34507,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6997.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7901.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5676,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 840.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 345,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 93,
             "unit": "KB"
           },
           {
