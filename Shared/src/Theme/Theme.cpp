@@ -72,6 +72,9 @@ void resolveAppColors(Theme::Theme& t)
 	// A neutral green, pulled a fifth of the way toward the accent so it belongs to the theme.
 	if (!t.readyGreen.isValid())
 		t.readyGreen = hueShifted(t.dark ? c(0x69c06d) : c(0x3fa257), p.accent.hsvHue(), 0.2f);
+	// Not pulled toward the accent: an error must read as red in every theme.
+	if (!t.errorText.isValid())
+		t.errorText = t.dark ? c(0xe5736b) : c(0xc0392b);
 	// Neutral, so hover and the accent-tinted selection differ by hue, not strength.
 	if (!t.cellHoverBg.isValid())
 		t.cellHoverBg = t.dark ? ColorUtils::mix(p.windowBg, Qt::white, 0.07f) : ColorUtils::mix(p.windowBg, Qt::black, 0.05f);

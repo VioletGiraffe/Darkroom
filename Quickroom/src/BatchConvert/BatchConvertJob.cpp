@@ -37,6 +37,7 @@ struct StageState
 
 	const Options options;
 	std::atomic_bool cancelled = false;
+	std::shared_ptr<AsyncDelivery<size_t>> startDelivery; // of target indices
 	std::shared_ptr<AsyncDelivery<TargetResult>> delivery;
 };
 
@@ -46,8 +47,10 @@ namespace {
 struct TargetWork
 {
 	Target target;
+	size_t targetIndex = 0;
 	CThreadPool* writePool = nullptr; // null for the I/O pool
 	ImageDecoding::EncodedImage source;
+	int64_t sourceBytes = 0; // the size of source, kept after it is freed
 	std::optional<thin_io::entry_times> sourceTimes;
 	QByteArray output;
 };
@@ -57,7 +60,13 @@ void deliverEnding(const StageState& state, TargetWork& work, Ending ending, QSt
 	// A failure after a cancel is the cancel's doing
 	if (ending == Ending::Failed && state.cancelled)
 		ending = Ending::Cancelled;
-	state.delivery->deliver(TargetResult{ std::move(work.target), ending, std::move(error) }, state.delivery);
+	TargetResult result{ std::move(work.target), work.targetIndex, ending, std::move(error) };
+	if (ending == Ending::Written)
+	{
+		result.sourceBytes = work.sourceBytes;
+		result.outputBytes = work.output.size();
+	}
+	state.delivery->deliver(std::move(result), state.delivery);
 }
 
 // image at size; null when out of memory. Single-threaded: the job runs one target per CPU worker.
@@ -102,6 +111,8 @@ void convertTarget(const std::shared_ptr<StageState>& state, const std::shared_p
 	if (state->cancelled)
 		return deliverEnding(*state, *work, Ending::Cancelled);
 
+	// Posted before the ending: the context's queue keeps the order
+	state->startDelivery->deliver(work->targetIndex, state->startDelivery);
 	ImageDecoding::DecodedImage decoded = ImageDecoding::decode(work->source, [&state](double) { return !state->cancelled; });
 	if (decoded.image.isNull())
 		return deliverEnding(*state, *work, Ending::Failed, decoded.error);
@@ -113,6 +124,7 @@ void convertTarget(const std::shared_ptr<StageState>& state, const std::shared_p
 
 	const ImageEncoding::EncodingOptions encoding{ .mimeType = work->target.mimeType, .quality = state->options.quality, .jpegSubsampling = state->options.jpegSubsampling };
 	ImageEncoding::EncodedFile output = ImageEncoding::encodeImage(image, decoded.iccProfile, encoding, work->source.bytes);
+	work->sourceBytes = work->source.bytes.size();
 	work->source = {}; // the whole source file, for a camera raw
 	if (output.bytes.isEmpty())
 		return deliverEnding(*state, *work, Ending::Failed, output.error);
@@ -146,14 +158,17 @@ bool isSlowStorage(const QString& path)
 
 } // namespace
 
-Job::Job(std::vector<Target> targets, Options options, std::function<void(const TargetResult&)> onTargetEnded, std::function<void()> onFinished,
-	QObject* parent)
+Job::Job(std::vector<Target> targets, Options options, std::function<void(size_t targetIndex)> onTargetStarted,
+	std::function<void(const TargetResult&)> onTargetEnded, std::function<void()> onFinished, QObject* parent)
 	: QObject{ parent }
 	, _targets{ std::move(targets) }
 	, _stageState{ std::make_shared<StageState>(std::move(options)) }
+	, _onTargetStarted{ std::move(onTargetStarted) }
 	, _onTargetEnded{ std::move(onTargetEnded) }
 	, _onFinished{ std::move(onFinished) }
 {
+	_stageState->startDelivery = std::make_shared<AsyncDelivery<size_t>>(this, [this](size_t targetIndex) { _onTargetStarted(targetIndex); });
+	_startRequest = AsyncRequest{ _stageState->startDelivery };
 	_stageState->delivery = std::make_shared<AsyncDelivery<TargetResult>>(this, [this](TargetResult result) { endTarget(result); });
 	_deliveryRequest = AsyncRequest{ _stageState->delivery };
 }
@@ -197,14 +212,16 @@ void Job::startTargets()
 	const int maxInFlight = 2 * static_cast<int>(CpuCount::get().logicalProcessorCount());
 	while (_inFlight < maxInFlight && _nextTarget < _targets.size())
 	{
-		Target& target = _targets[_nextTarget++];
+		const size_t targetIndex = _nextTarget++;
+		Target& target = _targets[targetIndex];
 		if (target.skipped)
 		{
-			_onTargetEnded(TargetResult{ std::move(target), Ending::Skipped });
+			_onTargetEnded(TargetResult{ std::move(target), targetIndex, Ending::Skipped });
 			continue;
 		}
 
 		auto work = std::make_shared<TargetWork>();
+		work->targetIndex = targetIndex;
 		work->writePool = writePool(target);
 		work->target = std::move(target);
 		++_inFlight;

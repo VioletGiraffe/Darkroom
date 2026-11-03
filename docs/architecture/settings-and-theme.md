@@ -33,7 +33,7 @@ rejecting the dialog restores all three.
 ## Themes
 
 `Theme::Theme` (`Theme/Theme.h`) is pure data: name and polarity, a `CBasePalette`, `Metrics`, the app-specific
-colors (star and label-UI tones, `instructionText`, `thumbnailMatte`, `readyGreen`), and an optional QSS fragment
+colors (star and label-UI tones, `instructionText`, `thumbnailMatte`, `readyGreen`, `errorText`), and an optional QSS fragment
 appended after the app sheet so its rules win equal-specificity ties. The selectable themes are one table in
 `Theme.cpp`; `Theme::current()` returns a copy of the resolved one.
 

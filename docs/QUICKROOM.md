@@ -77,7 +77,7 @@ Copy and move:
 
 Resize / convert, from the menu of a tile selection with images, or from Tools (Shift+R) for the selected images, if any:
 - The dialog lists the images. Images and folders dropped on it join the list until the conversion starts; Del removes
-  images from it.
+  images from it. During the conversion the list marks the images being converted, written, skipped and failed.
 - Resizing is optional: the image fits a box inside or outside, locked to enlarging or shrinking if asked. The box's sides
   swap for an image of the other orientation, unless that is turned off.
 - The format is the original's where writable, else JPEG, or one chosen for all. Lossy formats take a quality; JPEG takes

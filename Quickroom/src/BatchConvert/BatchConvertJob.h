@@ -10,6 +10,8 @@ DISABLE_COMPILER_WARNINGS
 #include <QString>
 RESTORE_COMPILER_WARNINGS
 
+#include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -23,8 +25,12 @@ enum class Ending { Written, Skipped, Failed, Cancelled };
 struct TargetResult
 {
 	Target target;
+	size_t targetIndex = 0; // in the plan, which keeps the order of the sources
 	Ending ending = Ending::Written;
 	QString error; // set when Failed
+	// Set when Written
+	int64_t sourceBytes = 0;
+	int64_t outputBytes = 0;
 };
 
 struct StageState;
@@ -39,9 +45,10 @@ struct StageState;
 class Job final : public QObject
 {
 public:
-	// The callbacks run on this object's thread
-	Job(std::vector<Target> targets, Options options, std::function<void(const TargetResult&)> onTargetEnded, std::function<void()> onFinished,
-		QObject* parent);
+	// The callbacks run on this object's thread.
+	// onTargetStarted runs when a target's decoding starts, after its read. A skipped target only ends.
+	Job(std::vector<Target> targets, Options options, std::function<void(size_t targetIndex)> onTargetStarted,
+		std::function<void(const TargetResult&)> onTargetEnded, std::function<void()> onFinished, QObject* parent);
 	~Job() override;
 
 	// Creates the target folders, then starts the targets
@@ -64,8 +71,10 @@ private:
 	std::shared_ptr<StageState> _stageState;
 	std::unique_ptr<CThreadPool> _ownWritePool; // created on the first target that needs it
 	QHash<QString, bool> _ownWritePoolByFolders; // writePool() by source and target folder
+	std::function<void(size_t targetIndex)> _onTargetStarted;
 	std::function<void(const TargetResult&)> _onTargetEnded;
 	std::function<void()> _onFinished;
+	AsyncRequest _startRequest;
 	AsyncRequest _deliveryRequest;
 };
 

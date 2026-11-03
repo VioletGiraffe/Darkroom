@@ -8,6 +8,10 @@ DISABLE_COMPILER_WARNINGS
 #include <QStringList>
 RESTORE_COMPILER_WARNINGS
 
+#include <cstddef>
+#include <cstdint>
+
+class QAction;
 class QCheckBox;
 class QComboBox;
 class QGroupBox;
@@ -22,7 +26,7 @@ class QSpinBox;
 class SegmentedToggle;
 
 // The resize and format conversion of a set of images: the images and the options, then the progress. The options and the window geometry persist.
-// Dropped images join the set until the conversion starts.
+// Dropped images join the set until the conversion starts. Then the list shows each image's progress.
 // While the conversion runs, closing the dialog cancels it; the dialog closes once the targets in flight end.
 class BatchConvertDialog final : public QDialog
 {
@@ -54,12 +58,18 @@ private:
 	void updateControls();
 
 	void startConversion();
+	void showTargetStarted(size_t targetIndex);
 	void showTargetEnded(const BatchConvert::TargetResult& result);
 	void showFinished();
+	// The progress, or the summary when finished; then the size the written images saved
+	[[nodiscard]] QString statusText(bool finished) const;
 
 private:
-	QWidget* _setupArea = nullptr; // the images and the options
+	// The list's row of each image is its target's index
 	QListWidget* _imageList = nullptr;
+	QAction* _removeAction = nullptr;
+	QLabel* _dropHint = nullptr;
+	QWidget* _optionsArea = nullptr;
 	QGroupBox* _resizeGroup = nullptr;
 	SegmentedToggle* _fitToggle = nullptr;
 	QSpinBox* _widthBox = nullptr;
@@ -83,10 +93,13 @@ private:
 	QPushButton* _closeButton = nullptr;
 
 	BatchConvert::Job* _job = nullptr;
+	bool _started = false; // the images and the options are fixed from then on
 	int _targetCount = 0;
 	int _endedCount = 0;
 	int _writtenCount = 0;
 	int _skippedCount = 0;
 	int _failedCount = 0;
+	int64_t _writtenSourceBytes = 0;
+	int64_t _writtenOutputBytes = 0;
 	bool _closeOnFinish = false;
 };

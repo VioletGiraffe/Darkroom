@@ -1,19 +1,25 @@
 #include "BatchConvert/BatchConvertDialog.h"
+#include "Theme/Theme.h"
 #include "UiComponents/SegmentedToggle.h"
 #include "Utils.h"
+#include "assert/advanced_assert.h"
+#include "utils/displayformatting.h"
 #include "widgets/cpersistenceenabler.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QAbstractButton>
 #include <QAction>
+#include <QBrush>
 #include <QCheckBox>
 #include <QCloseEvent>
+#include <QColor>
 #include <QComboBox>
 #include <QDir>
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QFileDialog>
+#include <QFont>
 #include <QFormLayout>
 #include <QGridLayout>
 #include <QGroupBox>
@@ -38,6 +44,7 @@ RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 #include <array>
+#include <cstdlib>
 #include <utility>
 
 using namespace BatchConvert;
@@ -77,6 +84,16 @@ int indexOf(const std::array<Value, Count>& values, Value value)
 	return static_cast<int>(std::ranges::find(values, value) - values.begin());
 }
 
+// An invalid color restores the list's own text color
+void styleImageItem(QListWidgetItem& item, const QColor& color, bool bold = false, bool italic = false)
+{
+	QFont font = item.font();
+	font.setBold(bold);
+	font.setItalic(italic);
+	item.setFont(font);
+	item.setForeground(color.isValid() ? QBrush{ color } : QBrush{});
+}
+
 } // namespace
 
 void BatchConvertDialog::showForImages(const QStringList& imagePaths)
@@ -94,13 +111,14 @@ BatchConvertDialog::BatchConvertDialog(const QStringList& imagePaths)
 	_imageList = new QListWidget;
 	_imageList->setSelectionMode(QAbstractItemView::ExtendedSelection);
 	_imageList->setContextMenuPolicy(Qt::ActionsContextMenu);
-	auto* removeAction = new QAction(tr("Remove from the batch"), _imageList);
-	removeAction->setShortcut(QKeySequence::Delete);
-	removeAction->setShortcutContext(Qt::WidgetShortcut);
-	_imageList->addAction(removeAction);
+	_removeAction = new QAction(tr("Remove from the batch"), _imageList);
+	_removeAction->setShortcut(QKeySequence::Delete);
+	_removeAction->setShortcutContext(Qt::WidgetShortcut);
+	_imageList->addAction(_removeAction);
+	_dropHint = new QLabel(tr("Drop images or folders here to add them"));
 	auto* imagesLayout = new QVBoxLayout(imagesGroup);
 	imagesLayout->addWidget(_imageList);
-	imagesLayout->addWidget(new QLabel(tr("Drop images or folders here to add them")));
+	imagesLayout->addWidget(_dropHint);
 
 	_resizeGroup = new QGroupBox(tr("Resize"));
 	_resizeGroup->setCheckable(true);
@@ -161,17 +179,17 @@ BatchConvertDialog::BatchConvertDialog(const QStringList& imagePaths)
 	outputGrid->addWidget(_sourceFolderButton, 2, 0, 1, 3);
 	outputGrid->setColumnStretch(1, 1);
 
-	auto* optionsLayout = new QVBoxLayout;
+	_optionsArea = new QWidget;
+	auto* optionsLayout = new QVBoxLayout(_optionsArea);
+	optionsLayout->setContentsMargins(0, 0, 0, 0);
 	optionsLayout->addWidget(_resizeGroup);
 	optionsLayout->addWidget(formatGroup);
 	optionsLayout->addWidget(outputGroup);
 	optionsLayout->addStretch();
 
-	_setupArea = new QWidget;
-	auto* setupLayout = new QHBoxLayout(_setupArea);
-	setupLayout->setContentsMargins(0, 0, 0, 0);
-	setupLayout->addWidget(imagesGroup, 1);
-	setupLayout->addLayout(optionsLayout);
+	auto* setupRow = new QHBoxLayout;
+	setupRow->addWidget(imagesGroup, 1);
+	setupRow->addWidget(_optionsArea);
 
 	_progressBar = new QProgressBar;
 	_statusLabel = new QLabel;
@@ -189,7 +207,7 @@ BatchConvertDialog::BatchConvertDialog(const QStringList& imagePaths)
 	buttonRow->addWidget(_closeButton);
 
 	auto* layout = new QVBoxLayout(this);
-	layout->addWidget(_setupArea, 1);
+	layout->addLayout(setupRow, 1);
 	layout->addWidget(_progressBar);
 	layout->addWidget(_statusLabel);
 	layout->addWidget(_failureList, 1);
@@ -198,7 +216,7 @@ BatchConvertDialog::BatchConvertDialog(const QStringList& imagePaths)
 	loadOptions();
 	addImages(imagePaths);
 
-	connect(removeAction, &QAction::triggered, this, &BatchConvertDialog::removeSelectedImages);
+	connect(_removeAction, &QAction::triggered, this, &BatchConvertDialog::removeSelectedImages);
 	connect(_formatBox, &QComboBox::currentIndexChanged, this, &BatchConvertDialog::updateControls);
 	for (QRadioButton* location : { _subfolderButton, _folderButton, _sourceFolderButton })
 		connect(location, &QRadioButton::toggled, this, &BatchConvertDialog::updateControls);
@@ -231,7 +249,7 @@ void BatchConvertDialog::reject()
 	// Set first: the job may finish within cancel()
 	_closeOnFinish = true;
 	_closeButton->setEnabled(false);
-	_statusLabel->setText(tr("Cancelling..."));
+	_statusLabel->setText(tr("Cancelling"));
 	_job->cancel();
 }
 
@@ -254,7 +272,7 @@ void BatchConvertDialog::dragEnterEvent(QDragEnterEvent* event)
 void BatchConvertDialog::dragMoveEvent(QDragMoveEvent* event)
 {
 	const QList<QUrl> urls = event->mimeData()->urls();
-	if (_setupArea->isEnabled() && std::ranges::any_of(urls, &QUrl::isLocalFile))
+	if (!_started && std::ranges::any_of(urls, &QUrl::isLocalFile))
 		acceptDropAsCopy(event);
 	else
 		event->ignore();
@@ -403,30 +421,58 @@ void BatchConvertDialog::startConversion()
 			return;
 	}
 
-	_setupArea->setEnabled(false);
+	_started = true;
+	_optionsArea->setEnabled(false);
+	_removeAction->setEnabled(false);
+	_dropHint->hide();
 	_startButton->setEnabled(false);
 	_closeButton->setText(tr("Cancel"));
 	_targetCount = static_cast<int>(plan.targets.size());
 	_progressBar->setRange(0, _targetCount);
 	_progressBar->setValue(0);
 	_progressBar->show();
-	_statusLabel->setText(tr("Starting..."));
+	_statusLabel->setText(statusText(false));
 	_statusLabel->show();
 
-	_job = new Job(std::move(plan.targets), conversion, [this](const TargetResult& result) { showTargetEnded(result); }, [this] { showFinished(); }, this);
+	_job = new Job(std::move(plan.targets), conversion, [this](size_t targetIndex) { showTargetStarted(targetIndex); },
+		[this](const TargetResult& result) { showTargetEnded(result); }, [this] { showFinished(); }, this);
 	_job->start();
+}
+
+void BatchConvertDialog::showTargetStarted(size_t targetIndex)
+{
+	QListWidgetItem* item = _imageList->item(static_cast<int>(targetIndex));
+	assert_and_return_r(item, );
+	styleImageItem(*item, Theme::current().palette.accentText, true);
+	_imageList->scrollToItem(item);
 }
 
 void BatchConvertDialog::showTargetEnded(const TargetResult& result)
 {
+	QListWidgetItem* item = _imageList->item(static_cast<int>(result.targetIndex));
+	assert_and_return_r(item, );
+	const Theme::Theme& theme = Theme::current();
+
 	++_endedCount;
 	switch (result.ending)
 	{
-	case Ending::Written: ++_writtenCount; break;
-	case Ending::Skipped: ++_skippedCount; break;
-	case Ending::Cancelled: break;
+	case Ending::Written:
+		++_writtenCount;
+		_writtenSourceBytes += result.sourceBytes;
+		_writtenOutputBytes += result.outputBytes;
+		styleImageItem(*item, theme.palette.textDim);
+		break;
+	case Ending::Skipped:
+		++_skippedCount;
+		styleImageItem(*item, theme.palette.textDim, false, true);
+		break;
+	case Ending::Cancelled:
+		styleImageItem(*item, {});
+		break;
 	case Ending::Failed:
 		++_failedCount;
+		styleImageItem(*item, theme.errorText);
+		item->setToolTip(result.error);
 		_failureList->appendPlainText(QStringLiteral("%1: %2").arg(QDir::toNativeSeparators(result.target.sourcePath), result.error));
 		_failureList->show();
 		break;
@@ -434,13 +480,12 @@ void BatchConvertDialog::showTargetEnded(const TargetResult& result)
 
 	_progressBar->setValue(_endedCount);
 	if (!_closeOnFinish)
-		_statusLabel->setText(tr("%1 of %2 images done").arg(_endedCount).arg(_targetCount));
+		_statusLabel->setText(statusText(false));
 }
 
 void BatchConvertDialog::showFinished()
 {
-	const QString outcome = _endedCount < _targetCount || _closeOnFinish ? tr("Cancelled.") : tr("Done.");
-	_statusLabel->setText(outcome + ' ' + tr("Written: %1, skipped: %2, failed: %3").arg(_writtenCount).arg(_skippedCount).arg(_failedCount));
+	_statusLabel->setText(statusText(true));
 	_closeButton->setText(tr("Close"));
 	_closeButton->setEnabled(true);
 	_job->deleteLater();
@@ -448,4 +493,28 @@ void BatchConvertDialog::showFinished()
 
 	if (_closeOnFinish)
 		QDialog::reject();
+}
+
+QString BatchConvertDialog::statusText(bool finished) const
+{
+	QStringList items;
+	if (!finished)
+		items.push_back(tr("Converting: %1/%2").arg(_endedCount).arg(_targetCount));
+	else
+	{
+		items.push_back(_endedCount < _targetCount || _closeOnFinish ? tr("Cancelled") : tr("Done"));
+		items.push_back(tr("Written: %1/%2").arg(_writtenCount).arg(_targetCount));
+		if (_skippedCount > 0)
+			items.push_back(tr("Skipped: %1").arg(_skippedCount));
+		if (_failedCount > 0)
+			items.push_back(tr("Failed: %1").arg(_failedCount));
+	}
+
+	if (_writtenSourceBytes > 0)
+	{
+		const int64_t saved = _writtenSourceBytes - _writtenOutputBytes;
+		const QString sign = saved < 0 ? QStringLiteral("−") : QString{};
+		items.push_back(tr("Saved: %1").arg(sign + fileSizeToString(static_cast<uint64_t>(std::abs(saved)))));
+	}
+	return items.join(QStringLiteral("    "));
 }

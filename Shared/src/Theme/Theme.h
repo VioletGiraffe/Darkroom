@@ -54,6 +54,7 @@ struct Theme
 	QColor instructionText; // explanatory text and toolbar glyphs: neutral, and stronger than the tinted textDim
 	QColor thumbnailMatte;
 	QColor readyGreen;
+	QColor errorText;
 	QColor cellHoverBg; // a grid cell under the cursor; accentBg marks the selected cell
 
 	QString qssFragment; // optional per-theme QSS, appended after the app sheet so it wins ties
