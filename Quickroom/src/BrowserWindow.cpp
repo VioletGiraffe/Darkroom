@@ -89,6 +89,7 @@ const ThumbnailWidget::Options TILE_OPTIONS{};
 
 // Not QKeySequence::Cut: on Windows and Linux it includes Shift+Del, the permanent deletion.
 const QKeySequence CUT_KEYS{ Qt::CTRL | Qt::Key_X };
+const QKeySequence COPY_PATHS_KEYS{ Qt::CTRL | Qt::SHIFT | Qt::Key_X };
 const QKeySequence COMPARE_KEYS{ Qt::SHIFT | Qt::Key_C };
 const QKeySequence BATCH_CONVERT_KEYS{ Qt::SHIFT | Qt::Key_R };
 
@@ -393,6 +394,7 @@ void BrowserWindow::setupUi()
 		new QShortcut(deletionKeys(mode), _grid, [this, mode] { deletePaths(selectedPaths(), mode); }, Qt::WidgetShortcut);
 	new QShortcut(QKeySequence::Copy, _grid, [this] { FileOperations::putPathsOnClipboard(selectedPaths(), false); }, Qt::WidgetShortcut);
 	new QShortcut(CUT_KEYS, _grid, [this] { FileOperations::putPathsOnClipboard(selectedPaths(), true); }, Qt::WidgetShortcut);
+	new QShortcut(COPY_PATHS_KEYS, _grid, [this] { FileOperations::putPathsOnClipboardAsText(selectedPaths()); }, Qt::WidgetShortcut);
 	new QShortcut(QKeySequence::Paste, _grid, [this] { pasteInto(_currentPath); }, Qt::WidgetShortcut);
 
 	connect(QGuiApplication::clipboard(), &QClipboard::dataChanged, this, &BrowserWindow::updateCutMarks);
@@ -685,6 +687,8 @@ void BrowserWindow::showEntryContextMenu(QListWidgetItem& item, QPoint globalPos
 	menu.addSeparator();
 	menu.addAction(tr("Cut"), CUT_KEYS, this, [targets] { FileOperations::putPathsOnClipboard(targets, true); });
 	menu.addAction(tr("Copy"), QKeySequence::Copy, this, [targets] { FileOperations::putPathsOnClipboard(targets, false); });
+	const QString copyPathsText = targets.size() == 1 ? tr("Copy full path") : tr("Copy full paths");
+	menu.addAction(copyPathsText, COPY_PATHS_KEYS, this, [targets] { FileOperations::putPathsOnClipboardAsText(targets); });
 	if (entry.kind == EntryKind::Folder)
 		menu.addAction(tr("Paste into folder"), this, [this, path] { pasteInto(path); })->setEnabled(clipboardHasFiles());
 

@@ -11,6 +11,7 @@
 
 DISABLE_COMPILER_WARNINGS
 #include <QClipboard>
+#include <QDir>
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QMessageBox>
@@ -72,6 +73,12 @@ void FileOperations::putPathsOnClipboard(const QStringList& paths, bool cut)
 #endif
 	}
 	QGuiApplication::clipboard()->setMimeData(mime);
+}
+
+void FileOperations::putPathsOnClipboardAsText(const QStringList& paths)
+{
+	if (!paths.empty())
+		QGuiApplication::clipboard()->setText(QDir::toNativeSeparators(paths.join('\n')));
 }
 
 QStringList FileOperations::localFilePaths(const QMimeData& mime)

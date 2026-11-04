@@ -66,7 +66,7 @@ Copy and move:
 
 - Ctrl+C / Ctrl+X put the selection on the clipboard as file URLs, a cut with the marker file managers use for
   "move on paste" (Explorer's on Windows, KDE's and GNOME's elsewhere). Tiles of cut files are faded, whichever app cut
-  them.
+  them. Ctrl+Shift+X puts the selection's full paths on the clipboard as text, one per line.
 - Ctrl+V pastes into the folder shown; a folder tile's menu pastes into that folder. Everything on the clipboard is
   pasted, folders and unsupported files included. A cut is moved and taken off the clipboard.
 - A drop lands in the folder tile under the cursor, else in the folder shown. It follows file managers: a move within

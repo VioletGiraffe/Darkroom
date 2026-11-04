@@ -16,6 +16,8 @@ namespace FileOperations
 	// Puts paths on the clipboard as file URLs. cut adds the markers file managers read as "move on paste".
 	// Leaves the clipboard unchanged when paths is empty.
 	void putPathsOnClipboard(const QStringList& paths, bool cut);
+	// Puts paths on the clipboard as text, one per line, with native separators. Leaves the clipboard unchanged when paths is empty.
+	void putPathsOnClipboardAsText(const QStringList& paths);
 
 	// The local files of mime's URLs; other URLs are dropped.
 	[[nodiscard]] QStringList localFilePaths(const QMimeData& mime);
