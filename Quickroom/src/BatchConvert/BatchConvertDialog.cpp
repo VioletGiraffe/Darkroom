@@ -257,7 +257,6 @@ void BatchConvertDialog::reject()
 		return;
 	}
 
-	// Set first: the job may finish within cancel()
 	_closeOnFinish = true;
 	_closeButton->setEnabled(false);
 	_statusLabel->setText(tr("Cancelling"));

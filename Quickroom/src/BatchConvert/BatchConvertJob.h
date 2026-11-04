@@ -1,7 +1,6 @@
 #pragma once
 
 #include "BatchConvert/BatchConvertPlan.h"
-#include "Core/AsyncDelivery.h"
 #include "compiler/compiler_warnings_control.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -42,7 +41,7 @@ struct StageState;
 // - writing, on the I/O pool for its target. When the target and its source are on two different slow volumes, the write goes
 //   to a one-thread pool of the job's own instead: the I/O pool has one serial worker for all slow storage.
 // A bounded number of targets is in flight: reads would otherwise run ahead of the encoding and hold every source in memory.
-// Must not be destroyed while running: in-flight stages refer to the job's write pool.
+// Must not be destroyed while running: in-flight stages refer to the job and its write pool.
 class Job final : public QObject
 {
 public:
@@ -68,6 +67,7 @@ private:
 	std::vector<Target> _targets;
 	size_t _nextTarget = 0;
 	int _inFlight = 0;
+	const int _maxInFlight; // enough to keep every CPU worker busy while the next sources are read
 	bool _running = false;
 	std::shared_ptr<StageState> _stageState;
 	std::unique_ptr<CThreadPool> _ownWritePool; // created on the first target that needs it
@@ -76,8 +76,6 @@ private:
 	std::function<void(size_t targetIndex)> _onTargetStarted;
 	std::function<void(const TargetResult&)> _onTargetEnded;
 	std::function<void()> _onFinished;
-	AsyncRequest _startRequest;
-	AsyncRequest _deliveryRequest;
 };
 
 } // namespace BatchConvert

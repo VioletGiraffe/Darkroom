@@ -1,4 +1,5 @@
 #include "BatchConvert/BatchConvertJob.h"
+#include "Core/AsyncDelivery.h"
 #include "Core/CpuThreadPool.h"
 #include "Core/IoThreadPool.h"
 #include "FileOperations.h"
@@ -32,15 +33,23 @@ RESTORE_COMPILER_WARNINGS
 
 namespace BatchConvert {
 
+struct TargetEvent
+{
+	enum class Kind { Started, Ended } kind;
+	TargetResult result; // Started: only targetIndex is set
+};
+
 // What the stages of every target share
 struct StageState
 {
-	explicit StageState(Options options) : options{ std::move(options) } {}
+	StageState(Options options, QObject* context, std::function<void(TargetEvent)> onEvent)
+		: options{ std::move(options) }, delivery{ context, std::move(onEvent) }
+	{
+	}
 
 	const Options options;
 	std::atomic_bool cancelled = false;
-	std::shared_ptr<AsyncDelivery<size_t>> startDelivery; // of target indices
-	std::shared_ptr<AsyncDelivery<TargetResult>> delivery;
+	AsyncDelivery<TargetEvent> delivery;
 };
 
 namespace {
@@ -48,6 +57,7 @@ namespace {
 // One target's data, handed from stage to stage
 struct TargetWork
 {
+	std::shared_ptr<StageState> state;
 	Target target;
 	size_t targetIndex = 0;
 	CThreadPool* writePool = nullptr; // null for the I/O pool
@@ -57,10 +67,10 @@ struct TargetWork
 	QByteArray output;
 };
 
-void deliverEnding(const StageState& state, TargetWork& work, Ending ending, QString error = {})
+void deliverEnding(TargetWork& work, Ending ending, QString error = {})
 {
 	// A failure after a cancel is the cancel's doing
-	if (ending == Ending::Failed && state.cancelled)
+	if (ending == Ending::Failed && work.state->cancelled)
 		ending = Ending::Cancelled;
 	if (ending == Ending::Failed && error.isEmpty())
 		error = QObject::tr("Unknown error");
@@ -70,29 +80,29 @@ void deliverEnding(const StageState& state, TargetWork& work, Ending ending, QSt
 		result.sourceBytes = work.sourceBytes;
 		result.outputBytes = work.output.size();
 	}
-	state.delivery->deliver(std::move(result), state.delivery);
+	work.state->delivery.deliver(TargetEvent{ TargetEvent::Kind::Ended, std::move(result) }, work.state);
 }
 
-using Stage = void (*)(const std::shared_ptr<StageState>&, const std::shared_ptr<TargetWork>&);
+using Stage = void (*)(const std::shared_ptr<TargetWork>&);
 
 // An exception ends the target as failed: the pool would contain it, and the target would never end
-void runStage(Stage stage, const std::shared_ptr<StageState>& state, const std::shared_ptr<TargetWork>& work)
+void runStage(Stage stage, const std::shared_ptr<TargetWork>& work)
 {
 	try
 	{
-		stage(state, work);
+		stage(work);
 	}
 	catch (const std::bad_alloc&)
 	{
-		deliverEnding(*state, *work, Ending::Failed, QObject::tr("Not enough memory"));
+		deliverEnding(*work, Ending::Failed, QObject::tr("Not enough memory"));
 	}
 	catch (const std::exception& e)
 	{
-		deliverEnding(*state, *work, Ending::Failed, QString::fromLocal8Bit(e.what()));
+		deliverEnding(*work, Ending::Failed, QString::fromLocal8Bit(e.what()));
 	}
 	catch (...)
 	{
-		deliverEnding(*state, *work, Ending::Failed);
+		deliverEnding(*work, Ending::Failed);
 	}
 }
 
@@ -111,10 +121,10 @@ QImage resizedImage(const QImage& image, QSize size)
 	return resized;
 }
 
-void writeTarget(const std::shared_ptr<StageState>& state, const std::shared_ptr<TargetWork>& work)
+void writeTarget(const std::shared_ptr<TargetWork>& work)
 {
-	if (state->cancelled)
-		return deliverEnding(*state, *work, Ending::Cancelled);
+	if (work->state->cancelled)
+		return deliverEnding(*work, Ending::Cancelled);
 
 	const Target& target = work->target;
 	// Where Trash is unavailable, the write replaces the source
@@ -126,7 +136,7 @@ void writeTarget(const std::shared_ptr<StageState>& state, const std::shared_ptr
 		// The source is back in place unless the move out of Trash fails too
 		if (!sourceInTrash.isEmpty() && !QFile::rename(sourceInTrash, target.sourcePath))
 			error = QObject::tr("%1 (the original is in Trash)").arg(error);
-		return deliverEnding(*state, *work, Ending::Failed, QObject::tr("Cannot save %1: %2").arg(QDir::toNativeSeparators(target.targetPath), error));
+		return deliverEnding(*work, Ending::Failed, QObject::tr("Cannot save %1: %2").arg(QDir::toNativeSeparators(target.targetPath), error));
 	}
 
 	if (work->sourceTimes)
@@ -136,52 +146,53 @@ void writeTarget(const std::shared_ptr<StageState>& state, const std::shared_ptr
 		// Best effort: the image is written either way
 		static_cast<void>(thin_io::set_times(thin_io::native_path(target.targetPath).data(), times));
 	}
-	deliverEnding(*state, *work, Ending::Written);
+	deliverEnding(*work, Ending::Written);
 }
 
-void convertTarget(const std::shared_ptr<StageState>& state, const std::shared_ptr<TargetWork>& work)
+void convertTarget(const std::shared_ptr<TargetWork>& work)
 {
-	if (state->cancelled)
-		return deliverEnding(*state, *work, Ending::Cancelled);
+	StageState& state = *work->state;
+	if (state.cancelled)
+		return deliverEnding(*work, Ending::Cancelled);
 
 	// Posted before the ending: the context's queue keeps the order
-	state->startDelivery->deliver(work->targetIndex, state->startDelivery);
-	ImageDecoding::DecodedImage decoded = ImageDecoding::decode(work->source, [&state](double) { return !state->cancelled; });
+	state.delivery.deliver(TargetEvent{ TargetEvent::Kind::Started, TargetResult{ .targetIndex = work->targetIndex } }, work->state);
+	ImageDecoding::DecodedImage decoded = ImageDecoding::decode(work->source, [&state](double) { return !state.cancelled; });
 	if (decoded.image.isNull())
-		return deliverEnding(*state, *work, Ending::Failed, decoded.error);
+		return deliverEnding(*work, Ending::Failed, decoded.error);
 	ImageDecoding::applyOrientation(decoded.image, decoded.orientation);
 
-	const QImage image = resizedImage(decoded.image, outputSize(decoded.image.size(), state->options.resize));
+	const QImage image = resizedImage(decoded.image, outputSize(decoded.image.size(), state.options.resize));
 	if (image.isNull())
-		return deliverEnding(*state, *work, Ending::Failed, QObject::tr("Not enough memory to resize the image"));
+		return deliverEnding(*work, Ending::Failed, QObject::tr("Not enough memory to resize the image"));
 
-	const ImageEncoding::EncodingOptions encoding{ .mimeType = work->target.mimeType, .quality = state->options.quality, .jpegSubsampling = state->options.jpegSubsampling };
+	const ImageEncoding::EncodingOptions encoding{ .mimeType = work->target.mimeType, .quality = state.options.quality, .jpegSubsampling = state.options.jpegSubsampling };
 	ImageEncoding::EncodedFile output = ImageEncoding::encodeImage(image, decoded.iccProfile, encoding, work->source.bytes);
 	work->sourceBytes = work->source.bytes.size();
 	work->source = {}; // the whole source file, for a camera raw
 	if (output.bytes.isEmpty())
-		return deliverEnding(*state, *work, Ending::Failed, output.error);
+		return deliverEnding(*work, Ending::Failed, output.error);
 
 	work->output = std::move(output.bytes);
-	auto write = [state, work] { runStage(writeTarget, state, work); };
+	auto write = [work] { runStage(writeTarget, work); };
 	if (work->writePool)
 		work->writePool->enqueue(std::move(write));
 	else
 		IoThreadPool::enqueue(work->target.targetPath, std::move(write));
 }
 
-void readTarget(const std::shared_ptr<StageState>& state, const std::shared_ptr<TargetWork>& work)
+void readTarget(const std::shared_ptr<TargetWork>& work)
 {
-	if (state->cancelled)
-		return deliverEnding(*state, *work, Ending::Cancelled);
+	if (work->state->cancelled)
+		return deliverEnding(*work, Ending::Cancelled);
 
 	work->source = ImageDecoding::readEncodedImage(work->target.sourcePath, ImageDecoding::RawRendering::Full);
 	if (!work->source.error.isEmpty())
-		return deliverEnding(*state, *work, Ending::Failed, work->source.error);
+		return deliverEnding(*work, Ending::Failed, work->source.error);
 	// Before the write, which may move the source to Trash
 	work->sourceTimes = thin_io::get_times(thin_io::native_path(work->target.sourcePath).data());
 
-	cpuThreadPool().enqueue([state, work] { runStage(convertTarget, state, work); });
+	cpuThreadPool().enqueue([work] { runStage(convertTarget, work); });
 }
 
 bool isSlowStorage(const QString& path)
@@ -195,15 +206,17 @@ Job::Job(std::vector<Target> targets, Options options, std::function<void(size_t
 	std::function<void(const TargetResult&)> onTargetEnded, std::function<void()> onFinished, QObject* parent)
 	: QObject{ parent }
 	, _targets{ std::move(targets) }
-	, _stageState{ std::make_shared<StageState>(std::move(options)) }
+	, _maxInFlight{ 2 * static_cast<int>(CpuCount::get().logicalProcessorCount()) }
+	, _stageState{ std::make_shared<StageState>(std::move(options), this, [this](TargetEvent event) {
+		if (event.kind == TargetEvent::Kind::Started)
+			_onTargetStarted(event.result.targetIndex);
+		else
+			endTarget(event.result);
+	}) }
 	, _onTargetStarted{ std::move(onTargetStarted) }
 	, _onTargetEnded{ std::move(onTargetEnded) }
 	, _onFinished{ std::move(onFinished) }
 {
-	_stageState->startDelivery = std::make_shared<AsyncDelivery<size_t>>(this, [this](size_t targetIndex) { _onTargetStarted(targetIndex); });
-	_startRequest = AsyncRequest{ _stageState->startDelivery };
-	_stageState->delivery = std::make_shared<AsyncDelivery<TargetResult>>(this, [this](TargetResult result) { endTarget(result); });
-	_deliveryRequest = AsyncRequest{ _stageState->delivery };
 }
 
 Job::~Job()
@@ -235,18 +248,11 @@ void Job::cancel()
 {
 	_stageState->cancelled = true;
 	_nextTarget = _targets.size();
-	if (_running && _inFlight == 0)
-	{
-		_running = false;
-		_onFinished();
-	}
 }
 
 void Job::startTargets()
 {
-	// Enough to keep every CPU worker busy while the next sources are read
-	const int maxInFlight = 2 * static_cast<int>(CpuCount::get().logicalProcessorCount());
-	while (_inFlight < maxInFlight && _nextTarget < _targets.size())
+	while (_inFlight < _maxInFlight && _nextTarget < _targets.size())
 	{
 		const size_t targetIndex = _nextTarget++;
 		Target& target = _targets[targetIndex];
@@ -263,11 +269,12 @@ void Job::startTargets()
 		}
 
 		auto work = std::make_shared<TargetWork>();
+		work->state = _stageState;
 		work->targetIndex = targetIndex;
 		work->writePool = writePool(target);
 		work->target = std::move(target);
 		++_inFlight;
-		IoThreadPool::enqueue(work->target.sourcePath, [state = _stageState, work] { runStage(readTarget, state, work); });
+		IoThreadPool::enqueue(work->target.sourcePath, [work] { runStage(readTarget, work); });
 	}
 
 	if (_inFlight == 0 && _running)
