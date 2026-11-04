@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793818122349,
+  "lastUpdate": 1793823641670,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -21405,6 +21405,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 93,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "da50ce364965a2b0d1c8019b30a664c0a6abf5e3",
+          "message": "Darkroom's media and import renames go through file-operations' inlineRename, and library, import and batch-convert names are checked by its portable rules on every platform\n\nCase-only renames are now allowed on case-sensitive filesystems: inlineRename refuses a distinct entry that already has the new spelling.",
+          "timestamp": "2026-11-04T22:04:37+02:00",
+          "tree_id": "ed6d4d86f4a9708fc95b7cff41ec0c1bd7bd3c7e",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/da50ce364965a2b0d1c8019b30a664c0a6abf5e3"
+        },
+        "date": 1793823638803,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 19922,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 2995,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 34575,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 7043.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7941,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5713,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 847.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 345.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 94.5,
             "unit": "KB"
           },
           {
