@@ -100,6 +100,7 @@ The browser watches the folder it shows through thin_io's `directory_watcher` (`
 shortly after a change, so changes made by other programs appear without F5. A refresh compares the listing with the
 grid: unchanged entries keep their tiles, and a file rewritten in place gets a new one. When the shown folder
 disappears, the browser moves to its nearest existing ancestor.
+- A change to a file whose extension the browser does not show causes no refresh.
 - Where notifications may miss changes (such as a network volume on Linux or macOS) or the folder cannot be watched, the browser also refreshes every few seconds.
 - A watch that ends (the volume locked for eject, the folder replaced) restarts a few seconds later, with a refresh. The watch never keeps a volume from ejecting.
 

@@ -1,5 +1,6 @@
 #include "FolderListing.h"
 #include "Utils.h"
+#include "directory_watcher.hpp" // thin_io
 #include "directoryscan/thinioqstring.h"
 #include "qt_paths.hpp" // thin_io
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
@@ -84,6 +85,28 @@ std::optional<std::vector<FolderEntry>> listFolder(const QString& folder)
 		});
 	}
 	return entries;
+}
+
+bool isChangeToUnsupportedFile(const thin_io::watch_event& event)
+{
+	const auto isSupported = [](const thin_io::native_string& name) { return isSupportedMediaFile(thin_io::to_qstring(name)); };
+	using enum thin_io::watch_event_kind;
+	switch (event.kind)
+	{
+	case modified:
+	case metadata_changed:
+		// An entry of unknown kind counts as a file: Linux reports no kind for files.
+		// A link's own change never shows: the listing follows links.
+		// A subfolder's new date waits for the next refresh on a Windows filesystem without extended change information: Windows reports no kind there.
+		return event.entry != thin_io::entry_kind::directory && !isSupported(event.path);
+	case created:
+	case removed:
+	case renamed:
+		// An entry of unknown kind may be a link to a folder.
+		return event.entry == thin_io::entry_kind::regular_file && !isSupported(event.path) && !isSupported(event.old_path);
+	default:
+		return false;
+	}
 }
 
 bool precedesInOrder(const FolderEntry& a, const FolderEntry& b, const SortOrder& order)

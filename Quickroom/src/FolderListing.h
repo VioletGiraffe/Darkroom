@@ -11,6 +11,10 @@ RESTORE_COMPILER_WARNINGS
 #include <optional>
 #include <vector>
 
+namespace thin_io {
+struct watch_event;
+}
+
 enum class EntryKind { Folder, Image, Video };
 
 struct FolderEntry
@@ -29,6 +33,8 @@ inline constexpr SortControl::Options BROWSER_SORT_OPTIONS = SortControl::NameFi
 // Folders and supported media files directly in folder, unsorted, with links followed. Hidden entries, broken links
 // and special files are left out. nullopt when folder cannot be listed.
 [[nodiscard]] std::optional<std::vector<FolderEntry>> listFolder(const QString& folder);
+// A change to a file listFolder leaves out by name: listFolder's result stays the same.
+[[nodiscard]] bool isChangeToUnsupportedFile(const thin_io::watch_event& event);
 
 // Ascending: folders first, then by the sort field, ties in name order. Descending reverses all of it.
 // Type is the extension; folders have none.

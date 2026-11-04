@@ -1,4 +1,5 @@
 #include "FolderWatcher.h"
+#include "FolderListing.h"
 #include "qt_paths.hpp" // thin_io
 
 DISABLE_COMPILER_WARNINGS
@@ -9,6 +10,7 @@ DISABLE_COMPILER_WARNINGS
 #endif
 RESTORE_COMPILER_WARNINGS
 
+#include <algorithm>
 #include <chrono>
 #include <utility>
 
@@ -43,7 +45,7 @@ bool FolderWatcher::startWatch()
 void FolderWatcher::readNotifications()
 {
 	const auto events = _watcher->read_events();
-	if (events && events->empty())
+	if (events && std::ranges::all_of(*events, isChangeToUnsupportedFile))
 		return;
 
 	// The stopped event comes last.

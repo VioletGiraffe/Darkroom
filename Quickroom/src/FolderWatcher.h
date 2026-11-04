@@ -18,7 +18,7 @@ class QWinEventNotifier;
 class QSocketNotifier;
 #endif
 
-// Calls onChange when the entries directly in one folder may have changed:
+// Calls onChange when listFolder's result for one folder may have changed:
 // - on a notification;
 // - on every poll tick, while notifications may miss changes or the folder cannot be watched.
 // A stopped watch is replaced on the next tick.
