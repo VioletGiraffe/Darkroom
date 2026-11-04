@@ -6,11 +6,15 @@ DISABLE_COMPILER_WARNINGS
 #include <QSize>
 RESTORE_COMPILER_WARNINGS
 
+#include <cstddef>
 #include <optional>
 
 namespace thin_io { class buffered_reader; }
 
 namespace ImageDecoding {
+
+// The buffered_reader window size for LibRaw's reads: chosen in docs/image-read-performance.md
+inline constexpr size_t LibRawReadWindowSize = 256 * 1024;
 
 // The largest JPEG preview a camera raw embeds, oriented as the raw is; format is left to the caller.
 // Empty when the raw has no JPEG preview. uprightRenderSize, when given, receives the upright size decodeRaw() renders the raw

@@ -40,6 +40,11 @@ static QString rawFileSuffix(const QString& path)
 	return rawFileSuffixes().contains(suffix) ? suffix : QString{};
 }
 
+static size_t readerWindowSize(bool raw) noexcept
+{
+	return raw ? LibRawReadWindowSize : thin_io::buffered_reader::default_window_size;
+}
+
 static EncodedImage readWholeFile(thin_io::buffered_reader& file)
 {
 	const std::optional<uint64_t> size = file.size();
@@ -153,11 +158,11 @@ EncodedImage readEncodedImage(const QString& path, RawRendering rawRendering)
 
 EncodedImage readEncodedImage(const QString& path, RawRendering rawRendering, const RawPreviewHandler& onRawPreview)
 {
-	thin_io::buffered_reader file;
+	const QString rawSuffix = rawFileSuffix(path);
+	thin_io::buffered_reader file{ readerWindowSize(!rawSuffix.isEmpty()) };
 	if (!file.open(thin_io::native_path(path).data()))
 		return { .error = QString::fromStdString(thin_io::buffered_reader::text_for_last_error()) };
 
-	const QString rawSuffix = rawFileSuffix(path);
 	if (rawSuffix.isEmpty())
 		return readWholeFile(file);
 
@@ -266,10 +271,11 @@ void applyOrientation(QImage& image, QImageIOHandler::Transformations orientatio
 
 QSize readUprightImageSize(const QString& path)
 {
-	thin_io::buffered_reader file;
+	const bool raw = !rawFileSuffix(path).isEmpty();
+	thin_io::buffered_reader file{ readerWindowSize(raw) };
 	if (!file.open(thin_io::native_path(path).data()))
 		return {};
-	if (!rawFileSuffix(path).isEmpty())
+	if (raw)
 		return readRawUprightSize(file);
 
 	const std::optional<std::span<const std::byte>> start = file.peek(3);

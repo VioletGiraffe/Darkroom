@@ -3,7 +3,7 @@
 [← Back to build, tests, CI, and release](build.md#image-read-benchmark)
 
 Measurements by `scripts/image_read_benchmark.py` and a queue-depth sweep made while validating its method, 2026-10-25,
-on an i5-12600KF.
+on an i5-12600KF. The raw metadata section is from a read trace, 2026-11-04.
 
 ## HDD setup
 
@@ -125,8 +125,58 @@ hyperthreads of one P-core. One CPU: CPU 0.
 - A pool sized by core count would give a one- or two-core machine 2 workers: 17-37% below 6 workers on the same CPUs,
   on the NVMe drives.
 
+## Raw metadata reads
+
+How LibRaw reads a raw through `buffered_reader`, and the window policy `LibRawReadWindowSize` was chosen with.
+
+Method:
+- A scratch harness, linked against the vcpkg LibRaw 0.22.2, runs `readRawPreview()`'s path on the 30 raws of the test
+  corpus, one per format variant, 14-958 MB: `open_datastream`, then the largest JPEG preview. It logs every read and
+  peek LibRaw makes, and every OS read the reader issues.
+- A replay of the logged calls reproduces the reader's OS reads exactly, for every file, and simulates other policies.
+- Read counts and bytes are exact. Times come from a cost model, not a measurement: per read, a latency plus the bytes
+  over a bandwidth. NVMe 80 µs and 3 GB/s, HDD 9 ms and 180 MB/s, a 1 Gb share 0.4 ms and 110 MB/s.
+
+What LibRaw reads:
+- Opening a raw makes about 1,100 calls, 90% of them 2 or 4 bytes; most continue from the previous one.
+- It returns to the header repeatedly after visiting one other region: a maker note within the first MB in NEF and ARW,
+  one region near 3 MB in RAF, the file's tail in DNG, IIQ, RW2 and CR3, one region per frame in a pixel-shift PEF.
+- The preview is one read larger than any window, straight to the destination under every policy.
+
+Opening, all 30 files:
+
+| Windows | OS reads | MB read | Source |
+|---|---|---|---|
+| 1 × 128 KB | 310 | 35.3 | measured |
+| 1 × 256 KB | 261 | 55.5 | simulated |
+| 1 × 1 MB | 228 | 181 | simulated |
+| 2 × 128 KB | 109 | 13.0 | measured |
+| 2 × 256 KB | 84 | 18.8 | measured |
+| 2 × 512 KB | 75 | 35.9 | simulated |
+| 3 × 128 KB | 95 | 11.9 | simulated |
+| 3 × 256 KB | 77 | 18.6 | simulated |
+
+The single-window rows are the reader before two windows. The measured two-window rows end a window filled near a known
+end of file at it, and read nothing past that end. The simulated multi-window rows do the same, with the end taken from
+the file's size: 3 reads fewer at 2 × 256 KB.
+
+Opening and preview, model ms per file, from the measured traces:
+
+| Windows | NVMe | HDD | 1 Gb share |
+|---|---|---|---|
+| 1 × 128 KB | 2.0 | 120 | 35.6 |
+| 2 × 128 KB | 1.2 | 56 | 25.9 |
+| 2 × 256 KB | 1.2 | 49 | 26.8 |
+
+- A single window refills on every return to the header. A larger one cuts reads slowly and multiplies the bytes.
+- Two windows remove most refills. A third saves 4-11 reads over the corpus.
+- Above 256 KB, reads barely fall while bytes grow: most of LibRaw's jumps are longer than any window.
+- 256 KB is the best size where every read costs a seek, 128 KB where the bytes dominate; they are equal on NVMe.
+- `LibRawReadWindowSize` is 256 KB: slow storage shares one serial I/O worker, where seeks dominate.
+
 ## Not covered
 
+- Raw metadata: timings on a real HDD or share; the preview read before a full render, which a whole-file read follows.
 - HDD: a folder scattered across a large span of a full disk, where longer seeks leave more to reordering.
 - SSD: cold metadata, and PCIe 4.0 links.
 - SSD: a small CPU busy decoding. The benchmark cannot show it: under load from other processes, its Python threads
