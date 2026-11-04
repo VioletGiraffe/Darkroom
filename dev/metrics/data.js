@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793799697001,
+  "lastUpdate": 1793816223531,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -21232,6 +21232,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .text",
             "value": 5676,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 840.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 345,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 93,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "beaf389fd81449249e86d5d8f5e4273f36b41a4b",
+          "message": "Raw thumbnails and metadata need far fewer reads: LibRaw reads through two 256 KB windows",
+          "timestamp": "2026-11-04T19:55:30+02:00",
+          "tree_id": "b169c703d4a9cdb433dc643e7914ad3777b722bc",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/beaf389fd81449249e86d5d8f5e4273f36b41a4b"
+        },
+        "date": 1793816220975,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 19860,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 2855,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 34541,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6998,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7919,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5676.5,
             "unit": "KB"
           },
           {
