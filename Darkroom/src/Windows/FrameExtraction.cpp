@@ -109,7 +109,7 @@ FrameExtraction::Outcome reextractOneVideo(Catalog& catalog, MediaItemId id, Fra
 		? QFileInfo(outputFolder).dir().filePath(".darkroom-resplit-" + QUuid::createUuid().toString(QUuid::Id128))
 		: QString{};
 
-	if (hadExistingFolder && !QDir{}.rename(outputFolder, preservedFolder))
+	if (hadExistingFolder && !renameInPlace(outputFolder, QFileInfo(preservedFolder).fileName()))
 	{
 		QMessageBox::critical(dialogParent, QObject::tr("Error"),
 			QObject::tr("Failed to preserve the existing frame folder before replacing it:\n%1").arg(outputFolder));
@@ -127,7 +127,7 @@ FrameExtraction::Outcome reextractOneVideo(Catalog& catalog, MediaItemId id, Fra
 			return;
 		}
 
-		if (hadExistingFolder && !QDir{}.rename(preservedFolder, outputFolder))
+		if (hadExistingFolder && !renameInPlace(preservedFolder, QFileInfo(outputFolder).fileName()))
 		{
 			QMessageBox::critical(dialogParent, QObject::tr("Error"),
 				QObject::tr("Failed to restore the previous frame folder.\n\nPreserved folder:\n%1\n\nOriginal location:\n%2")

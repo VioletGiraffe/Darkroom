@@ -316,6 +316,16 @@ TEST_CASE("renameLabel: folders and stored paths follow, associations survive", 
 		REQUIRE(catalog.mediaItemHasLabel(video, Catalog::BestLabelId));
 		requireRebuildStable(catalog);
 	}
+	SECTION("a case-only rename respells the folder on disk")
+	{
+		REQUIRE(catalog.renameLabel(f.alpha, "ALPHA", &error));
+		REQUIRE(labelIdByName(catalog, "ALPHA") == f.alpha);
+		REQUIRE(catalog.folderForMediaItem(video) == f.root + "/ALPHA/Clip");
+		const QStringList rootEntries = QDir(f.root).entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+		REQUIRE(rootEntries.contains("ALPHA"));
+		REQUIRE_FALSE(rootEntries.contains("Alpha"));
+		requireRebuildStable(catalog);
+	}
 	SECTION("renaming to an existing label's name is refused, including a case variant")
 	{
 		REQUIRE_FALSE(catalog.renameLabel(f.alpha, "Beta", &error));

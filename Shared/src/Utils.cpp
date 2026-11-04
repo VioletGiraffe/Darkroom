@@ -6,6 +6,8 @@
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
 #include "dialogs/messagedialog.h"
+#include "fileoperations/centrypath.h"
+#include "fileoperations/inlinerename.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -204,6 +206,15 @@ bool deleteFolderRecursivelyIfPresent(const QString& folderPath)
 	if (!info.isDir())
 		return false;
 	return QDir(folderPath).removeRecursively();
+}
+
+bool renameInPlace(const QString& path, const QString& newName)
+{
+	const std::optional<CEntryPath> source = parseOperationPath(path);
+	assert_and_return_r(source && !source->isRoot(), false);
+
+	const InlineRenameStatus status = inlineRename(*source, newName, false).status;
+	return status == InlineRenameStatus::Renamed || status == InlineRenameStatus::NothingToDo;
 }
 
 QString pathComparisonKey(const QString& path)

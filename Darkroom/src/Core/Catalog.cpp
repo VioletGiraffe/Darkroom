@@ -1049,7 +1049,7 @@ bool Catalog::renameLabel(LabelId labelId, const QString& newDisplayName, QStrin
 
 	if (haveStorageFolder)
 	{
-		if (!QFile::rename(oldFolder, newFolder))
+		if (!renameInPlace(oldFolder, newName))
 		{
 			qWarning() << "Catalog: failed to rename folder" << oldFolder << "to" << newFolder;
 			return fail(QObject::tr("Could not rename the label folder:\n%1").arg(QDir::toNativeSeparators(oldFolder)));
@@ -1058,14 +1058,14 @@ bool Catalog::renameLabel(LabelId labelId, const QString& newDisplayName, QStrin
 	}
 	if (havePhotoDir)
 	{
-		if (!QFile::rename(oldPhotoDir, newPhotoDir))
+		if (!renameInPlace(oldPhotoDir, newName))
 		{
 			qWarning() << "Catalog: failed to rename folder" << oldPhotoDir << "to" << newPhotoDir;
 			QString message = QObject::tr("Could not rename the label's photo folder:\n%1").arg(QDir::toNativeSeparators(oldPhotoDir));
 			// Keep both backing directories under one name.
 			if (haveStorageFolder)
 			{
-				if (QFile::rename(newFolder, oldFolder))
+				if (renameInPlace(newFolder, oldName))
 					completedMoves.clear();
 				else
 					message += "\n\n" + QObject::tr("Additionally, the label folder could not be renamed back and remains at:\n%1").arg(QDir::toNativeSeparators(newFolder));

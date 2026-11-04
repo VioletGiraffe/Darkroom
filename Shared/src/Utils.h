@@ -47,6 +47,10 @@ void acceptDropAsCopy(QDropEvent* event);
 // An empty path fails; an already-absent path succeeds.
 [[nodiscard]] bool deleteFolderRecursivelyIfPresent(const QString& folderPath);
 
+// Renames the file or folder at path within its folder through file-operations' inlineRename: never replaces an existing entry,
+// and changes only the letter case on any filesystem.
+[[nodiscard]] bool renameInPlace(const QString& path, const QString& newName);
+
 // Lexical, case/separator-insensitive path key. Does not resolve symlinks or junctions.
 [[nodiscard]] QString pathComparisonKey(const QString& path);
 
