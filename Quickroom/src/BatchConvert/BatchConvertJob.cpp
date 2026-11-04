@@ -83,10 +83,9 @@ void deliverEnding(TargetWork& work, Ending ending, QString error = {})
 	work.state->delivery.deliver(TargetEvent{ TargetEvent::Kind::Ended, std::move(result) }, work.state);
 }
 
-using Stage = void (*)(const std::shared_ptr<TargetWork>&);
-
-// An exception ends the target as failed: the pool would contain it, and the target would never end
-void runStage(Stage stage, const std::shared_ptr<TargetWork>& work)
+// An exception ends the target as failed, so that every started target ends
+template <typename Stage>
+void runStage(const Stage& stage, const std::shared_ptr<TargetWork>& work)
 {
 	try
 	{
@@ -271,10 +270,12 @@ void Job::startTargets()
 		auto work = std::make_shared<TargetWork>();
 		work->state = _stageState;
 		work->targetIndex = targetIndex;
-		work->writePool = writePool(target);
 		work->target = std::move(target);
 		++_inFlight;
-		IoThreadPool::enqueue(work->target.sourcePath, [work] { runStage(readTarget, work); });
+		runStage([this](const std::shared_ptr<TargetWork>& started) {
+			started->writePool = writePool(started->target);
+			IoThreadPool::enqueue(started->target.sourcePath, [started] { runStage(readTarget, started); });
+		}, work);
 	}
 
 	if (_inFlight == 0 && _running)
