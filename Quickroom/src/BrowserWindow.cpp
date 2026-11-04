@@ -95,6 +95,7 @@ const ThumbnailWidget::Options TILE_OPTIONS{};
 const QKeySequence CUT_KEYS{ Qt::CTRL | Qt::Key_X };
 const QKeySequence COPY_PATHS_KEYS{ Qt::CTRL | Qt::SHIFT | Qt::Key_X };
 const QKeySequence RENAME_KEYS{ Qt::Key_F2 };
+const QKeySequence NEW_FOLDER_KEYS{ Qt::Key_F7 };
 const QKeySequence COMPARE_KEYS{ Qt::SHIFT | Qt::Key_C };
 const QKeySequence BATCH_CONVERT_KEYS{ Qt::SHIFT | Qt::Key_R };
 
@@ -430,6 +431,8 @@ void BrowserWindow::setupUi()
 void BrowserWindow::setupMainMenu()
 {
 	QMenu* fileMenu = menuBar()->addMenu(tr("&File"));
+	fileMenu->addAction(tr("New folder..."), NEW_FOLDER_KEYS, this, &BrowserWindow::createFolderInShownFolder);
+	fileMenu->addSeparator();
 	fileMenu->addAction(tr("Settings..."), QKeySequence("Ctrl+Alt+P"), this, [this] { SettingsDialog(this).exec(); });
 	fileMenu->addSeparator();
 	// Closes every window: video players are top-level and outlive the browser.
@@ -736,6 +739,8 @@ void BrowserWindow::showBackgroundContextMenu(QPoint globalPos)
 {
 	QMenu menu(this);
 	menu.addAction(tr("Paste"), QKeySequence::Paste, this, [this] { pasteInto(_currentPath); })->setEnabled(clipboardHasFiles());
+	menu.addSeparator();
+	menu.addAction(tr("New folder..."), NEW_FOLDER_KEYS, this, &BrowserWindow::createFolderInShownFolder);
 	menu.exec(globalPos);
 }
 
@@ -915,6 +920,16 @@ QStringList BrowserWindow::selectedPaths() const
 void BrowserWindow::renameEntry(const QString& path)
 {
 	const QString newPath = FileOperations::renameInteractive(path, this);
+	if (newPath.isEmpty())
+		return;
+
+	refresh();
+	selectAndScrollToPath(newPath);
+}
+
+void BrowserWindow::createFolderInShownFolder()
+{
+	const QString newPath = FileOperations::createFolderInteractive(_currentPath, this);
 	if (newPath.isEmpty())
 		return;
 

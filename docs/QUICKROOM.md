@@ -60,6 +60,9 @@ of relisting.
 Rename: F2 or a tile's menu, for a single entry, through file-operations' `inlineRename`. Renaming onto a file asks
 before replacing it permanently; a folder is never replaced. Open viewers and players follow the renamed file.
 
+New folder: F7, the File menu or the menu of the grid's empty area. A relative path such as `a/b` creates every folder
+missing on it. The suggested name is the first free "New folder (n)".
+
 Photo comparison is Darkroom's `PhotoCompareWindow` (see [playback.md](architecture/playback.md#photocomparewindow)),
 opened from the context menu of a selection of two or more images, or from Tools > Compare photos (Shift+C), which
 takes such a selection too and otherwise opens empty to take dropped files. It is parentless, for a taskbar button of its

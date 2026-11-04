@@ -38,6 +38,9 @@ namespace FileOperations
 	// Asks for a new name and renames path in place; replacing a file asks first, a folder is never replaced.
 	// Open players and viewers follow the file. Returns the new path, empty when nothing was renamed.
 	[[nodiscard]] QString renameInteractive(const QString& path, QWidget* dialogParent);
+	// Asks for a folder name, or a relative path whose missing folders are all created, and creates it in parentFolder.
+	// Returns the path of the top-level folder named, empty when nothing was created.
+	[[nodiscard]] QString createFolderInteractive(const QString& parentFolder, QWidget* dialogParent);
 
 	// Menu wording for deleteWithConfirmation in the given mode.
 	[[nodiscard]] QString deleteActionText(PathDeletion::Mode mode);
