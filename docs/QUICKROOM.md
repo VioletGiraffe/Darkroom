@@ -112,7 +112,9 @@ disappears, the browser moves to its nearest existing ancestor.
 - Where notifications may miss changes (such as a network volume on Linux or macOS) or the folder cannot be watched, the browser also refreshes every few seconds.
 - A watch that ends (the volume locked for eject, the folder replaced) restarts a few seconds later, with a refresh. The watch never keeps a volume from ejecting.
 
-Browser state (last folder, tile width, sort order, window geometry) persists under `browser/*` settings keys.
+Browser state (last folder, tile width, sort order, window geometry) persists under `browser/*` settings keys. The last
+folder is stored together with its first selected entry when a browser closes or the app quits.
+The next browser selects that entry and scrolls to it if it lists the entry and is not asked to select another.
 
 ## Startup
 
@@ -120,7 +122,7 @@ The first command-line path decides which window opens; further paths are ignore
 
 - **Folder** - the browser, listing it.
 - **Image** - the viewer alone, browsing the images beside it in that folder. No browser is created: building
-  one lists a directory and overwrites the remembered folder, which opening a single file must not do.
+  one lists a directory, and its folder replaces the remembered one on exit, which opening a single file must not do.
 - **Video** - the player alone, browsing the videos beside it in that folder.
 - **Missing path** - reported, then the browser.
 - **Any other file** - the browser on its folder, where that file is not listed.

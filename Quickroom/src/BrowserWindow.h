@@ -23,6 +23,7 @@ class CLabelElided;
 class MediaGrid;
 class NameFilterField;
 class QAction;
+class QCloseEvent;
 class QDragEnterEvent;
 class QDragMoveEvent;
 class QDropEvent;
@@ -40,10 +41,11 @@ public:
 	enum class PathFieldHistory { Skip, Record };
 
 	// Creates a self-deleting browser window at folder, or at the remembered folder when folder is empty.
-	// selectPath, when the listed folder contains it, becomes the current item.
+	// selectPath, else the entry stored with the remembered folder, becomes the current item if the listed folder contains it.
 	static void showForFolder(const QString& folder = {}, const QString& selectPath = {}, PathFieldHistory history = PathFieldHistory::Skip);
 
 protected:
+	void closeEvent(QCloseEvent* event) override;
 	// Forwards mouse back/forward buttons from the grid viewport to history navigation.
 	bool eventFilter(QObject* watched, QEvent* event) override;
 
@@ -60,6 +62,8 @@ private:
 
 	// Lists path into the grid and watches it; false and no state change when path cannot be listed.
 	bool listDirectory(const QString& path);
+	// The remembered folder and its entry to select are only written together: the entry must belong to the folder.
+	void storeFolderAndSelection() const;
 	// listDirectory plus a Back/Forward history push; a failed listing reverts the path field.
 	void navigateTo(const QString& path, PathFieldHistory history = PathFieldHistory::Skip);
 	void goBack();

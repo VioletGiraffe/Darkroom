@@ -34,7 +34,9 @@ DISABLE_COMPILER_WARNINGS
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
+#include <QCloseEvent>
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QDateTime>
 #include <QDir>
 #include <QDragEnterEvent>
@@ -82,6 +84,7 @@ namespace {
 
 const QString LAST_FOLDER_KEY = QStringLiteral("browser/lastFolder");
 const QString TILE_SIZE_KEY   = QStringLiteral("browser/tileSize");
+const QString SELECTED_ENTRY_KEY = QStringLiteral("browser/selectedEntry");
 const QString PATH_FIELD_HISTORY_KEY = QStringLiteral("browser/pathFieldHistory");
 constexpr int PATH_FIELD_HISTORY_SIZE = 100;
 const QString RECENT_TRANSFER_FOLDERS_KEY = QStringLiteral("browser/recentTransferFolders");
@@ -198,6 +201,14 @@ QStringList shownPathsOfKind(const QListWidget& grid, EntryKind kind)
 	return paths;
 }
 
+QString firstSelectedPathInGridOrder(const QListWidget& grid)
+{
+	for (int row = 0, rows = grid.count(); row < rows; ++row)
+		if (const QListWidgetItem* item = grid.item(row); item->isSelected())
+			return static_cast<const GridEntry*>(item)->path;
+	return {};
+}
+
 // Paths of the shown images among items, in grid order: a batch conversion numbers clashing names in that order
 QStringList imagePathsInGridOrder(const QListWidget& grid, const QList<QListWidgetItem*>& items)
 {
@@ -254,8 +265,8 @@ void BrowserWindow::showForFolder(const QString& folder, const QString& selectPa
 	window->setAttribute(Qt::WA_DeleteOnClose);
 	window->show();
 	// Scrolling to the item needs the laid-out viewport the window only has once shown.
-	if (!selectPath.isEmpty())
-		window->selectAndScrollToPath(selectPath);
+	if (const QString pathToSelect = selectPath.isEmpty() ? QSettings{}.value(SELECTED_ENTRY_KEY).toString() : selectPath; !pathToSelect.isEmpty())
+		window->selectAndScrollToPath(pathToSelect);
 }
 
 BrowserWindow::BrowserWindow(const QString& folder, PathFieldHistory history)
@@ -266,6 +277,12 @@ BrowserWindow::BrowserWindow(const QString& folder, PathFieldHistory history)
 
 	resize(1200, 800);
 	enablePersistence(this, "browser/window", CPersistenceEnabler::Delayed{ true }, CPersistenceEnabler::SetDefaultSize{ false });
+	// Some quits close no window, such as the end of a Windows session.
+	// Only an open browser stores its state then: a closed one stored it on closing, and a browser closed later may have replaced it.
+	connect(qApp, &QCoreApplication::aboutToQuit, this, [this] {
+		if (isVisible())
+			storeFolderAndSelection();
+	});
 
 	navigateTo(folder, history);
 }
@@ -487,8 +504,14 @@ bool BrowserWindow::listDirectory(const QString& path)
 	_pathField->setCurrentIndex(_pathField->findText(nativePath)); // the dropdown highlights the listed folder, or nothing
 	_pathField->setEditText(nativePath);
 	setWindowTitle((dir.dirName().isEmpty() ? nativePath : dir.dirName()) + QStringLiteral(" - Quickroom"));
-	QSettings{}.setValue(LAST_FOLDER_KEY, _currentPath);
 	return true;
+}
+
+void BrowserWindow::storeFolderAndSelection() const
+{
+	QSettings settings;
+	settings.setValue(LAST_FOLDER_KEY, _currentPath);
+	settings.setValue(SELECTED_ENTRY_KEY, firstSelectedPathInGridOrder(*_grid));
 }
 
 void BrowserWindow::navigateTo(const QString& path, PathFieldHistory history)
@@ -1076,6 +1099,12 @@ void BrowserWindow::applyTileSize()
 	setTileSizeHints();
 	_grid->discardAllCards();
 	_grid->ensureVisibleCardsExist();
+}
+
+void BrowserWindow::closeEvent(QCloseEvent* event)
+{
+	storeFolderAndSelection();
+	QMainWindow::closeEvent(event);
 }
 
 bool BrowserWindow::eventFilter(QObject* watched, QEvent* event)
