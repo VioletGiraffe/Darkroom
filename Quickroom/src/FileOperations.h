@@ -35,6 +35,10 @@ namespace FileOperations
 	// Returns the paths that are gone afterwards.
 	[[nodiscard]] QSet<QString> deleteWithConfirmation(const QStringList& paths, PathDeletion::Mode mode, QWidget* dialogParent);
 
+	// Asks for a new name and renames path in place; replacing a file asks first, a folder is never replaced.
+	// Open players and viewers follow the file. Returns the new path, empty when nothing was renamed.
+	[[nodiscard]] QString renameInteractive(const QString& path, QWidget* dialogParent);
+
 	// Menu wording for deleteWithConfirmation in the given mode.
 	[[nodiscard]] QString deleteActionText(PathDeletion::Mode mode);
 

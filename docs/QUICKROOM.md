@@ -57,6 +57,9 @@ including a folder asks first. The filesystem step is the shared `PathDeletion` 
 through the removal actions `FileOperations` installs, and the browser removes the deleted entries in place instead
 of relisting.
 
+Rename: F2 or a tile's menu, for a single entry, through file-operations' `inlineRename`. Renaming onto a file asks
+before replacing it permanently; a folder is never replaced. Open viewers and players follow the renamed file.
+
 Photo comparison is Darkroom's `PhotoCompareWindow` (see [playback.md](architecture/playback.md#photocomparewindow)),
 opened from the context menu of a selection of two or more images, or from Tools > Compare photos (Shift+C), which
 takes such a selection too and otherwise opens empty to take dropped files. It is parentless, for a taskbar button of its

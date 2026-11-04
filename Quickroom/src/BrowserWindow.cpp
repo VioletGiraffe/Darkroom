@@ -90,6 +90,7 @@ const ThumbnailWidget::Options TILE_OPTIONS{};
 // Not QKeySequence::Cut: on Windows and Linux it includes Shift+Del, the permanent deletion.
 const QKeySequence CUT_KEYS{ Qt::CTRL | Qt::Key_X };
 const QKeySequence COPY_PATHS_KEYS{ Qt::CTRL | Qt::SHIFT | Qt::Key_X };
+const QKeySequence RENAME_KEYS{ Qt::Key_F2 };
 const QKeySequence COMPARE_KEYS{ Qt::SHIFT | Qt::Key_C };
 const QKeySequence BATCH_CONVERT_KEYS{ Qt::SHIFT | Qt::Key_R };
 
@@ -396,6 +397,10 @@ void BrowserWindow::setupUi()
 	new QShortcut(CUT_KEYS, _grid, [this] { FileOperations::putPathsOnClipboard(selectedPaths(), true); }, Qt::WidgetShortcut);
 	new QShortcut(COPY_PATHS_KEYS, _grid, [this] { FileOperations::putPathsOnClipboardAsText(selectedPaths()); }, Qt::WidgetShortcut);
 	new QShortcut(QKeySequence::Paste, _grid, [this] { pasteInto(_currentPath); }, Qt::WidgetShortcut);
+	new QShortcut(RENAME_KEYS, _grid, [this] {
+		if (const QStringList paths = selectedPaths(); paths.size() == 1)
+			renameEntry(paths.front());
+	}, Qt::WidgetShortcut);
 
 	connect(QGuiApplication::clipboard(), &QClipboard::dataChanged, this, &BrowserWindow::updateCutMarks);
 	updateCutMarks();
@@ -692,13 +697,19 @@ void BrowserWindow::showEntryContextMenu(QListWidgetItem& item, QPoint globalPos
 	if (entry.kind == EntryKind::Folder)
 		menu.addAction(tr("Paste into folder"), this, [this, path] { pasteInto(path); })->setEnabled(clipboardHasFiles());
 
-	// Queued, like folder activation in activateEntry: the tile showing this menu may be among those removed.
+	// Rename and deletion are queued, like folder activation in activateEntry: the tile showing this menu may be among those removed.
 	const auto addDeleteAction = [this, &menu, targets](PathDeletion::Mode mode) {
 		menu.addAction(FileOperations::deleteActionText(mode), deletionKeys(mode), this, [this, targets, mode] {
 			QMetaObject::invokeMethod(this, [this, targets, mode] { deletePaths(targets, mode); }, Qt::QueuedConnection);
 		});
 	};
 	menu.addSeparator();
+	if (targets.size() == 1)
+	{
+		menu.addAction(tr("Rename..."), RENAME_KEYS, this, [this, path] {
+			QMetaObject::invokeMethod(this, [this, path] { renameEntry(path); }, Qt::QueuedConnection);
+		});
+	}
 	addDeleteAction(PathDeletion::Mode::Trash);
 	addDeleteAction(PathDeletion::Mode::Permanent);
 
@@ -851,6 +862,16 @@ void BrowserWindow::selectAndScrollToPath(const QString& path)
 QStringList BrowserWindow::selectedPaths() const
 {
 	return entryPaths(_grid->selectedItems());
+}
+
+void BrowserWindow::renameEntry(const QString& path)
+{
+	const QString newPath = FileOperations::renameInteractive(path, this);
+	if (newPath.isEmpty())
+		return;
+
+	refresh();
+	selectAndScrollToPath(newPath);
 }
 
 void BrowserWindow::deletePaths(const QStringList& paths, PathDeletion::Mode mode)

@@ -4,20 +4,29 @@
 #include "Windows/PhotoCompareWindow.h"
 #include "Windows/RemovalAction.h"
 #include "Windows/VideoPlayerWindow.h"
+#include "Utils.h"
+#include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
+#include "fileoperations/centrypath.h"
 #include "fileoperations/cfilesystemmutator.h"
+#include "fileoperations/inlinerename.h"
 #include "fileoperationsui/cfileoperationdialog.h"
 #include "fileoperationsui/fileoperationtexts.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QClipboard>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QDir>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QLabel>
+#include <QLineEdit>
 #include <QMessageBox>
 #include <QMimeData>
 #include <QObject>
 #include <QUrl>
+#include <QVBoxLayout>
 RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
@@ -25,6 +34,7 @@ RESTORE_COMPILER_WARNINGS
 #include <optional>
 #include <stdint.h>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -44,6 +54,45 @@ const QString GNOME_COPIED_FILES_FORMAT = QStringLiteral("x-special/gnome-copied
 			onDeleted(path);
 		return deleted;
 	} };
+}
+
+// Empty when cancelled. A file's name is preselected up to its extension, as file managers do.
+[[nodiscard]] QString askForNewName(const QString& name, bool isFolder, QWidget* parent)
+{
+	QDialog dialog(parent);
+	dialog.setWindowTitle(QObject::tr("Rename"));
+	dialog.setMinimumWidth(400);
+
+	auto* nameField = new QLineEdit(name);
+	const qsizetype stemLength = isFolder ? 0 : QFileInfo(name).completeBaseName().size();
+	nameField->setSelection(0, static_cast<int>(stemLength > 0 ? stemLength : name.size()));
+
+	auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+	QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+	QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+	auto* layout = new QVBoxLayout(&dialog);
+	layout->addWidget(new QLabel(QObject::tr("New name:")));
+	layout->addWidget(nameField);
+	layout->addWidget(buttons);
+
+	return dialog.exec() == QDialog::Accepted ? nameField->text() : QString{};
+}
+
+// Players and viewers holding path, or the file it replaces, let go of it during the rename and then follow it to newPath.
+[[nodiscard]] InlineRenameResult renameReleasingOpenFiles(const CEntryPath& source, const QString& path, const QString& newName, const QString& newPath, bool replaceExistingFile)
+{
+	QStringList released{ path };
+	if (replaceExistingFile)
+		released.push_back(newPath);
+	releaseMediaFilesHeldOpen(released);
+
+	InlineRenameResult result = inlineRename(source, newName, replaceExistingFile);
+	std::vector<PathMove> completedMoves;
+	if (result.status == InlineRenameStatus::Renamed)
+		completedMoves.push_back({ path, newPath });
+	followMovedMediaFiles(released, completedMoves);
+	return result;
 }
 
 } // namespace
@@ -154,6 +203,53 @@ QSet<QString> FileOperations::deleteWithConfirmation(const QStringList& paths, P
 	}
 
 	return PathDeletion::removePathsInteractive(paths, mode, dialogParent);
+}
+
+QString FileOperations::renameInteractive(const QString& path, QWidget* dialogParent)
+{
+	const std::optional<CEntryPath> source = parseOperationPath(path);
+	assert_and_return_r(source && !source->isRoot(), {});
+
+	const QString title = QObject::tr("Rename");
+	const bool isFolder = QFileInfo(path).isDir();
+	// A refused name is offered again for correction.
+	for (QString newName = source->name();;)
+	{
+		newName = askForNewName(newName, isFolder, dialogParent);
+		if (newName.isEmpty())
+			return {};
+
+		// Built as listFolder builds entry paths, so the caller can find the entry by it.
+		const QString newPath = QFileInfo(path).absoluteDir().absoluteFilePath(newName);
+		InlineRenameResult result = renameReleasingOpenFiles(*source, path, newName, newPath, false);
+		if (result.status == InlineRenameStatus::ReplacementRequired)
+		{
+			const QString question = QObject::tr("A %1 named “%2” already exists here. Replace it permanently?").arg(fileOperationEntryKindNoun(*result.destinationKind), newName);
+			if (QMessageBox::warning(dialogParent, title, question, QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+				continue;
+			result = renameReleasingOpenFiles(*source, path, newName, newPath, true);
+		}
+
+		using enum InlineRenameStatus;
+		switch (result.status)
+		{
+		case Renamed:
+			return newPath;
+		case NothingToDo:
+			return {};
+		case Rejected:
+			QMessageBox::warning(dialogParent, title, QObject::tr("A %1 named “%2” already exists here.").arg(fileOperationEntryKindNoun(*result.destinationKind), newName));
+			break;
+		case RejectedInvalidName:
+			QMessageBox::warning(dialogParent, title, newNameRejectionText(result.nameRejection));
+			break;
+		case Failed:
+			QMessageBox::critical(dialogParent, title, QObject::tr("Could not rename “%1”: %2.").arg(source->name(), fileSystemErrorText(result.failure->filesystemError)));
+			return {};
+		case ReplacementRequired:
+			assert_and_return_unconditional_r("inlineRename asked again after replaceExistingFile", {});
+		}
+	}
 }
 
 QString FileOperations::deleteActionText(PathDeletion::Mode mode)

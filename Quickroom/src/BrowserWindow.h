@@ -85,6 +85,8 @@ private:
 	[[nodiscard]] std::function<void(const QString& path)> pathSelector();
 
 	[[nodiscard]] QStringList selectedPaths() const;
+	// FileOperations::renameInteractive, then the renamed entry becomes current.
+	void renameEntry(const QString& path);
 	void deletePaths(const QStringList& paths, PathDeletion::Mode mode);
 	// Drops the entries of paths; the shown entry nearest to the last of them becomes current.
 	void removeEntries(const QSet<QString>& paths);
