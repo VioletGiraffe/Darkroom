@@ -96,10 +96,12 @@ On Windows a tile's menu ends with "Explorer context menu": Explorer's own (clas
 the item like a submenu, on hover or click, while Quickroom's menu stays open behind it. The shell side is cpputils'
 `system/shellcontextmenu`.
 
-The browser watches the folder it shows and refreshes it shortly after a change, so changes made by other programs
-appear without F5. A refresh compares the listing with the grid: unchanged entries keep their tiles, and a file
-rewritten in place gets a new one. When the shown folder disappears, the browser moves to its nearest existing
-ancestor.
+The browser watches the folder it shows through thin_io's `directory_watcher` (`FolderWatcher`) and refreshes it
+shortly after a change, so changes made by other programs appear without F5. A refresh compares the listing with the
+grid: unchanged entries keep their tiles, and a file rewritten in place gets a new one. When the shown folder
+disappears, the browser moves to its nearest existing ancestor.
+- Where notifications may miss changes (such as a network volume on Linux or macOS) or the folder cannot be watched, the browser also refreshes every few seconds.
+- A watch that ends (the volume locked for eject, the folder replaced) restarts a few seconds later, with a refresh. The watch never keeps a volume from ejecting.
 
 Browser state (last folder, tile width, sort order, window geometry) persists under `browser/*` settings keys.
 

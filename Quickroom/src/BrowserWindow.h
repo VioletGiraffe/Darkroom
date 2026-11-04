@@ -1,5 +1,6 @@
 #pragma once
 
+#include "FolderWatcher.h"
 #include "Windows/PathDeletion.h"
 #include "compiler/compiler_warnings_control.h"
 
@@ -13,6 +14,7 @@ DISABLE_COMPILER_WARNINGS
 RESTORE_COMPILER_WARNINGS
 
 #include <functional>
+#include <memory>
 #include <vector>
 
 class CHistoryComboBox;
@@ -23,7 +25,6 @@ class QAction;
 class QDragEnterEvent;
 class QDragMoveEvent;
 class QDropEvent;
-class QFileSystemWatcher;
 class QListWidgetItem;
 class QTimer;
 class SortControl;
@@ -124,7 +125,7 @@ private:
 	QTimer*    _zoomDebounce = nullptr;
 	QTimer*    _refreshDebounce = nullptr;
 	QTimer*    _selectionSummaryDebounce = nullptr;
-	QFileSystemWatcher* _folderWatcher = nullptr;
+	std::unique_ptr<FolderWatcher> _folderWatcher;
 	QFileIconProvider _iconProvider;
 
 	int _tileWidth = -1;

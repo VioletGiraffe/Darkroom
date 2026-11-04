@@ -42,7 +42,6 @@ DISABLE_COMPILER_WARNINGS
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
-#include <QFileSystemWatcher>
 #include <QGraphicsOpacityEffect>
 #include <QGuiApplication>
 #include <QHBoxLayout>
@@ -70,6 +69,7 @@ RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 #include <optional>
 #include <ranges>
 #include <unordered_map>
@@ -409,12 +409,6 @@ void BrowserWindow::setupUi()
 	_refreshDebounce->setSingleShot(true);
 	_refreshDebounce->setInterval(300);
 	connect(_refreshDebounce, &QTimer::timeout, this, &BrowserWindow::refresh);
-
-	_folderWatcher = new QFileSystemWatcher(this);
-	connect(_folderWatcher, &QFileSystemWatcher::directoryChanged, this, [this] {
-		if (!_refreshDebounce->isActive())
-			_refreshDebounce->start();
-	});
 }
 
 void BrowserWindow::setupMainMenu()
@@ -446,16 +440,19 @@ void BrowserWindow::setupMainMenu()
 bool BrowserWindow::listDirectory(const QString& path)
 {
 	const QDir dir(path);
-	std::optional<std::vector<FolderEntry>> entries = listFolder(dir.absolutePath());
+	QString absolutePath = dir.absolutePath();
+	// Before the listing: a change made before the watch starts may go unreported.
+	auto watcher = std::make_unique<FolderWatcher>(absolutePath, [this] {
+		if (!_refreshDebounce->isActive())
+			_refreshDebounce->start();
+	});
+	std::optional<std::vector<FolderEntry>> entries = listFolder(absolutePath);
 	if (!entries)
 		return false;
 
 	_grid->clear();
-	_currentPath = dir.absolutePath();
-
-	if (const QStringList watched = _folderWatcher->directories(); !watched.empty())
-		_folderWatcher->removePaths(watched);
-	_folderWatcher->addPath(_currentPath);
+	_currentPath = std::move(absolutePath);
+	_folderWatcher = std::move(watcher);
 
 	for (FolderEntry& entry : *entries)
 		_grid->addItem(new GridEntry(std::move(entry), _sortControl->order()));

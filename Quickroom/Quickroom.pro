@@ -92,6 +92,7 @@ win*{
 
 mac*{
 	LIBS += -framework AppKit
+	LIBS += -framework CoreServices # FSEvents, for thin_io's directory_watcher
 	ICON = res/quickroom.icns
 }
 
