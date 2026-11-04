@@ -64,8 +64,8 @@ private:
 	bool listDirectory(const QString& path);
 	// The remembered folder and its entry to select are only written together: the entry must belong to the folder.
 	void storeFolderAndSelection() const;
-	// listDirectory plus a Back/Forward history push; a failed listing reverts the path field.
-	void navigateTo(const QString& path, PathFieldHistory history = PathFieldHistory::Skip);
+	// listDirectory plus a Back/Forward history push; a failed listing reverts the path field and returns false.
+	bool navigateTo(const QString& path, PathFieldHistory history = PathFieldHistory::Skip);
 	void goBack();
 	void goForward();
 	void goUp();

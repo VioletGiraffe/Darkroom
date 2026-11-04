@@ -318,8 +318,10 @@ void BrowserWindow::setupUi()
 	_pathField->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
 	_pathField->setMaxCount(PATH_FIELD_HISTORY_SIZE);
 	_pathField->setSettingsKeyForHistoryPersistence(PATH_FIELD_HISTORY_KEY);
+	// A failed navigation leaves the focus in the path field, for correcting the path.
 	const auto navigateToPathFieldText = [this](const QString& text) {
-		navigateTo(QDir::fromNativeSeparators(text.trimmed()), PathFieldHistory::Record);
+		if (navigateTo(QDir::fromNativeSeparators(text.trimmed()), PathFieldHistory::Record))
+			_grid->setFocus();
 	};
 	connect(_pathField, &CHistoryComboBox::itemActivated, this, navigateToPathFieldText);
 	// Queued: navigating rebuilds the items while the combo box is still handling the pick
@@ -329,8 +331,8 @@ void BrowserWindow::setupUi()
 	auto* browseButton = new QPushButton(tr("Browse..."));
 	browseButton->setFocusPolicy(Qt::NoFocus);
 	connect(browseButton, &QPushButton::clicked, this, [this] {
-		if (const QString folder = QFileDialog::getExistingDirectory(this, tr("Open folder"), _currentPath); !folder.isEmpty())
-			navigateTo(folder, PathFieldHistory::Record);
+		if (const QString folder = QFileDialog::getExistingDirectory(this, tr("Open folder"), _currentPath); !folder.isEmpty() && navigateTo(folder, PathFieldHistory::Record))
+			_grid->setFocus();
 	});
 	headerLayout->addWidget(browseButton);
 	headerLayout->addSpacing(8);
@@ -515,14 +517,14 @@ void BrowserWindow::storeFolderAndSelection() const
 	settings.setValue(SELECTED_ENTRY_KEY, firstSelectedPathInGridOrder(*_grid));
 }
 
-void BrowserWindow::navigateTo(const QString& path, PathFieldHistory history)
+bool BrowserWindow::navigateTo(const QString& path, PathFieldHistory history)
 {
 	const bool samePath = _historyIndex >= 0 && _history[static_cast<size_t>(_historyIndex)] == QDir(path).absolutePath();
 	if (!listDirectory(path))
 	{
 		statusBar()->showMessage(tr("Cannot open \"%1\"").arg(QDir::toNativeSeparators(path)));
 		_pathField->setEditText(QDir::toNativeSeparators(_currentPath));
-		return;
+		return false;
 	}
 	if (history == PathFieldHistory::Record)
 		_pathField->addToHistory(QDir::toNativeSeparators(_currentPath));
@@ -534,6 +536,7 @@ void BrowserWindow::navigateTo(const QString& path, PathFieldHistory history)
 		++_historyIndex;
 	}
 	updateNavigationActions();
+	return true;
 }
 
 void BrowserWindow::goBack()
