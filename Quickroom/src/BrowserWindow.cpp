@@ -393,6 +393,7 @@ void BrowserWindow::setupUi()
 	centralLayout->addWidget(header);
 	centralLayout->addWidget(_grid);
 	setCentralWidget(central);
+	_grid->setFocus();
 	setAcceptDrops(true);
 
 	connect(_grid, &QListWidget::itemActivated, this, &BrowserWindow::activateEntry);
