@@ -334,6 +334,8 @@ TEST_CASE("renameLabel: folders and stored paths follow, associations survive", 
 		REQUIRE_FALSE(catalog.renameLabel(f.alpha, "a/b", &error));
 		REQUIRE_FALSE(catalog.renameLabel(f.alpha, "a\\b", &error));
 		REQUIRE_FALSE(catalog.renameLabel(f.alpha, "CON", &error));
+		REQUIRE_FALSE(catalog.renameLabel(f.alpha, "COM¹.x", &error));
+		REQUIRE_FALSE(catalog.renameLabel(f.alpha, "a:b", &error)); // refused on every platform: the library may move to Windows
 		REQUIRE_FALSE(catalog.renameLabel(f.alpha, "Photos", &error));
 		REQUIRE_FALSE(catalog.renameLabel(f.alpha, "best", &error));
 		REQUIRE_FALSE(catalog.renameLabel(f.alpha, "trailing.", &error));

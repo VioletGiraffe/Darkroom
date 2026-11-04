@@ -40,7 +40,8 @@ INCLUDEPATH += \
 	../cpp-template-utils \
 	../image-processing \
 	../magic-alignment/src \
-	../thin_io/src
+	../thin_io/src \
+	../file-operations
 
 include(../vcpkg.pri)
 

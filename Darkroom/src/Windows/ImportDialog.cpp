@@ -33,6 +33,10 @@
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
 #include "dialogs/messagedialog.h"
+#include "fileoperations/centrypath.h"
+#include "fileoperations/inlinerename.h"
+#include "fileoperations/newnamecheck.h"
+#include "fileoperationsui/fileoperationtexts.h"
 #include "utils/filemanager.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 #include "widgets/cpersistenceenabler.h"
@@ -77,6 +81,7 @@ DISABLE_COMPILER_WARNINGS
 RESTORE_COMPILER_WARNINGS
 
 #include <algorithm>
+#include <optional>
 #include <utility>
 
 namespace {
@@ -1160,25 +1165,23 @@ void ImportDialog::renameStagedItem(StagedId id)
 		QLineEdit::Normal, oldBase, &ok).trimmed();
 	if (!ok || newBase.isEmpty() || newBase == oldBase)
 		return;
-	if (const QChar bad = invalidFilenameChar(newBase); !bad.isNull())
-	{
-		QMessageBox::warning(this, tr("Rename"), tr("Name contains an invalid character: '%1'").arg(bad));
-		return;
-	}
 
 	const QString newName = suffix.isEmpty() ? newBase : QStringLiteral("%1.%2").arg(newBase, suffix);
-	const QString newPath = oldInfo.dir().filePath(newName);
-	if (QFileInfo::exists(newPath) && QFileInfo(newPath) != oldInfo)
+	// Portable: the file is about to enter a library, which may move between platforms.
+	if (const NameRejection rejection = checkNewEntryName(newName, NameRules::Portable); rejection != NameRejection::None)
 	{
-		QMessageBox::warning(this, tr("Rename"), tr("A file named \"%1\" already exists in that folder.").arg(newName));
+		QMessageBox::warning(this, tr("Rename"), newNameRejectionText(rejection));
 		return;
 	}
 
-	if (!renameReleasingOpenFiles(entry.path, newPath))
+	const std::optional<CEntryPath> source = parseOperationPath(entry.path);
+	assert_and_return_r(source && !source->isRoot(), );
+	if (const QString failure = inlineRenameFailureText(renameEntryReleasingOpenFiles(*source, newName, false)); !failure.isEmpty())
 	{
-		QMessageBox::warning(this, tr("Rename"), tr("Could not rename the file (it may be open elsewhere):\n%1").arg(QDir::toNativeSeparators(entry.path)));
+		QMessageBox::warning(this, tr("Rename"), tr("Could not rename the file: %1\n%2").arg(failure, QDir::toNativeSeparators(entry.path)));
 		return;
 	}
+	const QString newPath = oldInfo.dir().filePath(newName);
 
 	const auto renamed = _staged.find(id);
 	if (renamed == _staged.end())

@@ -120,7 +120,7 @@ affected animation closes it, stopping on its current frame. Still images are de
 - **Deletion** (`PathDeletion`): the windows stay open without the file. The window whose own removal action failed or
   was cancelled reloads its file, a player at its previous position.
 - **Darkroom's moves** (renaming an item or a label, a label removal that relocates storage, import moves and
-  renames): `followMovedMediaFiles` concludes them. Players and viewers rebase the paths they list and reopen a released
+  renames) **and Quickroom's renames**: `followMovedMediaFiles` concludes them. Players and viewers rebase the paths they list and reopen a released
   file at its new location, or where it was when its move failed. `Catalog` moves storage itself, so it reports its moves through
   storage-move handlers that MainWindow installs on `Library`.
 - **Quickroom's transfers**: the moved files are released and not reopened.

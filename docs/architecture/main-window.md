@@ -135,6 +135,9 @@ This is the only video frame-folder move outside Catalog's label-reconciliation 
 A photo rename changes only the file's base name in place, preserving directory and extension, then records the path
 through the same Catalog operation. Missing sources are refused.
 
+Each filesystem step, rollbacks included, is file-operations' `inlineRename`: it never replaces an existing entry, and
+it performs case-only renames on case-sensitive and case-insensitive filesystems alike.
+
 ## Integrity check
 
 MainWindow owns the Tools menu's catalog integrity workflow. `CatalogIntegrity::scan` produces the report on the GUI

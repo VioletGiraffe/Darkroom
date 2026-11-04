@@ -245,15 +245,6 @@ QString pathAfterMoves(const QString& path, const std::vector<PathMove>& moves)
 	return path;
 }
 
-QChar invalidFilenameChar(const QString& name)
-{
-	static const QString invalidChars = R"(\/:*?"<>|)";
-	for (const QChar c : name)
-		if (invalidChars.contains(c))
-			return c;
-	return {};
-}
-
 static const QStringList FRAME_IMAGE_SUFFIXES { "jpg", "jpeg", "tif", "tiff", "png" };
 
 bool isFrameImageFile(const QString& fileName)

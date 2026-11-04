@@ -4,6 +4,10 @@
 #include "Utils.h"
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
+#include "fileoperations/centrypath.h"
+#include "fileoperations/inlinerename.h"
+#include "fileoperations/newnamecheck.h"
+#include "fileoperationsui/fileoperationtexts.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QDir>
@@ -14,20 +18,31 @@ DISABLE_COMPILER_WARNINGS
 #include <QMessageBox>
 RESTORE_COMPILER_WARNINGS
 
+#include <optional>
 #include <vector>
 
 namespace {
 
 using MediaRename::Result;
 
-bool caseOnlyRenameAllowed([[maybe_unused]] QWidget* parent, [[maybe_unused]] const QString& title)
+// Renames from to to, a path in the same folder, never replacing an existing entry. Returns why it failed, empty on success.
+[[nodiscard]] QString renameEntry(const QString& from, const QString& to)
 {
-#if defined Q_OS_WIN || defined Q_OS_MACOS
+	const std::optional<CEntryPath> source = parseOperationPath(from);
+	assert_and_return_r(source && !source->isRoot(), QObject::tr("the path is not valid"));
+
+	return inlineRenameFailureText(inlineRename(*source, QFileInfo(to).fileName(), false));
+}
+
+// Warns and returns true when name cannot be a file or folder name on every platform: a library may move between them.
+[[nodiscard]] bool rejectUnusableName(const QString& name, QWidget* parent, const QString& title)
+{
+	const NameRejection rejection = checkNewEntryName(name, NameRules::Portable);
+	if (rejection == NameRejection::None)
+		return false;
+
+	QMessageBox::warning(parent, title, newNameRejectionText(rejection));
 	return true;
-#else
-	QMessageBox::warning(parent, title, QObject::tr("Changing only the letter case of the name is not supported on a case-sensitive file system."));
-	return false;
-#endif
 }
 
 // Moves back newest first. Returns a description of the moves that could not be undone, which stay in moves.
@@ -37,7 +52,7 @@ bool caseOnlyRenameAllowed([[maybe_unused]] QWidget* parent, [[maybe_unused]] co
 	std::vector<PathMove> notUndone;
 	for (auto move = moves.crbegin(); move != moves.crend(); ++move)
 	{
-		if (QFile::rename(move->to, move->from))
+		if (renameEntry(move->to, move->from).isEmpty())
 			continue;
 		failures += "\n\n" + QObject::tr("Additionally, this rename could not be undone:\n%1\n→ %2").arg(move->to, move->from);
 		notUndone.push_back(*move);
@@ -59,13 +74,13 @@ Result renameVideo(Catalog& catalog, MediaItemId id, const QString& newName, con
 	const QString error = [&]() -> QString {
 		if (renameSourceFile)
 		{
-			if (!QFile::rename(oldSourcePath, newSourcePath))
-				return QObject::tr("Failed to rename the source file:\n%1\n→ %2").arg(oldSourcePath, newSourcePath);
+			if (const QString failure = renameEntry(oldSourcePath, newSourcePath); !failure.isEmpty())
+				return QObject::tr("Failed to rename the source file: %1\n%2\n→ %3").arg(failure, oldSourcePath, newSourcePath);
 			completedMoves.push_back({ oldSourcePath, newSourcePath });
 		}
 
-		if (!QFile::rename(oldFolderPath, newFolderPath))
-			return QObject::tr("Failed to rename the frame folder:\n%1\n→ %2").arg(oldFolderPath, newFolderPath) + undoCompletedMoves(completedMoves);
+		if (const QString failure = renameEntry(oldFolderPath, newFolderPath); !failure.isEmpty())
+			return QObject::tr("Failed to rename the frame folder: %1\n%2\n→ %3").arg(failure, oldFolderPath, newFolderPath) + undoCompletedMoves(completedMoves);
 		completedMoves.push_back({ oldFolderPath, newFolderPath });
 
 		if (!catalog.updateMediaItemPaths(id, newSourcePath, newFolderPath))
@@ -105,21 +120,16 @@ Result renameVideoInteractive(Catalog& catalog, MediaItemId id, QWidget* parent)
 	if (newBaseName.isEmpty() || newBaseName == oldBaseName)
 		return {};
 
-	if (const QChar bad = invalidFilenameChar(newBaseName); !bad.isNull())
-	{
-		QMessageBox::warning(parent, QObject::tr("Rename media file"), QObject::tr("Name contains an invalid character: '%1'").arg(bad));
-		return {};
-	}
-
+	// Skips the early existence checks: the new spelling may name the item's own file and folder, and renameEntry refuses a distinct entry.
 	const bool caseChangeOnly = newBaseName.compare(oldBaseName, Qt::CaseInsensitive) == 0;
-	if (caseChangeOnly && !caseOnlyRenameAllowed(parent, QObject::tr("Rename media file")))
-		return {};
 
 	const QFileInfo oldSourceInfo{ oldSourcePath };
 	QString newSourcePath;
 	if (!oldSourcePath.isEmpty())
 	{
 		const QString newFileName = oldSourceInfo.suffix().isEmpty() ? newBaseName : newBaseName + "." + oldSourceInfo.suffix();
+		if (rejectUnusableName(newFileName, parent, QObject::tr("Rename media file")))
+			return {};
 		newSourcePath = oldSourceInfo.absolutePath() + "/" + newFileName;
 
 		if (!caseChangeOnly && sourceExists && QFile::exists(newSourcePath))
@@ -130,7 +140,10 @@ Result renameVideoInteractive(Catalog& catalog, MediaItemId id, QWidget* parent)
 	}
 
 	const qint64 sourceSize = catalog.mediaItems().value(id).sourceSize;
-	const QString newFolderPath = parentPath + "/" + Catalog::frameFolderName(newBaseName, oldSourceInfo.suffix(), sourceSize);
+	const QString newFolderName = Catalog::frameFolderName(newBaseName, oldSourceInfo.suffix(), sourceSize);
+	if (rejectUnusableName(newFolderName, parent, QObject::tr("Rename media file")))
+		return {};
+	const QString newFolderPath = parentPath + "/" + newFolderName;
 	if (!caseChangeOnly && QDir(newFolderPath).exists())
 	{
 		QMessageBox::warning(parent, QObject::tr("Rename media file"), QObject::tr("A folder with that name already exists:\n%1").arg(newFolderPath));
@@ -165,8 +178,8 @@ Result renamePhoto(Catalog& catalog, MediaItemId id, const QString& newSourcePat
 	std::vector<PathMove> completedMoves;
 	releaseMediaFilesHeldOpen(movingPaths);
 	const QString error = [&]() -> QString {
-		if (!QFile::rename(oldSourcePath, newSourcePath))
-			return QObject::tr("Failed to rename the file:\n%1\n→ %2").arg(oldSourcePath, newSourcePath);
+		if (const QString failure = renameEntry(oldSourcePath, newSourcePath); !failure.isEmpty())
+			return QObject::tr("Failed to rename the file: %1\n%2\n→ %3").arg(failure, oldSourcePath, newSourcePath);
 		completedMoves.push_back({ oldSourcePath, newSourcePath });
 
 		if (!catalog.updateMediaItemPaths(id, newSourcePath, folderAbs))
@@ -204,18 +217,13 @@ Result renamePhotoInteractive(Catalog& catalog, MediaItemId id, QWidget* parent)
 	if (newBaseName.isEmpty() || newBaseName == oldBaseName)
 		return {};
 
-	if (const QChar bad = invalidFilenameChar(newBaseName); !bad.isNull())
-	{
-		QMessageBox::warning(parent, title, QObject::tr("Name contains an invalid character: '%1'").arg(bad));
+	const QString newFileName = suffix.isEmpty() ? newBaseName : newBaseName + "." + suffix;
+	if (rejectUnusableName(newFileName, parent, title))
 		return {};
-	}
-
-	const bool caseChangeOnly = newBaseName.compare(oldBaseName, Qt::CaseInsensitive) == 0;
-	if (caseChangeOnly && !caseOnlyRenameAllowed(parent, title))
-		return {};
-
-	const QString newFileName   = suffix.isEmpty() ? newBaseName : newBaseName + "." + suffix;
 	const QString newSourcePath = oldInfo.absolutePath() + "/" + newFileName;
+
+	// Skips the early existence check: the new spelling may name the photo's own file, and renameEntry refuses a distinct entry.
+	const bool caseChangeOnly = newBaseName.compare(oldBaseName, Qt::CaseInsensitive) == 0;
 
 	if (!caseChangeOnly && QFile::exists(newSourcePath))
 	{

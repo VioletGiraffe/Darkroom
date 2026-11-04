@@ -5,6 +5,7 @@
 
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
+#include "fileoperations/newnamecheck.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QColor>
@@ -40,18 +41,6 @@ namespace
 	// Seeded into the label once at creation and persisted; the star glyph itself is themed separately,
 	// so this is a data-model default, deliberately not a live theme colour.
 	constexpr QStringView kBestLabelColor       = u"#cc8a1f";
-
-	[[nodiscard]] bool isReservedWindowsDeviceName(const QString& name)
-	{
-		const QString stem = name.section('.', 0, 0).trimmed().toUpper();
-		if (stem == QLatin1String("CON") || stem == QLatin1String("PRN") || stem == QLatin1String("AUX") || stem == QLatin1String("NUL"))
-			return true;
-		if (stem.size() != 4 || (!stem.startsWith(QLatin1String("COM")) && !stem.startsWith(QLatin1String("LPT"))))
-			return false;
-		const QChar suffix = stem.back();
-		return (suffix >= QLatin1Char('1') && suffix <= QLatin1Char('9'))
-			|| suffix == QChar(0x00b9) || suffix == QChar(0x00b2) || suffix == QChar(0x00b3);
-	}
 
 	// Backstop name validation: the result must remain a real direct child, never a symlink alias.
 	[[nodiscard]] QString validatedDirectChildPath(const QString& parentFolder, const QString& childName)
@@ -951,24 +940,36 @@ void Catalog::relocateFolderOffLabel(MediaItemId id, LabelId removedLabelId)
 
 const char* Catalog::labelNameValidationError(const QString& displayName)
 {
-	if (displayName.isEmpty() || displayName.trimmed().isEmpty())
+	if (displayName.trimmed().isEmpty())
 		return "The label name cannot be empty.";
 	if (displayName.front().isSpace() || displayName.back().isSpace())
 		return "The label name cannot begin or end with whitespace.";
-	if (displayName == QLatin1String(".") || displayName == QLatin1String(".."))
-		return "'.' and '..' cannot be used as label names.";
-	if (displayName.endsWith(QLatin1Char('.')))
-		return "The label name cannot end with a dot.";
 	for (const QChar c : displayName)
 		if (c.category() == QChar::Other_Control)
 			return "The label name cannot contain control characters.";
-	if (!invalidFilenameChar(displayName).isNull())
-		return "The label name contains a character that is not allowed in file names.";
 	if (displayName.compare(kBestLabelName.toString(), Qt::CaseInsensitive) == 0
 		|| displayName.compare(PhotosDirectoryName.toString(), Qt::CaseInsensitive) == 0)
 		return "This label name is reserved.";
-	if (isReservedWindowsDeviceName(displayName))
+
+	// Portable: the label's folder is in the library, which may move between platforms.
+	using enum NameRejection;
+	switch (checkNewEntryName(displayName, NameRules::Portable))
+	{
+	case None:
+		return nullptr;
+	case Empty:
+	case WhitespaceOnly:
+		return "The label name cannot be empty.";
+	case DotComponent:
+		return "'.' and '..' cannot be used as label names.";
+	case TrailingDotOrSpace:
+		return "The label name cannot end with a dot.";
+	case Separator:
+	case InvalidCharacter:
+		return "The label name contains a character that is not allowed in file names.";
+	case ReservedDeviceName:
 		return "This label name is a reserved Windows device name.";
+	}
 	return nullptr;
 }
 

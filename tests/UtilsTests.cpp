@@ -134,14 +134,6 @@ TEST_CASE("parseTrailingTimestamp: a plausible yyyyMMddHHmmss at the end of the 
 	REQUIRE_FALSE(parseTrailingTimestamp("").isValid());
 }
 
-TEST_CASE("invalidFilenameChar: the first Windows-illegal character, null when there is none", "[utils]")
-{
-	REQUIRE(invalidFilenameChar("Summer trip (1).jpg").isNull());
-	REQUIRE(invalidFilenameChar("a?b*c") == '?');
-	for (const QChar c : QString(R"(\/:*?"<>|)"))
-		REQUIRE(invalidFilenameChar(QString("name") + c) == c);
-}
-
 TEST_CASE("filesAreIdentical: every byte across chunk boundaries", "[utils]")
 {
 	QTemporaryDir dir;

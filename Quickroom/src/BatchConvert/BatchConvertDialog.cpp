@@ -3,6 +3,8 @@
 #include "UiComponents/SegmentedToggle.h"
 #include "Utils.h"
 #include "assert/advanced_assert.h"
+#include "fileoperations/newnamecheck.h"
+#include "fileoperationsui/fileoperationtexts.h"
 #include "utils/displayformatting.h"
 #include "widgets/cpersistenceenabler.h"
 
@@ -35,7 +37,6 @@ DISABLE_COMPILER_WARNINGS
 #include <QProgressBar>
 #include <QPushButton>
 #include <QRadioButton>
-#include <QRegularExpression>
 #include <QSet>
 #include <QSettings>
 #include <QSpinBox>
@@ -83,13 +84,6 @@ template <typename Value, size_t Count>
 int indexOf(const std::array<Value, Count>& values, Value value)
 {
 	return static_cast<int>(std::ranges::find(values, value) - values.begin());
-}
-
-// Whether name can name a folder on Windows, the strictest platform
-bool isValidFolderName(const QString& name)
-{
-	static const QRegularExpression deviceName{ QStringLiteral(R"(^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..*)?$)"), QRegularExpression::CaseInsensitiveOption };
-	return !name.isEmpty() && invalidFilenameChar(name).isNull() && !name.endsWith('.') && !name.endsWith(' ') && !deviceName.match(name).hasMatch();
 }
 
 // An invalid color restores the list's own text color
@@ -399,11 +393,13 @@ void BatchConvertDialog::updateControls()
 	_folderEdit->setEnabled(_folderButton->isChecked());
 	_browseButton->setEnabled(_folderButton->isChecked());
 
+	// Portable: the output may be read from another platform.
+	const NameRejection subfolderRejection = _subfolderButton->isChecked() ? checkNewEntryName(_subfolderEdit->text().trimmed(), NameRules::Portable) : NameRejection::None;
 	QString startBlocker;
 	if (_imageList->count() == 0)
 		startBlocker = tr("Add images to convert");
-	else if (_subfolderButton->isChecked() && !isValidFolderName(_subfolderEdit->text().trimmed()))
-		startBlocker = tr("The subfolder name is not a valid folder name");
+	else if (subfolderRejection != NameRejection::None)
+		startBlocker = tr("The subfolder name cannot be used. %1").arg(newNameRejectionText(subfolderRejection));
 	else if (_folderButton->isChecked() && !QDir::isAbsolutePath(_folderEdit->text().trimmed()))
 		startBlocker = tr("Enter the full path of the folder to save to");
 	_startButton->setEnabled(startBlocker.isEmpty() && !_job);

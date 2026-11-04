@@ -65,9 +65,6 @@ struct PathMove
 // path rebased by the first move from it or from a folder above it; path itself when no move applies.
 [[nodiscard]] QString pathAfterMoves(const QString& path, const std::vector<PathMove>& moves);
 
-// Returns the first Windows-illegal filename character, or a null QChar.
-[[nodiscard]] QChar invalidFilenameChar(const QString& name);
-
 // Name-sorted frame image filenames directly in dir. Suffix matching is case-insensitive.
 [[nodiscard]] QStringList listFrameImageFiles(const QDir& dir);
 // Whether listFrameImageFiles would list a file of this name.

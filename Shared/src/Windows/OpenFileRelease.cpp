@@ -2,9 +2,13 @@
 #include "Windows/ImageViewerWindow.h"
 #include "Windows/VideoPlayerWindow.h"
 #include "compiler/compiler_warnings_control.h"
+#include "fileoperations/centrypath.h"
+#include "fileoperations/inlinerename.h"
 
 DISABLE_COMPILER_WARNINGS
+#include <QDir>
 #include <QFile>
+#include <QFileInfo>
 RESTORE_COMPILER_WARNINGS
 
 void releaseMediaFilesHeldOpen(const QStringList& paths)
@@ -22,7 +26,21 @@ void followMovedMediaFiles(const QStringList& releasedPaths, const std::vector<P
 	ImageViewerWindow::followMovedFiles(wasReleased, newLocation);
 }
 
-bool renameReleasingOpenFiles(const QString& from, const QString& to)
+InlineRenameResult renameEntryReleasingOpenFiles(const CEntryPath& source, const QString& newName, bool replaceExistingFile)
+{
+	const QString& path = source.value();
+	const QString newPath = QFileInfo(path).dir().filePath(newName);
+	QStringList released{ path };
+	if (replaceExistingFile)
+		released.push_back(newPath);
+	releaseMediaFilesHeldOpen(released);
+
+	InlineRenameResult result = inlineRename(source, newName, replaceExistingFile);
+	followMovedMediaFiles(released, result.status == InlineRenameStatus::Renamed ? std::vector<PathMove>{ { path, newPath } } : std::vector<PathMove>{});
+	return result;
+}
+
+bool moveReleasingOpenFiles(const QString& from, const QString& to)
 {
 	releaseMediaFilesHeldOpen({ from });
 	const bool renamed = QFile::rename(from, to);

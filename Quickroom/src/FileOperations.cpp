@@ -4,7 +4,6 @@
 #include "Windows/PhotoCompareWindow.h"
 #include "Windows/RemovalAction.h"
 #include "Windows/VideoPlayerWindow.h"
-#include "Utils.h"
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
 #include "fileoperations/centrypath.h"
@@ -34,7 +33,6 @@ RESTORE_COMPILER_WARNINGS
 #include <optional>
 #include <stdint.h>
 #include <utility>
-#include <vector>
 
 namespace {
 
@@ -77,22 +75,6 @@ const QString GNOME_COPIED_FILES_FORMAT = QStringLiteral("x-special/gnome-copied
 	layout->addWidget(buttons);
 
 	return dialog.exec() == QDialog::Accepted ? nameField->text() : QString{};
-}
-
-// Players and viewers holding path, or the file it replaces, let go of it during the rename and then follow it to newPath.
-[[nodiscard]] InlineRenameResult renameReleasingOpenFiles(const CEntryPath& source, const QString& path, const QString& newName, const QString& newPath, bool replaceExistingFile)
-{
-	QStringList released{ path };
-	if (replaceExistingFile)
-		released.push_back(newPath);
-	releaseMediaFilesHeldOpen(released);
-
-	InlineRenameResult result = inlineRename(source, newName, replaceExistingFile);
-	std::vector<PathMove> completedMoves;
-	if (result.status == InlineRenameStatus::Renamed)
-		completedMoves.push_back({ path, newPath });
-	followMovedMediaFiles(released, completedMoves);
-	return result;
 }
 
 } // namespace
@@ -221,13 +203,13 @@ QString FileOperations::renameInteractive(const QString& path, QWidget* dialogPa
 
 		// Built as listFolder builds entry paths, so the caller can find the entry by it.
 		const QString newPath = QFileInfo(path).absoluteDir().absoluteFilePath(newName);
-		InlineRenameResult result = renameReleasingOpenFiles(*source, path, newName, newPath, false);
+		InlineRenameResult result = renameEntryReleasingOpenFiles(*source, newName, false);
 		if (result.status == InlineRenameStatus::ReplacementRequired)
 		{
 			const QString question = QObject::tr("A %1 named “%2” already exists here. Replace it permanently?").arg(fileOperationEntryKindNoun(*result.destinationKind), newName);
 			if (QMessageBox::warning(dialogParent, title, question, QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
 				continue;
-			result = renameReleasingOpenFiles(*source, path, newName, newPath, true);
+			result = renameEntryReleasingOpenFiles(*source, newName, true);
 		}
 
 		using enum InlineRenameStatus;

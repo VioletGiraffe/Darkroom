@@ -65,6 +65,8 @@ LIBS += -L$${DESTDIR} -lshared -lqtutils -lcpputils -lthin_io
 # Unix only: MSBuild tracks link inputs itself
 mac*|linux*|freebsd: PRE_TARGETDEPS += $${DESTDIR}/libshared.a $${DESTDIR}/libqtutils.a $${DESTDIR}/libcpputils.a $${DESTDIR}/libthin_io.a
 include(../vcpkg.pri)
+# Catalog's name check
+include(../file-operations/libraries/fileoperations.pri)
 include(../cpputils/dependencies.pri)
 
 win*{

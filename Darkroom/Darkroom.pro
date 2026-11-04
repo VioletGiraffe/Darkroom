@@ -69,6 +69,8 @@ LIBS += -L$${DESTDIR} -lshared -lqtutils -lmagic-alignment -lcpputils -limage-pr
 mac*|linux*|freebsd: PRE_TARGETDEPS += $${DESTDIR}/libshared.a $${DESTDIR}/libqtutils.a $${DESTDIR}/libmagic-alignment.a \
 	$${DESTDIR}/libcpputils.a $${DESTDIR}/libimage-processing.a $${DESTDIR}/libthin_io.a
 include(../vcpkg.pri)
+# Inline rename and its user-facing texts
+include(../file-operations/libraries/fileoperationsui.pri)
 include(../cpputils/dependencies.pri)
 
 ###################################################
