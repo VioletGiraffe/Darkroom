@@ -5,6 +5,7 @@
 #include "FileTypeIcons.h"
 #include "FolderListing.h"
 #include "ImageDecoding/ImageDecoding.h"
+#include "RecentPaths.h"
 #include "SettingsDialog.h"
 #include "Theme/Theme.h"
 #include "UiComponents/IconSource.h"
@@ -50,6 +51,7 @@ DISABLE_COMPILER_WARNINGS
 #include <QListWidgetItem>
 #include <QMenu>
 #include <QMenuBar>
+#include <QMessageBox>
 #include <QMetaObject>
 #include <QMimeData>
 #include <QMouseEvent>
@@ -82,6 +84,8 @@ const QString LAST_FOLDER_KEY = QStringLiteral("browser/lastFolder");
 const QString TILE_SIZE_KEY   = QStringLiteral("browser/tileSize");
 const QString PATH_FIELD_HISTORY_KEY = QStringLiteral("browser/pathFieldHistory");
 constexpr int PATH_FIELD_HISTORY_SIZE = 100;
+const QString RECENT_TRANSFER_FOLDERS_KEY = QStringLiteral("browser/recentTransferFolders");
+constexpr int RECENT_TRANSFER_FOLDERS_SIZE = 10;
 constexpr int DEFAULT_TILE_WIDTH = 160;
 constexpr int MIN_TILE_WIDTH  = 80;
 constexpr int MAX_TILE_WIDTH  = 800;
@@ -97,6 +101,11 @@ const QKeySequence BATCH_CONVERT_KEYS{ Qt::SHIFT | Qt::Key_R };
 QKeySequence deletionKeys(PathDeletion::Mode mode)
 {
 	return mode == PathDeletion::Mode::Trash ? QKeySequence{ Qt::Key_Delete } : QKeySequence{ Qt::SHIFT | Qt::Key_Delete };
+}
+
+QString transferMenuTitle(TransferKind kind)
+{
+	return kind == TransferKind::Copy ? QObject::tr("Copy to") : QObject::tr("Move to");
 }
 
 int savedTileWidth()
@@ -694,6 +703,8 @@ void BrowserWindow::showEntryContextMenu(QListWidgetItem& item, QPoint globalPos
 	menu.addAction(tr("Copy"), QKeySequence::Copy, this, [targets] { FileOperations::putPathsOnClipboard(targets, false); });
 	const QString copyPathsText = targets.size() == 1 ? tr("Copy full path") : tr("Copy full paths");
 	menu.addAction(copyPathsText, COPY_PATHS_KEYS, this, [targets] { FileOperations::putPathsOnClipboardAsText(targets); });
+	addTransferSubmenu(menu, TransferKind::Copy, targets);
+	addTransferSubmenu(menu, TransferKind::Move, targets);
 	if (entry.kind == EntryKind::Folder)
 		menu.addAction(tr("Paste into folder"), this, [this, path] { pasteInto(path); })->setEnabled(clipboardHasFiles());
 
@@ -742,6 +753,43 @@ void BrowserWindow::pasteInto(const QString& folder)
 	if (cut)
 		QGuiApplication::clipboard()->clear(); // invalidates mime
 	FileOperations::startTransfer(cut ? TransferKind::Move : TransferKind::Copy, sources, folder, this);
+}
+
+void BrowserWindow::addTransferSubmenu(QMenu& menu, TransferKind kind, const QStringList& sources)
+{
+	QMenu* submenu = menu.addMenu(transferMenuTitle(kind));
+	const QStringList recentFolders = RecentPaths::read(RECENT_TRANSFER_FOLDERS_KEY);
+	const QString currentFolderKey = pathComparisonKey(_currentPath);
+	for (qsizetype index = 0; index < recentFolders.size(); ++index)
+	{
+		const QString& folder = recentFolders[index];
+		QAction* action = submenu->addAction(RecentPaths::menuEntryText(index, folder), this, [this, kind, sources, folder] { transferInto(kind, sources, folder); });
+		// Disabled, not left out: the other entries keep their numbers.
+		action->setEnabled(pathComparisonKey(folder) != currentFolderKey);
+	}
+
+	if (!recentFolders.empty())
+		submenu->addSeparator();
+	const QString startFolder = recentFolders.empty() ? _currentPath : recentFolders.front();
+	submenu->addAction(tr("Choose folder..."), this, [this, kind, sources, startFolder] {
+		if (const QString folder = QFileDialog::getExistingDirectory(this, transferMenuTitle(kind), startFolder); !folder.isEmpty())
+			transferInto(kind, sources, folder);
+	});
+}
+
+void BrowserWindow::transferInto(TransferKind kind, const QStringList& sources, const QString& folder)
+{
+	// Not checked when the menu is built: the check can block on an unavailable network share.
+	if (!QFileInfo(folder).isDir())
+	{
+		const QString question = tr("The folder cannot be found:\n%1\n\nRemove it from the recently used folders?").arg(QDir::toNativeSeparators(folder));
+		if (QMessageBox::question(this, transferMenuTitle(kind), question) == QMessageBox::Yes)
+			RecentPaths::remove(RECENT_TRANSFER_FOLDERS_KEY, folder);
+		return;
+	}
+
+	RecentPaths::record(RECENT_TRANSFER_FOLDERS_KEY, folder, RECENT_TRANSFER_FOLDERS_SIZE);
+	FileOperations::startTransfer(kind, sources, folder, this);
 }
 
 void BrowserWindow::updateCutMarks()

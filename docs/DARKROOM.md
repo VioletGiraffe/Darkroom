@@ -95,7 +95,8 @@ The directories:
   as the dump location.
 - Root - app-wide modules: `SharedSettings.h` (the shared settings store, its keys and defaults), `Shortcuts.h`
   (shortcut strings shared by several windows), each with a Darkroom-only counterpart (`DarkroomSettings.h`,
-  `DarkroomShortcuts.h`), `Ffmpeg` (process wrapper, UI-free), `Import` (per-item import workers, UI-free), `Utils`
+  `DarkroomShortcuts.h`), `Ffmpeg` (process wrapper, UI-free), `Import` (per-item import workers, UI-free),
+  `RecentPaths` (most-recent-first path lists in the settings store, and their numbered menu text), `Utils`
   (path and file helpers, the supported-extension lists, ffmpeg discovery, error-reporting message boxes), and
   `main.cpp`.
 

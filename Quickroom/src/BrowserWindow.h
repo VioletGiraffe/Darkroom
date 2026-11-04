@@ -3,6 +3,7 @@
 #include "FolderWatcher.h"
 #include "Windows/PathDeletion.h"
 #include "compiler/compiler_warnings_control.h"
+#include "fileoperations/fileoperationtypes.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QFileIconProvider>
@@ -26,6 +27,7 @@ class QDragEnterEvent;
 class QDragMoveEvent;
 class QDropEvent;
 class QListWidgetItem;
+class QMenu;
 class QTimer;
 class SortControl;
 
@@ -97,6 +99,10 @@ private:
 
 	// Copies or moves the files on the clipboard into folder; a cut is moved and taken off the clipboard.
 	void pasteInto(const QString& folder);
+	// A "Copy to" or "Move to" submenu for sources: the recently used folders, then a folder picker.
+	void addTransferSubmenu(QMenu& menu, TransferKind kind, const QStringList& sources);
+	// Starts the transfer and makes folder the most recently used; a missing folder is offered for removal from the list instead.
+	void transferInto(TransferKind kind, const QStringList& sources, const QString& folder);
 	// Fades the tiles of the files cut to the clipboard, by this or any other app.
 	void updateCutMarks();
 	[[nodiscard]] bool isCut(const QString& path) const;

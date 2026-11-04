@@ -13,6 +13,7 @@
 #include "Windows/SettingsDialog.h"
 #include "Core/MediaItemId.h"
 #include "Windows/VideoPlayerWindow.h"
+#include "RecentPaths.h"
 #include "Utils.h"
 #include "DarkroomSettings.h"
 #include "Shortcuts.h"
@@ -99,23 +100,10 @@ QString libraryPickerStartFolder(const QString& path)
 
 constexpr int MAX_RECENT_LIBRARIES = 8;
 
-// Do not stat recent roots: an entry may refer to an unavailable drive or network share.
-[[nodiscard]] QStringList recentLibraries()
-{
-	return QSettings{}.value(Settings::RecentLibraries).toStringList();
-}
-
 void recordCurrentLibrary(const QString& root)
 {
-	QSettings settings;
-	settings.setValue(Settings::RootFolder, root);
-
-	QStringList recents = settings.value(Settings::RecentLibraries).toStringList();
-	recents.removeIf([&root](const QString& entry) { return entry.compare(root, Qt::CaseInsensitive) == 0; });
-	recents.prepend(root);
-	if (recents.size() > MAX_RECENT_LIBRARIES)
-		recents.resize(MAX_RECENT_LIBRARIES);
-	settings.setValue(Settings::RecentLibraries, recents);
+	QSettings{}.setValue(Settings::RootFolder, root);
+	RecentPaths::record(Settings::RecentLibraries, root, MAX_RECENT_LIBRARIES);
 }
 
 // A check on a disconnected network share can block for the OS timeout, so shutdown must not wait for it.
@@ -172,7 +160,7 @@ struct LibraryChoice
 // Unparented for the same reason as chooseFirstRunLibraryFolder. Empty when the user quits.
 [[nodiscard]] std::optional<LibraryChoice> chooseLibraryAfterLoadFailure(const QString& failedRoot, const QString& error)
 {
-	const QStringList recentRoots = recentLibraries();
+	const QStringList recentRoots = RecentPaths::read(Settings::RecentLibraries);
 
 	QDialog dialog;
 	dialog.setWindowTitle(QObject::tr("Open library"));
@@ -480,16 +468,13 @@ void MainWindow::rebuildRecentLibraryActions()
 	_recentLibraryActions.clear();
 
 	const QString currentRoot = _library.rootFolder();
-	int number = 0;
-	for (const QString& root : recentLibraries())
+	const QStringList recentRoots = RecentPaths::read(Settings::RecentLibraries);
+	for (qsizetype index = 0; index < recentRoots.size(); ++index)
 	{
-		QString display = QDir::toNativeSeparators(root);
-		display.replace('&', QLatin1String("&&"));
+		const QString& root = recentRoots[index];
+		QAction* action = _libraryMenu->addAction(RecentPaths::menuEntryText(index, root), this, [this, root] { openRecentLibrary(root); });
 
-		QAction* action = _libraryMenu->addAction(QString("&%1  %2").arg(++number).arg(display),
-			this, [this, root] { openRecentLibrary(root); });
-
-		if (root.compare(currentRoot, Qt::CaseInsensitive) == 0)
+		if (pathComparisonKey(root) == pathComparisonKey(currentRoot))
 		{
 			action->setCheckable(true);
 			action->setChecked(true);
