@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793747148946,
+  "lastUpdate": 1793799697001,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -21148,6 +21148,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Quickroom.exe size",
             "value": 7901.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5676,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 840.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 345,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 93,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "81cb627e2e70c466fcae5011f1a6def9ef016423",
+          "message": "Quickroom browser: a file it does not show that keeps changing, such as a download or a log, no longer makes it refresh the folder over and over",
+          "timestamp": "2026-11-04T15:24:16+02:00",
+          "tree_id": "b7c4bbcab7c03a0c1974202dcbe653c8e354ce00",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/81cb627e2e70c466fcae5011f1a6def9ef016423"
+        },
+        "date": 1793799693972,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 19853,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 2848,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 34507,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 6997.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7921,
             "unit": "KB"
           },
           {
