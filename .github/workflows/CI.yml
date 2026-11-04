@@ -113,13 +113,21 @@ jobs:
       if: startsWith(matrix.os, 'macos')
       run: brew install libomp
 
-    # vcpkg's built packages, so a run rebuilds only what vcpkg.json or the triplets changed
+    # Expressions cannot read the runner's own environment variables
+    - name: Read runner image version
+      id: runner_image
+      shell: pwsh
+      run: |
+        "version=$env:ImageVersion" >> $env:GITHUB_OUTPUT
+
+    # vcpkg's built packages, so a run rebuilds only what vcpkg.json, the triplets or the runner image changed.
+    # The image is part of every key: vcpkg's package ABIs hash its compiler, CMake and PowerShell, so another image's packages never match.
     - name: Cache vcpkg packages
       uses: actions/cache@v4
       with:
         path: ${{ runner.temp }}/vcpkg-binary-cache
-        key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-triplets/**') }}
-        restore-keys: vcpkg-${{ runner.os }}-
+        key: vcpkg-${{ runner.os }}-${{ steps.runner_image.outputs.version }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-triplets/**') }}
+        restore-keys: vcpkg-${{ runner.os }}-${{ steps.runner_image.outputs.version }}-
 
     # After the MSVC environment, which can point VCPKG_ROOT at Visual Studio's own vcpkg
     - name: Set up vcpkg at the manifest's baseline
