@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793999331731,
+  "lastUpdate": 1794000661131,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -21726,6 +21726,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rsrc",
             "value": 24,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "7e4a917d199f5bddfd2745f808f951d68442b830",
+          "message": "App icons regenerated from their SVGs at every Windows scaling size and on Apple's icon grid; file-type icons written by qtutils' ICO writer\n\nEvery .ico stores frames below 256 px as BMP, so no image-decoding DLLs load at startup.",
+          "timestamp": "2026-11-06T22:57:38+02:00",
+          "tree_id": "4342257fc1cee92a76239f461799d4005d4ae375",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/7e4a917d199f5bddfd2745f808f951d68442b830"
+        },
+        "date": 1794000658305,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 19932,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 3074,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 34938,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 7078.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7301.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5714.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 848,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 345.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 94.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 57,
             "unit": "KB"
           },
           {
