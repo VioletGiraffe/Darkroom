@@ -18,8 +18,9 @@ What the script is arranged around:
   Every label fits its band with a margin. 4-letter labels only manage that on glyphs of their own.
 
 Outputs are committed and this needs Bahnschrift, a Windows font, so it is a dev-time tool - never a build
-step. Run it with no arguments; it needs Pillow, numpy and fontTools, and rewrites every file in OUT. An icon
-whose inputs did not change regenerates byte-identical.
+step. Run it with no arguments; it needs Pillow, numpy, fontTools and resvg-py, the last for qtutils'
+svg_to_icons.py, whose write_ico it uses. It rewrites every file in OUT. An icon whose inputs did not change
+regenerates byte-identical.
 
 Adding a format:
   Add a TYPES entry. Every letter of the label must exist in GLYPHS; the run fails naming a missing one.
@@ -45,7 +46,6 @@ The face needs three corrections before it can serve as the wordmark:
   Stems are not fitted horizontally: at 24 they are 1.7px and look soft magnified, but read well at true
     size. Snapping and thickening them were tried and made the true-size result no better.
 """
-import struct
 import sys
 from io import BytesIO
 from pathlib import Path
@@ -54,6 +54,9 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from fontTools.ttLib import TTFont
 from fontTools.varLib import instancer
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "qtutils" / "scripts"))
+from svg_to_icons import write_ico
 
 OUT = Path(__file__).resolve().parent.parent / "Quickroom" / "res" / "filetypes"
 WORDMARK_FONT = Path("C:/Windows/Fonts/bahnschrift.ttf")
@@ -89,7 +92,6 @@ SIZES = [16, 20, 24, 32, 40, 48, 60, 64, 256]
 VECTOR_FROM = 24      # at or above this the wordmark comes from the font, below it from the hand-drawn face
 PIXEL_MARK_AT = 16    # only the smallest size uses the bitmap landscape
 SUN_FROM = 24         # smaller landscapes have no sun: at those sizes it reads as a stray sprocket hole
-BMP_UPTO = 48         # largest size stored uncompressed; see write_ico
 
 # Geometry as fractions of the icon, taken from the hand-tuned 16px design.
 BODY_X, BODY_W = 3 / 16, 10 / 16
@@ -547,45 +549,6 @@ def render(label, colour, size, body=PAPER):
         draw_vector_wordmark(im, label, g, size)
     # BOX resolves the supersample by area: LANCZOS rings across block edges and greys the pixel face.
     return im.resize((size, size), Image.BOX)
-
-
-def _bmp_entry(im):
-    """One uncompressed ICO entry: BITMAPINFOHEADER, bottom-up BGRA rows, then a 1bpp transparency mask
-    padded to 4-byte rows. The declared height covers both sets of rows, hence h * 2."""
-    w, h = im.size
-    px = im.load()
-    out = bytearray(struct.pack("<IiiHHIIiiII", 40, w, h * 2, 1, 32, 0, 0, 0, 0, 0, 0))
-    for y in range(h - 1, -1, -1):
-        for x in range(w):
-            r, g, b, a = px[x, y]
-            out += bytes((b, g, r, a))
-    stride = ((w + 31) // 32) * 4
-    for y in range(h - 1, -1, -1):
-        bits = bytearray(stride)
-        for x in range(w):
-            if px[x, y][3] == 0:
-                bits[x // 8] |= 0x80 >> (x % 8)
-        out += bits
-    return bytes(out)
-
-
-def write_ico(path, images):
-    """BMP at and below BMP_UPTO, PNG above it: the convention older icon readers expect."""
-    blobs = []
-    for im in images:
-        if im.width > BMP_UPTO:
-            buf = BytesIO()
-            im.save(buf, "PNG")
-            blobs.append(buf.getvalue())
-        else:
-            blobs.append(_bmp_entry(im))
-    header = bytearray(struct.pack("<HHH", 0, 1, len(images)))
-    offset = 6 + 16 * len(images)
-    for im, blob in zip(images, blobs):
-        # A size of 256 is stored as 0: the field is one byte.
-        header += struct.pack("<BBBBHHII", im.width & 0xFF, im.height & 0xFF, 0, 0, 1, 32, len(blob), offset)
-        offset += len(blob)
-    path.write_bytes(bytes(header) + b"".join(blobs))
 
 
 def main():

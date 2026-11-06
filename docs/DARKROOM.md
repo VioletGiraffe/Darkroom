@@ -37,6 +37,10 @@ contains implementation detail. Keep both in sync.
 Projects, the tests' link trap, CI, and packaging are in [build.md](build.md). Generated solutions,
 Makefiles, IDE state, `bin/`, and `build/` are not sources of truth.
 
+The apps' `.ico` and `.icns` icons are generated from their SVGs, which are the masters:
+`python qtutils/scripts/svg_to_icons.py Darkroom/res/darkroom.svg Darkroom/res/darkroom.ico`, then the same with
+`.icns`, and both again for `Quickroom/res/quickroom.svg`.
+
 ### Submodules
 
 The git submodules build as static libraries; `file-operations` builds two, the engine and its dialogs.
