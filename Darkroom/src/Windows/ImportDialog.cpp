@@ -188,6 +188,7 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 	QVBoxLayout* outerLayout = new QVBoxLayout(this);
 
 	_splitter = new QSplitter(Qt::Horizontal, this);
+	_splitter->setObjectName("labelPaneSplitter"); // enablePersistence saves named splitters
 	outerLayout->addWidget(_splitter, 1);
 
 	QWidget* labelPane = new QWidget();
@@ -376,15 +377,10 @@ ImportDialog::ImportDialog(Library& library, const QString& suggestedRelocateFol
 	resize(1200, 800);
 	setWindowState(Qt::WindowMaximized);
 	enablePersistence(this, "importDialog/window", CPersistenceEnabler::Delayed{ true }, CPersistenceEnabler::SetDefaultSize{ false });
-
-	const QByteArray splitterState = QSettings{}.value("importDialog/splitter").toByteArray();
-	if (!splitterState.isEmpty())
-		_splitter->restoreState(splitterState);
 }
 
 ImportDialog::~ImportDialog()
 {
-	QSettings{}.setValue("importDialog/splitter", _splitter->saveState());
 	QSettings{}.setValue("importDialog/relocateFolder", _relocateFolderEdit->text());
 
 	for (const StagedEntry& entry : std::as_const(_staged))

@@ -296,6 +296,7 @@ void MediaBrowserWidget::setupUi()
 	connect(_gridZoomDebounce, &QTimer::timeout, this, &MediaBrowserWidget::rebuildAllCards);
 
 	_splitter = new QSplitter(Qt::Horizontal);
+	_splitter->setObjectName("labelPaneSplitter"); // the window's enablePersistence saves named splitters
 	_splitter->addWidget(_labelSidebar);
 	_splitter->addWidget(rightPanel);
 	_splitter->setStretchFactor(0, 0);
