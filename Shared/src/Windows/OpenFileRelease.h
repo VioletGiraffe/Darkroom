@@ -10,6 +10,7 @@ RESTORE_COMPILER_WARNINGS
 #include <vector>
 
 class CEntryPath;
+enum class InlineRenameReplacement;
 struct InlineRenameResult;
 
 // Open players and image viewers close their file when it is at or under one of paths: Windows refuses to delete or move an open file.
@@ -21,7 +22,7 @@ void releaseMediaFilesHeldOpen(const QStringList& paths);
 void followMovedMediaFiles(const QStringList& releasedPaths, const std::vector<PathMove>& completedMoves);
 
 // inlineRename between releaseMediaFilesHeldOpen and followMovedMediaFiles; a file it replaces is released too.
-[[nodiscard]] InlineRenameResult renameEntryReleasingOpenFiles(const CEntryPath& source, const QString& newName, bool replaceExistingFile);
+[[nodiscard]] InlineRenameResult renameEntryReleasingOpenFiles(const CEntryPath& source, const QString& newName, InlineRenameReplacement fileReplacement);
 
 // QFile::rename of a file or folder between releaseMediaFilesHeldOpen and followMovedMediaFiles: unlike inlineRename, it can
 // move into another folder, copying across volumes.

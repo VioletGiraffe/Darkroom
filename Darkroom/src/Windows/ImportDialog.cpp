@@ -37,6 +37,7 @@
 #include "fileoperations/fileoperationtexts.h"
 #include "fileoperations/inlinerename.h"
 #include "fileoperations/newnamecheck.h"
+#include "fileoperationsui/usermessagebox.h"
 #include "utils/filemanager.h"
 #include "utils/naturalsorting/cnaturalsorterqcollator.h"
 #include "widgets/cpersistenceenabler.h"
@@ -1176,9 +1177,10 @@ void ImportDialog::renameStagedItem(StagedId id)
 
 	const std::optional<CEntryPath> source = parseOperationPath(entry.path);
 	assert_and_return_r(source && !source->isRoot(), );
-	if (const QString failure = inlineRenameFailureText(renameEntryReleasingOpenFiles(*source, newName, false)); !failure.isEmpty())
+	const InlineRenameResult result = renameEntryReleasingOpenFiles(*source, newName, InlineRenameReplacement::Never);
+	if (const std::optional<UserMessage> refusal = inlineRenameMessage(result, QDir::toNativeSeparators(entry.path), newName))
 	{
-		QMessageBox::warning(this, tr("Rename"), tr("Could not rename the file: %1\n%2").arg(failure, QDir::toNativeSeparators(entry.path)));
+		showUserMessage(this, *refusal);
 		return;
 	}
 	const QString newPath = oldInfo.dir().filePath(newName);

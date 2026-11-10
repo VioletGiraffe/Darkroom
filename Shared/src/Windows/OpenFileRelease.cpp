@@ -26,16 +26,16 @@ void followMovedMediaFiles(const QStringList& releasedPaths, const std::vector<P
 	ImageViewerWindow::followMovedFiles(wasReleased, newLocation);
 }
 
-InlineRenameResult renameEntryReleasingOpenFiles(const CEntryPath& source, const QString& newName, bool replaceExistingFile)
+InlineRenameResult renameEntryReleasingOpenFiles(const CEntryPath& source, const QString& newName, const InlineRenameReplacement fileReplacement)
 {
 	const QString& path = source.value();
 	const QString newPath = QFileInfo(path).dir().filePath(newName);
 	QStringList released{ path };
-	if (replaceExistingFile)
+	if (fileReplacement == InlineRenameReplacement::Replace)
 		released.push_back(newPath);
 	releaseMediaFilesHeldOpen(released);
 
-	InlineRenameResult result = inlineRename(source, newName, replaceExistingFile);
+	InlineRenameResult result = inlineRename(source, newName, fileReplacement);
 	followMovedMediaFiles(released, result.status == InlineRenameStatus::Renamed ? std::vector<PathMove>{ { path, newPath } } : std::vector<PathMove>{});
 	return result;
 }

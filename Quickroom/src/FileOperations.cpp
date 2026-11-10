@@ -202,13 +202,13 @@ QString FileOperations::renameInteractive(const QString& path, QWidget* dialogPa
 		if (newName.isEmpty())
 			return {};
 
-		InlineRenameResult result = renameEntryReleasingOpenFiles(*source, newName, false);
+		InlineRenameResult result = renameEntryReleasingOpenFiles(*source, newName, InlineRenameReplacement::Ask);
 		if (result.status == InlineRenameStatus::ReplacementRequired)
 		{
 			const UserMessage question = inlineRenameReplacementQuestion(result, newName);
 			if (QMessageBox::warning(dialogParent, question.title, question.text, QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
 				continue;
-			result = renameEntryReleasingOpenFiles(*source, newName, true);
+			result = renameEntryReleasingOpenFiles(*source, newName, InlineRenameReplacement::Replace);
 		}
 
 		// Built as listFolder builds entry paths, so the caller can find the entry by it.
@@ -218,7 +218,7 @@ QString FileOperations::renameInteractive(const QString& path, QWidget* dialogPa
 			return {};
 
 		const std::optional<UserMessage> refusal = inlineRenameMessage(result, source->name(), newName);
-		assert_and_return_r(refusal, {}); // Empty only for ReplacementRequired, which replaceExistingFile rules out
+		assert_and_return_r(refusal, {}); // Empty only for ReplacementRequired, which Replace rules out
 		showUserMessage(dialogParent, *refusal);
 		if (result.status == InlineRenameStatus::Failed)
 			return {};

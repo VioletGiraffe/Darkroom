@@ -31,7 +31,7 @@ using MediaRename::Result;
 	const std::optional<CEntryPath> source = parseOperationPath(from);
 	assert_and_return_r(source && !source->isRoot(), QObject::tr("the path is not valid"));
 
-	return inlineRenameFailureText(inlineRename(*source, QFileInfo(to).fileName(), false));
+	return inlineRenameFailureText(inlineRename(*source, QFileInfo(to).fileName(), InlineRenameReplacement::Never));
 }
 
 // Warns and returns true when name cannot be a file or folder name on every platform: a library may move between them.

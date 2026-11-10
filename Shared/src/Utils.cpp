@@ -213,7 +213,7 @@ bool renameInPlace(const QString& path, const QString& newName)
 	const std::optional<CEntryPath> source = parseOperationPath(path);
 	assert_and_return_r(source && !source->isRoot(), false);
 
-	const InlineRenameStatus status = inlineRename(*source, newName, false).status;
+	const InlineRenameStatus status = inlineRename(*source, newName, InlineRenameReplacement::Never).status;
 	return status == InlineRenameStatus::Renamed || status == InlineRenameStatus::NothingToDo;
 }
 
