@@ -5,9 +5,9 @@
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
 #include "fileoperations/centrypath.h"
+#include "fileoperations/fileoperationtexts.h"
 #include "fileoperations/inlinerename.h"
 #include "fileoperations/newnamecheck.h"
-#include "fileoperationsui/fileoperationtexts.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QDir>

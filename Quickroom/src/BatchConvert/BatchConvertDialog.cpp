@@ -3,9 +3,9 @@
 #include "UiComponents/SegmentedToggle.h"
 #include "Utils.h"
 #include "assert/advanced_assert.h"
+#include "fileoperations/fileoperationtexts.h"
 #include "fileoperations/newnamecheck.h"
-#include "fileoperationsui/fileoperationtexts.h"
-#include "utils/displayformatting.h"
+#include "qtcore_helpers/displayformatting.hpp"
 #include "widgets/cpersistenceenabler.h"
 
 DISABLE_COMPILER_WARNINGS

@@ -8,10 +8,10 @@
 #include "compiler/compiler_warnings_control.h"
 #include "fileoperations/centrypath.h"
 #include "fileoperations/cfilesystemmutator.h"
+#include "fileoperations/fileoperationtexts.h"
 #include "fileoperations/inlinerename.h"
 #include "fileoperations/newnamecheck.h"
 #include "fileoperationsui/cfileoperationdialog.h"
-#include "fileoperationsui/fileoperationtexts.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QClipboard>

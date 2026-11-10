@@ -12,7 +12,7 @@
 
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
-#include "utils/displayformatting.h"
+#include "qtcore_helpers/displayformatting.hpp"
 #include "utils/filemanager.h"
 #include "utils/scoped_cursor.h"
 #include "widgets/cpersistenceenabler.h"
