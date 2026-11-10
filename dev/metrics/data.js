@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794000661131,
+  "lastUpdate": 1794350529677,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -21795,6 +21795,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .data",
             "value": 345.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 94.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 57,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "035f4ce962496c9d613809c8e4a79d4125bd548d",
+          "message": "The main window's label sidebar keeps a width dragged wider across restarts; the import dialog's label pane is saved by its window's persistence instead of by hand",
+          "timestamp": "2026-11-11T00:34:21+02:00",
+          "tree_id": "8076ecbf190fa11897f95a7931e585492a16d1c3",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/035f4ce962496c9d613809c8e4a79d4125bd548d"
+        },
+        "date": 1794350527465,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 19933,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 3051,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 35526,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 7073.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7303.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5709.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 848.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 345,
             "unit": "KB"
           },
           {
