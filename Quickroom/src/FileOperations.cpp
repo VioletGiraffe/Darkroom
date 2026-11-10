@@ -8,10 +8,11 @@
 #include "compiler/compiler_warnings_control.h"
 #include "fileoperations/centrypath.h"
 #include "fileoperations/cfilesystemmutator.h"
+#include "fileoperations/entrycreation.h"
 #include "fileoperations/fileoperationtexts.h"
 #include "fileoperations/inlinerename.h"
-#include "fileoperations/newnamecheck.h"
 #include "fileoperationsui/cfileoperationdialog.h"
+#include "fileoperationsui/usermessagebox.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QClipboard>
@@ -193,51 +194,42 @@ QString FileOperations::renameInteractive(const QString& path, QWidget* dialogPa
 	const std::optional<CEntryPath> source = parseOperationPath(path);
 	assert_and_return_r(source && !source->isRoot(), {});
 
-	const QString title = QObject::tr("Rename");
 	const bool isFolder = QFileInfo(path).isDir();
 	// A refused name is offered again for correction.
 	for (QString newName = source->name();;)
 	{
-		newName = askForName(title, QObject::tr("New name:"), newName, isFolder, dialogParent);
+		newName = askForName(QObject::tr("Rename"), QObject::tr("New name:"), newName, isFolder, dialogParent);
 		if (newName.isEmpty())
 			return {};
 
-		// Built as listFolder builds entry paths, so the caller can find the entry by it.
-		const QString newPath = QFileInfo(path).absoluteDir().absoluteFilePath(newName);
 		InlineRenameResult result = renameEntryReleasingOpenFiles(*source, newName, false);
 		if (result.status == InlineRenameStatus::ReplacementRequired)
 		{
-			const QString question = QObject::tr("A %1 named “%2” already exists here. Replace it permanently?").arg(fileOperationEntryKindNoun(*result.destinationKind), newName);
-			if (QMessageBox::warning(dialogParent, title, question, QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
+			const UserMessage question = inlineRenameReplacementQuestion(result, newName);
+			if (QMessageBox::warning(dialogParent, question.title, question.text, QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes)
 				continue;
 			result = renameEntryReleasingOpenFiles(*source, newName, true);
 		}
 
-		using enum InlineRenameStatus;
-		switch (result.status)
-		{
-		case Renamed:
-			return newPath;
-		case NothingToDo:
+		// Built as listFolder builds entry paths, so the caller can find the entry by it.
+		if (result.status == InlineRenameStatus::Renamed)
+			return QFileInfo(path).absoluteDir().absoluteFilePath(newName);
+		if (result.status == InlineRenameStatus::NothingToDo)
 			return {};
-		case Rejected:
-			QMessageBox::warning(dialogParent, title, QObject::tr("A %1 named “%2” already exists here.").arg(fileOperationEntryKindNoun(*result.destinationKind), newName));
-			break;
-		case RejectedInvalidName:
-			QMessageBox::warning(dialogParent, title, newNameRejectionText(result.nameRejection));
-			break;
-		case Failed:
-			QMessageBox::critical(dialogParent, title, QObject::tr("Could not rename “%1”: %2.").arg(source->name(), fileSystemErrorText(result.failure->filesystemError)));
+
+		const std::optional<UserMessage> refusal = inlineRenameMessage(result, source->name(), newName);
+		assert_and_return_r(refusal, {}); // Empty only for ReplacementRequired, which replaceExistingFile rules out
+		showUserMessage(dialogParent, *refusal);
+		if (result.status == InlineRenameStatus::Failed)
 			return {};
-		case ReplacementRequired:
-			assert_and_return_unconditional_r("inlineRename asked again after replaceExistingFile", {});
-		}
 	}
 }
 
 QString FileOperations::createFolderInteractive(const QString& parentFolder, QWidget* dialogParent)
 {
-	const QString title = QObject::tr("New folder");
+	const std::optional<CEntryPath> parent = parseOperationPath(parentFolder);
+	assert_and_return_r(parent, {});
+
 	const QDir parentDir(parentFolder);
 	QString name = QObject::tr("New folder");
 	for (int number = 2; parentDir.exists(name); ++number)
@@ -246,32 +238,18 @@ QString FileOperations::createFolderInteractive(const QString& parentFolder, QWi
 	// A refused or taken name is offered again for correction.
 	for (;;)
 	{
-		name = askForName(title, QObject::tr("Folder name (a/b creates nested folders):"), name, true, dialogParent);
+		name = askForName(QObject::tr("New folder"), QObject::tr("Folder name (a/b creates nested folders):"), name, true, dialogParent);
 		if (name.isEmpty())
 			return {};
 
-		if (const NameRejection rejection = checkNewEntryPath(name); rejection != NameRejection::None)
-		{
-			QMessageBox::warning(dialogParent, title, newNameRejectionText(rejection));
-			continue;
-		}
-
-		const std::optional<CEntryPath> target = parseOperationPath(parentFolder + '/' + name);
-		assert_and_return_r(target, {});
-		const auto created = CFileSystemMutator::createDirectories(*target);
-		if (!created)
-		{
-			QMessageBox::critical(dialogParent, title, QObject::tr("Could not create “%1”: %2.").arg(QDir::toNativeSeparators(name), fileSystemErrorText(created.error())));
-			return {};
-		}
-		if (*created == DirectoryCreationOutcome::FinalEntryAlreadyExisted)
-		{
-			QMessageBox::warning(dialogParent, title, QObject::tr("“%1” already exists here.").arg(QDir::toNativeSeparators(name)));
-			continue;
-		}
-
+		const EntryCreationResult result = createNewFolder(*parent, name);
 		// Built as listFolder builds entry paths, so the caller can find the entry by it.
-		return parentDir.absoluteFilePath(QDir::fromNativeSeparators(name).split('/', Qt::SkipEmptyParts).front());
+		if (result.status == EntryCreationStatus::Created)
+			return parentDir.absoluteFilePath(result.createdInParent->name());
+
+		showUserMessage(dialogParent, *entryCreationMessage(result, name));
+		if (result.status != EntryCreationStatus::AlreadyExists && result.status != EntryCreationStatus::RejectedInvalidName)
+			return {};
 	}
 }
 
