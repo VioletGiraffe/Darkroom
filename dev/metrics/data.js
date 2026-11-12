@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794498482768,
+  "lastUpdate": 1794502718337,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -21938,6 +21938,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Quickroom.exe size",
             "value": 7307.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5712.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 850,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 346.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 94.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 57,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "49caa338e698aeed02cd2316c60fcc07ee0ca2cb",
+          "message": "Quickroom pastes files the clipboard holds only as virtual files, such as files copied on a VMware host, through Explorer's own Paste; file-operations updated",
+          "timestamp": "2026-11-12T18:37:35+02:00",
+          "tree_id": "5967d2c8acdf33b6fd7199f09b5c7bb3a662181a",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/49caa338e698aeed02cd2316c60fcc07ee0ca2cb"
+        },
+        "date": 1794502715627,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 19982,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 3095,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 35609,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 7079.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7314,
             "unit": "KB"
           },
           {
