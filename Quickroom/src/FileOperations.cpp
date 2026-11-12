@@ -13,6 +13,8 @@
 #include "fileoperations/inlinerename.h"
 #include "fileoperationsui/cfileoperationdialog.h"
 #include "fileoperationsui/usermessagebox.h"
+#include "shelloperations/cshelloperationrunner.h"
+#include "shelloperations/shellfileoperations.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QClipboard>
@@ -44,6 +46,18 @@ constexpr uint32_t MOVE_DROP_EFFECT = 2; // DROPEFFECT_MOVE, without the Windows
 // The KDE and GNOME cut markers; the GNOME one repeats the URLs after a "cut" line.
 const QString KDE_CUT_FORMAT = QStringLiteral("application/x-kde-cutselection");
 const QString GNOME_COPIED_FILES_FORMAT = QStringLiteral("x-special/gnome-copied-files");
+#ifdef Q_OS_WIN
+// The shell's virtual file list, Unicode and ANSI
+const QString VIRTUAL_FILES_FORMAT = QStringLiteral("application/x-qt-windows-mime;value=\"FileGroupDescriptorW\"");
+const QString ANSI_VIRTUAL_FILES_FORMAT = QStringLiteral("application/x-qt-windows-mime;value=\"FileGroupDescriptor\"");
+#endif
+
+// Created on first use, which is on the GUI thread
+CShellOperationRunner& shellOperations()
+{
+	static CShellOperationRunner runner;
+	return runner;
+}
 
 // Deletes one path on behalf of window; remove returns whether it is gone.
 [[nodiscard]] RemovalAction deleteAction(QWidget* window, PathDeletion::Mode mode, std::function<void(const QString& path)> onDeleted)
@@ -138,6 +152,31 @@ bool FileOperations::isMarkedAsCut(const QMimeData& mime)
 		return true;
 	const QByteArray gnomeCopiedFiles = mime.data(GNOME_COPIED_FILES_FORMAT);
 	return gnomeCopiedFiles == "cut" || gnomeCopiedFiles.startsWith("cut\n");
+}
+
+bool FileOperations::holdsVirtualFiles([[maybe_unused]] const QMimeData& mime)
+{
+#ifdef Q_OS_WIN
+	return mime.hasFormat(VIRTUAL_FILES_FORMAT) || mime.hasFormat(ANSI_VIRTUAL_FILES_FORMAT);
+#else
+	return false;
+#endif
+}
+
+#ifdef Q_OS_WIN
+void FileOperations::startShellPaste(const QString& destinationFolder)
+{
+	// No owner window: closing the browser during the paste must not take the shell's dialogs with it
+	shellOperations().run([destinationFolder] {
+		if (!pasteFromClipboardWithShell(destinationFolder, nullptr))
+			log_unconditional_r("The shell's Paste failed in " + destinationFolder.toStdString());
+	});
+}
+#endif
+
+void FileOperations::waitForShellPastes()
+{
+	shellOperations().waitForPendingOperations();
 }
 
 void FileOperations::startTransfer(TransferKind kind, const QStringList& sources, const QString& destinationFolder, QWidget* parent)

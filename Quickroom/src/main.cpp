@@ -130,5 +130,7 @@ int main(int argc, char* argv[])
 #endif
 	openStartupWindow(QDir::fromNativeSeparators(startupPath));
 
-	return QApplication::exec();
+	const int exitCode = QApplication::exec();
+	FileOperations::waitForShellPastes();
+	return exitCode;
 }

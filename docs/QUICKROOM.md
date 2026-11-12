@@ -82,6 +82,8 @@ Copy and move:
   performs a move itself.
 - The `file-operations` engine runs each transfer in its own progress dialog, which asks about collisions. Before a
   move, open players and viewers release the files moved. The folder watch shows the result.
+- On Windows, a clipboard holding only virtual files (contents without a path, such as files copied on a VMware host) is
+  pasted by Explorer's own Paste, with Explorer's dialogs. On quit, Quickroom waits for such pastes to finish.
 
 Resize / convert, from the menu of a tile selection with images, or from Tools (Shift+R) for the selected images, if any:
 - The dialog lists the images. Images and folders dropped on it join the list until the conversion starts; Del removes

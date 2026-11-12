@@ -135,7 +135,7 @@ void setCutMark(QWidget* card, bool cut)
 [[nodiscard]] bool clipboardHasFiles()
 {
 	const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
-	return mime && !FileOperations::localFilePaths(*mime).empty();
+	return mime && (!FileOperations::localFilePaths(*mime).empty() || FileOperations::holdsVirtualFiles(*mime));
 }
 
 // The requested folder, else the remembered one, else Pictures, else home. A requested folder that has gone
@@ -779,7 +779,13 @@ void BrowserWindow::pasteInto(const QString& folder)
 
 	const QStringList sources = FileOperations::localFilePaths(*mime);
 	if (sources.empty())
+	{
+#ifdef Q_OS_WIN
+		if (FileOperations::holdsVirtualFiles(*mime))
+			FileOperations::startShellPaste(folder);
+#endif
 		return;
+	}
 
 	const bool cut = FileOperations::isMarkedAsCut(*mime);
 	if (cut)

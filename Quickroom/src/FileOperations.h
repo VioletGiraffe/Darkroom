@@ -23,6 +23,15 @@ namespace FileOperations
 	[[nodiscard]] QStringList localFilePaths(const QMimeData& mime);
 	// Whether mime carries a cut marker from this app or a file manager.
 	[[nodiscard]] bool isMarkedAsCut(const QMimeData& mime);
+	// Whether mime holds virtual files: contents without a path, which only the shell can paste. Always false outside Windows.
+	[[nodiscard]] bool holdsVirtualFiles(const QMimeData& mime);
+
+#ifdef _WIN32
+	// Pastes the clipboard into destinationFolder with Explorer's own Paste command, on a thread of its own.
+	void startShellPaste(const QString& destinationFolder);
+#endif
+	// Returns once every shell paste has finished, dispatching events meanwhile. Called after the event loop ends.
+	void waitForShellPastes();
 
 	// Copies or moves sources into destinationFolder in a progress dialog that blocks parent's window while in the foreground.
 	// Before a move, open players and viewers release the files moved.
