@@ -888,13 +888,21 @@ void ImportDialog::zoomStagedCards(int steps)
 
 void ImportDialog::rebuildAllStagedCards()
 {
-	for (auto it = _staged.begin(); it != _staged.end(); ++it)
+	for (MediaGrid* grid : { _videoGrid, _photoGrid })
 	{
-		MediaItemWidget* card = buildStagedCard(it.key(), it->path, it->tempPreviewDir, it->durationMs);
-		card->setInBest(it->pendingBest);
-		it->item->setSizeHint(card->sizeHint());
-		it->item->listWidget()->setItemWidget(it->item, card);
-		updateCardLabelDots(it.key());
+		grid->reflowKeepingPosition([this, grid] {
+			for (auto it = _staged.begin(); it != _staged.end(); ++it)
+			{
+				if (it->item->listWidget() != grid)
+					continue;
+
+				MediaItemWidget* card = buildStagedCard(it.key(), it->path, it->tempPreviewDir, it->durationMs);
+				card->setInBest(it->pendingBest);
+				it->item->setSizeHint(card->sizeHint());
+				grid->setItemWidget(it->item, card);
+				updateCardLabelDots(it.key());
+			}
+		});
 	}
 }
 

@@ -65,20 +65,34 @@ struct ViewportAnchor
 {
 	QListWidgetItem* item = nullptr;
 	int top = 0;   // viewport coordinates
+	bool fullyInView = false;
 };
 
-// Rows flow left to right, so the first shown row reaching into the viewport is the top-left visible item.
-ViewportAnchor firstVisibleItem(const QListWidget& grid)
+// The first selected item in view, else the first item in view.
+// Rows flow left to right and wrap: a later row is never above an earlier one.
+ViewportAnchor viewportAnchor(const QListWidget& grid)
 {
+	const QRect viewportRect = grid.viewport()->rect();
+	ViewportAnchor firstInView;
 	for (int row = 0, rows = grid.count(); row < rows; ++row)
 	{
 		QListWidgetItem* rowItem = grid.item(row);
 		if (rowItem->isHidden())
 			continue;
-		if (const QRect rect = grid.visualItemRect(rowItem); rect.bottom() >= 0)
-			return { rowItem, rect.top() };
+
+		const QRect rect = grid.visualItemRect(rowItem);
+		if (rect.bottom() < 0)
+			continue;
+		if (rect.top() > viewportRect.bottom())
+			break;
+
+		const ViewportAnchor candidate{ rowItem, rect.top(), viewportRect.contains(rect) };
+		if (rowItem->isSelected())
+			return candidate;
+		if (!firstInView.item)
+			firstInView = candidate;
 	}
-	return {};
+	return firstInView;
 }
 
 }  // namespace
@@ -154,6 +168,28 @@ void MediaGrid::discardAllCards()
 	// setItemWidget deletes the widget it replaces, so a null one clears the row.
 	for (int row = 0, rows = count(); row < rows; ++row)
 		setItemWidget(item(row), nullptr);
+}
+
+void MediaGrid::reflowKeepingPosition(const std::function<void()>& changeItemSizes)
+{
+	keepPositionThrough([this, &changeItemSizes] {
+		changeItemSizes();
+		scheduleDelayedItemsLayout();   // a size hint change schedules none
+	});
+}
+
+void MediaGrid::keepPositionThrough(const std::function<void()>& reflow)
+{
+	const ViewportAnchor anchor = viewportAnchor(*this);
+	reflow();
+	if (anchor.item)
+	{
+		executeDelayedItemsLayout();   // QListView may defer the reflow
+		verticalScrollBar()->setValue(verticalScrollBar()->value() + visualItemRect(anchor.item).top() - anchor.top);
+		if (anchor.fullyInView)
+			scrollToItem(anchor.item);   // a grown item may reach past the viewport's bottom
+	}
+	ensureVisibleCardsExist();
 }
 
 void MediaGrid::filterRows(const std::function<bool(const QListWidgetItem&)>& isShown)
@@ -240,15 +276,14 @@ void MediaGrid::wheelEvent(QWheelEvent* event)
 
 void MediaGrid::resizeEvent(QResizeEvent* event)
 {
-	// Read before the base handler, which reflows the items for the new width.
-	const ViewportAnchor anchor = event->size().width() != event->oldSize().width() ? firstVisibleItem(*this) : ViewportAnchor{};
-	QListWidget::resizeEvent(event);
-	if (anchor.item)
+	// Only a width change reflows the items.
+	if (event->size().width() != event->oldSize().width())
+		keepPositionThrough([this, event] { QListWidget::resizeEvent(event); });
+	else
 	{
-		executeDelayedItemsLayout();   // QListView may defer the reflow
-		verticalScrollBar()->setValue(verticalScrollBar()->value() + visualItemRect(anchor.item).top() - anchor.top);
+		QListWidget::resizeEvent(event);
+		ensureVisibleCardsExist();
 	}
-	ensureVisibleCardsExist();
 }
 
 void MediaGrid::scrollContentsBy(int dx, int dy)

@@ -115,5 +115,8 @@ reconstruction:
 - The main browser and FrameViewerWindow preserve rows and recreate attached cards.
 - ImportDialog rebuilds staged cards while preserving pending state.
 
+Every owner resizes its items through `MediaGrid::reflowKeepingPosition`, which keeps the view in place as a width change
+does: the first selected item in view stays at its viewport offset, else the first item in view.
+
 These small owner-specific persistence/debounce paths remain intentionally separate; see the
 [backlog](../darkroom-backlog.md).

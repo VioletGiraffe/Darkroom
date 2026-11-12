@@ -835,9 +835,8 @@ void MediaBrowserWidget::rebuildGridRows()
 void MediaBrowserWidget::rebuildAllCards()
 {
 	updateCardCanvasSizes();
-	applyCardSizeHints();
 	_mediaGrid->discardAllCards();
-	_mediaGrid->ensureVisibleCardsExist();
+	_mediaGrid->reflowKeepingPosition([this] { applyCardSizeHints(); });
 }
 
 QString MediaBrowserWidget::topAnchorKey() const

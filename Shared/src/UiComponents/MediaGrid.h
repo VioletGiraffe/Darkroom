@@ -16,7 +16,7 @@ class QUrl;
 // no item is visible. Its owner supplies the data sources; the view contains no catalog logic.
 // Every card carries a "selected" dynamic property mirroring its row, so the central sheet can style the selected state.
 // Hidden rows are never selected, so actions on the selection never reach them.
-// A width change keeps the first visible item at its viewport offset through the reflow.
+// A width change keeps the scroll anchor at its viewport offset through the reflow: the first selected item in view, else the first item in view.
 class MediaGrid final : public QListWidget {
 public:
 	explicit MediaGrid(QWidget* parent = nullptr);
@@ -36,6 +36,10 @@ public:
 
 	// Drops every card; ensureVisibleCardsExist() rebuilds the ones still on screen.
 	void discardAllCards();
+
+	// Runs changeItemSizes and the item layout with the scroll anchor kept as through a width change, then calls ensureVisibleCardsExist().
+	// changeItemSizes must not remove items.
+	void reflowKeepingPosition(const std::function<void()>& changeItemSizes);
 
 	// Hides the rows isShown rejects and shows the rest. A hidden current row stops being current.
 	void filterRows(const std::function<bool(const QListWidgetItem&)>& isShown);
@@ -59,6 +63,9 @@ protected:
 	void selectionChanged(const QItemSelection& selected, const QItemSelection& deselected) override;
 
 private:
+	// Runs reflow and the item layout it scheduled, restores the scroll anchor, then calls ensureVisibleCardsExist().
+	void keepPositionThrough(const std::function<void()>& reflow);
+
 	std::function<QList<QUrl>(const QList<QListWidgetItem*>&)> _dragUrlsProvider;
 	std::function<void(Qt::DropAction action, const QList<QUrl>& urls)> _dragFinishedHandler;
 	Qt::DropActions _dragActions = Qt::CopyAction;

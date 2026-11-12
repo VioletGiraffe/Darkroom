@@ -150,11 +150,12 @@ void FrameViewerWindow::zoomThumbnails(int steps)
 
 void FrameViewerWindow::applyThumbnailSize()
 {
-	const QSize cell{ _thumbnailSize, _thumbnailSize };
-	for (int row = 0, rows = _grid->count(); row < rows; ++row)
-		_grid->item(row)->setSizeHint(cell);
 	_grid->discardAllCards();
-	_grid->ensureVisibleCardsExist();
+	_grid->reflowKeepingPosition([this] {
+		const QSize cell{ _thumbnailSize, _thumbnailSize };
+		for (int row = 0, rows = _grid->count(); row < rows; ++row)
+			_grid->item(row)->setSizeHint(cell);
+	});
 }
 
 void FrameViewerWindow::showThumbnailContextMenu(QListWidgetItem& item, QPoint globalPos)

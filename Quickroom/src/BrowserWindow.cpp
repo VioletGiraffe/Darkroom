@@ -1100,9 +1100,8 @@ void BrowserWindow::zoomTiles(int steps)
 
 void BrowserWindow::applyTileSize()
 {
-	setTileSizeHints();
 	_grid->discardAllCards();
-	_grid->ensureVisibleCardsExist();
+	_grid->reflowKeepingPosition([this] { setTileSizeHints(); });
 }
 
 void BrowserWindow::closeEvent(QCloseEvent* event)
