@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794350529677,
+  "lastUpdate": 1794498482768,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -21874,6 +21874,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .data",
             "value": 345,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 94.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 57,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "685683e24c02fe6074a4890b4f42a288d626d67e",
+          "message": "Media grids lay out their items once per batch of new cards instead of once per card: every rect is read before the first card is attached",
+          "timestamp": "2026-11-12T17:35:01+02:00",
+          "tree_id": "3e2842b461664c72a3efadf5e598e97fa73df9f5",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/685683e24c02fe6074a4890b4f42a288d626d67e"
+        },
+        "date": 1794498461978,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 19982,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 3050,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 35532,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 7079.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7307.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5712.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 850,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 346.5,
             "unit": "KB"
           },
           {
