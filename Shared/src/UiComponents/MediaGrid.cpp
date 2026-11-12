@@ -24,6 +24,7 @@ RESTORE_COMPILER_WARNINGS
 #include <algorithm>
 #include <cmath>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -136,7 +137,7 @@ void MediaGrid::ensureVisibleCardsExist()
 	if (!_cardFactory)
 		return;
 
-	// visualItemRect() reads the item layout, which QListView otherwise defers to the next event loop pass.
+	// visualItemRect() is not documented to run a pending item layout.
 	executeDelayedItemsLayout();
 
 	const int rows = count();
@@ -146,21 +147,33 @@ void MediaGrid::ensureVisibleCardsExist()
 	const QRect visibleArea = viewport()->rect();
 	const QRect materializeArea = visibleArea.adjusted(0, -slack, 0, slack);
 
-	const auto materializeCardsIn = [this, rows](const QRect& area) {
-		for (int row = 0; row < rows; ++row)
+	// All rects are read before any card is attached: each attachment schedules a full item layout, which the next rect read runs.
+	std::vector<QListWidgetItem*> visibleRows;
+	std::vector<QListWidgetItem*> preloadRows;
+	for (int row = 0; row < rows; ++row)
+	{
+		QListWidgetItem* rowItem = item(row);
+		if (rowItem->isHidden() || itemWidget(rowItem))
+			continue;
+		if (const QRect rect = visualItemRect(rowItem); rect.intersects(visibleArea))
+			visibleRows.push_back(rowItem);
+		else if (rect.intersects(materializeArea))
+			preloadRows.push_back(rowItem);
+	}
+
+	// Start the useful work in view order before filling the bounded off-screen preload margin.
+	for (const std::vector<QListWidgetItem*>* newCardRows : { &visibleRows, &preloadRows })
+	{
+		for (QListWidgetItem* rowItem : *newCardRows)
 		{
-			QListWidgetItem* rowItem = item(row);
-			if (rowItem->isHidden() || !area.intersects(visualItemRect(rowItem)) || itemWidget(rowItem))
-				continue;
 			QWidget* card = _cardFactory(rowItem);
 			card->setProperty("selected", rowItem->isSelected());   // read by the first polish, so no repolish needed
 			setItemWidget(rowItem, card);
 		}
-	};
+	}
 
-	// Start the useful work in view order before filling the bounded off-screen preload margin.
-	materializeCardsIn(visibleArea);
-	materializeCardsIn(materializeArea);
+	// Only the first attachment sets its card's geometry; this layout sets the others'.
+	executeDelayedItemsLayout();
 }
 
 void MediaGrid::discardAllCards()
