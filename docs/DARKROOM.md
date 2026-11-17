@@ -21,12 +21,12 @@ contains implementation detail. Keep both in sync.
 
 | Path | Holds |
 |---|---|
-| `Darkroom/` | Darkroom: `Darkroom.pro`, `src/`, `res/` (app icon, its `UI/` icon SVGs, `resources.qrc`) |
+| `Darkroom/` | Darkroom: `Darkroom.pro`, `src/`, `res/` (app icon, Linux `.desktop` file, its `UI/` icon SVGs, `resources.qrc`) |
 | `Quickroom/` | [Quickroom](QUICKROOM.md): `Quickroom.pro`, `src/`, `res/` |
 | `Shared/` | the static library both apps link: `Shared.pro`, `src/`, `res/` (the shared `UI/` icon SVGs, `shared.qrc`) |
 | `tests/` | Catch2 tests over the Core model |
 | `docs/` | this documentation; `mockups/` holds static HTML UI mockups, design input only and not kept in sync with the code |
-| `scripts/` | `build` and `run_tests` (see [build.md](build.md#scripts)), `create_dmg.sh` (macOS packaging), `build-filetype-icons.py` (Quickroom file-type icons) and `preview-filetype-icons.py` (contact sheets of them), `image_read_benchmark` (see [build.md](build.md#image-read-benchmark)), `fit_tone_curve.py` (fits LibRaw renderings' tone curve to cameras' JPEGs) |
+| `scripts/` | `build` and `run_tests` (see [build.md](build.md#scripts)), `create_dmg.sh` (macOS packaging), `create_appimage.sh` (Linux packaging), `build-filetype-icons.py` (Quickroom file-type icons) and `preview-filetype-icons.py` (contact sheets of them), `image_read_benchmark` (see [build.md](build.md#image-read-benchmark)), `fit_tone_curve.py` (fits LibRaw renderings' tone curve to cameras' JPEGs) |
 | `installer.iss` | Windows installer script (Inno Setup) |
 | `.github/workflows/` | CI |
 | `Darkroom.pro`, `Tests.pro`, `global.pri` | the two qmake roots and their shared compiler settings |

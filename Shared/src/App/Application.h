@@ -16,11 +16,16 @@ public:
 	Application(int& argc, char** argv, const QString& name, const QString& version, const QString& iconPath);
 	~Application();
 
+	// See TestRun.h
+	[[nodiscard]] bool isTestRun() const { return _earlySetup.isTestRun; }
+
 private:
 	// Constructed first: runs the steps the members below require to have run.
 	struct EarlySetup
 	{
-		EarlySetup();
+		EarlySetup(int argc, char** argv);
+
+		const bool isTestRun;
 	};
 
 	EarlySetup _earlySetup;

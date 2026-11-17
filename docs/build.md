@@ -110,17 +110,19 @@ method's validation: [image-read-performance.md](image-read-performance.md).
 
 ## CI
 
-`.github/workflows/CI.yml` runs on every push (except to `gh-pages`) and pull request, on Windows (MSVC), Ubuntu
-(GCC 14), and macOS (clang), each against Qt 6.11. Per OS, in order:
+`.github/workflows/CI.yml` runs on every push (except to `gh-pages`) and pull request, on Windows (MSVC), Ubuntu 24.04
+x64 and arm64 (GCC 14), and macOS (clang), each against Qt 6.11. Per OS, in order:
 
 1. Set up vcpkg at `vcpkg.json`'s baseline. Its built packages are cached across runs.
 2. Build and run the tests: `run_tests`.
 3. Build both apps, even when the tests failed: `build`. Windows pins the v145 toolset. The libraries the tests step
    built are reused: both roots build into the same directories.
 4. Package whenever the apps built, so packaging is checked even when the tests failed: `windeployqt` into
-   `dist/` and Inno Setup on Windows; `scripts/create_dmg.sh` on macOS. The packages are uploaded as workflow
-   artifacts only when every step passed. Linux only builds.
-5. Record metrics: LOC per project and executable sizes (per PE section on Windows) go to the `gh-pages` branch under
+   `dist/` and Inno Setup on Windows; `scripts/create_dmg.sh` on macOS; `scripts/create_appimage.sh` on Linux.
+   The packages are uploaded as workflow artifacts only when every step passed.
+5. Start each packaged app with `--test-run`, without the Qt install's library and plugin paths, which would hide
+   what the deployment left out. On Linux it runs under `xvfb-run`.
+6. Record metrics: LOC per project and executable sizes (per PE section on Windows) go to the `gh-pages` branch under
    `dev/metrics` through github-action-benchmark, which regenerates the chart there.
 
 `cleanup.yml` is a manual run that deletes old workflow runs.
@@ -139,3 +141,15 @@ method's validation: [image-read-performance.md](image-read-performance.md).
 - **macOS:** `scripts/create_dmg.sh <Qt dir>` runs `macdeployqt` on both already-built release bundles and packages
   them into one `Darkroom.dmg`. It treats macdeployqt's `ERROR` output as failure, since the tool exits 0 regardless.
   It thins each bundle's universal Qt binaries to its executable's architecture, then re-signs the bundle ad-hoc.
+- **Linux:** `scripts/create_appimage.sh <Qt dir>` runs linuxdeploy and its Qt plugin (continuous builds, downloaded
+  into `build/`) on each release binary with its `res/*.desktop` file, deploying the xcb and Wayland platform plugins.
+  It produces `Darkroom-<arch>.AppImage` and `Quickroom-<arch>.AppImage`, `<arch>` being `x86_64` or `arm64`.
+  The AppImages use the system's glibc and libstdc++, so they run only where both are at least as new as the build
+  machine's: CI pins Ubuntu 24.04. Video frame extraction uses the system's `ffmpeg`, found on `PATH`.
+
+## Test run
+
+`--test-run` as the first argument starts an app on settings in a temporary folder; Darkroom also gets a new library
+there. After a few seconds the app exits 0 when a window is shown, no dialog is open, and the Qt plugins the apps rely
+on are present: the image formats and a Qt Multimedia backend. Otherwise it prints the reason and exits 1.
+`Shared/src/App/TestRun.cpp` holds the checks.

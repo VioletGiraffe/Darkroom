@@ -1,5 +1,6 @@
 #include "App/Application.h"
 #include "App/MemoryLog.h"
+#include "App/TestRun.h"
 #include "Core/CpuThreadPool.h"
 #include "Core/IoThreadPool.h"
 #include "SharedSettings.h"
@@ -15,15 +16,19 @@ DISABLE_COMPILER_WARNINGS
 #include <QImageReader>
 RESTORE_COMPILER_WARNINGS
 
-Application::EarlySetup::EarlySetup()
+Application::EarlySetup::EarlySetup(int argc, char** argv) :
+	isTestRun{ TestRun::requested(argc, argv) }
 {
 	installMemoryLog();
+	if (isTestRun)
+		TestRun::isolateSettings();
 	Q_INIT_RESOURCE(shared);
 	WidgetUtils::tagWindowsAsSrgb();
 	CCrashHandler::setMinidumpsStorageFolderPath(QDir::tempPath().toStdWString());
 }
 
 Application::Application(int& argc, char** argv, const QString& name, const QString& version, const QString& iconPath) :
+	_earlySetup{ argc, argv },
 	_app{ argc, argv },
 	_crashHandler{ [](const wchar_t* msg) { qInfo() << QString::fromWCharArray(msg); } }
 {
@@ -40,6 +45,9 @@ Application::Application(int& argc, char** argv, const QString& name, const QStr
 
 	initSharedSettings();
 	Style::install();
+
+	if (isTestRun())
+		TestRun::scheduleVerdict();
 }
 
 Application::~Application()

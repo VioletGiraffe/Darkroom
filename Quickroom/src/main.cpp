@@ -122,7 +122,7 @@ int main(int argc, char* argv[])
 	const Application app{ argc, argv, QuickroomApplicationName, STRINGIFY_EXPANDED_ARGUMENT(QUICKROOM_VERSION), ":/quickroom.svg" };
 
 	// Take the first argument as a path to open, if any
-	QString startupPath = QApplication::arguments().value(1, /*default:*/{});
+	QString startupPath = app.isTestRun() ? QString{} : QApplication::arguments().value(1, /*default:*/{});
 #ifdef Q_OS_WIN
 	// Windows argv parsing reads \" as an escaped quote: a quoted drive root "C:\" arrives as C:"
 	if (startupPath.endsWith('"'))

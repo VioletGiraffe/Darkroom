@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Darkroom
+GenericName=Photo and Video Organizer
+Comment=Organize, label and compare photos and videos
+Exec=Darkroom
+Icon=darkroom
+Terminal=false
+Categories=Graphics;Photography;

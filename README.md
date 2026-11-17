@@ -18,14 +18,16 @@ video, tag everything with colored labels, flip through thumbnails, and compare 
 ## Getting started
 
 1. Download and install Darkroom from Releases.
+   On Linux, download `Darkroom-x86_64.AppImage` (or `-arm64`), make it executable with `chmod +x`, and run it. It needs Ubuntu 24.04 or a distribution at least as recent.
 2. [Download ffmpeg](https://ffmpeg.org/download.html) if you want video support, Darkroom needs it to read video files. Optional.
    Put the `ffmpeg` binary next to Darkroom's executable or anywhere on your PATH, or point Settings at it. Without it, photos still work.
+   On Linux, install your distribution's package instead: `sudo apt install ffmpeg` on Ubuntu.
 3. Open Darkroom and drag videos, photos, or whole folders onto the window to get started.
 
 ## Quickroom
 
-Quickroom is a companion app in this same repo: a fast image/folder browser and viewer. It installs together
-with Darkroom, so there is nothing extra to download.
+Quickroom is a companion app in this same repo: a fast image/folder browser and viewer. On Windows and macOS it
+installs together with Darkroom, so there is nothing extra to download. On Linux it is an AppImage of its own, `Quickroom-x86_64.AppImage` (or `-arm64`).
 
 - **Folder browser**: a thumbnail grid of the images and videos in it.
 - **Fullscreen (or windowed) viewing with zoom and pan support**: point Quickroom at an image and it opens fullscreen; arrow keys move to next or previous image in the same folder; `F` or double-click switches from full-screen image view to folder browsing.

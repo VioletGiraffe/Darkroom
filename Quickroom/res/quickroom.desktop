@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Quickroom
+GenericName=Image and Video Viewer
+Comment=Fast image and video browser and viewer
+Exec=Quickroom %f
+Icon=quickroom
+Terminal=false
+Categories=Graphics;Viewer;
+# The suffixes in Utils.cpp and ImageDecoding::rawFileSuffixes, as the types shared-mime-info defines for them.
+# image/x-dcraw is the parent type of every camera raw, including those without a type of their own.
+MimeType=image/jpeg;image/png;image/tiff;image/webp;image/gif;image/bmp;image/svg+xml;image/x-dcraw;image/x-adobe-dng;image/x-canon-cr2;image/x-canon-cr3;image/x-canon-crw;image/x-nikon-nef;image/x-nikon-nrw;image/x-sony-arw;image/x-sony-sr2;image/x-sony-srf;image/x-fuji-raf;image/x-olympus-orf;image/x-panasonic-rw;image/x-panasonic-rw2;image/x-pentax-pef;image/x-samsung-srw;image/x-minolta-mrw;image/x-kodak-dcr;image/x-kodak-kdc;image/x-kodak-k25;image/x-epson-erf;video/mp4;video/x-m4v;video/quicktime;video/x-msvideo;video/x-matroska;video/x-flv;video/webm;video/x-ms-wmv;video/mpeg;video/mp2t;

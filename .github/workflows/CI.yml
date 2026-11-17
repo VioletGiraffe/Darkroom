@@ -29,12 +29,16 @@ jobs:
       matrix:
         include:
           # vcpkg_triplet: the triplet vcpkg.pri links against on that runner
+          # Linux is pinned: the AppImages run only where glibc and libstdc++ are at least as new as the build machine's
           - os: windows-latest
             qt_arch: win64_msvc2022_64
             vcpkg_triplet: x64-windows-static-md
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             qt_arch: linux_gcc_64
             vcpkg_triplet: x64-linux
+          - os: ubuntu-24.04-arm
+            qt_arch: linux_gcc_arm64
+            vcpkg_triplet: arm64-linux
           - os: macos-latest
             qt_arch: clang_64
             vcpkg_triplet: arm64-osx
@@ -90,7 +94,8 @@ jobs:
         aqtsource: git+https://github.com/miurahr/aqtinstall.git@076e1659807d0b362a3ed684d54c2e9c775eb9c7
         target: desktop
         arch: ${{ matrix.qt_arch }}
-        archives: 'qtbase icu qtsvg'
+        # qtwayland: the Wayland window decorations the AppImages deploy; the Wayland client itself is in qtbase
+        archives: ${{ startsWith(matrix.os, 'ubuntu') && 'qtbase icu qtsvg qtwayland' || 'qtbase icu qtsvg' }}
         modules: 'qtimageformats qtmultimedia'
         cache: 'true'
 
@@ -126,8 +131,8 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ${{ runner.temp }}/vcpkg-binary-cache
-        key: vcpkg-${{ runner.os }}-${{ steps.runner_image.outputs.version }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-triplets/**') }}
-        restore-keys: vcpkg-${{ runner.os }}-${{ steps.runner_image.outputs.version }}-
+        key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.runner_image.outputs.version }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-triplets/**') }}
+        restore-keys: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.runner_image.outputs.version }}-
 
     # After the MSVC environment, which can point VCPKG_ROOT at Visual Studio's own vcpkg
     - name: Set up vcpkg at the manifest's baseline
@@ -178,6 +183,7 @@ jobs:
 
     # Keyed on the app build alone: packaging is still checked when the tests failed.
     - name: Build installer (Windows)
+      id: build_installer_windows
       if: ${{ !cancelled() && steps.build_app_windows.outcome == 'success' }}
       shell: cmd
       run: |
@@ -194,14 +200,65 @@ jobs:
 
         "%programfiles(x86)%\Inno Setup 6\iscc" installer.iss
 
+    # The deployed set alone: the Qt install's directories would hide what the deployment left out
+    - name: Test run (Windows)
+      if: ${{ !cancelled() && steps.build_installer_windows.outcome == 'success' }}
+      shell: pwsh
+      run: |
+        Remove-Item Env:QT_PLUGIN_PATH -ErrorAction Ignore
+        $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -and -not (Test-Path (Join-Path $_ 'Qt6Core.dll')) }) -join ';'
+        $failed = $false
+        foreach ($app in 'Darkroom', 'Quickroom') {
+          # A GUI executable started directly would not be waited for
+          $out = Join-Path $env:RUNNER_TEMP "$app-out.txt"
+          $err = Join-Path $env:RUNNER_TEMP "$app-err.txt"
+          $process = Start-Process "dist\$app.exe" -ArgumentList '--test-run' -Wait -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
+          Get-Content $out, $err
+          "${app}: exit code $($process.ExitCode)"
+          if ($process.ExitCode -ne 0) { $failed = $true }
+        }
+        if ($failed) { exit 1 }
+
     - name: Build app (Unix)
       id: build_app_unix
       if: ${{ !cancelled() && !startsWith(matrix.os, 'windows') }}
       run: ./scripts/build.sh
 
     - name: Build .dmg (macOS)
+      id: build_dmg
       if: ${{ !cancelled() && steps.build_app_unix.outcome == 'success' && startsWith(matrix.os, 'macos') }}
       run: ./scripts/create_dmg.sh $QT_ROOT_DIR
+
+    # The bundles create_dmg.sh deployed, without the Qt install's plugins to hide what the deployment left out
+    - name: Test run (macOS)
+      if: ${{ !cancelled() && steps.build_dmg.outcome == 'success' }}
+      run: |
+        unset QT_PLUGIN_PATH
+        status=0
+        for app in Darkroom Quickroom; do
+          "bin/release/$app.app/Contents/MacOS/$app" --test-run || status=1
+        done
+        exit $status
+
+    # linuxdeploy copies the libraries the platform plugins link from this machine
+    - name: Build AppImages (Linux)
+      id: build_appimages
+      if: ${{ !cancelled() && steps.build_app_unix.outcome == 'success' && startsWith(matrix.os, 'ubuntu') }}
+      run: |
+        sudo apt install -qq libwayland-client0 libwayland-cursor0 libxkbcommon0 libxcb-cursor0
+        ./scripts/create_appimage.sh $QT_ROOT_DIR
+
+    # The Qt install's paths would hide libraries and plugins missing from the AppImages. The runners have no FUSE to mount them.
+    - name: Test run (Linux)
+      if: ${{ !cancelled() && steps.build_appimages.outcome == 'success' }}
+      run: |
+        sudo apt install -qq xvfb
+        unset LD_LIBRARY_PATH QT_PLUGIN_PATH
+        status=0
+        for appimage in Darkroom-*.AppImage Quickroom-*.AppImage; do
+          APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run --auto-servernum "./$appimage" --test-run || status=1
+        done
+        exit $status
 
     - name: Binary sizes - Windows
       if: startsWith(matrix.os, 'windows')
@@ -293,4 +350,19 @@ jobs:
       uses: actions/upload-artifact@v7
       with:
         path: Darkroom.dmg
+        archive: false
+
+    # One upload per file: an unarchived artifact holds a single file
+    - name: Upload Darkroom AppImage
+      if: success() && startsWith(matrix.os, 'ubuntu')
+      uses: actions/upload-artifact@v7
+      with:
+        path: Darkroom-*.AppImage
+        archive: false
+
+    - name: Upload Quickroom AppImage
+      if: success() && startsWith(matrix.os, 'ubuntu')
+      uses: actions/upload-artifact@v7
+      with:
+        path: Quickroom-*.AppImage
         archive: false
