@@ -56,6 +56,18 @@ TEST_CASE("fNumberText and exposureBiasText", "[imageinfo]")
 	CHECK(exposureBiasText({ 0, 1 }) == "0 EV");
 }
 
+TEST_CASE("lensSpecificationText: a range shows once when both ends match; a zoom's one known f-number names its end", "[imageinfo]")
+{
+	using ImageMetadata::LensSpecification;
+	CHECK(lensSpecificationText(LensSpecification{ 90.0, 90.0, 2.8, 2.8 }) == "90 mm f/2.8");
+	CHECK(lensSpecificationText(LensSpecification{ 24.0, 70.0, 4.0, 4.0 }) == "24–70 mm f/4");
+	CHECK(lensSpecificationText(LensSpecification{ 18.0, 55.0, 3.5, 5.6 }) == "18–55 mm f/3.5–5.6");
+	CHECK(lensSpecificationText(LensSpecification{ 24.0, 120.0, 4.0, std::nullopt }) == "24–120 mm f/4 at 24 mm");
+	CHECK(lensSpecificationText(LensSpecification{ 4.5, 9.0, std::nullopt, 5.6 }) == "4.5–9 mm f/5.6 at 9 mm");
+	CHECK(lensSpecificationText(LensSpecification{ 35.0, 35.0, std::nullopt, 2.0 }) == "35 mm f/2");
+	CHECK(lensSpecificationText(LensSpecification{ 35.0, 35.0, std::nullopt, std::nullopt }) == "35 mm");
+}
+
 TEST_CASE("exifValueText: lists cut after their first values, bytes as hex while short", "[imageinfo]")
 {
 	CHECK(exifValueText(ExifValue{ QString{ "Text" } }) == "Text");
@@ -74,6 +86,7 @@ TEST_CASE("groups: the summary groups, then the other tags by directory", "[imag
 	info.capture.model = "Canon EOS R5";
 	info.capture.lensMake = "Canon";
 	info.capture.lens = "RF50mm";
+	info.capture.lensSpecification = ImageMetadata::LensSpecification{ 50.0, 50.0, 1.8, 1.8 };
 	info.capture.exposureTime = ExifRational{ 1, 250 };
 	info.capture.focalLength = 50.0;
 	info.capture.focalLength35mm = 50;
@@ -95,6 +108,7 @@ TEST_CASE("groups: the summary groups, then the other tags by directory", "[imag
 	CHECK_FALSE(findRow(groups, "Image", "EXIF"));
 	CHECK(findRow(groups, "Camera", "Camera")->value == "Canon EOS R5");
 	CHECK(findRow(groups, "Camera", "Lens")->value == "Canon RF50mm");
+	CHECK(findRow(groups, "Camera", "Lens specification")->value == "50 mm f/1.8");
 	CHECK(findRow(groups, "Exposure", "Shutter speed")->value == "1/250 s");
 	CHECK(findRow(groups, "Exposure", "Focal length")->value == "50 mm (50 mm in 35 mm format)");
 	CHECK(findRow(groups, "Exposure", "Metering mode")->value == "Pattern");
@@ -109,6 +123,14 @@ TEST_CASE("groups: the summary groups, then the other tags by directory", "[imag
 	CHECK(exif.rows[0].keyToolTip == "Tag 0x927C (37500)");
 	CHECK(exif.rows[1].key == "LensModel");
 	CHECK(findRow(groups, "Other tags: IFD0", "Tag 0xFFFE"));
+
+	SECTION("a lens without a name shows its specification instead")
+	{
+		info.capture.lens.clear();
+		const std::vector<Group> unnamed = ImageInfoRows::groups("C:/Photos/IMG_1.jpg", info);
+		CHECK(findRow(unnamed, "Camera", "Lens")->value == "Canon 50 mm f/1.8");
+		CHECK_FALSE(findRow(unnamed, "Camera", "Lens specification"));
+	}
 }
 
 TEST_CASE("groups: the color profile by its source, and a profile without a name or unreadable", "[imageinfo]")

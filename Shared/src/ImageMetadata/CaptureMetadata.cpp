@@ -44,6 +44,15 @@ double toDouble(ExifRational rational) noexcept
 
 } // namespace
 
+std::optional<LensSpecification> lensSpecificationFrom(double minFocalLength, double maxFocalLength, double fNumberAtMinFocal, double fNumberAtMaxFocal)
+{
+	if (!(minFocalLength > 0 && minFocalLength <= maxFocalLength))
+		return std::nullopt;
+
+	const auto known = [](double fNumber) { return fNumber > 0 ? std::optional{ fNumber } : std::nullopt; };
+	return LensSpecification{ minFocalLength, maxFocalLength, known(fNumberAtMinFocal), known(fNumberAtMaxFocal) };
+}
+
 CaptureMetadata takeCaptureMetadata(ExifTags& tags)
 {
 	using enum ExifDirectory;
@@ -105,6 +114,19 @@ CaptureMetadata takeCaptureMetadata(ExifTags& tags)
 	setText(metadata.lensMake, Exif, 0xA433);
 	setText(metadata.lens, Exif, 0xA434); // LensModel
 	setText(metadata.lensSerial, Exif, 0xA435);
+	// LensSpecification, else DNG's LensInfo: the focal range, then the widest f-number at each end, 0/0 when unknown
+	for (const auto& [directory, tag] : { std::pair{ Exif, uint16_t{ 0xA432 } }, std::pair{ Ifd0, uint16_t{ 0xC630 } } })
+	{
+		const std::optional<std::vector<ExifRational>> values = readRationals(directory, tag, 2);
+		if (!values)
+			continue;
+
+		const auto fNumber = [&](size_t index) { return index < values->size() && (*values)[index].denominator != 0 ? toDouble((*values)[index]) : 0.0; };
+		metadata.lensSpecification = lensSpecificationFrom(toDouble((*values)[0]), toDouble((*values)[1]), fNumber(2), fNumber(3));
+		if (metadata.lensSpecification)
+			break;
+		taken.erase({ directory, tag });
+	}
 
 	if (const std::optional<QString> dateTime = readText(Exif, 0x9003)) // DateTimeOriginal
 	{

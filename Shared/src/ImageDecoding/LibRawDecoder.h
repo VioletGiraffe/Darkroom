@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ImageDecoding/ImageDecoding.h"
+#include "ImageMetadata/CaptureMetadata.h"
 #include "ImageMetadata/Exif.h"
 
 DISABLE_COMPILER_WARNINGS
@@ -46,6 +47,7 @@ struct RawMetadata {
 	ImageMetadata::ExifTags exif;
 	QSize uprightSize;                                  // as readRawUprightSize()
 	QString lensMake, lens, lensSerial, bodySerial;     // from the EXIF, or decoded from the maker notes
+	std::optional<ImageMetadata::LensSpecification> lensSpecification; // decoded from the maker notes
 	QByteArray iccProfile;
 };
 // Empty when LibRaw cannot parse the raw

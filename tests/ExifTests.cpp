@@ -589,8 +589,11 @@ TEST_CASE("exifTagsFromRaw: camera raw samples", "[.][rawexif]")
 		REQUIRE(metadata);
 		CHECK(metadata->exif == tags);
 		CHECK_FALSE(metadata->uprightSize.isEmpty());
-		WARN(QStringLiteral("%1: lens \"%2\", lens serial \"%3\", body serial \"%4\", ICC profile %5 bytes").arg(file.fileName(), metadata->lens,
-			metadata->lensSerial, metadata->bodySerial).arg(metadata->iccProfile.size()).toStdString());
+		const std::optional<LensSpecification>& lens = metadata->lensSpecification;
+		const QString lensSpecification = lens ? QStringLiteral("%1-%2 mm f/%3-%4").arg(lens->minFocalLength).arg(lens->maxFocalLength)
+			.arg(lens->fNumberAtMinFocal.value_or(0)).arg(lens->fNumberAtMaxFocal.value_or(0)) : QStringLiteral("none");
+		WARN(QStringLiteral("%1: lens \"%2\", lens specification %3, lens serial \"%4\", body serial \"%5\", ICC profile %6 bytes").arg(file.fileName(),
+			metadata->lens, lensSpecification, metadata->lensSerial, metadata->bodySerial).arg(metadata->iccProfile.size()).toStdString());
 
 		const QSize outputSize{ 1200, 800 };
 		ExifTags expected = tags;
@@ -794,6 +797,7 @@ TEST_CASE("takeCaptureMetadata: decodes its fields and leaves the other entries"
 				{ 0x9207, ShortType, 1, bytesOf<uint16_t>(5, order) },                              // MeteringMode
 				{ 0x9209, ShortType, 1, bytesOf<uint16_t>(0x10, order) },                           // Flash
 				{ 0xA434, AsciiType, 7, ascii("RF50mm") },                                          // LensModel
+				{ 0xA432, RationalType, 4, rational(24, 1, order) + rational(70, 1, order) + rational(4, 1, order) + rational(0, 0, order) }, // LensSpecification
 				{ 0x9003, AsciiType, 20, ascii("2024:05:06 07:08:09") },                            // DateTimeOriginal
 				{ 0x9291, AsciiType, 3, ascii("05") },                                              // SubSecTimeOriginal
 				{ 0x9011, AsciiType, 7, ascii("-03:30") },                                          // OffsetTimeOriginal
@@ -815,6 +819,7 @@ TEST_CASE("takeCaptureMetadata: decodes its fields and leaves the other entries"
 		CHECK(metadata.model == "Canon EOS R5");
 		CHECK(metadata.copyright == "Me!");
 		CHECK(metadata.lens == "RF50mm");
+		CHECK(metadata.lensSpecification == LensSpecification{ 24.0, 70.0, 4.0, std::nullopt }); // 0/0: unknown
 		CHECK(metadata.orientation == 6);
 		CHECK(metadata.exposureTime == ExifRational{ 1, 250 });
 		CHECK(metadata.fNumber == Approx(2.8));
@@ -855,6 +860,18 @@ TEST_CASE("takeCaptureMetadata: entries that fail to decode stay", "[exif]")
 	const CaptureMetadata metadata = takeCaptureMetadata(tags);
 	CHECK(metadata == CaptureMetadata{});
 	CHECK(tags == read);
+}
+
+TEST_CASE("takeCaptureMetadata, the lens specification: DNG's LensInfo when LensSpecification is missing or invalid", "[exif]")
+{
+	constexpr ByteOrder order = ByteOrder::Little;
+	const QByteArray lensInfo = rational(90, 1, order) + rational(90, 1, order) + rational(28, 10, order) + rational(28, 10, order);
+	const QByteArray noFocalRange = rational(0, 1, order) + rational(70, 1, order) + rational(0, 0, order) + rational(0, 0, order);
+	ExifTags tags = exifTagsFromTiff(tiffWithIfds(order, { { 0xC630, RationalType, 4, lensInfo } }, { { 0xA432, RationalType, 4, noFocalRange } }));
+	const CaptureMetadata metadata = takeCaptureMetadata(tags);
+	CHECK(metadata.lensSpecification == LensSpecification{ 90.0, 90.0, 2.8, 2.8 });
+	REQUIRE(tags.entries.size() == 1);
+	CHECK(findEntry(tags, ExifDirectory::Exif, 0xA432));
 }
 
 TEST_CASE("The names of EXIF codes", "[exif]")

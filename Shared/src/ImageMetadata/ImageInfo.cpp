@@ -65,6 +65,9 @@ ImageInfo readRaw(ImageInfo info, const QString& path, const QString& suffix)
 	fillIn(info.capture.lens, raw->lens);
 	fillIn(info.capture.lensSerial, raw->lensSerial);
 	fillIn(info.capture.bodySerial, raw->bodySerial);
+	// The maker notes' specification stands in for a missing lens name
+	if (info.capture.lens.isEmpty() && !info.capture.lensSpecification)
+		info.capture.lensSpecification = raw->lensSpecification;
 	return info;
 }
 

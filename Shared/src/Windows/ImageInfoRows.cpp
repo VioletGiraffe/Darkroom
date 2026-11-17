@@ -158,7 +158,11 @@ std::vector<Row> cameraRows(const CaptureMetadata& capture)
 			rows.push_back({ std::move(key), std::move(value) });
 	};
 	add(QObject::tr("Camera"), joinedNames(capture.make, capture.model));
-	add(QObject::tr("Lens"), joinedNames(capture.lensMake, capture.lens));
+	const QString specification = capture.lensSpecification ? lensSpecificationText(*capture.lensSpecification) : QString{};
+	// A lens without a name is described by its specification
+	add(QObject::tr("Lens"), joinedNames(capture.lensMake, capture.lens.isEmpty() ? specification : capture.lens));
+	if (!capture.lens.isEmpty())
+		add(QObject::tr("Lens specification"), specification);
 	add(QObject::tr("Camera serial number"), capture.bodySerial);
 	add(QObject::tr("Lens serial number"), capture.lensSerial);
 	return rows;
@@ -290,6 +294,26 @@ QString exposureTimeText(ExifRational seconds)
 QString fNumberText(double fNumber)
 {
 	return QStringLiteral("f/%1").arg(QString::number(fNumber, 'g', 3));
+}
+
+QString lensSpecificationText(const LensSpecification& lens)
+{
+	// A range collapses to one value when both ends read the same
+	const auto range = [](const QString& first, const QString& second) { return first == second ? first : first + u'–' + second; };
+	const auto fNumber = [](double value) { return QString::number(value, 'g', 3); };
+
+	const QString minFocal = decimalText(lens.minFocalLength, 1), maxFocal = decimalText(lens.maxFocalLength, 1);
+	const QString focalRange = QObject::tr("%1 mm").arg(range(minFocal, maxFocal));
+	if (lens.fNumberAtMinFocal && lens.fNumberAtMaxFocal)
+		return focalRange + QStringLiteral(" f/") + range(fNumber(*lens.fNumberAtMinFocal), fNumber(*lens.fNumberAtMaxFocal));
+	if (!lens.fNumberAtMinFocal && !lens.fNumberAtMaxFocal)
+		return focalRange;
+
+	// A zoom's one known f-number names its end: alone it would read as constant
+	const QString known = fNumberText(lens.fNumberAtMinFocal ? *lens.fNumberAtMinFocal : *lens.fNumberAtMaxFocal);
+	if (minFocal == maxFocal)
+		return focalRange + u' ' + known;
+	return focalRange + u' ' + QObject::tr("%1 at %2 mm").arg(known, lens.fNumberAtMinFocal ? minFocal : maxFocal);
 }
 
 QString exposureBiasText(ExifRational ev)

@@ -803,6 +803,9 @@ std::optional<RawMetadata> readRawMetadata(thin_io::buffered_reader& file)
 	};
 	if (metadata.lens.isEmpty())
 		metadata.lens = text(data.lens.makernotes.Lens);
+	const libraw_makernotes_lens_t& makerNotesLens = data.lens.makernotes;
+	metadata.lensSpecification = ImageMetadata::lensSpecificationFrom(makerNotesLens.MinFocal, makerNotesLens.MaxFocal, makerNotesLens.MaxAp4MinFocal,
+		makerNotesLens.MaxAp4MaxFocal);
 	if (data.color.profile && data.color.profile_length > 0)
 		metadata.iccProfile = QByteArray{ static_cast<const char*>(data.color.profile), static_cast<qsizetype>(data.color.profile_length) };
 	return metadata;

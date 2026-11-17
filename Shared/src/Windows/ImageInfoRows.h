@@ -31,6 +31,7 @@ struct Group
 // The value formats, public for the tests
 [[nodiscard]] QString exposureTimeText(ImageMetadata::ExifRational seconds);
 [[nodiscard]] QString fNumberText(double fNumber);
+[[nodiscard]] QString lensSpecificationText(const ImageMetadata::LensSpecification& lens);
 [[nodiscard]] QString exposureBiasText(ImageMetadata::ExifRational ev);
 [[nodiscard]] QString exifValueText(const ImageMetadata::ExifValue& value);
 

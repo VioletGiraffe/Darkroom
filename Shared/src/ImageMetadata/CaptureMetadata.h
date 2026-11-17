@@ -35,11 +35,26 @@ struct GpsPosition
 	bool operator==(const GpsPosition&) const = default;
 };
 
+// The lens's focal range, and its widest f-number at each end of it
+struct LensSpecification
+{
+	double minFocalLength = 0.0; // mm
+	double maxFocalLength = 0.0; // mm
+	std::optional<double> fNumberAtMinFocal, fNumberAtMaxFocal;
+
+	bool operator==(const LensSpecification&) const = default;
+};
+
+// Empty unless 0 < minFocalLength <= maxFocalLength; an f-number of 0 or less is unknown
+[[nodiscard]] std::optional<LensSpecification> lensSpecificationFrom(double minFocalLength, double maxFocalLength, double fNumberAtMinFocal,
+	double fNumberAtMaxFocal);
+
 // The commonly wanted EXIF fields, decoded. Each is empty or absent when the EXIF does not state it.
 struct CaptureMetadata
 {
 	QString make, model;
 	QString lensMake, lens, lensSerial, bodySerial;
+	std::optional<LensSpecification> lensSpecification;
 	QString software, artist, copyright, description;
 	std::optional<CaptureTime> captureTime;
 	std::optional<ExifRational> exposureTime; // seconds
