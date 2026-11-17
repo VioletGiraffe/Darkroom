@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794502718337,
+  "lastUpdate": 1794927602526,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -22027,6 +22027,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 850,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 346.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 94.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 57,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 18,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "5880d6e2b19d966eda9d530811b9139263eb7f7b",
+          "message": "Settings dialogs restore a cancelled theme choice without first applying a theme it replaces, and label rows and badges no longer clip their text; theme selection, errorText and stylesheet tokens come from qtutils, and the General settings page is shared by both apps",
+          "timestamp": "2026-11-17T16:51:46+02:00",
+          "tree_id": "de55abaf71fca98e2717fc490bcc8fad032910b5",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/5880d6e2b19d966eda9d530811b9139263eb7f7b"
+        },
+        "date": 1794927600246,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 19957,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 2985,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 36014,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 7084.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7320,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5717,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 850.5,
             "unit": "KB"
           },
           {
