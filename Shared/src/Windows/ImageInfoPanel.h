@@ -19,15 +19,18 @@ class QTreeView;
 // - Reads the file on IoThreadPool, and only while visible.
 // - Every group starts expanded; a group the user collapses stays collapsed for the next files.
 // - While the filter has text, only matching rows show, every group expanded; a group whose title matches shows all its rows.
-// - Esc in the filter field clears it, and Ctrl+C in the rows copies the selected ones, before the window's shortcuts see either.
+// - Esc clears the filter field when it has text, else moves the focus to focusOnEscape. Ctrl+C in the rows copies the selected ones.
+//   The window's shortcuts see neither key.
 // - Takes the wheel events its children leave: they never reach the window.
 class ImageInfoPanel final : public QWidget
 {
 public:
-	explicit ImageInfoPanel(QWidget* parent = nullptr);
+	ImageInfoPanel(QWidget* focusOnEscape, QWidget* parent);
 
 	// Read now if the panel is visible, else when it is next shown; the previous file's rows stay until then
 	void setPath(const QString& path);
+	// For a file changed on disk: reads it again, as setPath() reads a new one
+	void rereadFile();
 	void focusFilter();
 
 protected:
@@ -48,6 +51,7 @@ private:
 	[[nodiscard]] QString rowsText(bool selectedOnly) const;
 
 private:
+	QWidget* const _focusOnEscape;
 	QString _path;
 	QString _requestedPath; // the file last read, or being read
 	AsyncRequest _read;

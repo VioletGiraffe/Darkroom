@@ -149,7 +149,7 @@ ImageViewerWindow::ImageViewerWindow(QStringList imagePaths, int startIndex, QWi
 	_view->installEventFilter(this);
 
 	const QSettings settings = sharedSettings();
-	_infoPanel = new ImageInfoPanel{ this };
+	_infoPanel = new ImageInfoPanel{ _view, this };
 	_infoPanel->setVisible(settings.value(Settings::ImageViewerInfoPanelVisible, Defaults::ImageViewerInfoPanelVisible).toBool());
 	_splitter = new QSplitter{ Qt::Horizontal, this };
 	_splitter->addWidget(_view);
@@ -528,7 +528,17 @@ void ImageViewerWindow::saveImageAs()
 	}
 
 	if (const QString error = writeCurrentImage(targetPath, targetType, targetType == sourceType); !error.isEmpty())
+	{
 		QMessageBox::warning(this, tr("Error"), tr("Failed to save the image:\n%1\n\n%2").arg(QDir::toNativeSeparators(targetPath), error));
+		return;
+	}
+
+	const QFileInfo target{ targetPath };
+	for (ImageViewerWindow* viewer : _instances)
+	{
+		if (QFileInfo{ viewer->currentImagePath() } == target)
+			viewer->_infoPanel->rereadFile();
+	}
 }
 
 QString ImageViewerWindow::writeCurrentImage(const QString& targetPath, const QString& mimeType, bool copyFile) const

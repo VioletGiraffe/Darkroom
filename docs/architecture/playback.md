@@ -67,7 +67,7 @@ The info strip shows the image's position in the list and its file name in the c
 The image info panel (`I`, beside the view in a splitter) lists what `ImageMetadata::readImageInfo` reads from the
 file, as `ImageInfoRows` formats it: the common fields in named groups, then every other EXIF tag by directory. It reads
 only while visible, and a filter (`Ctrl+F`) narrows the rows; the filter and the groups the user collapsed stay as the
-viewer browses.
+viewer browses. Esc in the panel returns the focus to the image, once the filter is empty.
 The current image becomes the window icon after a delay, so several open viewers stay distinguishable in the
 taskbar without an icon being scaled for every image browsed past.
 

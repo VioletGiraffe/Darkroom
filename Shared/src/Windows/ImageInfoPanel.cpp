@@ -1,6 +1,7 @@
 #include "Windows/ImageInfoPanel.h"
 #include "Core/IoThreadPool.h"
 #include "Windows/ImageInfoRows.h"
+#include "assert/advanced_assert.h"
 
 DISABLE_COMPILER_WARNINGS
 #include <QAbstractItemView>
@@ -72,9 +73,12 @@ public:
 
 } // namespace
 
-ImageInfoPanel::ImageInfoPanel(QWidget* parent)
+ImageInfoPanel::ImageInfoPanel(QWidget* focusOnEscape, QWidget* parent)
 	: QWidget{ parent }
+	, _focusOnEscape{ focusOnEscape }
 {
+	assert_r(_focusOnEscape);
+
 	_filter = new QLineEdit{ this };
 	_filter->setPlaceholderText(tr("Filter"));
 	_filter->setClearButtonEnabled(true);
@@ -124,6 +128,12 @@ void ImageInfoPanel::setPath(const QString& path)
 	readUnlessRequested();
 }
 
+void ImageInfoPanel::rereadFile()
+{
+	_requestedPath.clear();
+	readUnlessRequested();
+}
+
 void ImageInfoPanel::focusFilter()
 {
 	_filter->setFocus(Qt::ShortcutFocusReason);
@@ -137,11 +147,16 @@ bool ImageInfoPanel::eventFilter(QObject* watched, QEvent* event)
 
 	// A ShortcutOverride accepted here keeps the window's shortcut from taking the key press that follows
 	const auto* key = static_cast<QKeyEvent*>(event);
-	if (watched == _filter && key->key() == Qt::Key_Escape && key->modifiers() == Qt::NoModifier && !_filter->text().isEmpty())
+	if (key->key() == Qt::Key_Escape && key->modifiers() == Qt::NoModifier)
 	{
 		event->accept();
 		if (event->type() == QEvent::KeyPress)
-			_filter->clear();
+		{
+			if (watched == _filter && !_filter->text().isEmpty())
+				_filter->clear();
+			else
+				_focusOnEscape->setFocus(Qt::OtherFocusReason);
+		}
 		return true;
 	}
 	if (watched == _tree && key->matches(QKeySequence::Copy))
