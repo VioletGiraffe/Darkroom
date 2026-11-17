@@ -278,14 +278,6 @@ std::optional<LibRawTagSource> libRawTagSource(int markedTag) noexcept
 	return std::nullopt;
 }
 
-// What LibRaw's exif_cb reports while LibRaw opens a raw
-struct LibRawExifCollector
-{
-	ExifTags tags; // without IFD0, which exifTagsFromRaw() picks from tiffIfds
-	std::map<int, std::vector<ExifEntry>> tiffIfds; // by LibRawTagSource::tiffIfd
-	bool byteOrderKnown = false;
-};
-
 // Reverses the byte order of each value; a RATIONAL is two LONGs
 void reverseByteOrder(QByteArray& value, uint16_t type)
 {
@@ -295,10 +287,22 @@ void reverseByteOrder(QByteArray& value, uint16_t type)
 		std::reverse(value.begin() + i, value.begin() + i + unit);
 }
 
-// LibRaw's exif_cb: adds the entry to the LibRawExifCollector at context. stream is positioned at the value.
+} // namespace
+
+// What LibRaw's exif_cb reports while LibRaw opens a raw
+struct RawExifCollector::Collected
+{
+	ExifTags tags; // without IFD0, which takeTags() picks from tiffIfds
+	std::map<int, std::vector<ExifEntry>> tiffIfds; // by LibRawTagSource::tiffIfd
+	bool byteOrderKnown = false;
+};
+
+namespace {
+
+// LibRaw's exif_cb: adds the entry to the RawExifCollector::Collected at context. stream is positioned at the value.
 void collectLibRawExifEntry(void* context, int markedTag, int type, int count, unsigned int byteOrder, void* stream, INT64 /*base*/)
 {
-	LibRawExifCollector& collector = *static_cast<LibRawExifCollector*>(context);
+	RawExifCollector::Collected& collector = *static_cast<RawExifCollector::Collected*>(context);
 	const std::optional<LibRawTagSource> source = libRawTagSource(markedTag);
 	const auto tag = static_cast<uint16_t>(markedTag & 0xFFFF);
 	const auto fieldType = static_cast<uint16_t>(type);
@@ -348,39 +352,23 @@ std::optional<ExifMetadata> readExifApp1(QByteArrayView payload) noexcept
 
 std::optional<QByteArrayView> findExifApp1(QByteArrayView jpeg) noexcept
 {
-	// After SOI, each marker is FF, its code and a big-endian length that counts itself; the image data starts at SOS
-	qsizetype pos = 2;
-	while (pos + 4 <= jpeg.size() && static_cast<uchar>(jpeg[pos]) == 0xFF)
-	{
-		const uchar marker = static_cast<uchar>(jpeg[pos + 1]);
-		if (marker == 0xFF) // fill byte
-		{
-			++pos;
-			continue;
-		}
-		if (marker == 0xDA || marker == 0xD9) // SOS, EOI
-			break;
-
-		const qsizetype length = qFromBigEndian<uint16_t>(jpeg.data() + pos + 2);
-		if (length < 2 || pos + 2 + length > jpeg.size())
-			break;
-
-		if (marker == 0xE1) // APP1
-		{
-			if (const QByteArrayView payload = jpeg.sliced(pos + 4, length - 2); payload.startsWith(ExifHeader))
-				return payload;
-		}
-
-		pos += 2 + length;
-	}
-	return std::nullopt;
+	std::optional<QByteArrayView> exifPayload;
+	forEachJpegSegment(jpeg, [&](uchar marker, QByteArrayView payload) {
+		if (marker == 0xE1 && payload.startsWith(ExifHeader)) // APP1
+			exifPayload = payload;
+		return !exifPayload;
+	});
+	return exifPayload;
 }
 
 ExifTags exifTagsFromApp1(QByteArrayView payload)
 {
-	if (!payload.startsWith(ExifHeader))
-		return {};
-	const std::optional<TiffView> tiff = tiffView(payload.sliced(ExifHeader.size()));
+	return payload.startsWith(ExifHeader) ? exifTagsFromTiff(payload.sliced(ExifHeader.size())) : ExifTags{};
+}
+
+ExifTags exifTagsFromTiff(QByteArrayView bytes)
+{
+	const std::optional<TiffView> tiff = tiffView(bytes);
 	if (!tiff)
 		return {};
 
@@ -393,23 +381,43 @@ ExifTags exifTagsFromApp1(QByteArrayView payload)
 
 ExifTags exifTagsFromRaw(QByteArrayView rawFile)
 {
-	LibRawExifCollector collector;
 	// Heap-allocated: a LibRaw instance is hundreds of KB
 	const auto raw = std::make_unique<LibRaw>();
-	raw->set_exifparser_handler(&collectLibRawExifEntry, &collector);
+	RawExifCollector collector{ *raw };
 	if (raw->open_buffer(rawFile.data(), static_cast<size_t>(rawFile.size())) != LIBRAW_SUCCESS)
 		return {};
+	return collector.takeTags();
+}
 
+RawExifCollector::RawExifCollector(LibRaw& raw)
+	: _raw{ raw }
+	, _collected{ std::make_unique<Collected>() }
+{
+	_raw.set_exifparser_handler(&collectLibRawExifEntry, _collected.get());
+}
+
+RawExifCollector::~RawExifCollector()
+{
+	_raw.set_exifparser_handler(nullptr, nullptr);
+}
+
+ExifTags RawExifCollector::takeTags()
+{
+	Collected& collected = *_collected;
 	// IFD0 is the first TIFF IFD holding a Make, else the first: a Fujifilm raw's comes from its embedded JPEG, after the raw data's IFD
-	if (collector.tiffIfds.empty())
-		return std::move(collector.tags);
-	auto ifd0 = std::ranges::find_if(collector.tiffIfds, [](const auto& ifd) { return std::ranges::contains(ifd.second, MakeTag, &ExifEntry::tag); });
-	if (ifd0 == collector.tiffIfds.end())
-		ifd0 = collector.tiffIfds.begin();
+	if (!collected.tiffIfds.empty())
+	{
+		auto ifd0 = std::ranges::find_if(collected.tiffIfds, [](const auto& ifd) { return std::ranges::contains(ifd.second, MakeTag, &ExifEntry::tag); });
+		if (ifd0 == collected.tiffIfds.end())
+			ifd0 = collected.tiffIfds.begin();
 
-	std::vector<ExifEntry>& entries = collector.tags.entries;
-	entries.insert(entries.begin(), std::make_move_iterator(ifd0->second.begin()), std::make_move_iterator(ifd0->second.end()));
-	return std::move(collector.tags);
+		std::vector<ExifEntry>& entries = collected.tags.entries;
+		entries.insert(entries.begin(), std::make_move_iterator(ifd0->second.begin()), std::make_move_iterator(ifd0->second.end()));
+	}
+
+	ExifTags tags = std::move(collected.tags);
+	collected = {};
+	return tags;
 }
 
 void prepareExifTagsForOutput(ExifTags& tags, QSize uprightOutputSize)

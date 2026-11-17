@@ -1,18 +1,31 @@
 #include "ImageDecoding/ImageDecoding.h"
+#include "ImageDecoding/LibRawDecoder.h"
+#include "ImageMetadata/CaptureMetadata.h"
+#include "ImageMetadata/EmbeddedMetadata.h"
 #include "ImageMetadata/Exif.h"
+#include "ImageMetadata/ExifTagNames.h"
+#include "ImageMetadata/ExifValues.h"
+#include "ImageMetadata/ImageInfo.h"
 #include "JpegTestData.h"
+#include "buffered_reader.hpp" // thin_io
+#include "qt_paths.hpp"        // thin_io
 
 #include "3rdparty/catch2/catch.hpp"
 
+#include <QBuffer>
 #include <QByteArray>
+#include <QColorSpace>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QImage>
 #include <QSize>
 #include <QString>
+#include <QTemporaryDir>
 #include <QtEndian>
 
 #include <algorithm>
+#include <bit>
 #include <cstdint>
 #include <cstring>
 #include <optional>
@@ -42,7 +55,8 @@ const QByteArray Scan = segment(0xDA, QByteArray(10, '\0')) + QByteArray{ "\x12\
 	return readJpegExif(jpeg(exifSegment(tiff))).adobeRgb;
 }
 
-constexpr uint16_t ByteType = 1, AsciiType = 2, ShortType = 3, LongType = 4, RationalType = 5, UndefinedType = 7;
+constexpr uint16_t ByteType = 1, AsciiType = 2, ShortType = 3, LongType = 4, RationalType = 5, UndefinedType = 7, SRationalType = 10,
+	FloatType = 11, DoubleType = 12;
 constexpr uint16_t MakerNoteTag = 0x927C, PixelXDimensionTag = 0xA002, PixelYDimensionTag = 0xA003;
 
 struct TestEntry
@@ -570,6 +584,15 @@ TEST_CASE("exifTagsFromRaw: camera raw samples", "[.][rawexif]")
 		CHECK(findEntry(tags, ExifDirectory::Ifd0, MakeTag));
 		CHECK(findEntry(tags, ExifDirectory::Exif, 0x9003)); // DateTimeOriginal
 
+		thin_io::buffered_reader reader{ ImageDecoding::LibRawReadWindowSize };
+		REQUIRE(reader.open(thin_io::native_path(file.filePath()).data()));
+		const std::optional<ImageDecoding::RawMetadata> metadata = ImageDecoding::readRawMetadata(reader);
+		REQUIRE(metadata);
+		CHECK(metadata->exif == tags);
+		CHECK_FALSE(metadata->uprightSize.isEmpty());
+		WARN(QStringLiteral("%1: lens \"%2\", lens serial \"%3\", body serial \"%4\", ICC profile %5 bytes").arg(file.fileName(), metadata->lens,
+			metadata->lensSerial, metadata->bodySerial).arg(metadata->iccProfile.size()).toStdString());
+
 		const QSize outputSize{ 1200, 800 };
 		ExifTags expected = tags;
 		prepareExifTagsForOutput(expected, outputSize);
@@ -577,4 +600,344 @@ TEST_CASE("exifTagsFromRaw: camera raw samples", "[.][rawexif]")
 		CHECK_FALSE(payload.isEmpty());
 		CHECK(sortedEntries(exifTagsFromApp1(payload).entries) == sortedEntries(expected.entries));
 	}
+}
+
+namespace {
+
+[[nodiscard]] QByteArray rational(uint32_t numerator, uint32_t denominator, ByteOrder order)
+{
+	return bytesOf(numerator, order) + bytesOf(denominator, order);
+}
+
+[[nodiscard]] QByteArray pngChunk(const char* type, const QByteArray& data)
+{
+	return bytesOf(static_cast<uint32_t>(data.size()), ByteOrder::Big) + type + data + QByteArray(4, '\0'); // the CRC is not checked
+}
+
+[[nodiscard]] QByteArray webpChunk(const char* type, const QByteArray& data)
+{
+	QByteArray chunk = type + bytesOf(static_cast<uint32_t>(data.size()), ByteOrder::Little) + data;
+	return data.size() % 2 ? chunk + '\0' : chunk;
+}
+
+[[nodiscard]] QByteArray webp(const QByteArray& chunks)
+{
+	return "RIFF" + bytesOf(static_cast<uint32_t>(4 + chunks.size()), ByteOrder::Little) + "WEBP" + chunks;
+}
+
+// An APP2 segment holding one part of an ICC profile
+[[nodiscard]] QByteArray iccSegment(uint8_t sequence, uint8_t count, const QByteArray& part)
+{
+	return segment(0xE2, QByteArray{ "ICC_PROFILE\0", 12 } + static_cast<char>(sequence) + static_cast<char>(count) + part);
+}
+
+[[nodiscard]] ExifEntry exifEntry(ExifDirectory directory, uint16_t tag, uint16_t type, uint32_t count, QByteArray value)
+{
+	return { directory, tag, type, count, std::move(value) };
+}
+
+} // namespace
+
+TEST_CASE("readEmbeddedMetadata, JPEG: the EXIF, and the ICC profile joined from its parts in sequence order", "[exif]")
+{
+	const QByteArray tiff = sampleTiff(ByteOrder::Little);
+	const EmbeddedMetadata metadata = readEmbeddedMetadata(jpeg(exifSegment(tiff) + iccSegment(2, 2, "-second") + iccSegment(1, 2, "first")));
+	CHECK(metadata.exif == exifTagsFromTiff(tiff));
+	CHECK(metadata.iccProfile == "first-second");
+
+	SECTION("a profile missing a part is left out")
+	{
+		CHECK(readEmbeddedMetadata(jpeg(iccSegment(1, 2, "first"))).iccProfile.isEmpty());
+		CHECK(readEmbeddedMetadata(jpeg(iccSegment(2, 2, "-second") + iccSegment(3, 2, "third"))).iccProfile.isEmpty());
+	}
+}
+
+TEST_CASE("readEmbeddedMetadata, TIFF: the file's own directories, and InterColorProfile", "[exif]")
+{
+	for (const ByteOrder order : { ByteOrder::Little, ByteOrder::Big })
+	{
+		const QByteArray profile{ "profile data" };
+		const QByteArray tiff = tiffWithIfds(order, { { MakeTag, AsciiType, 6, ascii("Canon") }, { 0x8773, UndefinedType, 12, profile } });
+		const EmbeddedMetadata metadata = readEmbeddedMetadata(tiff);
+		CHECK(metadata.exif == exifTagsFromTiff(tiff));
+		CHECK(metadata.exif.entries.size() == 2);
+		CHECK(metadata.iccProfile == profile);
+	}
+}
+
+TEST_CASE("readEmbeddedMetadata, PNG: eXIf with or without APP1's header, and iCCP decompressed", "[exif]")
+{
+	const QByteArray tiff = sampleTiff(ByteOrder::Big);
+	const QByteArray profile = QByteArray{ "an ICC profile, " }.repeated(20);
+	// qCompress puts the size first, then the zlib stream iCCP holds
+	const QByteArray iccp = QByteArray{ "Profile name" } + '\0' + '\0' + qCompress(profile).sliced(4);
+	const QByteArray header = QByteArray{ "\x89PNG\r\n\x1A\n", 8 } + pngChunk("IHDR", QByteArray(13, '\0'));
+
+	for (const QByteArray& exifChunk : { tiff, exifPayload(tiff) })
+	{
+		const EmbeddedMetadata metadata = readEmbeddedMetadata(header + pngChunk("iCCP", iccp) + pngChunk("IDAT", "x") + pngChunk("eXIf", exifChunk)
+			+ pngChunk("IEND", {}));
+		CHECK(metadata.exif == exifTagsFromTiff(tiff));
+		CHECK(metadata.iccProfile == profile);
+	}
+
+	SECTION("a chunk running past the end ends the walk")
+	{
+		const QByteArray truncated = header + pngChunk("eXIf", tiff).chopped(5);
+		CHECK(readEmbeddedMetadata(truncated).exif.entries.empty());
+	}
+}
+
+TEST_CASE("readEmbeddedMetadata, WebP: EXIF with or without APP1's header, and ICCP, after an odd-sized chunk", "[exif]")
+{
+	const QByteArray tiff = sampleTiff(ByteOrder::Little);
+	for (const QByteArray& exifChunk : { tiff, exifPayload(tiff) })
+	{
+		const EmbeddedMetadata metadata = readEmbeddedMetadata(webp(webpChunk("VP8X", "odd") + webpChunk("ICCP", "profile") + webpChunk("EXIF", exifChunk)));
+		CHECK(metadata.exif == exifTagsFromTiff(tiff));
+		CHECK(metadata.iccProfile == "profile");
+	}
+}
+
+TEST_CASE("readEmbeddedMetadata: nothing from other files", "[exif]")
+{
+	CHECK(readEmbeddedMetadata("GIF89a").exif.entries.empty());
+	CHECK(readEmbeddedMetadata({}).iccProfile.isEmpty());
+}
+
+TEST_CASE("exifTagName: each directory's table", "[exif]")
+{
+	CHECK(exifTagName(ExifDirectory::Ifd0, MakeTag) == "Make");
+	CHECK(exifTagName(ExifDirectory::Exif, 0x829A) == "ExposureTime");
+	CHECK(exifTagName(ExifDirectory::Ifd0, 0xC612) == "DNGVersion");
+	CHECK(exifTagName(ExifDirectory::Ifd1, 0x0201) == "JPEGInterchangeFormat");
+	CHECK(exifTagName(ExifDirectory::Gps, 0x0001) == "GPSLatitudeRef");
+	CHECK(exifTagName(ExifDirectory::Interoperability, 0x0001) == "InteroperabilityIndex");
+	CHECK(exifTagName(ExifDirectory::Ifd0, 0x0001).empty());
+	CHECK(exifTagName(ExifDirectory::Exif, 0xFFFF).empty());
+}
+
+TEST_CASE("exifEntryValue: numbers in the entry's byte order, as many as the value holds", "[exif]")
+{
+	using Integers = std::vector<int64_t>;
+	for (const ByteOrder order : { ByteOrder::Little, ByteOrder::Big })
+	{
+		const bool littleEndian = order == ByteOrder::Little;
+		const auto value = [&](uint16_t type, uint32_t count, const QByteArray& bytes) {
+			return exifEntryValue(exifEntry(ExifDirectory::Exif, 0x1234, type, count, bytes), littleEndian);
+		};
+		CHECK(value(ShortType, 2, bytesOf<uint16_t>(3, order) + bytesOf<uint16_t>(65535, order)) == ExifValue{ Integers{ 3, 65535 } });
+		CHECK(value(LongType, 1, bytesOf<uint32_t>(4000000000, order)) == ExifValue{ Integers{ 4000000000 } });
+		CHECK(value(9, 1, bytesOf<int32_t>(-5, order)) == ExifValue{ Integers{ -5 } }); // SLONG
+		CHECK(value(ByteType, 4, QByteArray{ "\x02\x03\x00\xFF", 4 }) == ExifValue{ Integers{ 2, 3, 0, 255 } });
+		CHECK(value(RationalType, 1, rational(1, 250, order)) == ExifValue{ std::vector<ExifRational>{ { 1, 250 } } });
+		CHECK(value(SRationalType, 1, bytesOf<int32_t>(-2, order) + bytesOf<int32_t>(3, order)) == ExifValue{ std::vector<ExifRational>{ { -2, 3 } } });
+		CHECK(value(FloatType, 1, bytesOf(std::bit_cast<uint32_t>(1.5f), order)) == ExifValue{ std::vector<double>{ 1.5 } });
+		CHECK(value(DoubleType, 1, bytesOf(std::bit_cast<uint64_t>(-0.25), order)) == ExifValue{ std::vector<double>{ -0.25 } });
+		// A count past the value
+		CHECK(value(ShortType, 3, bytesOf<uint16_t>(7, order)) == ExifValue{ Integers{ 7 } });
+	}
+}
+
+TEST_CASE("exifEntryValue: text", "[exif]")
+{
+	const auto value = [](ExifDirectory directory, uint16_t tag, uint16_t type, const QByteArray& bytes, bool littleEndian = true) {
+		return exifEntryValue(exifEntry(directory, tag, type, static_cast<uint32_t>(bytes.size()), bytes), littleEndian);
+	};
+	SECTION("ASCII: NUL-separated strings, trimmed, the empty ones left out")
+	{
+		CHECK(value(ExifDirectory::Ifd0, 0x8298, AsciiType, QByteArray{ "Photographer \0\0 Editor\0", 24 }) == ExifValue{ QString{ "Photographer; Editor" } });
+		CHECK(value(ExifDirectory::Ifd0, 0x010E, AsciiType, QByteArray{ "    \0", 5 }) == ExifValue{ QString{} });
+	}
+	SECTION("ASCII: UTF-8 when valid, else Latin-1")
+	{
+		CHECK(value(ExifDirectory::Ifd0, 0x013B, AsciiType, ascii("Jos\xC3\xA9")) == ExifValue{ QString{ u"José" } });
+		CHECK(value(ExifDirectory::Ifd0, 0x013B, AsciiType, ascii("Jos\xE9")) == ExifValue{ QString{ u"José" } });
+	}
+	SECTION("UNDEFINED: printable ASCII is text, anything else bytes")
+	{
+		CHECK(value(ExifDirectory::Exif, 0x9000, UndefinedType, "0232") == ExifValue{ QString{ "0232" } }); // ExifVersion
+		CHECK(value(ExifDirectory::Exif, 0x927C, UndefinedType, QByteArray{ "AB\x01", 3 }) == ExifValue{ QByteArray{ "AB\x01", 3 } });
+	}
+	SECTION("UserComment and GPS text: by their character code")
+	{
+		CHECK(value(ExifDirectory::Exif, 0x9286, UndefinedType, QByteArray{ "ASCII\0\0\0Hello", 13 }) == ExifValue{ QString{ "Hello" } });
+		CHECK(value(ExifDirectory::Exif, 0x9286, UndefinedType, QByteArray(8, '\0') + "Hi  ") == ExifValue{ QString{ "Hi" } });
+		CHECK(value(ExifDirectory::Exif, 0x9286, UndefinedType, QByteArray{ "UNICODE\0\0H\0i", 12 }, false) == ExifValue{ QString{ "Hi" } });
+		CHECK(value(ExifDirectory::Gps, 0x1B, UndefinedType, QByteArray{ "ASCII\0\0\0GPS", 11 }) == ExifValue{ QString{ "GPS" } });
+		const QByteArray jis = QByteArray{ "JIS\0\0\0\0\0", 8 } + "\x1B$B";
+		CHECK(value(ExifDirectory::Exif, 0x9286, UndefinedType, jis) == ExifValue{ jis });
+	}
+	SECTION("XP tags: UTF-16LE in any byte order")
+	{
+		CHECK(value(ExifDirectory::Ifd0, 0x9C9B, ByteType, QByteArray{ "T\0i\0t\0\0\0", 8 }, false) == ExifValue{ QString{ "Tit" } });
+	}
+}
+
+TEST_CASE("takeCaptureMetadata: decodes its fields and leaves the other entries", "[exif]")
+{
+	for (const ByteOrder order : { ByteOrder::Little, ByteOrder::Big })
+	{
+		const QByteArray tiff = tiffWithIfds(order,
+			{
+				{ MakeTag, AsciiType, 6, ascii("Canon") },
+				{ 0x0110, AsciiType, 13, ascii("Canon EOS R5") },
+				{ OrientationTag, ShortType, 1, bytesOf<uint16_t>(6, order) },
+				{ 0x8298, AsciiType, 4, ascii("Me!") }, // Copyright
+			},
+			{
+				{ 0x829A, RationalType, 1, rational(1, 250, order) },                                // ExposureTime
+				{ 0x829D, RationalType, 1, rational(28, 10, order) },                               // FNumber
+				{ 0x8827, ShortType, 1, bytesOf<uint16_t>(400, order) },                            // PhotographicSensitivity
+				{ 0x9204, SRationalType, 1, bytesOf<int32_t>(-2, order) + bytesOf<int32_t>(3, order) }, // ExposureBiasValue
+				{ 0x920A, RationalType, 1, rational(50, 1, order) },                                // FocalLength
+				{ 0xA405, ShortType, 1, bytesOf<uint16_t>(0, order) },                              // FocalLengthIn35mmFilm: unknown
+				{ 0x9207, ShortType, 1, bytesOf<uint16_t>(5, order) },                              // MeteringMode
+				{ 0x9209, ShortType, 1, bytesOf<uint16_t>(0x10, order) },                           // Flash
+				{ 0xA434, AsciiType, 7, ascii("RF50mm") },                                          // LensModel
+				{ 0x9003, AsciiType, 20, ascii("2024:05:06 07:08:09") },                            // DateTimeOriginal
+				{ 0x9291, AsciiType, 3, ascii("05") },                                              // SubSecTimeOriginal
+				{ 0x9011, AsciiType, 7, ascii("-03:30") },                                          // OffsetTimeOriginal
+				{ MakerNoteTag, UndefinedType, 9, QByteArray{ "MakerNote", 9 } },
+			},
+			{
+				{ 0x0000, ByteType, 4, QByteArray{ "\x02\x03\x00\x00", 4 } }, // GPSVersionID
+				{ 0x0001, AsciiType, 2, ascii("S") },
+				{ 0x0002, RationalType, 3, rational(33, 1, order) + rational(51, 1, order) + rational(3000, 100, order) },
+				{ 0x0003, AsciiType, 2, ascii("E") },
+				{ 0x0004, RationalType, 3, rational(151, 1, order) + rational(12, 1, order) + rational(0, 1, order) },
+				{ 0x0005, ByteType, 1, QByteArray{ "\x01", 1 } }, // below sea level
+				{ 0x0006, RationalType, 1, rational(50, 1, order) },
+			});
+		ExifTags tags = exifTagsFromTiff(tiff);
+		const CaptureMetadata metadata = takeCaptureMetadata(tags);
+
+		CHECK(metadata.make == "Canon");
+		CHECK(metadata.model == "Canon EOS R5");
+		CHECK(metadata.copyright == "Me!");
+		CHECK(metadata.lens == "RF50mm");
+		CHECK(metadata.orientation == 6);
+		CHECK(metadata.exposureTime == ExifRational{ 1, 250 });
+		CHECK(metadata.fNumber == Approx(2.8));
+		CHECK(metadata.iso == 400u);
+		CHECK(metadata.exposureBias == ExifRational{ -2, 3 });
+		CHECK(metadata.focalLength == Approx(50.0));
+		CHECK_FALSE(metadata.focalLength35mm);
+		CHECK(metadata.meteringMode == 5);
+		CHECK(metadata.flash == 0x10);
+		CHECK_FALSE(metadata.whiteBalance);
+		CHECK(metadata.captureTime == CaptureTime{ QDate{ 2024, 5, 6 }, QTime{ 7, 8, 9, 50 }, -(3 * 3600 + 30 * 60) });
+		REQUIRE(metadata.gps);
+		CHECK(metadata.gps->latitude == Approx(-(33 + 51 / 60.0 + 30 / 3600.0)));
+		CHECK(metadata.gps->longitude == Approx(151.2));
+		CHECK(metadata.gps->altitude == Approx(-50.0));
+
+		REQUIRE(tags.entries.size() == 2);
+		CHECK(findEntry(tags, ExifDirectory::Exif, MakerNoteTag));
+		CHECK(findEntry(tags, ExifDirectory::Gps, 0x0000));
+	}
+}
+
+TEST_CASE("takeCaptureMetadata: entries that fail to decode stay", "[exif]")
+{
+	constexpr ByteOrder order = ByteOrder::Little;
+	const QByteArray tiff = tiffWithIfds(order, {},
+		{
+			{ 0x829A, RationalType, 1, rational(1, 0, order) },             // ExposureTime: no denominator
+			{ 0x829D, ShortType, 1, bytesOf<uint16_t>(4, order) },          // FNumber: not a RATIONAL
+			{ 0x9003, AsciiType, 20, ascii("0000:00:00 00:00:00") },        // DateTimeOriginal: unset
+			{ 0x9011, AsciiType, 7, ascii("+01:00") },                      // OffsetTimeOriginal
+		},
+		{
+			{ 0x0002, RationalType, 3, rational(33, 1, order) + rational(51, 1, order) + rational(0, 1, order) }, // a latitude without a longitude
+		});
+	ExifTags tags = exifTagsFromTiff(tiff);
+	const ExifTags read = tags;
+	const CaptureMetadata metadata = takeCaptureMetadata(tags);
+	CHECK(metadata == CaptureMetadata{});
+	CHECK(tags == read);
+}
+
+TEST_CASE("The names of EXIF codes", "[exif]")
+{
+	CHECK(meteringModeName(5) == "Pattern");
+	CHECK(meteringModeName(7).empty());
+	CHECK(exposureProgramName(3) == "Aperture priority");
+	CHECK(whiteBalanceName(1) == "Manual");
+	CHECK(colorSpaceName(0xFFFF) == "Uncalibrated");
+	CHECK(orientationName(6) == "Rotate 90° clockwise");
+	CHECK(orientationName(0).empty());
+
+	CHECK(flashDescription(0x00) == "Did not fire");
+	CHECK(flashDescription(0x10) == "Did not fire, suppressed");
+	CHECK(flashDescription(0x19) == "Fired, auto mode");
+	CHECK(flashDescription(0x5F) == "Fired, auto mode, return light detected, red-eye reduction");
+	CHECK(flashDescription(0x20) == "No flash function");
+}
+
+TEST_CASE("readImageInfo: a JPEG's EXIF, comments and upright size; a PNG's text chunks, EXIF and color profile", "[exif]")
+{
+	QTemporaryDir folder;
+	REQUIRE(folder.isValid());
+
+	QImage image{ 3, 2, QImage::Format_RGB32 };
+	image.fill(Qt::gray);
+	image.setText("Title", "Sunset");
+
+	SECTION("JPEG")
+	{
+		QBuffer encoded;
+		REQUIRE(image.save(&encoded, "JPG"));
+		const QByteArray tiff = tiffWithIfds(ByteOrder::Big, { { MakeTag, AsciiType, 6, ascii("Canon") }, { OrientationTag, ShortType, 1, bytesOf<uint16_t>(6, ByteOrder::Big) } },
+			{ { MakerNoteTag, UndefinedType, 9, QByteArray{ "MakerNote", 9 } } });
+		const QString path = folder.filePath("photo.jpg");
+		QFile file{ path };
+		REQUIRE(file.open(QIODevice::WriteOnly));
+		const QByteArray bytes = jpegWithExifApp1(encoded.data(), exifPayload(tiff));
+		REQUIRE(file.write(bytes) == bytes.size());
+		file.close();
+
+		const ImageInfo info = readImageInfo(path);
+		CHECK(info.error.isEmpty());
+		CHECK(info.fileSize == bytes.size());
+		CHECK(info.lastModified.isValid());
+		CHECK(info.format == "jpeg");
+		CHECK(info.uprightSize == QSize{ 2, 3 });
+		CHECK_FALSE(info.colorProfile);
+		CHECK(std::ranges::contains(info.texts, std::pair{ QString{ "Title" }, QString{ "Sunset" } }));
+		CHECK(info.capture.make == "Canon");
+		CHECK(info.capture.orientation == 6);
+		REQUIRE(info.otherExif.entries.size() == 1);
+		CHECK(info.otherExif.entries.front().tag == MakerNoteTag);
+	}
+
+	SECTION("PNG")
+	{
+		image.setColorSpace(QColorSpace::DisplayP3);
+		QBuffer encoded;
+		REQUIRE(image.save(&encoded, "PNG"));
+		QByteArray png = encoded.data();
+		png.insert(8 + 25, pngChunk("eXIf", exifTiff(ByteOrder::Little, { { OrientationTag, 1 } }))); // after the signature and IHDR
+		const QString path = folder.filePath("image.png");
+		QFile file{ path };
+		REQUIRE(file.open(QIODevice::WriteOnly));
+		REQUIRE(file.write(png) == png.size());
+		file.close();
+
+		const ImageInfo info = readImageInfo(path);
+		CHECK(info.format == "png");
+		CHECK(info.uprightSize == QSize{ 3, 2 });
+		REQUIRE(info.colorProfile);
+		CHECK_FALSE(info.colorProfile->isEmpty());
+		CHECK(std::ranges::contains(info.texts, std::pair{ QString{ "Title" }, QString{ "Sunset" } }));
+		CHECK(info.capture.orientation == 1);
+	}
+}
+
+TEST_CASE("readImageInfo: an error, and nothing else, for a file that cannot be read", "[exif]")
+{
+	const ImageInfo info = readImageInfo(QDir::temp().filePath("no such file.jpg"));
+	CHECK_FALSE(info.error.isEmpty());
+	CHECK(info.fileSize == 0);
+	CHECK(info.format.isEmpty());
 }

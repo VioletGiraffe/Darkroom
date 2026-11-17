@@ -1,9 +1,12 @@
 #pragma once
 
 #include "ImageDecoding/ImageDecoding.h"
+#include "ImageMetadata/Exif.h"
 
 DISABLE_COMPILER_WARNINGS
+#include <QByteArray>
 #include <QSize>
+#include <QString>
 RESTORE_COMPILER_WARNINGS
 
 #include <cstddef>
@@ -37,5 +40,15 @@ struct LinearRawRendering {
 
 // From the raw's metadata, without unpacking; empty when LibRaw cannot parse it
 [[nodiscard]] QSize readRawUprightSize(thin_io::buffered_reader& file);
+
+// A camera raw's metadata as LibRaw parses it, without unpacking; a field is empty when the raw does not state it
+struct RawMetadata {
+	ImageMetadata::ExifTags exif;
+	QSize uprightSize;                                  // as readRawUprightSize()
+	QString lensMake, lens, lensSerial, bodySerial;     // from the EXIF, or decoded from the maker notes
+	QByteArray iccProfile;
+};
+// Empty when LibRaw cannot parse the raw
+[[nodiscard]] std::optional<RawMetadata> readRawMetadata(thin_io::buffered_reader& file);
 
 } // namespace ImageDecoding

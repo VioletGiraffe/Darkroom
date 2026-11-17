@@ -4,8 +4,10 @@
 #include "buffered_reader.hpp" // thin_io
 
 DISABLE_COMPILER_WARNINGS
+#include <QByteArray>
 #include <QImage>
 #include <QObject>
+#include <QString>
 #include <libraw/libraw.h>
 RESTORE_COMPILER_WARNINGS
 
@@ -775,6 +777,35 @@ QSize readRawUprightSize(thin_io::buffered_reader& file)
 		return {};
 
 	return uprightSize(raw->imgdata.sizes);
+}
+
+std::optional<RawMetadata> readRawMetadata(thin_io::buffered_reader& file)
+{
+	const std::optional<uint64_t> size = file.size();
+	if (!size)
+		return std::nullopt;
+
+	BufferedReaderStream stream{ file, *size };
+	const auto raw = std::make_unique<LibRaw>();
+	ImageMetadata::RawExifCollector exifCollector{ *raw };
+	if (raw->open_datastream(&stream) != LIBRAW_SUCCESS)
+		return std::nullopt;
+
+	const libraw_data_t& data = raw->imgdata;
+	const auto text = [](const auto& field) { return QString::fromUtf8(field, static_cast<qsizetype>(qstrnlen(field, sizeof field))).trimmed(); };
+	RawMetadata metadata{
+		.exif = exifCollector.takeTags(),
+		.uprightSize = uprightSize(data.sizes),
+		.lensMake = text(data.lens.LensMake),
+		.lens = text(data.lens.Lens),
+		.lensSerial = text(data.lens.LensSerial),
+		.bodySerial = text(data.shootinginfo.BodySerial),
+	};
+	if (metadata.lens.isEmpty())
+		metadata.lens = text(data.lens.makernotes.Lens);
+	if (data.color.profile && data.color.profile_length > 0)
+		metadata.iccProfile = QByteArray{ static_cast<const char*>(data.color.profile), static_cast<qsizetype>(data.color.profile_length) };
+	return metadata;
 }
 
 } // namespace ImageDecoding

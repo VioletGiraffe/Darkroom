@@ -7,11 +7,15 @@ DISABLE_COMPILER_WARNINGS
 #include <QByteArrayView>
 #include <QImageIOHandler>
 #include <QSize>
+#include <QtEndian>
 RESTORE_COMPILER_WARNINGS
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <vector>
+
+class LibRaw;
 
 namespace ImageMetadata {
 
@@ -29,6 +33,34 @@ struct ExifMetadata
 [[nodiscard]] std::optional<ExifMetadata> readExifApp1(QByteArrayView payload) noexcept;
 // The payload of jpeg's first APP1 segment that holds EXIF, as readExifApp1() takes it; empty when it has none. jpeg starts with SOI.
 [[nodiscard]] std::optional<QByteArrayView> findExifApp1(QByteArrayView jpeg) noexcept;
+
+// Calls visit(marker, payload) for each segment before the image data, payload following the length field, until visit returns false.
+// jpeg starts with SOI.
+template <typename Visitor>
+void forEachJpegSegment(QByteArrayView jpeg, const Visitor& visit)
+{
+	// After SOI, each marker is FF, its code and a big-endian length that counts itself; the image data starts at SOS
+	qsizetype pos = 2;
+	while (pos + 4 <= jpeg.size() && static_cast<uchar>(jpeg[pos]) == 0xFF)
+	{
+		const uchar marker = static_cast<uchar>(jpeg[pos + 1]);
+		if (marker == 0xFF) // fill byte
+		{
+			++pos;
+			continue;
+		}
+		if (marker == 0xDA || marker == 0xD9) // SOS, EOI
+			return;
+
+		const qsizetype length = qFromBigEndian<uint16_t>(jpeg.data() + pos + 2);
+		if (length < 2 || pos + 2 + length > jpeg.size())
+			return;
+		if (!visit(marker, jpeg.sliced(pos + 4, length - 2)))
+			return;
+
+		pos += 2 + length;
+	}
+}
 
 enum class ExifDirectory : uint8_t { Ifd0, Exif, Gps, Interoperability, Ifd1 };
 
@@ -54,8 +86,30 @@ struct ExifTags
 
 // payload as readExifApp1() takes it; no entries unless it holds EXIF. Leaves out entries with a value outside the payload.
 [[nodiscard]] ExifTags exifTagsFromApp1(QByteArrayView payload);
+// As exifTagsFromApp1(), for a TIFF structure without the APP1 header: a TIFF file, or a PNG's eXIf chunk
+[[nodiscard]] ExifTags exifTagsFromTiff(QByteArrayView tiff);
 // The EXIF directories LibRaw parses in a camera raw; no entries when LibRaw cannot open it. A tag found twice keeps its first value.
 [[nodiscard]] ExifTags exifTagsFromRaw(QByteArrayView rawFile);
+
+// Collects the EXIF directories LibRaw parses while it opens a raw: construct before the open, take the tags after a successful one.
+// Must be destroyed before the LibRaw instance.
+class RawExifCollector
+{
+public:
+	explicit RawExifCollector(LibRaw& raw);
+	~RawExifCollector();
+	RawExifCollector(const RawExifCollector&) = delete;
+	RawExifCollector& operator=(const RawExifCollector&) = delete;
+
+	// A tag found twice keeps its first value
+	[[nodiscard]] ExifTags takeTags();
+
+	struct Collected; // public for LibRaw's callback
+
+private:
+	LibRaw& _raw;
+	const std::unique_ptr<Collected> _collected;
+};
 
 // Fits tags to an image written upright at uprightOutputSize:
 // - leaves out IFD1, the MakerNote, and IFD0's tags other than the descriptive ones: those refer to the source file's layout;
