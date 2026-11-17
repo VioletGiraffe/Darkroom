@@ -34,10 +34,11 @@ for app in ${APPS}; do
 	BUNDLE="bin/release/${app}.app"
 	echo "${MYSELF}: deploying Qt frameworks into ${BUNDLE}"
 
-	# macdeployqt exits 0 even when it deploys nothing, so its output is the only signal of failure
-	DEPLOY_OUTPUT="$("${QT_DIR}/bin/macdeployqt" "${BUNDLE}" 2>&1)"
+	# macdeployqt exits 0 even when it deploys nothing: its ERROR lines count as a failure too
+	DEPLOY_STATUS=0
+	DEPLOY_OUTPUT="$("${QT_DIR}/bin/macdeployqt" "${BUNDLE}" 2>&1)" || DEPLOY_STATUS=$?
 	echo "${DEPLOY_OUTPUT}"
-	if echo "${DEPLOY_OUTPUT}" | grep -q "^ERROR"; then
+	if [ ${DEPLOY_STATUS} -ne 0 ] || echo "${DEPLOY_OUTPUT}" | grep -q "^ERROR"; then
 		echo "${MYSELF}: macdeployqt failed, refusing to package an undeployed bundle" >&2
 		exit 1
 	fi
@@ -76,7 +77,14 @@ cp LICENSE NOTICE "${STAGE}/"
 ln -s /Applications "${STAGE}/"
 
 # -srcfolder populates via a private nobrowse mount - no volume appears under /Volumes for Spotlight to grab and pin.
-hdiutil create "${DMG}" -ov -volname "${VOLUME}" -fs "HFS+" -format ULMO -srcfolder "${STAGE}"
+# Retried: on CI runners hdiutil still fails intermittently with "Resource busy".
+ATTEMPT=1
+until hdiutil create "${DMG}" -ov -volname "${VOLUME}" -fs "HFS+" -format ULMO -srcfolder "${STAGE}"; do
+	[ ${ATTEMPT} -lt 3 ] || exit 1
+	ATTEMPT=$((ATTEMPT + 1))
+	echo "${MYSELF}: hdiutil failed, retrying (attempt ${ATTEMPT})"
+	sleep 10
+done
 
 rm -rf "${STAGE}"
 
