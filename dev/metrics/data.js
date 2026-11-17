@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794948627045,
+  "lastUpdate": 1794949305166,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -22308,6 +22308,85 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/VioletGiraffe/Darkroom/commit/73e7ad92231f0d3a636e6812bcd2213ec9712aa2"
         },
         "date": 1794948624111,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 21930,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 2985,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 36014,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 7224.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7458,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5813,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 889.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 347,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 97.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 57,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 19.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "30d97e914b19efcb2aa6473dc1646167fb527b0e",
+          "message": "AppImage packaging no longer fails on Qt Multimedia: the FFmpeg backend gets the Qt Quick it links, and the unused GStreamer backend is left out",
+          "timestamp": "2026-11-17T22:50:18+02:00",
+          "tree_id": "979dc29eb329f4f1319f657c75b6a4019baade71",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/30d97e914b19efcb2aa6473dc1646167fb527b0e"
+        },
+        "date": 1794949302669,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
