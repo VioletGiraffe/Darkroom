@@ -4,7 +4,6 @@
 #include "theme/colorutils.h"
 #include "theme/cthemecontroller.h"
 
-#include <algorithm>
 #include <cmath>
 
 namespace {
@@ -72,9 +71,6 @@ void resolveAppColors(Theme::Theme& t)
 	// A neutral green, pulled a fifth of the way toward the accent so it belongs to the theme.
 	if (!t.readyGreen.isValid())
 		t.readyGreen = hueShifted(t.dark ? c(0x69c06d) : c(0x3fa257), p.accent.hsvHue(), 0.2f);
-	// Not pulled toward the accent: an error must read as red in every theme.
-	if (!t.errorText.isValid())
-		t.errorText = t.dark ? c(0xe5736b) : c(0xc0392b);
 	// Neutral, so hover and the accent-tinted selection differ by hue, not strength.
 	if (!t.cellHoverBg.isValid())
 		t.cellHoverBg = t.dark ? ColorUtils::mix(p.windowBg, Qt::white, 0.07f) : ColorUtils::mix(p.windowBg, Qt::black, 0.05f);
@@ -313,18 +309,7 @@ const Theme::Theme& Theme::current()
 
 void Theme::selectActiveTheme()
 {
-	const CThemeController& controller = CThemeController::instance();
-	const bool dark = controller.darkActive();
-	const QString storedName = controller.themeName(dark);
-
-	const std::vector<Theme>& themes = allThemes();
-	const auto matchesStored = [&](const Theme& t) { return t.dark == dark && t.name == storedName; };
-	auto it = std::find_if(themes.begin(), themes.end(), matchesStored);
-	if (it == themes.end()) // the stored name can outlive its theme in the settings
-		it = std::find_if(themes.begin(), themes.end(), [dark](const Theme& t) { return t.dark == dark; });
-	assert_r(it != themes.end()); // no theme of this polarity at all - a defective theme table
-
-	s_active = *it; // a copy, so nothing dangles if the table is ever rebuilt
+	s_active = CThemeController::instance().selectedTheme(allThemes()); // a copy, so nothing dangles if the table is ever rebuilt
 	// Runs before resolvedPalette so the library's tint never applies; an authored accentBg still wins over both.
 	if (!s_active.palette.accentBg.isValid())
 		s_active.palette.accentBg = accentTint(s_active.palette);

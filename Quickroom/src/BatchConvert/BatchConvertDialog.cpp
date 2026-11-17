@@ -481,7 +481,7 @@ void BatchConvertDialog::showTargetEnded(const TargetResult& result)
 		break;
 	case Ending::Failed:
 		++_failedCount;
-		styleImageItem(*item, theme.errorText);
+		styleImageItem(*item, theme.palette.errorText);
 		item->setToolTip(result.error);
 		_failureList->appendPlainText(QStringLiteral("%1: %2").arg(QDir::toNativeSeparators(result.target.sourcePath), result.error));
 		_failureList->show();

@@ -54,7 +54,6 @@ struct Theme
 	QColor instructionText; // explanatory text and toolbar glyphs: neutral, and stronger than the tinted textDim
 	QColor thumbnailMatte;
 	QColor readyGreen;
-	QColor errorText;
 	QColor cellHoverBg; // a grid cell under the cursor; accentBg marks the selected cell
 
 	QString qssFragment; // optional per-theme QSS, appended after the app sheet so it wins ties
@@ -66,8 +65,7 @@ struct Theme
 // The theme in effect - a copy independent of allThemes() storage. Valid once Style::install() ran.
 [[nodiscard]] const Theme& current();
 
-// Re-resolves current() from CThemeController's selection, falling back to the first theme of the
-// active polarity when the stored name no longer exists. Style::apply() calls this; nothing else needs to.
+// Re-resolves current() from CThemeController's selection. Style::apply() calls this; nothing else needs to.
 void selectActiveTheme();
 
 } // namespace Theme

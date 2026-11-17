@@ -25,7 +25,7 @@ store and moves shared values that earlier versions left in the apps' own stores
 the sole owner of the last-successful-root and recent-library settings.
 
 Each app has its own `SettingsDialog`. Darkroom's excludes library selection, which belongs to the Library menu.
-Both include the shared `ImagesSettingsPage`.
+Both include the shared `GeneralSettingsPage` (ffmpeg path, theming) and `ImagesSettingsPage`.
 Most changes persist on acceptance.
 The theming choices - color scheme and one theme per polarity - apply and persist immediately as a live preview;
 rejecting the dialog restores all three.
@@ -33,7 +33,7 @@ rejecting the dialog restores all three.
 ## Themes
 
 `Theme::Theme` (`Theme/Theme.h`) is pure data: name and polarity, a `CBasePalette`, `Metrics`, the app-specific
-colors (star and label-UI tones, `instructionText`, `thumbnailMatte`, `readyGreen`, `errorText`), and an optional QSS fragment
+colors (star and label-UI tones, `instructionText`, `thumbnailMatte`, `readyGreen`), and an optional QSS fragment
 appended after the app sheet so its rules win equal-specificity ties. The selectable themes are one table in
 `Theme.cpp`; `Theme::current()` returns a copy of the resolved one.
 
@@ -45,9 +45,9 @@ from the palette and the polarity, so a theme authors its palette and nothing el
 supplies its own `accentBg` default ahead of `resolvedPalette`, blended to a target contrast against the window: the
 media grid fills a whole card with that colour, where the library's flat tint is sized for a text highlight.
 
-qtutils provides the app-agnostic parts: `CThemeController` (persists the choices, drives
+qtutils provides the app-agnostic parts: `CThemeController` (persists the choices, resolves the selected theme, drives
 `QStyleHints::setColorScheme()` so the platform follows, emits `themeChanged()` when the effective theme changes),
-`CBasePalette` with its derivations (nine authored colors, the rest derivable), the tinted icon engine, the
+`CBasePalette` with its derivations (nine authored colors, the rest derivable), `CStyleSheetTokens` (expands the sheet's `@name@` placeholders), the tinted icon engine, the
 `themeicon:/` handler, and the styling fixups. The app defines its themes and its stylesheet. Polarity is always
 read from Qt. Colors are `QColor`, stringified only during sheet assembly.
 

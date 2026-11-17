@@ -46,9 +46,9 @@ QSize LabelRowDelegate::sizeHint(const QStyleOptionViewItem& option, const QMode
 	const QString name  = index.data(Qt::DisplayRole).toString();
 	const QString count = index.data(CountRole).toString();
 	const int leading = index.data(AllRole).toBool() ? ICON : SWATCH_W;
-	const int starW = index.data(StarRole).toBool() ? opt.fontMetrics.horizontalAdvance(QStringLiteral("★")) + GAP : 0;
-	const int countW = count.isEmpty() ? 0 : COUNT_GAP + opt.fontMetrics.horizontalAdvance(count);
-	const int width = PAD_L + leading + GAP + starW + opt.fontMetrics.horizontalAdvance(name) + countW + PAD_R;
+	const int starW = index.data(StarRole).toBool() ? roundedUpTextWidth(opt.font, QStringLiteral("★")) + GAP : 0;
+	const int countW = count.isEmpty() ? 0 : COUNT_GAP + roundedUpTextWidth(opt.font, count);
+	const int width = PAD_L + leading + GAP + starW + roundedUpTextWidth(opt.font, name) + countW + PAD_R;
 	return { width, qMax(leading, opt.fontMetrics.height()) + 2 * PAD_V };
 }
 
@@ -157,13 +157,13 @@ void LabelRowDelegate::paint(QPainter* p, const QStyleOptionViewItem& option, co
 	if (index.data(StarRole).toBool())
 	{
 		const QString star  = QStringLiteral("★");
-		const int     starW = opt.fontMetrics.horizontalAdvance(star);
+		const int     starW = roundedUpTextWidth(opt.font, star);
 		p->setPen(t.starActive);
 		p->drawText(QRect(nameX, r.top(), starW, r.height()), Qt::AlignLeft | Qt::AlignVCenter, star);
 		nameX += starW + GAP;
 	}
 
-	const int   countW = opt.fontMetrics.horizontalAdvance(count);
+	const int   countW = roundedUpTextWidth(opt.font, count);
 	// Not r.right(): it is inclusive, so the name would get one pixel less than sizeHint() budgeted.
 	const QRect countRect(r.left() + r.width() - PAD_R - countW, r.top(), countW, r.height());
 	p->setPen(t.palette.textDim);

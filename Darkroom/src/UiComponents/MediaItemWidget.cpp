@@ -5,6 +5,7 @@
 #include "Theme/Theme.h"
 #include "compiler/compiler_warnings_control.h"
 #include "theme/ctintedsvgiconengine.h"
+#include "utils/painterutils.h"
 #include "widgets/clabelelided.h"
 #include "Utils.h"
 
@@ -141,7 +142,7 @@ public:
 	[[nodiscard]] QSize sizeHint() const override
 	{
 		const QFontMetrics fm(font());
-		return { PAD_H * 2 + triangleWidth(fm) + GAP + fm.horizontalAdvance(_text), fm.height() + PAD_V * 2 };
+		return { PAD_H * 2 + triangleWidth(fm) + GAP + roundedUpTextWidth(font(), _text), fm.height() + PAD_V * 2 };
 	}
 
 protected:
