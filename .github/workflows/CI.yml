@@ -281,16 +281,16 @@ jobs:
         comment-on-alert: false
         fail-on-alert: false
 
-    - name: Archive Installer
+    - name: Upload Installer
       if: success() && startsWith(matrix.os, 'windows')
       uses: actions/upload-artifact@v7
       with:
-        name: Darkroom.exe
         path: Darkroom.exe
+        archive: false
 
-    - name: Archive .dmg
+    - name: Upload .dmg
       if: success() && startsWith(matrix.os, 'macos')
       uses: actions/upload-artifact@v7
       with:
-        name: Darkroom.dmg
         path: Darkroom.dmg
+        archive: false
