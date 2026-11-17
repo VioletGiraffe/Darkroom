@@ -5,13 +5,19 @@
 DISABLE_COMPILER_WARNINGS
 #include <QByteArray>
 #include <QImage>
+#include <QString>
 RESTORE_COMPILER_WARNINGS
 
-// Color conversion through Little CMS: Qt's own conversion rejects valid profiles, such as a tone curve that dips.
+#include <optional>
+
+// Color profiles through Little CMS: Qt rejects valid ones, such as a tone curve that dips.
 namespace ImageDecoding {
 
 // Adobe RGB (1998), for images that declare it only in EXIF
 [[nodiscard]] const QByteArray& adobeRgbIccProfile();
+
+// The profile's description, its name; empty when it has none, absent when the profile cannot be read
+[[nodiscard]] std::optional<QString> iccProfileDescription(const QByteArray& iccProfile);
 
 // Converts image from the color profile its pixels are in to sRGB, and tags it sRGB.
 // A no-op for an empty or unusable profile, one the pixel format does not match, and one sRGB already reproduces.

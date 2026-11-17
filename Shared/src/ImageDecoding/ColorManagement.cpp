@@ -211,6 +211,22 @@ const QByteArray& adobeRgbIccProfile()
 	return bytes;
 }
 
+std::optional<QString> iccProfileDescription(const QByteArray& iccProfile)
+{
+	const ProfilePtr profile{ cmsOpenProfileFromMem(iccProfile.constData(), static_cast<cmsUInt32Number>(iccProfile.size())), &cmsCloseProfile };
+	if (!profile)
+		return std::nullopt;
+
+	// The size counts the terminating NUL; 0 without a description
+	const cmsUInt32Number size = cmsGetProfileInfoUTF8(profile.get(), cmsInfoDescription, "en", "US", nullptr, 0);
+	if (size == 0)
+		return QString{};
+
+	QByteArray utf8{ static_cast<qsizetype>(size), '\0' };
+	cmsGetProfileInfoUTF8(profile.get(), cmsInfoDescription, "en", "US", utf8.data(), size);
+	return QString::fromUtf8(utf8.constData());
+}
+
 void convertToSrgb(QImage& image, const QByteArray& iccProfile)
 {
 	if (iccProfile.isEmpty() || image.isNull())

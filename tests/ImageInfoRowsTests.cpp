@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 using namespace ImageInfoRows;
@@ -108,6 +109,30 @@ TEST_CASE("groups: the summary groups, then the other tags by directory", "[imag
 	CHECK(exif.rows[0].keyToolTip == "Tag 0x927C (37500)");
 	CHECK(exif.rows[1].key == "LensModel");
 	CHECK(findRow(groups, "Other tags: IFD0", "Tag 0xFFFE"));
+}
+
+TEST_CASE("groups: the color profile by its source, and a profile without a name or unreadable", "[imageinfo]")
+{
+	using Source = ImageMetadata::ColorProfile::Source;
+	const auto profileRow = [](Source source, std::optional<QString> name) {
+		const std::vector<Group> rows = groups("image.jpg", ImageMetadata::ImageInfo{ .colorProfile = ImageMetadata::ColorProfile{ source, std::move(name) } });
+		const auto group = std::ranges::find(rows, QString{ "Image" }, &Group::title);
+		REQUIRE(group != rows.end());
+		REQUIRE_FALSE(group->rows.empty());
+		return group->rows.front();
+	};
+
+	const Row embedded = profileRow(Source::Embedded, "sRGB IEC61966-2.1");
+	CHECK(embedded.key == "Color profile");
+	CHECK(embedded.value == "sRGB IEC61966-2.1");
+	CHECK(profileRow(Source::Embedded, QString{}).value == "Unnamed");
+	CHECK(profileRow(Source::Embedded, std::nullopt).value == "Unreadable");
+	CHECK(profileRow(Source::ExifAdobeRgb, "Adobe RGB (1998)").value == "Adobe RGB (1998) (declared in EXIF)");
+
+	const Row raw = profileRow(Source::CameraRaw, "Camera");
+	CHECK(raw.key == "Embedded profile");
+	CHECK(raw.value == "Camera");
+	CHECK_FALSE(raw.keyToolTip.isEmpty());
 }
 
 TEST_CASE("groups: a file without EXIF says so; an unreadable file shows the error only", "[imageinfo]")

@@ -18,6 +18,7 @@ RESTORE_COMPILER_WARNINGS
 
 using ImageDecoding::adobeRgbIccProfile;
 using ImageDecoding::convertToSrgb;
+using ImageDecoding::iccProfileDescription;
 
 namespace {
 
@@ -58,6 +59,24 @@ using ToneCurvePtr = std::unique_ptr<cmsToneCurve, decltype(&cmsFreeToneCurve)>;
 	const cmsCIExyY d65{ 0.3127, 0.3290, 1.0 };
 	const cmsCIExyYTRIPLE rotated{ { 0.30, 0.60, 1.0 }, { 0.15, 0.06, 1.0 }, { 0.64, 0.33, 1.0 } };
 	const ProfilePtr profile{ cmsCreateRGBProfile(&d65, &rotated, curves), &cmsCloseProfile };
+	return saved(profile.get());
+}
+
+// icc saved as version, described as name, or without a description when name is null.
+// The version set before the write decides the description's type: v2's textDescriptionType, v4's multiLocalizedUnicodeType.
+[[nodiscard]] QByteArray described(const QByteArray& icc, const char* name, double version)
+{
+	const ProfilePtr profile{ cmsOpenProfileFromMem(icc.constData(), static_cast<cmsUInt32Number>(icc.size())), &cmsCloseProfile };
+	REQUIRE(profile);
+	cmsSetProfileVersion(profile.get(), version);
+	if (name)
+	{
+		const std::unique_ptr<cmsMLU, decltype(&cmsMLUfree)> description{ cmsMLUalloc(nullptr, 1), &cmsMLUfree };
+		REQUIRE(cmsMLUsetASCII(description.get(), "en", "US", name));
+		REQUIRE(cmsWriteTag(profile.get(), cmsSigProfileDescriptionTag, description.get()));
+	}
+	else
+		REQUIRE(cmsWriteTag(profile.get(), cmsSigProfileDescriptionTag, nullptr));
 	return saved(profile.get());
 }
 
@@ -201,4 +220,21 @@ TEST_CASE("convertToSrgb: a large image converts in bands, all alike", "[colorma
 TEST_CASE("adobeRgbIccProfile: Qt reads it as Adobe RGB", "[colormanagement]")
 {
 	REQUIRE(QColorSpace::fromIccProfile(adobeRgbIccProfile()) == QColorSpace{ QColorSpace::AdobeRgb });
+}
+
+TEST_CASE("iccProfileDescription: a v2 or v4 profile's name, also one Qt rejects; empty without one; absent for no profile", "[colormanagement]")
+{
+	CHECK(iccProfileDescription(adobeRgbIccProfile()) == "Adobe RGB (1998)");
+
+	for (const double version : { 2.1, 4.3 })
+	{
+		CAPTURE(version);
+		const QByteArray rejected = described(rotatedPrimariesWithDippingCurve(), "Rotated sRGB", version);
+		REQUIRE_FALSE(QColorSpace::fromIccProfile(rejected).isValid());
+		CHECK(iccProfileDescription(rejected) == "Rotated sRGB");
+		CHECK(iccProfileDescription(described(grayProfile(1.8), nullptr, version)) == QString{});
+	}
+
+	CHECK_FALSE(iccProfileDescription("not a profile"));
+	CHECK_FALSE(iccProfileDescription({}));
 }

@@ -119,6 +119,14 @@ std::vector<Row> fileRows(const QString& path, const ImageInfo& info)
 	return rows;
 }
 
+Row colorProfileRow(const ColorProfile& profile)
+{
+	const QString name = !profile.name ? QObject::tr("Unreadable") : profile.name->isEmpty() ? QObject::tr("Unnamed") : *profile.name;
+	if (profile.source == ColorProfile::Source::CameraRaw)
+		return { QObject::tr("Embedded profile"), name, QObject::tr("A profile the raw file carries, for its sensor data or a preview. The rendered image does not use it.") };
+	return { QObject::tr("Color profile"), profile.source == ColorProfile::Source::ExifAdobeRgb ? QObject::tr("%1 (declared in EXIF)").arg(name) : name };
+}
+
 std::vector<Row> imageRows(const ImageInfo& info)
 {
 	const CaptureMetadata& capture = info.capture;
@@ -134,7 +142,7 @@ std::vector<Row> imageRows(const ImageInfo& info)
 	if (capture.orientation)
 		rows.push_back({ QObject::tr("Orientation"), codeText(*capture.orientation, orientationName) });
 	if (info.colorProfile)
-		rows.push_back({ QObject::tr("Color profile"), info.colorProfile->isEmpty() ? QObject::tr("Embedded, unnamed") : *info.colorProfile });
+		rows.push_back(colorProfileRow(*info.colorProfile));
 	if (capture.colorSpace)
 		rows.push_back({ QObject::tr("Color space"), codeText(*capture.colorSpace, colorSpaceName) });
 	if (capture == CaptureMetadata{} && info.otherExif.entries.empty())

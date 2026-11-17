@@ -927,10 +927,53 @@ TEST_CASE("readImageInfo: a JPEG's EXIF, comments and upright size; a PNG's text
 		CHECK(info.format == "png");
 		CHECK(info.uprightSize == QSize{ 3, 2 });
 		REQUIRE(info.colorProfile);
-		CHECK_FALSE(info.colorProfile->isEmpty());
+		CHECK(info.colorProfile->source == ColorProfile::Source::Embedded);
+		REQUIRE(info.colorProfile->name);
+		CHECK_FALSE(info.colorProfile->name->isEmpty());
 		CHECK(std::ranges::contains(info.texts, std::pair{ QString{ "Title" }, QString{ "Sunset" } }));
 		CHECK(info.capture.orientation == 1);
 	}
+}
+
+TEST_CASE("readImageInfo, the color profile: Adobe RGB a JPEG's EXIF declares, unless one is embedded; InterColorProfile not also a tag", "[exif]")
+{
+	QTemporaryDir folder;
+	REQUIRE(folder.isValid());
+	const auto written = [&](const QString& name, const QByteArray& bytes) {
+		const QString path = folder.filePath(name);
+		QFile file{ path };
+		REQUIRE(file.open(QIODevice::WriteOnly));
+		REQUIRE(file.write(bytes) == bytes.size());
+		return path;
+	};
+
+	QImage image{ 3, 2, QImage::Format_RGB32 };
+	image.fill(Qt::gray);
+	QBuffer encoded;
+	REQUIRE(image.save(&encoded, "JPG"));
+	// Uncalibrated, with the interoperability index R03
+	const QByteArray tiff = tiffWithIfds(ByteOrder::Little, { { MakeTag, AsciiType, 6, ascii("Canon") } },
+		{ { 0xA001, ShortType, 1, bytesOf<uint16_t>(0xFFFF, ByteOrder::Little) } }, {}, { { 0x0001, AsciiType, 4, ascii("R03") } });
+	const QByteArray declaring = jpegWithExifApp1(encoded.data(), exifPayload(tiff));
+
+	const ImageInfo declared = readImageInfo(written("declared.jpg", declaring));
+	REQUIRE(declared.colorProfile);
+	CHECK(declared.colorProfile->source == ColorProfile::Source::ExifAdobeRgb);
+	CHECK(declared.colorProfile->name == "Adobe RGB (1998)");
+
+	QByteArray embedding = declaring;
+	embedding.insert(2, iccSegment(1, 1, QColorSpace{ QColorSpace::SRgb }.iccProfile()));
+	const ImageInfo embedded = readImageInfo(written("embedded.jpg", embedding));
+	REQUIRE(embedded.colorProfile);
+	CHECK(embedded.colorProfile->source == ColorProfile::Source::Embedded);
+
+	const QByteArray profile{ "profile data" };
+	const ImageInfo tiffInfo = readImageInfo(written("image.tif", tiffWithIfds(ByteOrder::Little, { { MakeTag, AsciiType, 6, ascii("Canon") }, { 0x8773, UndefinedType, 12, profile } })));
+	REQUIRE(tiffInfo.colorProfile);
+	CHECK(tiffInfo.colorProfile->source == ColorProfile::Source::Embedded);
+	CHECK_FALSE(tiffInfo.colorProfile->name); // not a profile Little CMS reads
+	CHECK(tiffInfo.capture.make == "Canon");
+	CHECK(tiffInfo.otherExif.entries.empty());
 }
 
 TEST_CASE("readImageInfo: an error, and nothing else, for a file that cannot be read", "[exif]")

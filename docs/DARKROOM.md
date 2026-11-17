@@ -89,8 +89,8 @@ The directories:
   camera raw through LibRaw; the EXIF for a JPEG written from the image, fitted to its upright pixels. A JPEG source's
   EXIF is edited in place, so its MakerNote stays valid; a raw's is rewritten without one. `readImageInfo` gathers what
   a file states about itself: the common EXIF fields decoded, the other tags with their specification names, the
-  embedded color profile, and a PNG's or JPEG's texts. It returns values only; the module also names tags and EXIF codes
-  in English, and formatting is the UI's. UI-free.
+  color profile, embedded or declared in EXIF, and a PNG's or JPEG's texts. It returns values only; the module also
+  names tags and EXIF codes in English, and formatting is the UI's. UI-free.
 - `UiComponents/` - widgets reused by more than one window.
 - `Windows/` - top-level windows and dialogs, the workflows that prompt the user or pump events (import execution,
   rename, delete, label management, frame extraction, source relocation), and collaborators that serve one window

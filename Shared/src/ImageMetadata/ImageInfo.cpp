@@ -1,30 +1,42 @@
 #include "ImageMetadata/ImageInfo.h"
+#include "ImageDecoding/ColorManagement.h"
 #include "ImageDecoding/ImageDecoding.h"
 #include "ImageDecoding/LibRawDecoder.h"
 #include "ImageMetadata/EmbeddedMetadata.h"
+#include "ImageMetadata/Exif.h"
 #include "buffered_reader.hpp" // thin_io
 #include "qt_paths.hpp"        // thin_io
 
 DISABLE_COMPILER_WARNINGS
 #include <QBuffer>
-#include <QColorSpace>
 #include <QFile>
 #include <QFileInfo>
 #include <QImageIOHandler>
 #include <QImageReader>
 RESTORE_COMPILER_WARNINGS
 
+#include <vector>
+
 namespace ImageMetadata {
 
 namespace {
 
-std::optional<QString> colorProfileDescription(const QByteArray& iccProfile)
+constexpr uint16_t InterColorProfileTag = 0x8773, AsShotIccProfileTag = 0xC68F;
+
+ColorProfile colorProfile(ColorProfile::Source source, const QByteArray& iccProfile)
 {
-	return iccProfile.isEmpty() ? std::nullopt : std::optional{ QColorSpace::fromIccProfile(iccProfile).description() };
+	return { source, ImageDecoding::iccProfileDescription(iccProfile) };
 }
 
-void setExif(ImageInfo& info, ExifTags exif)
+// Leaves out IFD0's entries holding iccProfile: colorProfile shows it
+void setExif(ImageInfo& info, ExifTags exif, const QByteArray& iccProfile)
 {
+	if (!iccProfile.isEmpty())
+	{
+		std::erase_if(exif.entries, [&](const ExifEntry& entry) {
+			return entry.directory == ExifDirectory::Ifd0 && (entry.tag == InterColorProfileTag || entry.tag == AsShotIccProfileTag) && entry.value == iccProfile;
+		});
+	}
 	info.capture = takeCaptureMetadata(exif);
 	info.otherExif = std::move(exif);
 }
@@ -41,8 +53,9 @@ ImageInfo readRaw(ImageInfo info, const QString& path, const QString& suffix)
 		return info;
 
 	info.uprightSize = raw->uprightSize;
-	info.colorProfile = colorProfileDescription(raw->iccProfile);
-	setExif(info, std::move(raw->exif));
+	if (!raw->iccProfile.isEmpty())
+		info.colorProfile = colorProfile(ColorProfile::Source::CameraRaw, raw->iccProfile);
+	setExif(info, std::move(raw->exif), raw->iccProfile);
 
 	const auto fillIn = [](QString& field, QString& decoded) {
 		if (field.isEmpty())
@@ -72,8 +85,11 @@ ImageInfo readOther(ImageInfo info, const QByteArray& bytes)
 	}
 
 	EmbeddedMetadata embedded = readEmbeddedMetadata(bytes);
-	info.colorProfile = colorProfileDescription(embedded.iccProfile);
-	setExif(info, std::move(embedded.exif));
+	if (!embedded.iccProfile.isEmpty())
+		info.colorProfile = colorProfile(ColorProfile::Source::Embedded, embedded.iccProfile);
+	else if (info.format == "jpeg" && readJpegExif(bytes).adobeRgb)
+		info.colorProfile = colorProfile(ColorProfile::Source::ExifAdobeRgb, ImageDecoding::adobeRgbIccProfile());
+	setExif(info, std::move(embedded.exif), embedded.iccProfile);
 	return info;
 }
 
