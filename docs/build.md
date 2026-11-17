@@ -143,6 +143,7 @@ x64 and arm64 (GCC 14), and macOS (clang), each against Qt 6.11. Per OS, in orde
   It thins each bundle's universal Qt binaries to its executable's architecture, then re-signs the bundle ad-hoc.
 - **Linux:** `scripts/create_appimage.sh <Qt dir>` runs linuxdeploy and its Qt plugin (continuous builds, downloaded
   into `build/`) on each release binary with its `res/*.desktop` file, deploying the xcb and Wayland platform plugins.
+  Of Qt Multimedia's backends, the AppImages carry only FFmpeg, Qt's default, along with Qt Quick, which that plugin links on Linux.
   It produces `Darkroom-<arch>.AppImage` and `Quickroom-<arch>.AppImage`, `<arch>` being `x86_64` or `arm64`.
   The AppImages use the system's glibc and libstdc++, so they run only where both are at least as new as the build
   machine's: CI pins Ubuntu 24.04. Video frame extraction uses the system's `ffmpeg`, found on `PATH`.

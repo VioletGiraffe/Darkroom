@@ -94,8 +94,10 @@ jobs:
         aqtsource: git+https://github.com/miurahr/aqtinstall.git@076e1659807d0b362a3ed684d54c2e9c775eb9c7
         target: desktop
         arch: ${{ matrix.qt_arch }}
-        # qtwayland: the Wayland window decorations the AppImages deploy; the Wayland client itself is in qtbase
-        archives: ${{ startsWith(matrix.os, 'ubuntu') && 'qtbase icu qtsvg qtwayland' || 'qtbase icu qtsvg' }}
+        # Linux only, for the AppImages:
+        #   qtwayland - the Wayland window decorations; the Wayland client itself is in qtbase
+        #   qtdeclarative - Qt Quick, which the FFmpeg multimedia plugin links on Linux
+        archives: ${{ startsWith(matrix.os, 'ubuntu') && 'qtbase icu qtsvg qtwayland qtdeclarative' || 'qtbase icu qtsvg' }}
         modules: 'qtimageformats qtmultimedia'
         cache: 'true'
 

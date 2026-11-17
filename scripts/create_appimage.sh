@@ -52,6 +52,9 @@ export LD_LIBRARY_PATH="${QT_DIR}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 # xcb is always deployed; Wayland also brings its shell integration and decoration plugins
 EXTRA_PLATFORM_PLUGINS="$(find "${QT_DIR}/plugins/platforms" -name 'libqwayland*.so' -printf '%f;')"
 export EXTRA_PLATFORM_PLUGINS
+# The Qt plugin deploys every multimedia backend. GStreamer's is unused, FFmpeg being Qt's default: its libraries are skipped
+# here and its plugin is deleted after deployment.
+export LINUXDEPLOY_EXCLUDED_LIBRARIES='libgst*'
 
 LINUXDEPLOY="${TOOLS}/linuxdeploy-${MACHINE}.AppImage"
 
@@ -66,6 +69,8 @@ for app in ${APPS}; do
 
 	# The apps use neither QNetworkInformation nor TLS
 	rm -rf "${APPDIR}/usr/plugins/networkinformation" "${APPDIR}/usr/plugins/tls"
+	# See LINUXDEPLOY_EXCLUDED_LIBRARIES
+	rm -f "${APPDIR}/usr/plugins/multimedia/libgstreamermediaplugin.so"
 
 	mkdir -p "${APPDIR}/usr/share/doc/${ID}"
 	cp LICENSE NOTICE "${APPDIR}/usr/share/doc/${ID}/"
