@@ -1,9 +1,11 @@
-# Darkroom
+# Darkroom and Quickroom
 
-Darkroom is a fast (and free) desktop software for organizing, inspecting, labeling your photos and videos.
+**Darkroom** is a fast (and free) desktop software for organizing, inspecting, labeling your photos and videos.
 
 Drop in your videos and photos to create an easily browsable library. You can pull frames out of any
 video, tag everything with colored labels, flip through thumbnails, and compare images side by side in a powerful UI with automatic image alignment.
+
+**Quickroom** is an image viewer optimized for speed and convenience, both when viewing individual files full screen, or browsing folders full of images.
 
 ## What you can do
 
@@ -26,18 +28,11 @@ video, tag everything with colored labels, flip through thumbnails, and compare 
 
 ## Quickroom
 
-Quickroom is a companion app in this same repo: a fast image/folder browser and viewer. On Windows and macOS it
-installs together with Darkroom, so there is nothing extra to download. On Linux it is an AppImage of its own, `Quickroom-x86_64.AppImage` (or `-arm64`).
+Quickroom is a companion app (in this same repo): a fast image/folder browser and viewer. On Windows and macOS it
+installs together with Darkroom, there is nothing extra to download. On Linux it is a separate AppImage.
 
 - **Folder browser**: a thumbnail grid of the images and videos in it.
 - **Fullscreen (or windowed) viewing with zoom and pan support**: point Quickroom at an image and it opens fullscreen; arrow keys move to next or previous image in the same folder; `F` or double-click switches from full-screen image view to folder browsing.
 - **Built-in video player** with the same features as Darkroom's player.
 - **Compare photos side by side**, with the same automatic alignment as Darkroom.
 - **Resize and convert images in batch**, keeping their EXIF.
-
-## Documentation
-
-- [docs/DARKROOM.md](docs/DARKROOM.md) - Darkroom's architecture + the index to the per-subsystem documents.
-- [docs/QUICKROOM.md](docs/QUICKROOM.md) -  Quickroom architecture + the index to the per-subsystem documents.
-- [docs/build.md](docs/build.md) - projects, tests, CI, and packaging.
-- [docs/guidelines.md](docs/guidelines.md) - coding conventions for this codebase.
