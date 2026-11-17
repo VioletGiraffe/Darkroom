@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794941860597,
+  "lastUpdate": 1794946462402,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -22185,6 +22185,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 887,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 347,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 97.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 57,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 19.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "40f84feb7ee29a2d3efeff8a6c5f1bdac16ddb6b",
+          "message": "The image info panel describes a lens without a name by its focal range and apertures, from EXIF's LensSpecification, DNG's LensInfo or a raw's maker notes",
+          "timestamp": "2026-11-17T22:01:16+02:00",
+          "tree_id": "0b90c16fa68cf5891d6a2da9c04d9cdc41b24cad",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/40f84feb7ee29a2d3efeff8a6c5f1bdac16ddb6b"
+        },
+        "date": 1794946458387,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 21807,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 2985,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 36014,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 7218.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7453.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5809,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 887.5,
             "unit": "KB"
           },
           {
