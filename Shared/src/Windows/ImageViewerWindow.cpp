@@ -143,6 +143,9 @@ ImageViewerWindow::ImageViewerWindow(QStringList imagePaths, int startIndex, QWi
 
 	_view = new CImageViewerWidget(this);
 	_view->setMinimumSize(MinViewSize);
+	// Must hold the focus when the window opens, and take it back on a click: the info panel's filter claims keys the window's shortcuts use
+	_view->setFocusPolicy(Qt::StrongFocus);
+	_view->setFocus();
 	_view->installEventFilter(this);
 
 	const QSettings settings = sharedSettings();
