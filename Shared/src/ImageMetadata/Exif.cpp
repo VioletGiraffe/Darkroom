@@ -308,6 +308,9 @@ void collectLibRawExifEntry(void* context, int markedTag, int type, int count, u
 	const auto fieldType = static_cast<uint16_t>(type);
 	if (!source || pointedDirectory(source->directory, tag) || typeSize(fieldType) == 0 || count < 0)
 		return;
+	// Never read: a raw's MakerNote may hold the image data, as a Phase One IIQ's does
+	if (source->directory == ExifDirectory::Exif && tag == MakerNoteTag)
+		return;
 
 	std::vector<ExifEntry>& entries = source->tiffIfd ? collector.tiffIfds[*source->tiffIfd] : collector.tags.entries;
 	if (std::ranges::any_of(entries, [&](const ExifEntry& entry) { return entry.directory == source->directory && entry.tag == tag; }))

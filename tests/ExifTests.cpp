@@ -576,13 +576,12 @@ TEST_CASE("exifTagsFromRaw: camera raw samples", "[.][rawexif]")
 			const ExifEntry* entry = findEntry(tags, directory, tag);
 			return entry ? QString::fromLatin1(entry->value.constData()) : QStringLiteral("none");
 		};
-		const ExifEntry* makerNote = findEntry(tags, ExifDirectory::Exif, MakerNoteTag);
-		WARN(QStringLiteral("%1: IFD0 %2, Exif %3, GPS %4, interoperability %5 entries; Make %6, DateTimeOriginal %7, MakerNote %8 bytes")
+		WARN(QStringLiteral("%1: IFD0 %2, Exif %3, GPS %4, interoperability %5 entries; Make %6, DateTimeOriginal %7")
 			.arg(file.fileName()).arg(entryCount(ExifDirectory::Ifd0)).arg(entryCount(ExifDirectory::Exif)).arg(entryCount(ExifDirectory::Gps))
-			.arg(entryCount(ExifDirectory::Interoperability)).arg(text(ExifDirectory::Ifd0, MakeTag), text(ExifDirectory::Exif, 0x9003))
-			.arg(makerNote ? makerNote->value.size() : 0).toStdString());
+			.arg(entryCount(ExifDirectory::Interoperability)).arg(text(ExifDirectory::Ifd0, MakeTag), text(ExifDirectory::Exif, 0x9003)).toStdString());
 		CHECK(findEntry(tags, ExifDirectory::Ifd0, MakeTag));
 		CHECK(findEntry(tags, ExifDirectory::Exif, 0x9003)); // DateTimeOriginal
+		CHECK_FALSE(findEntry(tags, ExifDirectory::Exif, MakerNoteTag));
 
 		thin_io::buffered_reader reader{ ImageDecoding::LibRawReadWindowSize };
 		REQUIRE(reader.open(thin_io::native_path(file.filePath()).data()));

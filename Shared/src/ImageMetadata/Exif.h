@@ -88,10 +88,12 @@ struct ExifTags
 [[nodiscard]] ExifTags exifTagsFromApp1(QByteArrayView payload);
 // As exifTagsFromApp1(), for a TIFF structure without the APP1 header: a TIFF file, or a PNG's eXIf chunk
 [[nodiscard]] ExifTags exifTagsFromTiff(QByteArrayView tiff);
-// The EXIF directories LibRaw parses in a camera raw; no entries when LibRaw cannot open it. A tag found twice keeps its first value.
+// The EXIF directories LibRaw parses in a camera raw, without the MakerNote; no entries when LibRaw cannot open it.
+// A tag found twice keeps its first value.
 [[nodiscard]] ExifTags exifTagsFromRaw(QByteArrayView rawFile);
 
-// Collects the EXIF directories LibRaw parses while it opens a raw: construct before the open, take the tags after a successful one.
+// Collects the EXIF directories LibRaw parses while it opens a raw, without the MakerNote: construct before the open, take the tags
+// after a successful one.
 // Must be destroyed before the LibRaw instance.
 class RawExifCollector
 {
