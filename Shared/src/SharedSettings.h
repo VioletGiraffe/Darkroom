@@ -26,6 +26,8 @@ namespace Settings {
 	constexpr const char* VideoPlayerMuted            = "VideoPlayer/Muted";
 	constexpr const char* VideoPlayerOscillationCurve = "VideoPlayer/OscillationCurve";
 	constexpr const char* PhotoCompareIgnoreRotation  = "photoCompare/ignoreRotation";
+	constexpr const char* ImageViewerInfoPanelVisible = "ImageViewer/InfoPanelVisible";
+	constexpr const char* ImageViewerInfoPanelWidth   = "ImageViewer/InfoPanelWidth";
 	constexpr const char* RawRendering                = "settings/rawRendering"; // read through rawRenderingSetting()
 	constexpr const char* ColorManagement             = "settings/colorManagement";
 }
@@ -38,6 +40,8 @@ namespace Defaults {
 	constexpr bool        VideoPlayerMuted            = false;
 	constexpr const char* VideoPlayerOscillationCurve = "cosine";
 	constexpr bool        PhotoCompareIgnoreRotation  = false;
+	constexpr bool        ImageViewerInfoPanelVisible = false;
+	constexpr int         ImageViewerInfoPanelWidth   = 360;
 	constexpr const char* RawRendering                = "halfSize";
 	constexpr bool        ColorManagement             = true;
 }

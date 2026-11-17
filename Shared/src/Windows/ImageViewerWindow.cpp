@@ -2,8 +2,10 @@
 #include "Core/CpuThreadPool.h"
 #include "ImageDecoding/ColorManagement.h"
 #include "ImageEncoding/ImageEncoding.h"
+#include "SharedSettings.h"
 #include "Shortcuts.h"
 #include "Utils.h"
+#include "Windows/ImageInfoPanel.h"
 #include "assert/advanced_assert.h"
 #include "utils/filemanager.h"
 #include "widgets/cimageviewerwidget.h"
@@ -30,7 +32,9 @@ DISABLE_COMPILER_WARNINGS
 #include <QMimeType>
 #include <QMouseEvent>
 #include <QScreen>
+#include <QSettings>
 #include <QSize>
+#include <QSplitter>
 #include <QTimer>
 #include <QUrl>
 #include <QWheelEvent>
@@ -112,6 +116,7 @@ void ImageViewerWindow::followMovedFiles(const std::function<bool(const QString&
 			path = newLocation(path);
 
 		viewer->updateTitleAndCaption();
+		viewer->_infoPanel->setPath(viewer->currentImagePath());
 		if (reopen)
 			viewer->resumeReleasedAnimation();
 		// A load that has yet to open the file would look for it at the old path
@@ -138,8 +143,24 @@ ImageViewerWindow::ImageViewerWindow(QStringList imagePaths, int startIndex, QWi
 
 	_view = new CImageViewerWidget(this);
 	_view->setMinimumSize(MinViewSize);
-	setCentralWidget(_view);
 	_view->installEventFilter(this);
+
+	const QSettings settings = sharedSettings();
+	_infoPanel = new ImageInfoPanel{ this };
+	_infoPanel->setVisible(settings.value(Settings::ImageViewerInfoPanelVisible, Defaults::ImageViewerInfoPanelVisible).toBool());
+	_splitter = new QSplitter{ Qt::Horizontal, this };
+	_splitter->addWidget(_view);
+	_splitter->addWidget(_infoPanel);
+	_splitter->setCollapsible(0, false);
+	_splitter->setCollapsible(1, false);
+	// The view takes every change of the window's width; the panel keeps the width it was given
+	_splitter->setStretchFactor(0, 1);
+	_splitter->setStretchFactor(1, 0);
+	_splitter->setSizes({ 1, settings.value(Settings::ImageViewerInfoPanelWidth, Defaults::ImageViewerInfoPanelWidth).toInt() });
+	connect(_splitter, &QSplitter::splitterMoved, this, [this] {
+		sharedSettings().setValue(Settings::ImageViewerInfoPanelWidth, _splitter->sizes()[1]);
+	});
+	setCentralWidget(_splitter);
 
 	_view->setImageScaler([](QImage& dest, const QImage& source, const QRect& srcRect, Qt::TransformationMode mode) {
 		const auto kernel = mode == Qt::FastTransformation ? ImageProcessing::ResizeKernel::NearestNeighbor : ImageProcessing::ResizeKernel::Auto;
@@ -197,12 +218,25 @@ void ImageViewerWindow::buildMenus()
 	viewMenu->addSeparator();
 	QAction* fullScreenAction = viewMenu->addAction(tr("Fullscreen"), this, &ImageViewerWindow::toggleFullScreen);
 	fullScreenAction->setShortcut(QKeySequence(Qt::Key_F));
-	QAction* overlayAction = viewMenu->addAction(tr("Show image info"));
+	QAction* overlayAction = viewMenu->addAction(tr("Show info strip and navigator"));
 	overlayAction->setCheckable(true);
 	overlayAction->setChecked(_view->isOverlayVisible());
-	overlayAction->setShortcut(QKeySequence(Qt::Key_I));
+	overlayAction->setShortcut(QKeySequence(QStringLiteral("Shift+I")));
 	connect(overlayAction, &QAction::toggled, _view, &CImageViewerWidget::setOverlayVisible);
 	_view->setInfoStripHint(tr("Press %1 to hide").arg(overlayAction->shortcut().toString(QKeySequence::NativeText)));
+	QAction* infoPanelAction = viewMenu->addAction(tr("Show image info"));
+	infoPanelAction->setCheckable(true);
+	infoPanelAction->setChecked(_infoPanel->isVisibleTo(this));
+	infoPanelAction->setShortcut(QKeySequence(Qt::Key_I));
+	connect(infoPanelAction, &QAction::toggled, this, [this](bool visible) {
+		_infoPanel->setVisible(visible);
+		sharedSettings().setValue(Settings::ImageViewerInfoPanelVisible, visible);
+	});
+	QAction* filterInfoAction = viewMenu->addAction(tr("Filter image info"), this, [this, infoPanelAction] {
+		infoPanelAction->setChecked(true);
+		_infoPanel->focusFilter();
+	});
+	filterInfoAction->setShortcut(QKeySequence::Find);
 
 	_imageMenu = new QMenu(tr("&Image"), menuBar);
 	_previousAction = _imageMenu->addAction(tr("Previous"), this, [this] { showImage(adjacentIndex(Direction::Previous)); });
@@ -237,6 +271,7 @@ void ImageViewerWindow::showImage(int index)
 	loadCurrentImage();
 
 	_animationReleased = false; // the load ended any animation
+	_infoPanel->setPath(path);
 	updateTitleAndCaption();
 	_previousAction->setEnabled(adjacentIndex(Direction::Previous) >= 0);
 	_nextAction->setEnabled(adjacentIndex(Direction::Next) >= 0);

@@ -13,11 +13,13 @@ RESTORE_COMPILER_WARNINGS
 #include <functional>
 #include <vector>
 
+class ImageInfoPanel;
 class QAction;
 class QMenu;
+class QSplitter;
 class QTimer;
 
-// Single-image viewer over the shared CImageViewerWidget, browsing a fixed list of sibling images.
+// Single-image viewer over the shared CImageViewerWidget, browsing a fixed list of sibling images, with an ImageInfoPanel beside it.
 // Controls are the menu bar and its shortcuts, the wheel for browsing, plus the widget's own mouse zoom and pan.
 class ImageViewerWindow final : public QMainWindow
 {
@@ -108,6 +110,8 @@ private:
 	std::vector<std::function<void(const QString& path)>> _imageActionUpdaters;
 
 	CImageViewerWidget* _view = nullptr;
+	QSplitter* _splitter = nullptr; // the view, then _infoPanel
+	ImageInfoPanel* _infoPanel = nullptr;
 	QTimer* _windowIconTimer = nullptr;
 	QMenu* _imageMenu = nullptr;
 	QAction* _previousAction = nullptr;

@@ -22,7 +22,8 @@ one item, Compare selected for several), passing frame-folder paths.
 ## ImageViewerWindow
 
 `ImageViewerWindow` is a self-deleting viewer over qtutils' `CImageViewerWidget`, which owns the pan/zoom view,
-the scaling, and the info overlay; the window supplies the menu bar and the browsing order.
+the scaling, and the overlay of info strip and navigator; the window supplies the menu bar, the browsing order and the
+image info panel.
 Scaling goes through `ImageProcessing::resize`, nearest neighbor when the widget requests a fast transform, and falls
 back to `CImageViewerWidget::scaleWithQt` for pixel formats the resizer rejects. Its chunks run on `cpuThreadPool()`,
 which also runs work on the calling thread - the GUI thread is blocked for the duration of a scale either way.
@@ -58,11 +59,15 @@ fullscreen and a window sized to the image down to a minimum, and the menu bar s
 creating the window behind the viewer can install an exit-fullscreen handler: it runs once when the user leaves
 fullscreen and decides whether that switch still happens. A caller can also install removal actions, see below, and
 add its own actions to the Image menu, which the viewer keeps current for the image shown: MediaBrowserWidget adds
-Best. Alone among the windows here it persists no geometry.
+Best. It persists no geometry; the image info panel's visibility and width are kept in the shared settings.
 Copy puts both the image and its file on the clipboard, for apps that paste pixels and for those that take files.
 Save as copies the file when the target format matches the source, keeping metadata and every frame; any other
 format encodes the frame shown through `ImageEncoding`, a JPEG with the source's EXIF.
 The info strip shows the image's position in the list and its file name in the center.
+The image info panel (`I`, beside the view in a splitter) lists what `ImageMetadata::readImageInfo` reads from the
+file, as `ImageInfoRows` formats it: the common fields in named groups, then every other EXIF tag by directory. It reads
+only while visible, and a filter (`Ctrl+F`) narrows the rows; the filter and the groups the user collapsed stay as the
+viewer browses.
 The current image becomes the window icon after a delay, so several open viewers stay distinguishable in the
 taskbar without an icon being scaled for every image browsed past.
 

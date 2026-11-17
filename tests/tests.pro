@@ -51,6 +51,7 @@ SOURCES += \
 	OscillationCurveTests.cpp \
 	MJpegParserTests.cpp \
 	ExifTests.cpp \
+	ImageInfoRowsTests.cpp \
 	ImageDecodingTests.cpp \
 	ImageEncodingTests.cpp \
 	ColorManagementTests.cpp \
