@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795131377597,
+  "lastUpdate": 1795131705543,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -22501,6 +22501,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .rdata",
             "value": 872.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 347,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 98,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 72,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 19.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "ddc8ec365158b2765de21aa58602c100056ff109",
+          "message": "The Linux AppImages can add themselves to the applications menu: each app offers it once at startup, and its Help menu installs or uninstalls the entry",
+          "timestamp": "2026-11-20T01:31:27+02:00",
+          "tree_id": "44692696318eb4699868821139a6a474fce98cd9",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/ddc8ec365158b2765de21aa58602c100056ff109"
+        },
+        "date": 1795131703177,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 21936,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 2986,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 36873,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 7258.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7492.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 5826,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 895,
             "unit": "KB"
           },
           {
