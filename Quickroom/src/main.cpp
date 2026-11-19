@@ -7,6 +7,7 @@
 #include "Utils.h"
 #include "Windows/ImageViewerWindow.h"
 #include "Windows/VideoPlayerWindow.h"
+#include "appimage/appimagedesktopentry.h"
 #include "compiler/compiler_warnings_control.h"
 #include "utility/macro_utils.h"
 
@@ -44,8 +45,8 @@ QStringList filesInFolder(const QString& folder, EntryKind kind)
 	return paths;
 }
 
-// Opens the viewer on path, browsing the images beside it. False when the image cannot be shown at all.
-bool showImageViewer(const QString& path)
+// Opens the viewer on path, browsing the images beside it. Null when the image cannot be shown at all.
+ImageViewerWindow* showImageViewer(const QString& path)
 {
 	QStringList images = filesInFolder(QFileInfo(path).absolutePath(), EntryKind::Image);
 
@@ -64,7 +65,7 @@ bool showImageViewer(const QString& path)
 
 	ImageViewerWindow* const viewer = ImageViewerWindow::showForImages(std::move(images), index, nullptr);
 	if (!viewer)
-		return false;
+		return nullptr;
 
 	FileOperations::installDeleteActions(*viewer);
 
@@ -76,43 +77,38 @@ bool showImageViewer(const QString& path)
 		viewer->close();
 		return false;   // do not un-fullscreen a closing window
 	});
-	return true;
+	return viewer;
 }
 
-// Opens the window the command line asks for. Always leaves one open: an unusable path falls back to the
+// Opens the window the command line asks for, and returns it. Always opens one: an unusable path falls back to the
 // browser, which resolves what to show.
-void openStartupWindow(const QString& path)
+QWidget* openStartupWindow(const QString& path)
 {
 	if (path.isEmpty())
-	{
-		BrowserWindow::showForFolder();
-		return;
-	}
+		return BrowserWindow::showForFolder();
 
 	const QFileInfo info(path);
 	if (info.isDir())
-	{
-		BrowserWindow::showForFolder(info.absoluteFilePath(), {}, BrowserWindow::PathFieldHistory::Record);
-		return;
-	}
+		return BrowserWindow::showForFolder(info.absoluteFilePath(), {}, BrowserWindow::PathFieldHistory::Record);
 
 	if (info.isFile())
 	{
-		if (isSupportedImageFile(path) && showImageViewer(info.absoluteFilePath()))
-			return;
+		if (isSupportedImageFile(path))
+			if (ImageViewerWindow* const viewer = showImageViewer(info.absoluteFilePath()))
+				return viewer;
 		if (isSupportedVideoFile(path))
 		{
 			VideoPlayerWindow* const player = VideoPlayerWindow::createPlayerWindow(info.absoluteFilePath(), nullptr);
 			FileOperations::installDeleteActions(*player);
 			player->setNavigation(filesInFolder(info.absolutePath(), EntryKind::Video), {});
-			return;
+			return player;
 		}
 	}
 	else
 		reportMissingFile(nullptr, path);
 
 	// An unsupported file leaves the browser on its folder, where that file is simply not listed.
-	BrowserWindow::showForFolder(info.absolutePath());
+	return BrowserWindow::showForFolder(info.absolutePath());
 }
 
 } // namespace
@@ -128,7 +124,9 @@ int main(int argc, char* argv[])
 	if (startupPath.endsWith('"'))
 		startupPath.back() = '\\';
 #endif
-	openStartupWindow(QDir::fromNativeSeparators(startupPath));
+	QWidget* const startupWindow = openStartupWindow(QDir::fromNativeSeparators(startupPath));
+	if (!app.isTestRun())
+		AppImageDesktopEntry::offerOnce(startupWindow);
 
 	const int exitCode = QApplication::exec();
 	FileOperations::waitForShellPastes();

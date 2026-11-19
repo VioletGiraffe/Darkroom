@@ -21,6 +21,7 @@
 
 #include "appdialogs/caboutdialog.h"
 #include "appdialogs/reportbugdialog.h"
+#include "appimage/appimagedesktopentry.h"
 #include "compiler/compiler_warnings_control.h"
 #include "dialogs/messagedialog.h"
 #include "logger/cloggerinmemory.h"
@@ -356,6 +357,7 @@ void MainWindow::setupMainMenu()
 	helpMenu->addAction(tr("Report a bug..."), this, [this] {
 		ReportBugDialog::show(this, loggerInstance<CLoggerInMemory>(), QUrl(IssueTrackerUrl));
 	});
+	AppImageDesktopEntry::addToggleAction(*helpMenu, this);
 	helpMenu->addSeparator();
 	helpMenu->addAction(tr("About Darkroom..."), this, [this] {
 		CAboutDialog(QApplication::applicationVersion(), this).exec();

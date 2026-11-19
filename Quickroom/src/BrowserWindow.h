@@ -42,7 +42,7 @@ public:
 
 	// Creates a self-deleting browser window at folder, or at the remembered folder when folder is empty.
 	// selectPath, else the entry stored with the remembered folder, becomes the current item if the listed folder contains it.
-	static void showForFolder(const QString& folder = {}, const QString& selectPath = {}, PathFieldHistory history = PathFieldHistory::Skip);
+	static BrowserWindow* showForFolder(const QString& folder = {}, const QString& selectPath = {}, PathFieldHistory history = PathFieldHistory::Skip);
 
 protected:
 	void closeEvent(QCloseEvent* event) override;

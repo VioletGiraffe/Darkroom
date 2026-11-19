@@ -34,6 +34,8 @@ Application::Application(int& argc, char** argv, const QString& name, const QStr
 {
 	QApplication::setOrganizationName("VioletGiraffe");
 	QApplication::setApplicationName(name);
+	// The Linux desktop entry's file ID: each app's res/<id>.desktop is named after it
+	QApplication::setDesktopFileName(name.toLower());
 	QApplication::setApplicationVersion(version);
 	QApplication::setWindowIcon(QIcon{ iconPath });
 

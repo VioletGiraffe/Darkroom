@@ -147,10 +147,14 @@ x64 and arm64 (GCC 14), and macOS (clang), each against Qt 6.11. Per OS, in orde
   It produces `Darkroom-<arch>.AppImage` and `Quickroom-<arch>.AppImage`, `<arch>` being `x86_64` or `arm64`.
   The AppImages use the system's glibc and libstdc++, so they run only where both are at least as new as the build
   machine's: CI pins Ubuntu 24.04. Video frame extraction uses the system's `ffmpeg`, found on `PATH`.
+- **Linux desktop entry:** run from its AppImage, each app offers once to add itself to the applications menu, and its
+  Help menu installs or uninstalls the entry (qtutils `appimage/appimagedesktopentry.h`). The entry's file ID is the
+  app name in lowercase, set by `Application`: `res/<id>.desktop` must be named after it.
 
 ## Test run
 
 `--test-run` as the first argument starts an app on settings in a temporary folder; Darkroom also gets a new library
-there. After a few seconds the app exits 0 when a window is shown, no dialog is open, and the Qt plugins the apps rely
-on are present: the image formats and a Qt Multimedia backend. Otherwise it prints the reason and exits 1.
+there, and neither app offers the desktop entry. After a few seconds the app exits 0 when a window is shown, no dialog
+is open, and the Qt plugins the apps rely on are present: the image formats and a Qt Multimedia backend. Otherwise it
+prints the reason and exits 1.
 `Shared/src/App/TestRun.cpp` holds the checks.

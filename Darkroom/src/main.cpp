@@ -4,6 +4,7 @@
 #include "DarkroomSettings.h"
 #include "Windows/MainWindow.h"
 #include "SharedSettings.h"
+#include "appimage/appimagedesktopentry.h"
 #include "compiler/compiler_warnings_control.h"
 #include "utility/macro_utils.h"
 
@@ -49,5 +50,7 @@ int main(int argc, char* argv[])
 		return 0;
 
 	window.show();
+	if (!app.isTestRun())
+		AppImageDesktopEntry::offerOnce(&window);
 	return QApplication::exec();
 }

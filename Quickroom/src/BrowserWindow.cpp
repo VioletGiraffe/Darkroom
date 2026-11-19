@@ -21,6 +21,7 @@
 #include "Utils.h"
 #include "appdialogs/caboutdialog.h"
 #include "appdialogs/reportbugdialog.h"
+#include "appimage/appimagedesktopentry.h"
 #include "assert/advanced_assert.h"
 #include "compiler/compiler_warnings_control.h"
 #include "logger/cloggerinmemory.h"
@@ -259,7 +260,7 @@ QString nearestExistingFolder(QString path)
 
 } // anonymous namespace
 
-void BrowserWindow::showForFolder(const QString& folder, const QString& selectPath, PathFieldHistory history)
+BrowserWindow* BrowserWindow::showForFolder(const QString& folder, const QString& selectPath, PathFieldHistory history)
 {
 	auto* window = new BrowserWindow(resolveStartFolder(folder), history);
 	window->setAttribute(Qt::WA_DeleteOnClose);
@@ -267,6 +268,7 @@ void BrowserWindow::showForFolder(const QString& folder, const QString& selectPa
 	// Scrolling to the item needs the laid-out viewport the window only has once shown.
 	if (const QString pathToSelect = selectPath.isEmpty() ? QSettings{}.value(SELECTED_ENTRY_KEY).toString() : selectPath; !pathToSelect.isEmpty())
 		window->selectAndScrollToPath(pathToSelect);
+	return window;
 }
 
 BrowserWindow::BrowserWindow(const QString& folder, PathFieldHistory history)
@@ -470,6 +472,7 @@ void BrowserWindow::setupMainMenu()
 	helpMenu->addAction(tr("Report a bug..."), this, [this] {
 		ReportBugDialog::show(this, loggerInstance<CLoggerInMemory>(), QUrl(IssueTrackerUrl));
 	});
+	AppImageDesktopEntry::addToggleAction(*helpMenu, this);
 	helpMenu->addSeparator();
 	helpMenu->addAction(tr("About Quickroom..."), this, [this] {
 		CAboutDialog(QApplication::applicationVersion(), this).exec();
