@@ -65,7 +65,7 @@ for app in ${APPS}; do
 	echo "${MYSELF}: deploying ${app} into ${APPDIR}"
 	rm -rf "${APPDIR}"
 	"${LINUXDEPLOY}" --appdir "${APPDIR}" --executable "bin/release/${app}" \
-		--desktop-file "${app}/res/${ID}.desktop" --icon-file "${app}/res/${ID}.svg" --plugin qt
+		--desktop-file "${app}/res/${ID}.desktop" --icon-file "${app}/res/${ID}.png" --plugin qt
 
 	# The apps use neither QNetworkInformation nor TLS
 	rm -rf "${APPDIR}/usr/plugins/networkinformation" "${APPDIR}/usr/plugins/tls"

@@ -261,7 +261,7 @@ MediaItemWidget::MediaItemWidget(
 	auto* name = new CLabelElided(_footer);
 	name->setObjectName("cardName");
 	name->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-	name->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+	name->setPreferredWidthFollowsText(false);
 	QFont nameFont = name->font();
 	nameFont.setPointSize(9);
 	name->setFont(nameFont);
