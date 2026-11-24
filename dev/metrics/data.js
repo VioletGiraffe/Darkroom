@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795561718770,
+  "lastUpdate": 1795564710034,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -22703,6 +22703,85 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/VioletGiraffe/Darkroom/commit/a28a4e1c9e2e30496281e3d0220c16608d146c58"
         },
         "date": 1795561716441,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 21936,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 2986,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 37537,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 7543,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7795,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 6126.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 878.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 347,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 98.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 72,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 19.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "931f143bdbc1639bdca14fa7841c73619b2253fc",
+          "message": "CI downloads the Sequoia libomp bottle directly: brew fetch on the runner only sees the runner's own platform's bottles",
+          "timestamp": "2026-11-25T01:45:34+02:00",
+          "tree_id": "7f552520b3177b05e4c16907691be0e041da7a49",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/931f143bdbc1639bdca14fa7841c73619b2253fc"
+        },
+        "date": 1795564707273,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
