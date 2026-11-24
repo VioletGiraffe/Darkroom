@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795131705543,
+  "lastUpdate": 1795560537551,
   "repoUrl": "https://github.com/VioletGiraffe/Darkroom",
   "entries": {
     "Darkroom metrics": [
@@ -22590,6 +22590,85 @@ window.BENCHMARK_DATA = {
           {
             "name": "Section .pdata",
             "value": 98,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rsrc",
+            "value": 72,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .reloc",
+            "value": 19.5,
+            "unit": "KB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "committer": {
+            "email": "VioletGiraffe@users.noreply.github.com",
+            "name": "Violet Giraffe",
+            "username": "VioletGiraffe"
+          },
+          "distinct": true,
+          "id": "d1b1d54b5df2718150e7bbd51d4a41fff2f91e3b",
+          "message": "CI: the Qt kit comes from the qt-for-win release's stable URL without a checksum pin, and macOS and Linux use the released aqtinstall",
+          "timestamp": "2026-11-25T00:33:19+02:00",
+          "tree_id": "9ed824e3e695e6490ecef473d8ccff534a0c5afb",
+          "url": "https://github.com/VioletGiraffe/Darkroom/commit/d1b1d54b5df2718150e7bbd51d4a41fff2f91e3b"
+        },
+        "date": 1795560535422,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Lines of code (Darkroom)",
+            "value": 21936,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (Quickroom)",
+            "value": 2986,
+            "unit": "LOC"
+          },
+          {
+            "name": "Lines of code (libs)",
+            "value": 37537,
+            "unit": "LOC"
+          },
+          {
+            "name": "Darkroom.exe size",
+            "value": 7543,
+            "unit": "KB"
+          },
+          {
+            "name": "Quickroom.exe size",
+            "value": 7795,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .text",
+            "value": 6126.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .rdata",
+            "value": 878.5,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .data",
+            "value": 347,
+            "unit": "KB"
+          },
+          {
+            "name": "Section .pdata",
+            "value": 98.5,
             "unit": "KB"
           },
           {
