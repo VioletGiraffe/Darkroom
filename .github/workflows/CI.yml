@@ -31,7 +31,6 @@ jobs:
           # vcpkg_triplet: the triplet vcpkg.pri links against on that runner
           # Linux is pinned: the AppImages run only where glibc and libstdc++ are at least as new as the build machine's
           - os: windows-latest
-            qt_arch: win64_msvc2022_64
             vcpkg_triplet: x64-windows-static-md
           - os: ubuntu-24.04
             qt_arch: linux_gcc_64
@@ -86,11 +85,13 @@ jobs:
         "Libs C/C++ code: $loc LOC"
         "LOC_LIBS=$loc" >> $env:GITHUB_ENV
 
-    - name: Install Qt
+    - name: Install Qt (macOS and Linux)
+      if: ${{ !startsWith(matrix.os, 'windows') }}
       uses: jurplel/install-qt-action@v4
       with:
-        version: 6.11.*
-        # Qt 6.11's Windows repository layout needs an aqtinstall newer than its latest release (3.3.0)
+        version: 6.12.*
+        # Pinned for Qt 6.11's Windows repository layout, which needed an aqtinstall newer than its latest release (3.3.0);
+        # unverified whether macOS and Linux need the pin
         aqtsource: git+https://github.com/miurahr/aqtinstall.git@076e1659807d0b362a3ed684d54c2e9c775eb9c7
         target: desktop
         arch: ${{ matrix.qt_arch }}
@@ -100,6 +101,21 @@ jobs:
         archives: ${{ startsWith(matrix.os, 'ubuntu') && 'qtbase icu qtsvg qtwayland qtdeclarative' || 'qtbase icu qtsvg' }}
         modules: 'qtimageformats qtmultimedia'
         cache: 'true'
+
+    # The trimmed kit released by VioletGiraffe/qt-for-win, pinned by tag and checksum
+    - name: Install Qt (Windows)
+      if: startsWith(matrix.os, 'windows')
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        $archive = Join-Path $env:RUNNER_TEMP 'qt-6.12.1-msvc2022_64.7z'
+        gh release download 6.12.1 --repo VioletGiraffe/qt-for-win --pattern (Split-Path $archive -Leaf) --dir $env:RUNNER_TEMP
+        if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne 'a26294465d91e67480a419f03019e63cf529a4d8c523548c91549a6face24928') { throw "$archive does not match its checksum" }
+        7z x $archive "-o$env:RUNNER_TEMP\Qt" | Out-Null
+        if ($LASTEXITCODE) { throw "7z failed with exit code $LASTEXITCODE" }
+        "QT_ROOT_DIR=$env:RUNNER_TEMP\Qt" >> $env:GITHUB_ENV
+        "$env:RUNNER_TEMP\Qt\bin" >> $env:GITHUB_PATH
 
     - name: Windows - set up MSVC environment
       if: startsWith(matrix.os, 'windows')
@@ -195,7 +211,7 @@ jobs:
         mkdir %STAGING_DIR%
         copy /y bin\release\Darkroom.exe "%STAGING_DIR%\" >nul
         copy /y bin\release\Quickroom.exe "%STAGING_DIR%\" >nul
-        FOR %%p IN (%STAGING_DIR%\*.exe) DO %QT_ROOT_DIR%\bin\windeployqt.exe --dir %STAGING_DIR% --force --release --no-translations --no-system-d3d-compiler --no-system-dxc-compiler --no-opengl-sw --skip-plugin-types networkinformation --skip-plugin-types tls %%p
+        FOR %%p IN (%STAGING_DIR%\*.exe) DO %QT_ROOT_DIR%\bin\windeployqt.exe --dir %STAGING_DIR% --force --release --no-translations --no-system-d3d-compiler --no-system-dxc-compiler --no-opengl-sw --skip-plugin-types networkinformation,tls %%p
 
         del  %STAGING_DIR%\dxil.dll >nul
         del  %STAGING_DIR%\dxcompiler.dll >nul
