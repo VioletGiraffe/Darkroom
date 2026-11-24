@@ -112,7 +112,7 @@ method's validation: [image-read-performance.md](image-read-performance.md).
 
 `.github/workflows/CI.yml` runs on every push (except to `gh-pages`) and pull request, on Windows (MSVC), Ubuntu 24.04
 x64 and arm64 (GCC 14), and macOS (clang), each against Qt 6.12. Windows gets Qt from the trimmed kit released by
-`VioletGiraffe/qt-for-win`, pinned by tag and SHA-256; macOS and Linux install it with `install-qt-action`.
+`VioletGiraffe/qt-for-win`, pinned by release tag; macOS and Linux install it with `install-qt-action`.
 Per OS, in order:
 
 1. Set up vcpkg at `vcpkg.json`'s baseline. Its built packages are cached across runs.

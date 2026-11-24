@@ -90,9 +90,6 @@ jobs:
       uses: jurplel/install-qt-action@v4
       with:
         version: 6.12.*
-        # Pinned for Qt 6.11's Windows repository layout, which needed an aqtinstall newer than its latest release (3.3.0);
-        # unverified whether macOS and Linux need the pin
-        aqtsource: git+https://github.com/miurahr/aqtinstall.git@076e1659807d0b362a3ed684d54c2e9c775eb9c7
         target: desktop
         arch: ${{ matrix.qt_arch }}
         # Linux only, for the AppImages:
@@ -102,16 +99,13 @@ jobs:
         modules: 'qtimageformats qtmultimedia'
         cache: 'true'
 
-    # The trimmed kit released by VioletGiraffe/qt-for-win, pinned by tag and checksum
+    # The trimmed kit released by VioletGiraffe/qt-for-win
     - name: Install Qt (Windows)
       if: startsWith(matrix.os, 'windows')
       shell: pwsh
-      env:
-        GH_TOKEN: ${{ github.token }}
       run: |
-        $archive = Join-Path $env:RUNNER_TEMP 'qt-6.12.1-msvc2022_64.7z'
-        gh release download 6.12.1 --repo VioletGiraffe/qt-for-win --pattern (Split-Path $archive -Leaf) --dir $env:RUNNER_TEMP
-        if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne 'a26294465d91e67480a419f03019e63cf529a4d8c523548c91549a6face24928') { throw "$archive does not match its checksum" }
+        $archive = Join-Path $env:RUNNER_TEMP 'qt.7z'
+        Invoke-WebRequest 'https://github.com/VioletGiraffe/qt-for-win/releases/download/6.12.1/qt-6.12.1-msvc2022_64.7z' -OutFile $archive
         7z x $archive "-o$env:RUNNER_TEMP\Qt" | Out-Null
         if ($LASTEXITCODE) { throw "7z failed with exit code $LASTEXITCODE" }
         "QT_ROOT_DIR=$env:RUNNER_TEMP\Qt" >> $env:GITHUB_ENV
