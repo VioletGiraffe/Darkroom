@@ -127,12 +127,16 @@ jobs:
 
     # LibRaw's OpenMP runtime: vcpkg-triplets/arm64-osx.cmake and vcpkg.pri point at /opt/homebrew/opt/libomp.
     # The arm64_sequoia bottle targets global.pri's macOS 15: `brew install` takes the build for the runner's newer macOS.
+    # The bottle comes straight from Homebrew's package registry: `brew fetch --bottle-tag` sees only the runner's own platform's bottles.
+    # QQ== is the anonymous token Homebrew itself sends to ghcr.io.
     - name: macOS - install libomp
       if: startsWith(matrix.os, 'macos')
       run: |
-        brew fetch --bottle-tag=arm64_sequoia libomp
+        bottle=$(curl -fsSL https://formulae.brew.sh/api/formula/libomp.json | jq -c '.bottle.stable.files.arm64_sequoia')
+        curl -fsSL -H "Authorization: Bearer QQ==" -o "$RUNNER_TEMP/libomp.tar.gz" "$(jq -r .url <<<"$bottle")"
+        echo "$(jq -r .sha256 <<<"$bottle")  $RUNNER_TEMP/libomp.tar.gz" | shasum -a 256 -c
         mkdir -p "$RUNNER_TEMP/libomp"
-        tar -xzf "$(brew --cache --bottle-tag=arm64_sequoia libomp)" -C "$RUNNER_TEMP/libomp" --strip-components=2
+        tar -xzf "$RUNNER_TEMP/libomp.tar.gz" -C "$RUNNER_TEMP/libomp" --strip-components=2
         ln -sfn "$RUNNER_TEMP/libomp" /opt/homebrew/opt/libomp
         test -f /opt/homebrew/opt/libomp/lib/libomp.a
 
