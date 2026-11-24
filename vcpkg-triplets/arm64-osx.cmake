@@ -4,7 +4,7 @@ set(VCPKG_LIBRARY_LINKAGE static)
 
 set(VCPKG_CMAKE_SYSTEM_NAME Darwin)
 set(VCPKG_OSX_ARCHITECTURES arm64)
-set(VCPKG_OSX_DEPLOYMENT_TARGET 13.3) # global.pri's QMAKE_MACOSX_DEPLOYMENT_TARGET
+set(VCPKG_OSX_DEPLOYMENT_TARGET 15.0) # global.pri's QMAKE_MACOSX_DEPLOYMENT_TARGET
 
 # LibRaw's OpenMP runtime is Homebrew's libomp (brew install libomp): Apple's clang ships none
 if(PORT STREQUAL "libraw")

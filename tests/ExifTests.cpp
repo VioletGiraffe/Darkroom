@@ -429,7 +429,9 @@ TEST_CASE("exifApp1FromTags: reads back as the same entries without IFD1, each I
 
 TEST_CASE("exifApp1FromTags: every IFD and every value outside its entry starts on a word boundary", "[exif]")
 {
-	const QByteArray tiff = exifApp1FromTags(sampleTags(ByteOrder::Little)).sliced(6);
+	const QByteArray app1 = exifApp1FromTags(sampleTags(ByteOrder::Little));
+	// A copy: GCC's -Warray-bounds follows QByteArray::data() into its 1-byte empty-array fallback and flags these reads
+	const std::vector<char> tiff(app1.cbegin() + 6, app1.cend());
 	const auto read16 = [&](qsizetype offset) { return qFromLittleEndian<uint16_t>(tiff.data() + offset); };
 	const auto read32 = [&](qsizetype offset) { return qFromLittleEndian<uint32_t>(tiff.data() + offset); };
 	const auto typeSize = [](uint16_t type) { return type == ShortType ? 2 : type == LongType ? 4 : type == RationalType ? 8 : 1; };

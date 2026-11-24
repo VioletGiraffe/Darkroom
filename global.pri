@@ -8,7 +8,7 @@ win*{
 }
 
 mac*{
-	QMAKE_MACOSX_DEPLOYMENT_TARGET = 13.3
+	QMAKE_MACOSX_DEPLOYMENT_TARGET = 15.0
 
 	# Qt frameworks as system headers: moc output includes them outside DISABLE_COMPILER_WARNINGS
 	QMAKE_CXXFLAGS += -iframework $$[QT_INSTALL_LIBS]

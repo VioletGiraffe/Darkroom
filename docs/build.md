@@ -2,7 +2,7 @@
 
 [← Back to architecture index](DARKROOM.md)
 
-Toolchain minimums (Qt 6.8, macOS 13.3) and their reasons are stated at the top of [DARKROOM.md](DARKROOM.md).
+Toolchain minimums (Qt 6.8, macOS 15.0) and their reasons are stated at the top of [DARKROOM.md](DARKROOM.md).
 
 ## Two qmake roots
 
@@ -40,11 +40,12 @@ CI and local builds run the same scripts in `scripts/`; the `.bat` files start t
   the same triplet as the scripts.
 - `vcpkg-triplets/` overrides the built-in triplets:
   - Windows builds with the v145 toolset; the apps must not use an older one.
-  - macOS is Apple Silicon only and targets 13.3, as `global.pri` does.
+  - macOS is Apple Silicon only and targets 15.0, as `global.pri` does.
   - x64 Linux fails rather than build libjpeg-turbo without SIMD, which needs `nasm` installed.
-- LibRaw is built with OpenMP. On macOS the runtime is Homebrew's `libomp` (`brew install libomp`), linked statically.
-  Homebrew builds it for the macOS it runs on, newer than 13.3, so the linker warns; whether the apps start on older
-  macOS is untested.
+- LibRaw is built with OpenMP. On macOS the runtime is Homebrew's `libomp`, linked statically.
+  - CI unpacks its `arm64_sequoia` bottle, the oldest Homebrew has, which targets macOS 15.
+  - `brew install libomp` installs the build for the Mac's own macOS: on a newer macOS the linker warns, and the apps
+    may not start on 15.
 - Updating a library changes its override; a version newer than the baseline's also needs the baseline moved to a vcpkg
   commit that has it, which the local vcpkg checkout must contain.
 

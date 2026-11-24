@@ -2,8 +2,8 @@
 
 Darkroom is a C++/Qt 6 desktop application for organizing videos and photos, extracting video frames through ffmpeg,
 and comparing media. Qt 6.8 is the minimum supported version because decoded cache images are presented through
-`QVideoFrame(QImage)`; Qt 6.10 or newer is recommended. The minimum supported macOS version is 13.3, required by
-libc++'s floating-point formatting runtime used by the profiler; only Apple Silicon Macs are supported.
+`QVideoFrame(QImage)`; Qt 6.10 or newer is recommended. The minimum supported macOS version is 15.0, the target of
+Homebrew's oldest `libomp` build (see [build.md](build.md)); only Apple Silicon Macs are supported.
 
 This file is the architectural entry point. Subsystem documents contain structure, rationale, and invariants; code
 contains implementation detail. Keep both in sync.

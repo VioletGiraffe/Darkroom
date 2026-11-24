@@ -125,10 +125,16 @@ jobs:
         sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 50
         g++ --version
 
-    # LibRaw's OpenMP runtime: vcpkg-triplets/arm64-osx.cmake and vcpkg.pri point at it
+    # LibRaw's OpenMP runtime: vcpkg-triplets/arm64-osx.cmake and vcpkg.pri point at /opt/homebrew/opt/libomp.
+    # The arm64_sequoia bottle targets global.pri's macOS 15: `brew install` takes the build for the runner's newer macOS.
     - name: macOS - install libomp
       if: startsWith(matrix.os, 'macos')
-      run: brew install libomp
+      run: |
+        brew fetch --bottle-tag=arm64_sequoia libomp
+        mkdir -p "$RUNNER_TEMP/libomp"
+        tar -xzf "$(brew --cache --bottle-tag=arm64_sequoia libomp)" -C "$RUNNER_TEMP/libomp" --strip-components=2
+        ln -sfn "$RUNNER_TEMP/libomp" /opt/homebrew/opt/libomp
+        test -f /opt/homebrew/opt/libomp/lib/libomp.a
 
     # Expressions cannot read the runner's own environment variables
     - name: Read runner image version
