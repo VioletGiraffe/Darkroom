@@ -52,9 +52,11 @@ export LD_LIBRARY_PATH="${QT_DIR}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 # xcb is always deployed; Wayland also brings its shell integration and decoration plugins
 EXTRA_PLATFORM_PLUGINS="$(find "${QT_DIR}/plugins/platforms" -name 'libqwayland*.so' -printf '%f;')"
 export EXTRA_PLATFORM_PLUGINS
-# The Qt plugin deploys every multimedia backend. GStreamer's is unused, FFmpeg being Qt's default: its libraries are skipped
-# here and its plugin is deleted after deployment.
-export LINUXDEPLOY_EXCLUDED_LIBRARIES='libgst*'
+# Never deployed:
+#   libgst* - the Qt plugin deploys every multimedia backend, and GStreamer's is unused, FFmpeg being Qt's default; its plugin is
+#             deleted after deployment
+#   libva*  - VA-API comes from the host: a bundled libva looks for GPU drivers only under its build distro's paths
+export LINUXDEPLOY_EXCLUDED_LIBRARIES='libgst*;libva*'
 
 LINUXDEPLOY="${TOOLS}/linuxdeploy-${MACHINE}.AppImage"
 

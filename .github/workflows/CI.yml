@@ -120,7 +120,7 @@ jobs:
     - name: Linux - install toolchain
       if: startsWith(matrix.os, 'ubuntu')
       run: |
-        sudo apt update -y; sudo apt install -qq gcc-14 g++-14 libgl1-mesa-dev nasm
+        sudo apt update -y; sudo apt install -qq gcc-14 g++-14 libgl1-mesa-dev nasm libva2 libva-drm2
         sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 50
         sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 50
         g++ --version
