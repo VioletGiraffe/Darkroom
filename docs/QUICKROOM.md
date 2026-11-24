@@ -80,8 +80,8 @@ Copy and move:
 - A drop lands in the folder tile under the cursor, else in the folder shown. It follows file managers: a move within
   one volume, a copy across volumes, unless the copy or move key is held. Dragging out offers copy and move; the target
   performs a move itself.
-- The `file-operations` engine runs each transfer in its own progress dialog, which asks about collisions. Before a
-  move, open players and viewers release the files moved. The folder watch shows the result.
+- The `file-operations` engine runs each transfer in its own progress dialog, which asks about collisions. Copies and
+  moves keep links as links. Before a move, open players and viewers release the files moved. The folder watch shows the result.
 - On Windows, a clipboard holding only virtual files (contents without a path, such as files copied on a VMware host) is
   pasted by Explorer's own Paste, with Explorer's dialogs. On quit, Quickroom waits for such pastes to finish.
 

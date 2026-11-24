@@ -54,7 +54,7 @@ CI and local builds run the same scripts in `scripts/`; the `.bat` files start t
 - qmake does not pass a static library's `LIBS` on: a library `Shared` starts using must be added to both apps' `LIBS`
   and to their `depends` in `Darkroom.pro`.
 - Every static library a project links is in its `PRE_TARGETDEPS` on Unix, so make relinks when the library changes.
-- Quickroom links the `file-operations` libraries through that submodule's `libraries/fileoperationsui.pri`, which
+- Both apps link the `file-operations` libraries through that submodule's `libraries/fileoperationsui.pri`, which
   adds their dependencies and include paths.
 
 `tests/tests.pro` compiles in the Darkroom sources under test, the model half of `Core/` (`Catalog`, `CatalogIntegrity`,

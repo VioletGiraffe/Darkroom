@@ -54,7 +54,7 @@ Each is its own include root except where noted:
 | `magic-alignment` (root `src/`) | automatic photo alignment fits for PhotoCompareWindow |
 | `image-processing` | SIMD image resize for ImageViewerWindow and Quickroom's icon tiles; has its own tests and a resize-comparison tool |
 | `thin_io` (root `src/`) | native filesystem access for `file-operations`, Quickroom's folder listing and folder watch, and `ImageDecoding`'s reads |
-| `file-operations` | Quickroom only: the copy/move engine and its progress and decision dialogs; has its own tests |
+| `file-operations` | inline rename, new-name checks and their user-facing texts for `Shared` and both apps; Quickroom's copy/move engine and its progress and decision dialogs; has its own tests |
 
 Link order matters on GNU ld: a library precedes the ones it uses. The `LIBS` comments in each `.pro` state the order.
 
